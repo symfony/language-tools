@@ -646,6 +646,26 @@ final class TranslationExtractorTest extends TestCase
         );
     }
 
+    public function testReadsTranslationTagsFromDirectivesOnlyAndResolvesTheirDomain(): void
+    {
+        $references = $this->extractor()->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            <p>{{ "{% trans %}documented.key{% endtrans %}" }}</p>
+            {% verbatim %}{% trans %}verbatim.key{% endtrans %}{% endverbatim %}
+            {# {% trans %}commented.key{% endtrans %} #}
+            {% trans %}{% endtrans %}
+            {%- trans -%}trimmed.key{%- endtrans -%}
+            {% trans with {'%link%': 'from "docs"'} from 'admin' into 'fr' %}decoyed.key{% endtrans %}
+            TWIG))->references;
+
+        self::assertSame(
+            [
+                ['trimmed.key', 'messages'],
+                ['decoyed.key', 'admin'],
+            ],
+            array_map(static fn ($reference): array => [$reference->key, $reference->domain], $references),
+        );
+    }
+
     private function lexedTwigString(string $literal): string
     {
         $script = <<<'PHP'

@@ -8,7 +8,6 @@ use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
-use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
 
 final class TwigTranslationReferenceExtractor
@@ -43,7 +42,7 @@ final class TwigTranslationReferenceExtractor
             }
         }
 
-        return [...$references, ...$this->tagReferences($uri, $text, $masked, $defaultDomain)];
+        return [...$references, ...$this->tagReferences($document, $uri, $text, $defaultDomain)];
     }
 
     /**
@@ -184,22 +183,45 @@ final class TwigTranslationReferenceExtractor
     }
 
     /** @return list<TranslationReference> */
-    private function tagReferences(string $uri, string $text, string $masked, string $defaultDomain): array
+    private function tagReferences(TwigDocument $document, string $uri, string $text, string $defaultDomain): array
     {
-        preg_match_all(
-            '/{%\s*trans(?:\s+from\s+(?|(\')((?:\\\\.|[^\'\\\\])+)\'|(\")((?:\\\\.|[^\"#\\\\])+)\"))?\s*%}(.+?){%\s*endtrans\s*%}/s',
-            $masked,
-            $matches,
-            \PREG_OFFSET_CAPTURE,
-        );
         $references = [];
-        foreach ($matches[3] as $i => [$message, $offset]) {
-            $domain = \is_string($matches[2][$i][0] ?? null) ? TwigStringDecoder::decode($matches[2][$i][0]) : $defaultDomain;
-            $key = trim($message);
-            $offset += \strlen($message) - \strlen(ltrim($message));
+        $open = null;
+        foreach ($document->nodesOfType('statement_directive') as $directive) {
+            $statement = $document->firstDescendant($directive, 'tag_statement');
+            $tag = null === $statement ? null : $document->directChild($statement, 'tag');
+            $name = null === $tag ? null : $document->text($tag);
+            if ('trans' === $name) {
+                $open = [$directive->endByte, $this->tagDomain($document, $statement) ?? $defaultDomain];
+                continue;
+            }
+            if ('endtrans' !== $name || null === $open) {
+                continue;
+            }
+            [$bodyOffset, $domain] = $open;
+            $open = null;
+            $body = substr($text, $bodyOffset, $directive->startByte - $bodyOffset);
+            $key = trim($body);
+            if ('' === $key) {
+                continue;
+            }
+            $offset = $bodyOffset + \strlen($body) - \strlen(ltrim($body));
             $references[] = new TranslationReference($key, $domain, $uri, $this->converter->toRange($text, $offset, \strlen($key)));
         }
 
         return $references;
+    }
+
+    private function tagDomain(TwigDocument $document, TreeSitterNode $statement): ?string
+    {
+        $fromKeyword = false;
+        foreach ($document->children($statement) as $child) {
+            if ($fromKeyword && null !== $literal = $document->stringLiteral($child)) {
+                return $literal->value;
+            }
+            $fromKeyword = 'variable' === $child->type && 'from' === $document->text($child);
+        }
+
+        return null;
     }
 }

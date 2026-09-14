@@ -61,6 +61,11 @@ Hover shows the key, domain, available locales and message from the selected
 development catalogue. Go to Definition navigates to source resources. Find All
 References and rename cover statically recognized PHP and Twig keys.
 
+The body of a Twig ``{% trans %}`` tag is recognized as a key, including
+whitespace-control forms such as ``{%- trans -%}``, and its domain comes from a
+``from`` argument. Only real tags count: a tag written inside a Twig string
+literal is ignored.
+
 Diagnostics
 -----------
 
