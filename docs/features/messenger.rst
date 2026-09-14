@@ -8,7 +8,10 @@ and YAML declarations.
 In YAML, bus and transport references are read from ``default_bus`` and
 ``failure_transport`` under ``framework.messenger`` and from the ``bus`` and
 ``from_transport`` attributes of service tags. Keys that only share those
-names, such as a ``$bus`` service argument, are ignored.
+names, such as a ``$bus`` service argument, are ignored. In PHP, a bus name is
+read from a ``BusNameStamp`` instantiation only when the class resolves to the
+Symfony stamp, so a same-named class from another namespace and text inside a
+string literal are ignored.
 
 Completion
 ----------

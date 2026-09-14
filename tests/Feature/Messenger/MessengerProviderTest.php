@@ -62,7 +62,7 @@ YAML;
         $converter = new PositionConverter();
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]));
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser);
         $facts = $extractor->extract(new SourceDocument('file:///workspace/config/packages/messenger.yaml', 'yaml', $text));
 
         $names = [];
@@ -141,7 +141,7 @@ YAML;
         $converter = new PositionConverter();
         $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]));
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser);
         $facts = $extractor->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $text));
 
         $references = [];
@@ -173,7 +173,6 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', <<<'PHP'
             <?php
@@ -200,7 +199,6 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', <<<'PHP'
             <?php
@@ -226,7 +224,6 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', <<<'PHP'
             <?php
@@ -254,7 +251,6 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Message.php', 'php', <<<'PHP'
             <?php
@@ -312,7 +308,6 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
         );
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
             <?php
@@ -345,7 +340,6 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
             <?php
@@ -379,7 +373,6 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
         );
         $text = <<<'PHP'
             <?php
@@ -470,7 +463,7 @@ YAML;
         $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
         $comments = new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]);
         $phpParser = new TolerantPhpParser(new Parser());
-        $extractor = new MessengerExtractor($converter, $phpParser, $yamlParser, $comments);
+        $extractor = new MessengerExtractor($converter, $phpParser, $yamlParser);
         $indexes = new MessengerIndexRegistry();
         $indexes->forProject($project)->replace(
             [new MessengerBus('command.bus', true)],
@@ -546,7 +539,6 @@ YAML;
             $converter,
             $phpParser,
             new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]),
         );
         $indexes = new MessengerIndexRegistry();
         $indexes->forProject($project)->replace([], [], [], [
@@ -649,6 +641,41 @@ YAML;
         self::assertSame([$handlerText], $parser->sources);
     }
 
+    public function testExtractsBusNamesOnlyFromMessengerBusNameStampInstantiations(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = new MessengerExtractor(
+            $converter,
+            new TolerantPhpParser(new Parser()),
+            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+        );
+        $text = <<<'PHP'
+            <?php
+            namespace App;
+
+            use Symfony\Component\Messenger\Stamp\BusNameStamp as Stamp;
+            use Vendor\Other\BusNameStamp;
+
+            final class Documentation
+            {
+                public const EXAMPLE = 'new BusNameStamp("documented.bus")';
+
+                public function stamps(): array
+                {
+                    return [
+                        new Stamp('aliased.bus'),
+                        new \Symfony\Component\Messenger\Stamp\BusNameStamp('qualified.bus'),
+                        new BusNameStamp('vendor.bus'),
+                    ];
+                }
+            }
+            PHP;
+
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Documentation.php', 'php', $text));
+
+        self::assertSame(['aliased.bus', 'qualified.bus'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
+    }
+
     public function testIgnoresCommentedPhpMessengerConstructs(): void
     {
         $converter = new PositionConverter();
@@ -656,7 +683,6 @@ YAML;
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))]),
         );
         $text = <<<'PHP'
             <?php

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Read Messenger bus and transport references from Messenger configuration keys instead of any YAML key named like them, so a `$bus` service argument is no longer reported as an unknown bus
+- Read bus names from resolved `BusNameStamp` instantiations instead of matching the class name in text, so string contents and same-named classes from other namespaces are ignored
 - Treat a doubled `%%` as an escaped percent sign in environment expressions
 - Recognize form options declared by a type extension registered on several types of the same hierarchy
 

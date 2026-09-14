@@ -15,8 +15,6 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceParseHealth;
-use Symfony\Lsp\Parser\CommentParserRegistry;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -132,7 +130,6 @@ final class MessengerSourceIndexerTest extends TestCase
             $converter,
             new TolerantPhpParser(new Parser()),
             new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new CommentParserRegistry(['php' => new PhpCommentParser()]),
         );
     }
 }

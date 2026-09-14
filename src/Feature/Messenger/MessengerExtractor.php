@@ -6,7 +6,6 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -15,6 +14,7 @@ use Symfony\Lsp\Parser\Php\PhpTypeKind;
 final class MessengerExtractor
 {
     private const AS_MESSAGE_HANDLER = 'Symfony\\Component\\Messenger\\Attribute\\AsMessageHandler';
+    private const BUS_NAME_STAMP = 'Symfony\\Component\\Messenger\\Stamp\\BusNameStamp';
     private const BUS_TYPES = [
         'Symfony\\Component\\Messenger\\MessageBus',
         'Symfony\\Component\\Messenger\\MessageBusInterface',
@@ -24,7 +24,6 @@ final class MessengerExtractor
         private readonly PositionConverter $converter,
         private readonly PhpParserInterface $parser,
         private readonly YamlConfigurationParser $yaml,
-        private readonly CommentParserRegistry $comments,
     ) {
     }
 
@@ -39,7 +38,6 @@ final class MessengerExtractor
         }
         if ('php' === $document->languageId) {
             $php = $this->parser->parse($document->text);
-            $source = $this->comments->mask('php', $document->text);
             foreach ($php->attributesNamed(self::AS_MESSAGE_HANDLER) as $attribute) {
                 $target = $attribute->targets[0] ?? null;
                 if (!\in_array($target?->kind, [PhpAttributeTargetKind::Type, PhpAttributeTargetKind::Method], true)) {
@@ -61,10 +59,6 @@ final class MessengerExtractor
                     $symbols[] = $this->symbol(MessengerSymbolKind::Message, $handles->className, $document->uri, $document->text, $handles->startOffset, false, $handles->endOffset - $handles->startOffset);
                 }
             }
-            preg_match_all('/BusNameStamp\s*\(\s*["\']([A-Za-z_][A-Za-z0-9_.-]*)/', $source, $matches, \PREG_OFFSET_CAPTURE);
-            foreach ($matches[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol(MessengerSymbolKind::Bus, $name, $document->uri, $document->text, $offset, false);
-            }
             $parents = $this->phpParents($php);
             foreach ($php->methodCalls as $call) {
                 if ('dispatch' !== $call->method || !$php->receiverHasType($call, ...self::BUS_TYPES)) {
@@ -76,11 +70,17 @@ final class MessengerExtractor
                     $symbols[] = $this->symbol(MessengerSymbolKind::Message, $message->className, $document->uri, $document->text, $message->classNameStartOffset, false, $message->classNameEndOffset - $message->classNameStartOffset);
                 }
             }
-            foreach ($php->objectCreations as $envelope) {
-                if ('Symfony\\Component\\Messenger\\Envelope' !== $envelope->className) {
+            foreach ($php->objectCreations as $creation) {
+                if (self::BUS_NAME_STAMP === $creation->className) {
+                    $literal = $creation->positionalArgument(0)?->stringLiteral;
+                    if (null !== $literal && 1 === preg_match('/^[A-Za-z_][A-Za-z0-9_.-]*$/D', $literal->value)) {
+                        $symbols[] = $this->symbol(MessengerSymbolKind::Bus, $literal->value, $document->uri, $document->text, $literal->startOffset, false, $literal->endOffset - $literal->startOffset);
+                    }
+                }
+                if ('Symfony\\Component\\Messenger\\Envelope' !== $creation->className) {
                     continue;
                 }
-                $messageArgument = $envelope->positionalArgument(0);
+                $messageArgument = $creation->positionalArgument(0);
                 $message = $php->firstObjectCreation($messageArgument);
                 if (null !== $message && $message->startOffset === $messageArgument?->expressionStartOffset) {
                     $symbols[] = $this->symbol(MessengerSymbolKind::Message, $message->className, $document->uri, $document->text, $message->classNameStartOffset, false, $message->classNameEndOffset - $message->classNameStartOffset);
