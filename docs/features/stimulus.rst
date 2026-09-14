@@ -63,7 +63,11 @@ are ignored.
 
 ``data-controller``, ``data-action`` and ``data-*-target`` attributes are
 recognized only where a template renders them as markup, and only when their
-value is static. Attribute values built from a Twig expression are ignored.
+value is static. Attribute values built from a Twig expression are ignored, and
+so is markup inside an HTML comment, which a browser never connects. A
+``data-action`` value contributes a reference only where a whole descriptor
+matches Stimulus' ``event->controller#method`` syntax, so values such as URLs
+are ignored.
 Markup-like text on an incomplete Twig directive line is ignored, while normal
 markup on following lines remains available. Later quoted expressions remain
 ignored, including expressions spanning several lines.

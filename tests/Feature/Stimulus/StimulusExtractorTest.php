@@ -147,6 +147,32 @@ final class StimulusExtractorTest extends TestCase
         );
     }
 
+    public function testExtractsActionsOnlyFromStimulusDescriptorsOutsideHtmlComments(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            <!-- <div data-controller="legacy" data-action="click->legacy#open"></div> -->
+            <form data-action="/orders/save#summary"></form>
+            <div data-action="click->chart#open mouseover->chart#hover"></div>
+            <div data-action="keydown.esc->modal#close:prevent"></div>
+            <a data-action="search#run">go</a>
+            TWIG));
+
+        self::assertSame(
+            [
+                ['chart', null, null],
+                ['chart', 'action', 'open'],
+                ['chart', null, null],
+                ['chart', 'action', 'hover'],
+                ['modal', null, null],
+                ['modal', 'action', 'close'],
+                ['search', null, null],
+                ['search', 'action', 'run'],
+            ],
+            array_map(static fn ($reference): array => [$reference->controller, $reference->kind?->value, $reference->member], $facts->references),
+        );
+    }
+
     public function testIgnoresAttributesOnIncompleteTwigDirectiveLines(): void
     {
         $project = new Project('/workspace', 'file:///workspace');

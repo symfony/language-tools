@@ -15,6 +15,7 @@ use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
 final class StimulusReferenceExtractor
 {
     private const APPLICATION_RECEIVERS = ['application', 'this.application'];
+    private const ACTION_DESCRIPTOR = '/^(?:\S+->)?([A-Za-z0-9_@][A-Za-z0-9_@.\/-]*)#([A-Za-z_$][A-Za-z0-9_$]*)(?::[A-Za-z0-9_:-]+)?$/D';
     private const HELPER_MEMBER_KINDS = [
         'stimulus_controller' => null,
         'stimulus_action' => StimulusMemberKind::Action,
@@ -72,7 +73,7 @@ final class StimulusReferenceExtractor
     public function extractTwig(string $uri, string $text): array
     {
         $document = $this->parser->parse($text);
-        $source = $document->markup();
+        $source = $this->withoutHtmlComments($document->markup());
         $references = [];
         preg_match_all('/\bdata-controller\s*=\s*([\'"])(.*?)\1/s', $source, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($attributes as $attribute) {
@@ -86,12 +87,15 @@ final class StimulusReferenceExtractor
         foreach ($attributes as $attribute) {
             $value = $attribute[2][0];
             $valueOffset = $attribute[2][1];
-            preg_match_all('/(?:[^\s]+->)?([A-Za-z0-9_@.\/-]+)#([A-Za-z_$][A-Za-z0-9_$]*)/', $value, $actions, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-            foreach ($actions as $action) {
+            preg_match_all('/\S+/', $value, $descriptors, \PREG_OFFSET_CAPTURE);
+            foreach ($descriptors[0] as [$descriptor, $descriptorOffset]) {
+                if (1 !== preg_match(self::ACTION_DESCRIPTOR, $descriptor, $action, \PREG_OFFSET_CAPTURE)) {
+                    continue;
+                }
                 $controller = $action[1][0];
                 $name = $action[2][0];
-                $references[] = new StimulusReference($controller, null, null, $uri, $this->converter->toRange($text, $valueOffset + $action[1][1], \strlen($controller)));
-                $references[] = new StimulusReference($controller, StimulusMemberKind::Action, $name, $uri, $this->converter->toRange($text, $valueOffset + $action[2][1], \strlen($name)));
+                $references[] = new StimulusReference($controller, null, null, $uri, $this->converter->toRange($text, $valueOffset + $descriptorOffset + $action[1][1], \strlen($controller)));
+                $references[] = new StimulusReference($controller, StimulusMemberKind::Action, $name, $uri, $this->converter->toRange($text, $valueOffset + $descriptorOffset + $action[2][1], \strlen($name)));
             }
         }
         preg_match_all('/\bdata-([A-Za-z0-9_@.-]+)-target\s*=\s*([\'"])(.*?)\2/s', $source, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
@@ -107,6 +111,19 @@ final class StimulusReferenceExtractor
         array_push($references, ...$this->helperReferences($document, $uri, $text));
 
         return $references;
+    }
+
+    /**
+     * Markup with HTML comments blanked: a browser never connects a controller
+     * a comment hides.
+     */
+    private function withoutHtmlComments(string $markup): string
+    {
+        return preg_replace_callback(
+            '/<!--.*?(?:-->|$)/s',
+            static fn (array $comment): string => preg_replace('/[^\r\n]/', ' ', $comment[0]) ?? $comment[0],
+            $markup,
+        ) ?? $markup;
     }
 
     /** @return list<StimulusReference> */
