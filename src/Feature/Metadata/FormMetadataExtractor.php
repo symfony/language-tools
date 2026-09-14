@@ -10,11 +10,17 @@ use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class FormMetadataExtractor
 {
+    private const FORM_FACTORY_TYPES = [
+        'Symfony\\Component\\Form\\FormFactoryInterface',
+        'Symfony\\Component\\Form\\FormFactory',
+    ];
+
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly BalancedDelimiterMatcher $delimiters,
@@ -177,7 +183,11 @@ final class FormMetadataExtractor
             if (!preg_match('/^\s*\[/', $current['text']) || !preg_match('/["\']([A-Za-z_][A-Za-z0-9_]*)$/', $current['text'], $prefix, \PREG_OFFSET_CAPTURE)) {
                 continue;
             }
-            $class = $this->formTypeClassAt($php, $call[2][1], $typeIndex);
+            $resolved = $this->callAt($php, $call[2][1]);
+            if (null === $resolved || ('add' !== $name && !$this->createsFormThroughSymfony($php, $resolved))) {
+                continue;
+            }
+            $class = $resolved->positionalArgument($typeIndex)?->completeClassReference?->className;
             if (null === $class) {
                 continue;
             }
@@ -189,15 +199,9 @@ final class FormMetadataExtractor
         return null;
     }
 
-    private function formTypeClassAt(PhpDocument $php, int $methodOffset, int $typeIndex): ?string
+    private function callAt(PhpDocument $php, int $methodOffset): ?PhpMethodCall
     {
-        foreach ($php->methodCalls as $call) {
-            if ($methodOffset === $call->methodStartOffset) {
-                return $call->positionalArgument($typeIndex)?->completeClassReference?->className;
-            }
-        }
-
-        return null;
+        return array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $methodOffset === $call->methodStartOffset);
     }
 
     /** @return list<PhpMethodCall> */
@@ -208,13 +212,29 @@ final class FormMetadataExtractor
             if (!\in_array($call->method, ['createForm', 'createNamed', 'add'], true)) {
                 continue;
             }
-            if ('add' === $call->method && null === $this->formBuilderVariableForCall($source, $php, $call)) {
+            if ('add' === $call->method
+                ? null === $this->formBuilderVariableForCall($source, $php, $call)
+                : !$this->createsFormThroughSymfony($php, $call)
+            ) {
                 continue;
             }
             $calls[] = $call;
         }
 
         return $calls;
+    }
+
+    /**
+     * Whether a `createForm` or `createNamed` call is Symfony's: a controller
+     * call on `$this`, or a call on a form factory.
+     */
+    private function createsFormThroughSymfony(PhpDocument $php, PhpMethodCall $call): bool
+    {
+        return match ($call->receiverContext->kind) {
+            PhpMethodReceiverKind::This => true,
+            PhpMethodReceiverKind::ThisProperty, PhpMethodReceiverKind::Variable => $php->receiverHasType($call, ...self::FORM_FACTORY_TYPES),
+            PhpMethodReceiverKind::Other => false,
+        };
     }
 
     private function formBuilderVariableForCall(string $source, PhpDocument $php, PhpMethodCall $call): ?PhpTypedVariable

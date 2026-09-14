@@ -526,6 +526,35 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame(['form.unknown_option'], array_column($this->diagnostics([$formProvider], $uri), 'code'));
     }
 
+    public function testIndexesFormOptionsOnlyForSymfonyFormCreators(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Report;
+
+            use App\Form\EventType;
+            use Symfony\Component\Form\FormFactoryInterface;
+
+            final class ReportBuilder
+            {
+                public function __construct(private FormFactoryInterface $forms, private PdfBuilder $pdf) {}
+
+                public function build(PdfBuilder $document): void
+                {
+                    $document->createForm(EventType::class, null, ['printed' => true]);
+                    $this->pdf->createForm(EventType::class, null, ['margin' => 10]);
+                    $this->forms->createNamed('event', EventType::class, null, ['factory' => true]);
+                    $this->createForm(EventType::class, null, ['controller' => true]);
+                }
+            }
+            PHP;
+
+        $options = $extractor->extract(new SourceDocument('file:///workspace/src/Report/ReportBuilder.php', 'php', $text))->formOptions;
+
+        self::assertSame(['factory', 'controller'], array_map(static fn ($option): string => $option->option, $options));
+    }
+
     public function testIndexesFormOptionsFromIncompleteSource(): void
     {
         $extractor = $this->createExtractor(new PositionConverter());

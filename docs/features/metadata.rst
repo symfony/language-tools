@@ -9,7 +9,9 @@ Forms
 
 Form option completion and hover are available in literal option arrays passed
 to ``createForm()``, ``createNamed()``, and form builder ``add()`` calls when
-the whole form type argument is a static ``::class`` reference. PHP's
+the whole form type argument is a static ``::class`` reference. A creator call
+counts when it is made on ``$this``, as in a controller, or on a value typed as
+a form factory; a same-named method on an unrelated object is ignored. PHP's
 case-insensitive ``class`` keyword is recognized in any letter case. The form
 type and options must be passed positionally. Required options are identified in
 completion and hover details.

@@ -6,6 +6,7 @@
 - Read bus names from resolved `BusNameStamp` instantiations instead of matching the class name in text, so string contents and same-named classes from other namespaces are ignored
 - Recognize routed Messenger transports declared under a `senders` key, in block or inline style, and stop reporting the `senders` key itself as an unknown transport
 - Read Twig `{% trans %}` keys from parsed tag directives instead of matching tag text, so a tag inside a string literal is ignored and whitespace-control forms are recognized
+- Recognize `createForm()` and `createNamed()` only on `$this` or a form factory receiver, so options passed to a same-named method on an unrelated object are no longer diagnosed
 - Treat a doubled `%%` as an escaped percent sign in environment expressions
 - Recognize form options declared by a type extension registered on several types of the same hierarchy
 
