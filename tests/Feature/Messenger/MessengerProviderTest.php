@@ -165,6 +165,41 @@ YAML;
         ], $references);
     }
 
+    public function testExtractsRoutedTransportsFromEverySenderNotation(): void
+    {
+        $text = <<<'YAML'
+            framework:
+                messenger:
+                    routing:
+                        'App\Message\Plain': async
+                        'App\Message\List': [async, audit]
+                        'App\Message\Flow': { senders: [async] }
+                        'App\Message\Block':
+                            senders: [async]
+                            send_and_handle: true
+            YAML;
+        $converter = new PositionConverter();
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)));
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/config/packages/messenger.yaml', 'yaml', $text));
+
+        $symbols = [];
+        foreach ($facts->symbols as $symbol) {
+            $symbols[] = [$symbol->kind->name, $symbol->name];
+        }
+        self::assertSame([
+            ['Message', 'App\Message\Plain'],
+            ['Transport', 'async'],
+            ['Message', 'App\Message\List'],
+            ['Transport', 'async'],
+            ['Transport', 'audit'],
+            ['Message', 'App\Message\Flow'],
+            ['Transport', 'async'],
+            ['Message', 'App\Message\Block'],
+            ['Transport', 'async'],
+        ], $symbols);
+    }
+
     public function testIndexesOnlyCompleteClassReferencesInHandlerMessages(): void
     {
         $converter = new PositionConverter();

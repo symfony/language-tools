@@ -19,6 +19,7 @@ final class MessengerExtractor
         'Symfony\\Component\\Messenger\\MessageBus',
         'Symfony\\Component\\Messenger\\MessageBusInterface',
     ];
+    private const ROUTING = ['framework', 'messenger', 'routing'];
 
     public function __construct(
         private readonly PositionConverter $converter,
@@ -94,8 +95,13 @@ final class MessengerExtractor
     /** @return list<MessengerSourceSymbol> */
     private function yamlSymbols(string $uri, string $text): array
     {
+        $occurrences = $this->yaml->parse($text);
+        $containers = [];
+        foreach ($occurrences as $occurrence) {
+            $containers[$this->identity($occurrence->scope, \array_slice($occurrence->path, 0, -1))] = true;
+        }
         $symbols = [];
-        foreach ($this->yaml->parse($text) as $occurrence) {
+        foreach ($occurrences as $occurrence) {
             $path = $occurrence->path;
             $parent = \array_slice($path, 0, -1);
             $key = [] === $path ? '' : $path[\count($path) - 1];
@@ -105,6 +111,7 @@ final class MessengerExtractor
                 ['framework', 'messenger', 'transports'] => MessengerSymbolKind::Transport,
                 default => null,
             };
+            $routedMessage = self::ROUTING === \array_slice($parent, -3);
             if (null !== $declarationKind) {
                 $symbols[] = $this->symbol($declarationKind, $key, $uri, $text, $keyOffset, true);
             }
@@ -114,10 +121,15 @@ final class MessengerExtractor
                 [$name, $nameOffset] = $reference;
                 $symbols[] = $this->symbol($referenceKind, $name, $uri, $text, $this->converter->toByteOffset($text, $occurrence->valueRange->start) + $nameOffset, false);
             }
-            if (\array_slice($parent, -3) !== ['framework', 'messenger', 'routing']) {
+            if ($routedMessage) {
+                $symbols[] = $this->symbol(MessengerSymbolKind::Message, ltrim($key, '\\'), $uri, $text, $keyOffset, false, \strlen($key));
+            }
+            $senders = 'senders' === $key
+                ? self::ROUTING === \array_slice($parent, -4, 3)
+                : $routedMessage && !isset($containers[$this->identity($occurrence->scope, $path)]);
+            if (!$senders) {
                 continue;
             }
-            $symbols[] = $this->symbol(MessengerSymbolKind::Message, ltrim($key, '\\'), $uri, $text, $keyOffset, false, \strlen($key));
             $valueOffset = $this->converter->toByteOffset($text, $occurrence->valueRange->start);
             preg_match_all('/[A-Za-z_][A-Za-z0-9_.-]*/', $occurrence->value, $names, \PREG_OFFSET_CAPTURE);
             foreach ($names[0] as [$name, $relativeOffset]) {
@@ -150,6 +162,12 @@ final class MessengerExtractor
             'from_transport' => MessengerSymbolKind::Transport,
             default => null,
         };
+    }
+
+    /** @param list<string> $path */
+    private function identity(string $scope, array $path): string
+    {
+        return $scope."\0".implode("\0", $path);
     }
 
     /**
