@@ -44,10 +44,10 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         ) {
             $messengerOptionContext = self::AS_MESSAGE_HANDLER === $this->phpParser->parse($request->document->text)->resolveName($attribute[1]);
         }
-        if ($messengerOptionContext && preg_match('/(?:\bbus|default_bus)\s*:\s*["\']?([A-Za-z0-9_.-]*)$/', $before, $match)) {
+        if ($messengerOptionContext && preg_match('/(?<![\w.$-])(?:default_)?bus\s*:\s*["\']?([A-Za-z0-9_.-]*)$/', $before, $match)) {
             $kind = MessengerSymbolKind::Bus;
             $prefix = $match[1];
-        } elseif ($messengerOptionContext && preg_match('/(?:fromTransport|from_transport|failure_transport)\s*:\s*["\']?([A-Za-z0-9_.-]*)$/', $before, $match)) {
+        } elseif ($messengerOptionContext && preg_match('/(?<![\w.$-])(?:fromTransport|from_transport|failure_transport)\s*:\s*["\']?([A-Za-z0-9_.-]*)$/', $before, $match)) {
             $kind = MessengerSymbolKind::Transport;
             $prefix = $match[1];
         } elseif (preg_match('/BusNameStamp\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match)) {

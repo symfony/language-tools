@@ -71,8 +71,8 @@ YAML;
             $names[] = $symbol->name;
             $declarations[] = $symbol->declaration;
         }
-        self::assertSame(['command.bus', 'async', 'failed', 'App\\Message\\Ping', 'async', 'command.bus', 'failed'], $names);
-        self::assertSame([true, true, true, false, false, false, false], $declarations);
+        self::assertSame(['command.bus', 'failed', 'command.bus', 'async', 'failed', 'App\\Message\\Ping', 'async'], $names);
+        self::assertSame([false, false, true, true, true, false, false], $declarations);
         $phpFacts = $extractor->extract(new SourceDocument('file:///workspace/src/Example.php', 'php', "<?php\nfoo(bus: 'not_messenger');\n\$dispatcher->dispatch(new NotAMessage());\n"));
         self::assertSame([], $phpFacts->symbols);
 
@@ -110,6 +110,59 @@ YAML;
             PHP));
         self::assertSame(["#[AsMessageHandler(bus: 'command.bus')"], $incompleteFacts->handlers);
         self::assertSame(['command.bus'], array_map(static fn ($symbol): string => $symbol->name, $incompleteFacts->symbols));
+    }
+
+    public function testExtractsBusAndTransportReferencesOnlyFromMessengerConfigurationKeys(): void
+    {
+        $text = <<<'YAML'
+            framework:
+                messenger:
+                    default_bus: command.bus
+                    buses:
+                        command.bus:
+                            middleware:
+                                - validation
+                    transports:
+                        async:
+                            dsn: 'in-memory://'
+                            failure_transport: failed
+            services:
+                monolog_mailer:
+                    class: Symfony\Component\Mailer\Mailer
+                    arguments:
+                        $bus: null # Send e-mail synchronously
+                        $failure_transport: ~
+                App\Handler:
+                    tags:
+                        - { name: messenger.message_handler, bus: 'quoted.bus', from_transport: async }
+                        - messenger.message_handler: { bus: map.bus }
+                        - { name: messenger.message_handler, bus: '%env(BUS)%' }
+            YAML;
+        $converter = new PositionConverter();
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+        $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
+        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser, new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]));
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $text));
+
+        $references = [];
+        $lines = explode("\n", $text);
+        foreach ($facts->symbols as $symbol) {
+            if ($symbol->declaration) {
+                continue;
+            }
+            $references[] = [
+                $symbol->kind->name,
+                $symbol->name,
+                substr($lines[$symbol->range->start->line], $symbol->range->start->character, $symbol->range->end->character - $symbol->range->start->character),
+            ];
+        }
+        self::assertSame([
+            ['Bus', 'command.bus', 'command.bus'],
+            ['Transport', 'failed', 'failed'],
+            ['Bus', 'quoted.bus', 'quoted.bus'],
+            ['Transport', 'async', 'async'],
+            ['Bus', 'map.bus', 'map.bus'],
+        ], $references);
     }
 
     public function testIndexesOnlyCompleteClassReferencesInHandlerMessages(): void
@@ -393,6 +446,8 @@ framework:
       App\Message\Ping: async
 services:
   handler:
+    arguments:
+      $bus: null
     tags:
       - { name: messenger.message_handler, bus: command.bus }
       - { name: messenger.message_handler, bus: missing.bus, from_transport: async }
@@ -453,6 +508,8 @@ YAML;
         self::assertSame(['command.bus'], array_column($completionProvider->complete($completionParams) ?? [], 'label'));
         $commentedCompletion = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, '# failure_transport: failed') + \strlen('# failure_transport: fa')));
         self::assertNull($completionProvider->complete($commentedCompletion));
+        $argumentCompletion = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, '$bus: null') + \strlen('$bus: nul')));
+        self::assertNull($completionProvider->complete($argumentCompletion));
         $routingCompletion = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, "async\nservices") + 3));
         self::assertSame(['async'], array_column($completionProvider->complete($routingCompletion) ?? [], 'label'));
         $hover = $relationshipProvider->hover($this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'async }') + 2)));

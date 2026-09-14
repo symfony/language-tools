@@ -36,16 +36,6 @@ final class MessengerExtractor
         $handlers = [];
         if ('yaml' === $document->languageId) {
             array_push($symbols, ...$this->yamlSymbols($document->uri, $document->text));
-            $source = $this->comments->mask('yaml', $document->text);
-            foreach ([
-                [MessengerSymbolKind::Bus, '/(?:\bbus|default_bus)\s*:\s*["\']?([A-Za-z_][A-Za-z0-9_.-]*)/'],
-                [MessengerSymbolKind::Transport, '/(?:fromTransport|from_transport|failure_transport)\s*:\s*["\']?([A-Za-z_][A-Za-z0-9_.-]*)/'],
-            ] as [$kind, $pattern]) {
-                preg_match_all($pattern, $source, $matches, \PREG_OFFSET_CAPTURE);
-                foreach ($matches[1] as [$name, $offset]) {
-                    $symbols[] = $this->symbol($kind, $name, $document->uri, $document->text, $offset, false);
-                }
-            }
         }
         if ('php' === $document->languageId) {
             $php = $this->parser->parse($document->text);
@@ -118,6 +108,12 @@ final class MessengerExtractor
             if (null !== $declarationKind) {
                 $symbols[] = $this->symbol($declarationKind, $key, $uri, $text, $keyOffset, true);
             }
+            $referenceKind = $this->referenceKind($path, $parent, $key);
+            $reference = null === $referenceKind ? null : $this->referenceName($occurrence->value);
+            if (null !== $reference) {
+                [$name, $nameOffset] = $reference;
+                $symbols[] = $this->symbol($referenceKind, $name, $uri, $text, $this->converter->toByteOffset($text, $occurrence->valueRange->start) + $nameOffset, false);
+            }
             if (\array_slice($parent, -3) !== ['framework', 'messenger', 'routing']) {
                 continue;
             }
@@ -130,6 +126,51 @@ final class MessengerExtractor
         }
 
         return $symbols;
+    }
+
+    /**
+     * @param list<string> $path
+     * @param list<string> $parent
+     */
+    private function referenceKind(array $path, array $parent, string $key): ?MessengerSymbolKind
+    {
+        if (['framework', 'messenger'] === \array_slice($path, 0, 2)) {
+            return match (true) {
+                'default_bus' === $key && 2 === \count($parent) => MessengerSymbolKind::Bus,
+                'failure_transport' === $key => MessengerSymbolKind::Transport,
+                default => null,
+            };
+        }
+        if ('services' !== ($path[0] ?? null) || !\in_array('tags', \array_slice($parent, -2), true)) {
+            return null;
+        }
+
+        return match ($key) {
+            'bus' => MessengerSymbolKind::Bus,
+            'from_transport' => MessengerSymbolKind::Transport,
+            default => null,
+        };
+    }
+
+    /**
+     * The referenced name and its byte offset inside the raw value.
+     *
+     * @return array{string, int}|null
+     */
+    private function referenceName(string $value): ?array
+    {
+        $offset = 0;
+        if (\strlen($value) > 1 && \in_array($quote = $value[0], ['"', "'"], true) && str_ends_with($value, $quote)) {
+            $value = substr($value, 1, -1);
+            $offset = 1;
+        }
+        if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_.-]*$/D', $value)
+            || (0 === $offset && \in_array(strtolower($value), ['null', 'true', 'false'], true))
+        ) {
+            return null;
+        }
+
+        return [$value, $offset];
     }
 
     private function symbol(MessengerSymbolKind $kind, string $name, string $uri, string $text, int $offset, bool $declaration, ?int $length = null): MessengerSourceSymbol

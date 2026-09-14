@@ -5,6 +5,11 @@ The Messenger integration understands buses, transports, routed message
 classes and handlers in the configured Symfony environment, together with PHP
 and YAML declarations.
 
+In YAML, bus and transport references are read from ``default_bus`` and
+``failure_transport`` under ``framework.messenger`` and from the ``bus`` and
+``from_transport`` attributes of service tags. Keys that only share those
+names, such as a ``$bus`` service argument, are ignored.
+
 Completion
 ----------
 
