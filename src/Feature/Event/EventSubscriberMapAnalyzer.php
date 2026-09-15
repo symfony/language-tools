@@ -6,9 +6,12 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 
 final class EventSubscriberMapAnalyzer
 {
+    private const SUBSCRIBER_INTERFACE = 'Symfony\\Component\\EventDispatcher\\EventSubscriberInterface';
+
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly BalancedDelimiterMatcher $delimiters,
@@ -19,39 +22,71 @@ final class EventSubscriberMapAnalyzer
     public function symbols(string $uri, string $text, string $source, PhpDocument $php): array
     {
         $symbols = [];
-        preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $source, $subscriberMethods, \PREG_OFFSET_CAPTURE);
-        foreach ($subscriberMethods[0] as [$declaration, $declarationOffset]) {
-            $open = $declarationOffset + \strlen($declaration) - 1;
-            $close = $this->delimiters->matching($source, $open, '{', '}') ?? \strlen($source);
-            $body = substr($source, $open + 1, $close - $open - 1);
-            preg_match_all('/["\']([^"\']+)["\']\s*=>/', $body, $stringEvents, \PREG_OFFSET_CAPTURE);
+        foreach ($this->subscribedEventMaps($source, $php) as ['offset' => $mapOffset, 'map' => $map]) {
+            preg_match_all('/["\']([^"\']+)["\']\s*=>/', $map, $stringEvents, \PREG_OFFSET_CAPTURE);
             foreach ($stringEvents[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol($name, $uri, $text, $open + 1 + $offset);
+                $symbols[] = $this->symbol($name, $uri, $text, $mapOffset + $offset);
             }
-            preg_match_all('/([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class\s*=>/', $body, $classEvents, \PREG_OFFSET_CAPTURE);
+            preg_match_all('/([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)::class\s*=>/', $map, $classEvents, \PREG_OFFSET_CAPTURE);
             foreach ($classEvents[1] as [$name, $offset]) {
-                $symbols[] = $this->symbol($php->resolveName($name), $uri, $text, $open + 1 + $offset, \strlen($name));
+                $symbols[] = $this->symbol($php->resolveName($name), $uri, $text, $mapOffset + $offset, \strlen($name));
             }
         }
 
         return $symbols;
     }
 
-    public function completionPrefix(string $source, int $offset): ?string
+    public function completionPrefix(string $source, PhpDocument $php, int $offset): ?string
     {
-        preg_match_all('/function\s+getSubscribedEvents\s*\([^)]*\)[^{]*\{/', $source, $subscriberMethods, \PREG_OFFSET_CAPTURE);
-        foreach ($subscriberMethods[0] as [$declaration, $declarationOffset]) {
-            $open = $declarationOffset + \strlen($declaration) - 1;
-            if ($offset <= $open || $offset > ($this->delimiters->matching($source, $open, '{', '}') ?? \strlen($source))) {
+        foreach ($this->subscribedEventMaps($source, $php) as ['offset' => $mapOffset, 'map' => $map]) {
+            if ($offset < $mapOffset || $offset > $mapOffset + \strlen($map)) {
                 continue;
             }
-            $bodyBefore = substr($source, $open + 1, $offset - $open - 1);
-            if (preg_match('/(?:\[|,)\s*["\']([^"\']*)$/s', $bodyBefore, $match)) {
+            if (preg_match('/(?:\[|,)\s*["\']([^"\']*)$/s', substr($map, 0, $offset - $mapOffset), $match)) {
                 return $match[1];
             }
         }
 
         return null;
+    }
+
+    /**
+     * The array returned by every `getSubscribedEvents()` declaration of a class
+     * that implements `EventSubscriberInterface`, keyed by its source offset.
+     *
+     * @return list<array{offset: int, map: string}>
+     */
+    private function subscribedEventMaps(string $source, PhpDocument $php): array
+    {
+        $maps = [];
+        foreach ($php->methodDeclarations as $method) {
+            if ('getSubscribedEvents' !== $method->name
+                || !$this->isSubscriber($php, $method)
+                || null === $method->bodyStartOffset
+            ) {
+                continue;
+            }
+            $body = substr($source, $method->bodyStartOffset, ($method->bodyEndOffset ?? \strlen($source)) - $method->bodyStartOffset);
+            if (!preg_match('/\breturn\s*\[/', $body, $return, \PREG_OFFSET_CAPTURE)) {
+                continue;
+            }
+            $open = $method->bodyStartOffset + $return[0][1] + \strlen($return[0][0]) - 1;
+            $close = $this->delimiters->matching($source, $open, '[', ']') ?? \strlen($source);
+            $maps[] = ['offset' => $open + 1, 'map' => substr($source, $open + 1, $close - $open - 1)];
+        }
+
+        return $maps;
+    }
+
+    private function isSubscriber(PhpDocument $php, PhpMethodDeclaration $method): bool
+    {
+        foreach ($php->typeDeclarations as $type) {
+            if ($method->className === $type->name) {
+                return \in_array(self::SUBSCRIBER_INTERFACE, $type->interfaceNames, true);
+            }
+        }
+
+        return false;
     }
 
     private function symbol(string $name, string $uri, string $text, int $offset, ?int $length = null): EventSourceSymbol

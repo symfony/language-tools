@@ -72,7 +72,10 @@ Serializer Groups and Mapped Properties
 Known serializer groups are completed in resolved PHP ``Groups`` attributes,
 including imported aliases and fully qualified names, in literal ``groups``
 context arrays and in YAML mappings. Unrelated attributes that share the
-``Groups`` short name are ignored. Hover and Find All References show their
+``Groups`` short name are ignored. A ``groups`` context entry is read from
+``Context`` attributes, serializer and normalizer calls, and a controller's
+``json()`` helper, so an identically named key elsewhere, such as validation
+groups of a constraint, is left alone. Hover and Find All References show their
 statically recognized occurrences.
 
 Go to Definition connects YAML validation and serializer class and property

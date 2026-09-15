@@ -39,7 +39,8 @@ The server recognizes event references in these contexts:
 * the optional static event name passed to ``dispatch()``;
 * static event names passed to ``addListener()``;
 * ``AsEventListener`` attributes;
-* ``EventSubscriberInterface::getSubscribedEvents()`` return values;
+* the array a class implementing ``EventSubscriberInterface`` returns from
+  ``getSubscribedEvents()``, and only that array;
 * ``kernel.event_listener`` service tags.
 
 Service tags are recognized in both block and inline YAML, and quoted event

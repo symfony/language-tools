@@ -47,6 +47,54 @@ final class SerializerMetadataProviderTest extends MetadataTestCase
         self::assertSame(['admin'], $this->completionLabels($completionProvider, $converter, $groupUri, $groupText, \strlen($groupText)));
     }
 
+    public function testIndexesGroupReferencesOnlyInSerializerContexts(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            use Symfony\Component\Serializer\Attribute\Context;
+            use Symfony\Component\Serializer\Attribute\Groups;
+            use Symfony\Component\Serializer\SerializerInterface;
+            use Symfony\Component\Validator\Constraints as Assert;
+
+            final class OrderController
+            {
+                #[Groups(['order:read'])]
+                #[Assert\NotBlank(['groups' => ['registration_step_two']])]
+                #[Context(normalizationContext: ['groups' => ['order:context']])]
+                public string $reference = '';
+
+                public function __construct(private SerializerInterface $serializer, private \PDO $connection) {}
+
+                public function show(object $order): array
+                {
+                    $payload = $this->serializer->serialize($order, 'json', ['groups' => ['order:serialize']]);
+                    $this->connection->normalize($order, null, ['groups' => ['pdo:ignored']]);
+                    $settings = ['groups' => ['plain:ignored']];
+
+                    return [$payload, $this->json($order, 200, [], ['groups' => ['order:json']]), $settings];
+                }
+            }
+            PHP;
+
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Controller/OrderController.php', 'php', $text));
+
+        self::assertSame(
+            [
+                ['order:read', true],
+                ['order:context', false],
+                ['order:serialize', false],
+                ['order:json', false],
+            ],
+            array_values(array_map(
+                static fn ($symbol): array => [$symbol->name, $symbol->declaration],
+                array_filter($facts->symbols, static fn ($symbol): bool => MetadataSymbolKind::SerializerGroup === $symbol->kind),
+            )),
+        );
+    }
+
     #[DataProvider('serializerGroupsAttributeCompletionProvider')]
     public function testCompletesSerializerGroupsOnlyInResolvedGroupsAttributes(string $text, ?string $expectedPrefix): void
     {

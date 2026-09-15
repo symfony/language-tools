@@ -54,7 +54,7 @@ final class EventExtractor
             ) {
                 return $match[2];
             }
-            if (null !== $prefix = $this->subscriberMapAnalyzer->completionPrefix($masked, $offset)) {
+            if (null !== $prefix = $this->subscriberMapAnalyzer->completionPrefix($masked, $php, $offset)) {
                 return $prefix;
             }
             foreach ($php->methodCalls as $call) {

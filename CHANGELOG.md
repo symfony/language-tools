@@ -14,6 +14,9 @@
 - Read a repository's `@extends ServiceEntityRepository<Entity>` tag from its own doc comment instead of the preceding kilobyte of source
 - Offer Twig completion for assets, routes, templates, security roles and Stimulus helpers only inside a Twig directive, and Stimulus `data-*` attribute completion only in markup
 - Scope Messenger option completion in YAML to Messenger configuration and service tags
+- Read subscribed events from the array a declared event subscriber returns, so local arrays and same-named methods on unrelated classes no longer register events
+- Read serializer `groups` context entries from serializer attributes and calls instead of any `groups` key, so validation groups are no longer indexed as serializer groups
+- Recognize `groups` in serializer `Context` attributes
 - Treat a doubled `%%` as an escaped percent sign in environment expressions
 - Recognize form options declared by a type extension registered on several types of the same hierarchy
 

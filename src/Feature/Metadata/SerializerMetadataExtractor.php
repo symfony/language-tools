@@ -4,12 +4,25 @@ namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
+use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 
 final class SerializerMetadataExtractor
 {
     private const GROUP_ATTRIBUTES = [
         'Symfony\\Component\\Serializer\\Attribute\\Groups',
         'Symfony\\Component\\Serializer\\Annotation\\Groups',
+    ];
+    private const CONTEXT_ATTRIBUTES = [
+        'Symfony\\Component\\Serializer\\Attribute\\Context',
+        'Symfony\\Component\\Serializer\\Annotation\\Context',
+    ];
+    private const CONTEXT_METHODS = ['serialize', 'deserialize', 'normalize', 'denormalize'];
+    private const SERIALIZERS = [
+        'Symfony\\Component\\Serializer\\SerializerInterface',
+        'Symfony\\Component\\Serializer\\Serializer',
+        'Symfony\\Component\\Serializer\\Normalizer\\NormalizerInterface',
+        'Symfony\\Component\\Serializer\\Normalizer\\DenormalizerInterface',
     ];
 
     public function __construct(
@@ -22,20 +35,30 @@ final class SerializerMetadataExtractor
     {
         $symbols = [];
         foreach ($php->attributes as $attribute) {
-            if (!\in_array($attribute->name, self::GROUP_ATTRIBUTES, true)) {
+            $declaration = \in_array($attribute->name, self::GROUP_ATTRIBUTES, true);
+            if (!$declaration && !\in_array($attribute->name, self::CONTEXT_ATTRIBUTES, true)) {
                 continue;
             }
             foreach ($attribute->arguments as $argument) {
                 $expression = $argument->expression;
                 $offset = $argument->expressionStartOffset;
-                if (\is_string($expression) && \is_int($offset)) {
-                    array_push($symbols, ...$this->quotedSymbols($uri, $text, $expression, $offset, true));
+                if (!\is_string($expression) || !\is_int($offset)) {
+                    continue;
                 }
+                array_push($symbols, ...$declaration
+                    ? $this->quotedSymbols($uri, $text, $expression, $offset, true)
+                    : $this->contextSymbols($uri, $text, $expression, $offset));
             }
         }
-        preg_match_all('/["\']groups["\']\s*=>\s*\[(.*?)\]/s', $source, $groupReferences, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
-        foreach ($groupReferences as $group) {
-            array_push($symbols, ...$this->quotedSymbols($uri, $text, $group[1][0], $group[1][1], false));
+        foreach ($php->methodCalls as $call) {
+            if (!$this->passesSerializerContext($call, $php)) {
+                continue;
+            }
+            foreach ($call->arguments as $argument) {
+                if (\is_string($argument->expression) && \is_int($argument->expressionStartOffset)) {
+                    array_push($symbols, ...$this->contextSymbols($uri, $text, $argument->expression, $argument->expressionStartOffset));
+                }
+            }
         }
 
         return $symbols;
@@ -54,6 +77,36 @@ final class SerializerMetadataExtractor
         }
 
         return null;
+    }
+
+    /**
+     * Whether the call takes a serializer context array: a serializer method, or
+     * a controller's `json()` helper.
+     */
+    private function passesSerializerContext(PhpMethodCall $call, PhpDocument $php): bool
+    {
+        if (PhpMethodReceiverKind::This === $call->receiverContext->kind) {
+            return 'json' === $call->method || \in_array($call->method, self::CONTEXT_METHODS, true);
+        }
+
+        return \in_array($call->method, self::CONTEXT_METHODS, true)
+            && ([] === $php->receiverVariables($call) || $php->receiverHasType($call, ...self::SERIALIZERS));
+    }
+
+    /**
+     * Group names of every `groups` entry of a literal context array.
+     *
+     * @return list<MetadataSourceSymbol>
+     */
+    private function contextSymbols(string $uri, string $text, string $expression, int $base): array
+    {
+        preg_match_all('/["\']groups["\']\s*=>\s*\[(.*?)\]/s', $expression, $groups, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+        $symbols = [];
+        foreach ($groups as $group) {
+            array_push($symbols, ...$this->quotedSymbols($uri, $text, $group[1][0], $base + $group[1][1], false));
+        }
+
+        return $symbols;
     }
 
     /** @return list<MetadataSourceSymbol> */

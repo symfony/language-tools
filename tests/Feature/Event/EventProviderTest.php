@@ -49,9 +49,10 @@ final class EventProviderTest extends TestCase
 namespace App;
 use App\Event\{OrderPlaced};
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener as Listener;
+use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Contracts\EventDispatcher\{EventDispatcherInterface};
 #[Listener(event: OrderPlaced::class)]
-final class Subscriber
+final class Subscriber implements EventSubscriberInterface
 {
     public function __construct(private EventDispatcherInterface $dispatcher) {}
     public static function getSubscribedEvents(): array
@@ -227,6 +228,43 @@ YAML;
 
         self::assertSame(['app.first', 'app.second'], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
         self::assertCount(2, $facts->listeners);
+    }
+
+    public function testExtractsSubscribedEventsOnlyFromReturnedSubscriberMaps(): void
+    {
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/OrderSubscriber.php', 'php', <<<'PHP'
+            <?php
+            namespace App;
+
+            use App\Event\OrderPlaced;
+            use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+
+            final class OrderSubscriber implements EventSubscriberInterface
+            {
+                public static function getSubscribedEvents(): array
+                {
+                    $listener = ['method' => 'onOrderPlaced', 'priority' => 10];
+
+                    return [
+                        OrderPlaced::class => 'onOrderPlaced',
+                        'legacy.order_placed' => [['on]Legacy', 10]],
+                    ];
+                }
+            }
+
+            final class MenuRegistry
+            {
+                public static function getSubscribedEvents(): array
+                {
+                    return ['dashboard' => 'buildDashboard'];
+                }
+            }
+            PHP));
+
+        self::assertSame(
+            ['legacy.order_placed', 'App\Event\OrderPlaced'],
+            array_map(static fn ($symbol): string => $symbol->name, $facts->symbols),
+        );
     }
 
     public function testExtractsYamlListenerEventsFromBlockAndFlowTagsWithByteExactRanges(): void
