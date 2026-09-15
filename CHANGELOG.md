@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.20.3 (2026-09-15)
 
 - Read YAML configuration values with Symfony's own YAML parser, so numbers written as `60_000`, `+60`, `0x1A` or `0o17` are no longer reported as invalid types
