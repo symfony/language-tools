@@ -38,6 +38,7 @@ final class BridgeTwigComponentsTest extends TestCase
         $section = $result['sections']['twig_components'] ?? null;
         self::assertIsArray($section);
         self::assertTrue($section['complete']);
+        self::assertTrue($section['enabled']);
         self::assertSame(['Alert', 'Form:Input', 'acme:Badge', 'ux:icon'], $section['names']);
         self::assertSame(['ux:icon'], $section['caseInsensitiveNames']);
         self::assertSame('components', $section['anonymousTemplateDirectory']);
@@ -76,6 +77,7 @@ final class BridgeTwigComponentsTest extends TestCase
         self::assertIsArray($section);
         self::assertSame([
             'complete' => true,
+            'enabled' => false,
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
@@ -99,6 +101,7 @@ final class BridgeTwigComponentsTest extends TestCase
         self::assertIsArray($section);
         self::assertSame([
             'complete' => true,
+            'enabled' => false,
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',

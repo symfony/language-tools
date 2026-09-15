@@ -602,7 +602,7 @@ final class TemplateProviderTest extends TestCase
         $documents->open(new Document($classUri, 'php', 1, $classText));
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
-        $indexes->forProject($project)->replaceRuntime(true, [], 'components');
+        $indexes->forProject($project)->replaceRuntime(true, true, [], 'components');
         $templateIndexes = $this->templateIndexes();
         $templateIndexes->forProject($project)->replaceRuntime(true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
@@ -688,7 +688,7 @@ final class TemplateProviderTest extends TestCase
         $withoutRuntimeMetadata = $provider->diagnostics($params);
         self::assertNull($withoutRuntimeMetadata);
 
-        $indexes->forProject($project)->replaceRuntime(true, ['ux:icon'], 'components', ['ux:icon']);
+        $indexes->forProject($project)->replaceRuntime(true, true, ['ux:icon'], 'components', ['ux:icon']);
         $withoutTemplateMetadata = $provider->diagnostics($params);
         self::assertNull($withoutTemplateMetadata);
 
@@ -709,9 +709,35 @@ final class TemplateProviderTest extends TestCase
             array_column($diagnostics, 'message'),
         );
 
-        $indexes->forProject($project)->replaceRuntime(false, [], 'components');
+        $indexes->forProject($project)->replaceRuntime(false, true, [], 'components');
         $withIncompleteRuntimeNames = $provider->diagnostics($params);
         self::assertNull($withIncompleteRuntimeNames);
+    }
+
+    public function testDoesNotDiagnoseComponentsWithoutTheTwigComponentIntegration(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $converter = new PositionConverter();
+        $commentParser = new TwigCommentParser();
+        $extractor = $this->componentExtractor($converter, $commentParser);
+        $usageUri = 'file:///workspace/templates/page.html.twig';
+        $usageText = "{{ component('toast') }}\n<twig:Unknown />";
+        $documents = new DocumentStore();
+        $documents->open(new Document($usageUri, 'twig', 1, $usageText));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project]);
+        $indexes = new TwigComponentIndexRegistry();
+        $indexes->forProject($project)->replace(
+            $extractor->extract($project, new SourceDocument($usageUri, 'twig', $usageText)),
+        );
+        $indexes->forProject($project)->replaceRuntime(true, false, [], 'components');
+        $templateIndexes = $this->templateIndexes();
+        $templateIndexes->forProject($project)->replaceRuntime(true);
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
+        $provider = new TwigComponentDiagnosticProvider($documentResolver, new LspProtocolMapper(), $indexes, $templateIndexes, $componentResolver);
+
+        self::assertNull($provider->diagnostics(['textDocument' => ['uri' => $usageUri]]));
     }
 
     public function testCompletesBundleProvidedAndAnonymousComponentNames(): void
@@ -727,7 +753,7 @@ final class TemplateProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $indexes = new TwigComponentIndexRegistry();
-        $indexes->forProject($project)->replaceRuntime(true, ['ux:icon'], 'components');
+        $indexes->forProject($project)->replaceRuntime(true, true, ['ux:icon'], 'components');
         $templateIndexes = $this->templateIndexes();
         $range = new Range(new Position(0, 0), new Position(0, 0));
         $templateIndexes->forProject($project)->replaceRuntime(

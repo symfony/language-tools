@@ -9,6 +9,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
 {
     private bool $complete = false;
     private bool $runtimeComplete = false;
+    private bool $runtimeEnabled = false;
     /** @var array<string, TwigComponent> */
     private array $runtimeComponents = [];
     /** @var array<string, TwigComponent> */
@@ -112,9 +113,10 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
      * @param list<string>        $caseInsensitiveNames
      * @param list<TwigComponent> $components
      */
-    public function replaceRuntime(bool $complete, array $names, string $anonymousTemplateDirectory, array $caseInsensitiveNames = [], array $components = []): void
+    public function replaceRuntime(bool $complete, bool $enabled, array $names, string $anonymousTemplateDirectory, array $caseInsensitiveNames = [], array $components = []): void
     {
         $this->runtimeComplete = $complete;
+        $this->runtimeEnabled = $enabled;
         $this->runtimeNames = array_fill_keys($names, true);
         $this->caseInsensitiveRuntimeNames = array_fill_keys(array_map('strtolower', $caseInsensitiveNames), true);
         $this->anonymousTemplateDirectory = $anonymousTemplateDirectory;
@@ -131,6 +133,11 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     public function isRuntimeComplete(): bool
     {
         return $this->runtimeComplete;
+    }
+
+    public function isRuntimeEnabled(): bool
+    {
+        return $this->runtimeEnabled;
     }
 
     public function hasRuntimeName(string $name): bool

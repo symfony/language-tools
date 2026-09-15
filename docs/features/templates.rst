@@ -82,8 +82,10 @@ or named ``name`` arguments. Escaped characters in static component names
 follow Twig's string rules. Imported
 aliases of the component attributes are recognized. Live Component properties
 and actions are included in completion and navigation. Unknown
-static component names are reported only after all registered components,
-including bundle components, are known.
+static component names are reported only in applications that enable
+``symfony/ux-twig-component``, and only after all registered components,
+including bundle components, are known. Applications without that integration
+keep their own ``component()`` Twig function undiagnosed.
 
 ``<twig:...>`` tags and ``data-live-action-param`` attributes are recognized
 only where a template renders them as markup. Look-alike text in comments,

@@ -51,6 +51,7 @@ final class ProjectTwigComponentSnapshotLoader implements RuntimeSnapshotLoaderI
         }
         $this->indexes->forProject($project)->replaceRuntime(
             true === ($section['complete'] ?? null),
+            true === ($section['enabled'] ?? null),
             $names,
             $directory,
             $caseInsensitiveNames,

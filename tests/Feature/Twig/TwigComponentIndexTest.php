@@ -61,7 +61,7 @@ final class TwigComponentIndexTest extends TestCase
         $index = new TwigComponentIndex();
         $index->replace(new TwigComponentSourceFacts('file:///templates/page.html.twig', [], [$reference]));
         $runtimeComponent = new TwigComponent('Ux:Icon', 'file:///vendor/ux-icon', $this->range());
-        $index->replaceRuntime(true, ['ux:icon'], 'components', ['ux:icon'], [$runtimeComponent]);
+        $index->replaceRuntime(true, true, ['ux:icon'], 'components', ['ux:icon'], [$runtimeComponent]);
 
         self::assertSame($runtimeComponent, $index->get('ux:icon'));
         self::assertSame([$reference], $index->references('ux:icon'));

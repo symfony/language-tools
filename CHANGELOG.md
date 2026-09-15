@@ -24,6 +24,7 @@
 - Recognize `groups` in serializer `Context` attributes
 - Treat a doubled `%%` as an escaped percent sign in environment expressions
 - Recognize form options declared by a type extension registered on several types of the same hierarchy
+- Report unknown Twig components only in applications that enable `symfony/ux-twig-component`, so an application's own `component()` Twig function is no longer diagnosed
 
 ## 0.20.2 (2026-09-13)
 

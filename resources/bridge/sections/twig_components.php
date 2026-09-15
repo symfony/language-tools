@@ -15,6 +15,7 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
     if (!$enabled) {
         return symfonyLspBridgeFinalizeSection([
             'complete' => true,
+            'enabled' => false,
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
@@ -118,6 +119,7 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
             $components = array_values($components);
             $section = [
                 'complete' => $complete,
+                'enabled' => true,
                 'generation' => hash('sha256', json_encode([$complete, $names, $caseInsensitiveNames, $anonymousTemplateDirectory, $components], JSON_THROW_ON_ERROR)),
                 'names' => $names,
                 'caseInsensitiveNames' => $caseInsensitiveNames,

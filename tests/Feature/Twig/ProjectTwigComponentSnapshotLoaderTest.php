@@ -20,6 +20,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
 
         $loader->load($project, [
             'complete' => true,
+            'enabled' => true,
             'names' => ['ux:icon', 'Alert', 42, ['nested']],
             'caseInsensitiveNames' => ['ux:icon', 42, ['nested']],
             'anonymousTemplateDirectory' => 'ui',
@@ -45,6 +46,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         self::assertNotNull($index->get('UX:Icon'));
         self::assertNull($index->get('broken'));
         self::assertTrue($index->isRuntimeComplete());
+        self::assertTrue($index->isRuntimeEnabled());
         self::assertTrue($index->hasRuntimeName('ux:icon'));
         self::assertTrue($index->hasRuntimeName('UX:Icon'));
         self::assertTrue($index->hasRuntimeName('uX:iCoN'));
@@ -59,16 +61,18 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         $indexes = new TwigComponentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
-        $indexes->forProject($project)->replaceRuntime(true, ['stale_component'], 'ui', ['stale_component']);
+        $indexes->forProject($project)->replaceRuntime(true, true, ['stale_component'], 'ui', ['stale_component']);
 
         $loader->load($project, [
             'complete' => true,
+            'enabled' => false,
             'names' => [],
             'anonymousTemplateDirectory' => 'components',
         ]);
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isRuntimeComplete());
+        self::assertFalse($index->isRuntimeEnabled());
         self::assertSame([], $index->runtimeNames());
         self::assertFalse($index->hasRuntimeName('STALE_COMPONENT'));
         self::assertSame('components', $index->anonymousTemplateDirectory());
