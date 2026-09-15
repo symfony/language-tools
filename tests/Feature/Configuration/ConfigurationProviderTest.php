@@ -145,6 +145,50 @@ final class ConfigurationProviderTest extends TestCase
         );
     }
 
+    public function testReadsYamlValuesTheWaySymfonyParsesThem(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            framework:
+                rate_limiter:
+                    limiters:
+                        underscored:
+                            limit: 60_000
+                        signed:
+                            limit: +60
+                        hexadecimal:
+                            limit: 0x1A
+                        octal:
+                            limit: 0o17
+                        constant:
+                            limit: !php/const App\Limits::MAX
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        // Symfony keeps quoted and leading-zero numbers as strings
+        $fixture->documents->update($uri, 2, <<<'YAML'
+            framework:
+                rate_limiter:
+                    limiters:
+                        quoted:
+                            limit: '60_000'
+                        leading_zero:
+                            limit: 0644
+            YAML);
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        self::assertSame(['config.invalid_type', 'config.invalid_type'], array_column($diagnostics, 'code'));
+        self::assertSame(
+            [
+                'Expected integer for "framework.rate_limiter.limiters.quoted.limit".',
+                'Expected integer for "framework.rate_limiter.limiters.leading_zero.limit".',
+            ],
+            array_column($diagnostics, 'message'),
+        );
+    }
+
     public function testResolvesNestedSequencePrototypes(): void
     {
         $fixture = $this->providers();

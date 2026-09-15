@@ -61,10 +61,13 @@ including renamed ``use`` imports. Chains on variables declared with a type
 that isn't a configuration builder are ignored, in diagnostics, hover and
 completion alike.
 YAML diagnostics recognize scalar values accepted from backed PHP enum cases
-and match ``!php/enum`` tags to the declared cases. PHP arguments are checked
-only when they are literals; expressions, enum cases and class constants stay
-opaque because their runtime values can't be determined statically. Direct
-``!php/const`` values stay opaque for the same reason.
+and match ``!php/enum`` tags to the declared cases. Other values are read with
+Symfony's own YAML parser, so every notation it supports is recognized,
+including numbers written as ``60_000``, ``+60``, ``0x1A`` or ``0o17``. PHP
+arguments are checked only when they are literals; expressions, enum cases and
+class constants stay opaque because their runtime values can't be determined
+statically. Tagged YAML values, such as ``!php/const``, stay opaque for the same
+reason.
 Tabs are reported wherever they indent YAML structure, including after leading
 spaces and on otherwise blank lines. Tabs inside block scalar content, quoted
 continuation lines, flow collection continuations and values are valid YAML and

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Read YAML configuration values with Symfony's own YAML parser, so numbers written as `60_000`, `+60`, `0x1A` or `0o17` are no longer reported as invalid types
+- Treat every tagged YAML configuration value as opaque instead of only `!php/const`
 - Read bundle configuration schemas from the extensions the kernel registers, so a bundle that declares its extension while prepending no longer has every configured key reported as unknown
 - Speed up checks by compiling each `.gitignore` file once per project instead of once per examined file
 - Speed up checks by looking for a suppression directive before parsing a document's comments

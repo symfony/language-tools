@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Configuration;
 
+use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Parser;
 use Symfony\Component\Yaml\Tag\TaggedValue;
 use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
@@ -14,6 +16,7 @@ final class ConfigurationValueValidator
     public function __construct(
         private readonly EnvironmentIndexRegistry $environmentIndexes,
         private readonly EnvironmentExpressionParser $environmentExpressions,
+        private readonly Parser $yaml = new Parser(),
     ) {
     }
 
@@ -61,14 +64,14 @@ final class ConfigurationValueValidator
     {
         $source = trim($value);
         $plain = trim($source, "\"'");
-        if (1 === preg_match('/^!php\/const(?:\s|$)/', $source)) {
-            return true;
-        }
         if (str_contains($plain, '%') || str_starts_with($plain, '$')) {
             return true;
         }
         if ([] !== $node->allowedEnumCases && null !== $enumCase = $this->enumCase($source)) {
             return $node->allowedValuesTruncated || \in_array($enumCase, $node->allowedEnumCases, true);
+        }
+        if (str_starts_with($source, '!')) {
+            return true;
         }
         $literal = $this->literal($source);
         if (null === $literal && $node->acceptsNull()) {
@@ -134,23 +137,13 @@ final class ConfigurationValueValidator
         return ltrim(trim($match[1], " \t\"'"), '\\');
     }
 
-    private function literal(string $source): string|int|float|bool|null
+    private function literal(string $source): mixed
     {
-        $length = \strlen($source);
-        if ($length >= 2 && \in_array($source[0], ['"', "'"], true) && str_ends_with($source, $source[0])) {
-            return substr($source, 1, -1);
+        try {
+            return $this->yaml->parse($source);
+        } catch (ParseException) {
+            return $source;
         }
-
-        return match (strtolower($source)) {
-            '~', 'null' => null,
-            'true' => true,
-            'false' => false,
-            default => match (true) {
-                1 === preg_match('/^-?\d+$/', $source) => (int) $source,
-                is_numeric($source) => (float) $source,
-                default => $source,
-            },
-        };
     }
 
     /**
