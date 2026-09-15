@@ -10,8 +10,9 @@ use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DiagnosticSuppressor
 {
-    private const DIRECTIVE_PATTERN = '/@symfony-lsp-ignore\b[^\r\n]*/';
-    private const VALID_DIRECTIVE_PATTERN = '/^@symfony-lsp-ignore[ \t]+(?<codes>[a-z][a-z0-9_.-]*(?:[ \t]*,[ \t]*[a-z][a-z0-9_.-]*)*)(?:[ \t]+\([^\r\n]*\))?[ \t]*$/D';
+    private const DIRECTIVE = '@symfony-lsp-ignore';
+    private const DIRECTIVE_PATTERN = '/'.self::DIRECTIVE.'\b[^\r\n]*/';
+    private const VALID_DIRECTIVE_PATTERN = '/^'.self::DIRECTIVE.'[ \t]+(?<codes>[a-z][a-z0-9_.-]*(?:[ \t]*,[ \t]*[a-z][a-z0-9_.-]*)*)(?:[ \t]+\([^\r\n]*\))?[ \t]*$/D';
 
     public function __construct(
         private readonly PositionConverter $positions,
@@ -109,6 +110,10 @@ final class DiagnosticSuppressor
     /** @return array{list<DiagnosticSuppression>, list<array<array-key, mixed>>} */
     private function suppressions(Document $document): array
     {
+        if (!str_contains($document->text, self::DIRECTIVE)) {
+            return [[], []];
+        }
+
         $suppressions = [];
         $warnings = [];
         foreach ($this->comments->comments($document->languageId, $document->text) as $comment) {
