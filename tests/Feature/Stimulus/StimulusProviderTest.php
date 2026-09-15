@@ -103,6 +103,12 @@ final class StimulusProviderTest extends TestCase
         $unknownActionUri = 'file:///workspace/templates/unknown_action.html.twig';
         $unknownActionText = '<button data-action="search#missing"></button>';
         $documents->open(new Document($unknownActionUri, 'twig', 1, $unknownActionText));
+        $quotedAttributeUri = 'file:///workspace/templates/quoted_attribute.html.twig';
+        $quotedAttributeText = '{% set markup = \'<button data-action="click->search#op';
+        $documents->open(new Document($quotedAttributeUri, 'twig', 1, $quotedAttributeText));
+        $markupHelperUri = 'file:///workspace/templates/markup_helper.html.twig';
+        $markupHelperText = "<p>Call stimulus_controller('sea";
+        $documents->open(new Document($markupHelperUri, 'twig', 1, $markupHelperText));
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
         $indexes = new StimulusIndexRegistry();
@@ -155,6 +161,8 @@ final class StimulusProviderTest extends TestCase
         self::assertSame(['results'], array_column($completionProvider->complete($this->params($converter, $targetCompletionUri, $targetCompletionText, \strlen($targetCompletionText))) ?? [], 'label'));
         self::assertSame(['onChange'], array_column($completionProvider->complete($this->params($converter, $packageActionCompletionUri, $packageActionCompletionText, \strlen($packageActionCompletionText))) ?? [], 'label'));
         self::assertSame(['field'], array_column($completionProvider->complete($this->params($converter, $packageTargetCompletionUri, $packageTargetCompletionText, \strlen($packageTargetCompletionText))) ?? [], 'label'));
+        self::assertNull($completionProvider->complete($this->params($converter, $quotedAttributeUri, $quotedAttributeText, \strlen($quotedAttributeText))));
+        self::assertNull($completionProvider->complete($this->params($converter, $markupHelperUri, $markupHelperText, \strlen($markupHelperText))));
 
         $actionParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, '#open') + 2);
         self::assertSame([$controllerUri], array_column($relationshipProvider->definition($actionParams) ?? [], 'uri'));

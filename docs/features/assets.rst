@@ -15,6 +15,9 @@ using the positional path or named ``path`` argument with the default asset
 package. Importmap entrypoint completion is available for a string or list
 passed to Twig ``importmap()``.
 
+Both are completed only where the cursor sits inside a Twig directive, so
+look-alike text in markup is left alone.
+
 Named asset packages, absolute public paths and dynamic expressions are ignored
 because they don't identify an AssetMapper logical path exactly.
 

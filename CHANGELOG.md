@@ -12,6 +12,8 @@
 - Ignore `trans()` calls whose receiver is declared with a type no translator can satisfy
 - Bind PHP route collection variables through parsed type declarations and object creations, so a `RoutingConfigurator` mentioned in a comment or a string no longer turns unrelated `add()` calls into routes
 - Read a repository's `@extends ServiceEntityRepository<Entity>` tag from its own doc comment instead of the preceding kilobyte of source
+- Offer Twig completion for assets, routes, templates, security roles and Stimulus helpers only inside a Twig directive, and Stimulus `data-*` attribute completion only in markup
+- Scope Messenger option completion in YAML to Messenger configuration and service tags
 - Treat a doubled `%%` as an escaped percent sign in environment expressions
 - Recognize form options declared by a type extension registered on several types of the same hierarchy
 

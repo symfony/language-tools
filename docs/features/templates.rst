@@ -21,6 +21,8 @@ contexts:
 * ``use``;
 * the ``include()`` and ``source()`` functions.
 
+In Twig, completion is offered only where the cursor sits inside a directive.
+
 Controller and controller-helper calls recognize named ``view`` and
 ``parameters`` arguments; Twig environment calls recognize named ``name`` and
 ``context`` arguments. Typed receivers explicitly captured by closures or

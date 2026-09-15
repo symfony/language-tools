@@ -14,6 +14,7 @@ use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
@@ -38,6 +39,7 @@ final class SecurityExtractor
         private readonly TwigDocumentParser $twigParser,
         private readonly TwigCallArgumentResolver $twigArguments,
         private readonly ?YamlDocumentParser $yamlParser = null,
+        private readonly TwigDirectiveLocator $twigDirectives = new TwigDirectiveLocator(),
     ) {
     }
 
@@ -55,7 +57,11 @@ final class SecurityExtractor
 
     public function completionContext(string $languageId, string $text, int $offset): ?SecurityCompletionContext
     {
-        $before = substr($this->comments->mask($languageId, $text), 0, $offset);
+        $masked = $this->comments->mask($languageId, $text);
+        if ('twig' === $languageId && !$this->twigDirectives->insideDirective($masked, $offset)) {
+            return null;
+        }
+        $before = substr($masked, 0, $offset);
         if ('twig' === $languageId && preg_match('/\bis_granted\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
         }

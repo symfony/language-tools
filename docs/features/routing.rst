@@ -27,8 +27,9 @@ functions are also supported. The server avoids suggestions when it can't
 establish that a similarly named method belongs to a Symfony API. Twig route
 functions recognize positional arguments
 and the named ``name`` and ``parameters`` arguments. Completion expects named
-arguments in their declared order and isn't offered inside Twig comments;
-navigation and diagnostics also recognize reordered named arguments. Static
+arguments in their declared order, and in Twig it is offered only inside a
+directive, never in markup or a comment; navigation and diagnostics also
+recognize reordered named arguments. Static
 Twig route names and quoted parameter keys use Twig's string escape semantics.
 Twig parameter mappings support explicit entries such as
 ``{slug: article.slug}`` and shorthand entries such as ``{year, month}``.

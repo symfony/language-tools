@@ -15,7 +15,7 @@ Completion is available for:
 * roles in imported, aliased and fully qualified ``IsGranted`` attributes;
 * roles passed to ``denyAccessUnlessGranted()`` on Symfony controllers;
 * roles passed to ``AuthorizationCheckerInterface::isGranted()``;
-* roles passed to Twig's ``is_granted()`` function;
+* roles passed to Twig's ``is_granted()`` function, inside a Twig directive;
 * roles in role hierarchy and access-control configuration;
 * firewall names passed to typed ``LogoutUrlGenerator`` calls and Twig's
   ``logout_path()`` and ``logout_url()`` functions.

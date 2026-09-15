@@ -38,7 +38,8 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         $lineOffset = (int) strrpos("\n".$before, "\n");
         $kind = null;
         $prefix = '';
-        $messengerOptionContext = 'yaml' === $request->document->languageId;
+        $messengerOptionContext = 'yaml' === $request->document->languageId
+            && $this->isMessengerOptionPath($this->yaml->parentPath($request->document->text, $lineOffset));
         if ('php' === $request->document->languageId
             && preg_match('/(?:#\[\s*|,\s*)([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*\([^)]*$/s', $before, $attribute)
         ) {
@@ -50,7 +51,7 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         } elseif ($messengerOptionContext && preg_match('/(?<![\w.$-])(?:fromTransport|from_transport|failure_transport)\s*:\s*["\']?([A-Za-z0-9_.-]*)$/', $before, $match)) {
             $kind = MessengerSymbolKind::Transport;
             $prefix = $match[1];
-        } elseif (preg_match('/BusNameStamp\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match)) {
+        } elseif ('php' === $request->document->languageId && preg_match('/BusNameStamp\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match)) {
             $kind = MessengerSymbolKind::Bus;
             $prefix = $match[1];
         } elseif ('yaml' === $request->document->languageId && \array_slice($this->yaml->parentPath($request->document->text, $lineOffset), -3) === ['framework', 'messenger', 'routing'] && preg_match('/:\s*\[?\s*["\']?([A-Za-z0-9_.-]*)$/', substr($before, $lineOffset), $match)) {
@@ -79,6 +80,17 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
         }
 
         return $items;
+    }
+
+    /**
+     * Whether the keys under $parent can name a Messenger bus or transport.
+     *
+     * @param list<string> $parent
+     */
+    private function isMessengerOptionPath(array $parent): bool
+    {
+        return ['framework', 'messenger'] === \array_slice($parent, 0, 2)
+            || ('services' === ($parent[0] ?? null) && \in_array('tags', \array_slice($parent, -2), true));
     }
 
     /** @return array<array-key, mixed> */

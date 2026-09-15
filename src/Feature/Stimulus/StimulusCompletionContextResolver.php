@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 
 final class StimulusCompletionContextResolver
 {
@@ -11,6 +12,7 @@ final class StimulusCompletionContextResolver
         private readonly PositionConverter $converter,
         private readonly TwigCommentParser $commentParser,
         private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
+        private readonly TwigDirectiveLocator $directives = new TwigDirectiveLocator(),
     ) {
     }
 
@@ -19,7 +21,11 @@ final class StimulusCompletionContextResolver
         if ('twig' !== $languageId) {
             return null;
         }
-        $before = substr($this->commentParser->mask($text), 0, $offset);
+        $masked = $this->commentParser->mask($text);
+        $before = substr($masked, 0, $offset);
+        if (!$this->directives->insideDirective($masked, $offset)) {
+            return $this->attributeContext($before, $text, $offset);
+        }
         if (preg_match('/\bstimulus_(?:action|target)\s*\(\s*([\'"])([^\'"]+)\1\s*,\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             return new StimulusCompletionContext(
                 str_contains($match[0], 'stimulus_action') ? StimulusMemberKind::Action : StimulusMemberKind::Target,
@@ -31,6 +37,13 @@ final class StimulusCompletionContextResolver
         if (preg_match('/\bstimulus_(?:controller|action|target)\s*\(\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             return new StimulusCompletionContext(null, null, $this->controllerNameNormalizer->normalize($match[2]), $this->converter->toRange($text, $offset - \strlen($match[2]), \strlen($match[2])));
         }
+
+        return null;
+    }
+
+    /** Completion inside a `data-*` attribute value, which a template renders as markup. */
+    private function attributeContext(string $before, string $text, int $offset): ?StimulusCompletionContext
+    {
         if (preg_match('/\bdata-action\s*=\s*([\'"])([^\'"]*)$/s', $before, $match)) {
             $token = preg_replace('/^.*\s/s', '', $match[2]);
             if (!\is_string($token)) {

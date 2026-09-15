@@ -956,6 +956,29 @@ final class TemplateProviderTest extends TestCase
         );
     }
 
+    public function testCompletesTemplateNamesOnlyInsideTwigDirectives(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = "{% extends 'article/sh";
+        [$completion, , $converter] = $this->providers($uri, 'twig', $text);
+        $position = $converter->toPosition($text, \strlen($text));
+        $params = ['textDocument' => ['uri' => $uri], 'position' => [
+            'line' => $position->line, 'character' => $position->character,
+        ]];
+
+        self::assertSame(['article/show.html.twig'], array_column($completion->complete($params) ?? [], 'label'));
+
+        $markupUri = 'file:///workspace/templates/markup.html.twig';
+        $markupText = "<p>Use include('article/sh";
+        [$markupCompletion, , $markupConverter] = $this->providers($markupUri, 'twig', $markupText);
+        $markupPosition = $markupConverter->toPosition($markupText, \strlen($markupText));
+
+        self::assertNull($markupCompletion->complete([
+            'textDocument' => ['uri' => $markupUri],
+            'position' => ['line' => $markupPosition->line, 'character' => $markupPosition->character],
+        ]));
+    }
+
     public function testCompletesTemplateNamesForTwigEnvironmentReceivers(): void
     {
         $uri = 'file:///workspace/src/Renderer.php';

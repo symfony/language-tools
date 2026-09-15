@@ -114,6 +114,11 @@ final class AssetProviderTest extends TestCase
         $commentOffset = strpos($commentText, 'images/lo') + \strlen('images/lo');
         self::assertNull($provider->complete($this->params($converter, $commentUri, $commentText, $commentOffset)));
 
+        $markupUri = 'file:///workspace/templates/markup.html.twig';
+        $markupText = "<p>Call asset('images/lo";
+        $documents->open(new Document($markupUri, 'twig', 1, $markupText));
+        self::assertNull($provider->complete($this->params($converter, $markupUri, $markupText, \strlen($markupText))));
+
         $assetOffset = strpos($usageText, 'images/logo.svg') + 2;
         $assetParams = $this->params($converter, $usageUri, $usageText, $assetOffset);
         $assetHover = $provider->hover($assetParams);

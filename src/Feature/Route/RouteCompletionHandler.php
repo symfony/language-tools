@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteCompletionHandler implements CompletionProviderInterface
@@ -21,6 +22,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
         private readonly CommentParserRegistry $comments,
         private readonly RouteCompletionBuilder $completionBuilder,
+        private readonly TwigDirectiveLocator $directives = new TwigDirectiveLocator(),
     ) {
     }
 
@@ -39,6 +41,9 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         $routeIndex = $this->routeIndexes->forProject($request->project);
         $masked = $this->comments->mask($request->document->languageId, $request->document->text);
         if ('twig' === $request->document->languageId) {
+            if (!$this->directives->insideDirective($masked, $this->positionConverter->toByteOffset($masked, $request->position))) {
+                return null;
+            }
             $twigText = $masked;
             $parameterContext = TwigRouteParameterCompletionContext::fromTwig(
                 $twigText,

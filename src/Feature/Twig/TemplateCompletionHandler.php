@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TemplateCompletionHandler implements CompletionProviderInterface
@@ -19,6 +20,7 @@ final class TemplateCompletionHandler implements CompletionProviderInterface
         private readonly TemplateReferenceExtractor $extractor,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly CommentParserRegistry $comments,
+        private readonly TwigDirectiveLocator $directives = new TwigDirectiveLocator(),
     ) {
     }
 
@@ -29,6 +31,11 @@ final class TemplateCompletionHandler implements CompletionProviderInterface
             return null;
         }
         $text = $this->comments->mask($request->document->languageId, $request->document->text);
+        if ('twig' === $request->document->languageId
+            && !$this->directives->insideDirective($text, $this->converter->toByteOffset($text, $request->position))
+        ) {
+            return null;
+        }
         $context = TemplateCompletionContext::create($request->document->languageId, $text, $request->position, $this->converter);
         if (null === $context
             || ($context->phpRenderCall && !$this->extractor->supportsPhpRenderAt(

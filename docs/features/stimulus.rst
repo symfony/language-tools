@@ -11,8 +11,10 @@ Controller completion is available in ``data-controller`` attributes and the
 ``stimulus_controller()``, ``stimulus_action()`` and ``stimulus_target()`` Twig
 helpers. Action completion is available in ``data-action`` descriptors and the
 ``stimulus_action()`` helper. Target completion is available in
-``data-*-target`` attributes and the ``stimulus_target()`` helper. The Twig
-helpers accept Symfony UX package names such as
+``data-*-target`` attributes and the ``stimulus_target()`` helper. The helpers
+are completed inside Twig directives and the attributes in markup, so neither is
+offered where the other belongs. The helpers accept Symfony UX package names
+such as
 ``symfony/ux-autocomplete/autocomplete`` and
 ``@symfony/ux-autocomplete/autocomplete``. Controller completion recognizes
 these spellings while typing and inserts the normalized Stimulus identifier.

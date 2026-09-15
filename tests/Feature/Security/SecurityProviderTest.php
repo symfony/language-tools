@@ -281,6 +281,16 @@ YAML;
         self::assertNull($extractor->completionContext('php', $text, strpos($text, 'ROLE_A') + \strlen('ROLE_A')));
     }
 
+    public function testOffersTwigSecurityCompletionsOnlyInsideDirectives(): void
+    {
+        $extractor = $this->extractor();
+        $directive = "{% if is_granted('ROLE_A";
+        $markup = "<p>Call is_granted('ROLE_A";
+
+        self::assertNotNull($extractor->completionContext('twig', $directive, \strlen($directive)));
+        self::assertNull($extractor->completionContext('twig', $markup, \strlen($markup)));
+    }
+
     public function testCompletesHoversNavigatesReferencesAndDiagnoses(): void
     {
         $yamlUri = 'file:///workspace/config/packages/security.yaml';

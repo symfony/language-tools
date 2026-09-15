@@ -115,6 +115,25 @@ final class RouteCompletionHandlerTest extends TestCase
         ]) ?? [], 'label'));
     }
 
+    public function testIgnoresRouteFunctionTextOutsideTwigDirectives(): void
+    {
+        $uri = 'file:///workspace/templates/article.html.twig';
+        $text = "<p>Call path('article_";
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'twig', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $indexes = new RouteIndexRegistry();
+        $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
+        $converter = new PositionConverter();
+        $position = $converter->toPosition($text, \strlen($text));
+
+        self::assertNull($this->handler($documents, $projects, $converter, $indexes)->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]));
+    }
+
     #[DataProvider('twigRouteParameterCompletionProvider')]
     public function testCompletesRouteParametersInTwigFunctions(string $text): void
     {
