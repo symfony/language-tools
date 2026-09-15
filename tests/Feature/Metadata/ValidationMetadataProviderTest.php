@@ -141,6 +141,43 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         self::assertSame(['Slug'], $this->completionLabels($completionProvider, $converter, $constraintNameUri, $constraintNameText, \strlen($constraintNameText)));
     }
 
+    public function testReadsNestedYamlConstraintsAsConstraintsRatherThanOptions(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<'YAML'
+            App\Entity\Order:
+                properties:
+                    name:
+                        - Length:
+                            min: 5
+                    emails:
+                        - All:
+                            - NotBlank: ~
+                            - Email: { mode: strict }
+                    flat:
+                        - All: [ NotBlank: ~ ]
+            unrelated_config:
+                properties:
+                    nested:
+                        Length:
+                            min: 5
+            YAML;
+
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/config/validator/Order.yaml', 'yaml', $text));
+
+        self::assertSame(
+            [['Length', 'min'], ['Email', 'mode']],
+            array_map(static fn ($option): array => [$option->constraint, $option->option], $facts->constraintOptions),
+        );
+        self::assertSame(
+            ['Length', 'All', 'NotBlank', 'Email', 'All', 'NotBlank'],
+            array_values(array_map(
+                static fn ($symbol): string => $symbol->name,
+                array_filter($facts->symbols, static fn ($symbol): bool => MetadataSymbolKind::Constraint === $symbol->kind),
+            )),
+        );
+    }
+
     public function testIndexesConstraintOptionsFromIncompleteSource(): void
     {
         $extractor = $this->createExtractor(new PositionConverter());

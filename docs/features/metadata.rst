@@ -56,8 +56,12 @@ extending ``Constraint`` are recognized from project files.
 
 Definitely unknown options are diagnosed only when the constraint itself is
 known. In PHP, the attribute must resolve to an installed constraint; unrelated
-attributes that share its short name are ignored. Validation applies to
-top-level named arguments; positional values and expressions nested inside
+attributes that share its short name are ignored. In YAML, a mapping is read
+only under a class name key, and Symfony's own distinction is applied: a
+sequence entry declares a constraint while a mapping key declares an option, so
+the nested constraints of ``All``, ``Collection`` or ``Sequentially`` are
+recognized as constraints instead of options of their parent. Validation applies
+to top-level named arguments; positional values and expressions nested inside
 argument values are ignored. Every constraint in a grouped PHP attribute is
 indexed. Go to Definition and Find All References connect application constraint
 classes to static PHP and YAML usages.

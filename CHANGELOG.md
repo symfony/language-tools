@@ -8,6 +8,8 @@
 - Read Twig `{% trans %}` keys from parsed tag directives instead of matching tag text, so a tag inside a string literal is ignored and whitespace-control forms are recognized
 - Recognize `createForm()` and `createNamed()` only on `$this` or a form factory receiver, so options passed to a same-named method on an unrelated object are no longer diagnosed
 - Ignore Stimulus markup inside HTML comments and read `data-action` references only from complete Stimulus descriptors, so commented markup and URL values are no longer reported as unknown controllers
+- Read YAML validation constraints and their options the way Symfony does, so nested constraints such as the entries of `All` are no longer reported as unknown options of their parent
+- Ignore `trans()` calls whose receiver is declared with a type no translator can satisfy
 - Treat a doubled `%%` as an escaped percent sign in environment expressions
 - Recognize form options declared by a type extension registered on several types of the same hierarchy
 

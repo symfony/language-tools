@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Configuration\ConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 
 final class YamlMetadataExtractor
@@ -28,7 +29,7 @@ final class YamlMetadataExtractor
                     false,
                 );
             }
-            if (3 === \count($path) && \in_array($path[1], ['properties', 'attributes'], true)) {
+            if (3 === \count($path) && str_contains($path[0], '\\') && \in_array($path[1], ['properties', 'attributes'], true)) {
                 $symbols[] = new MetadataSourceSymbol(
                     MetadataSymbolKind::Property,
                     $path[0].'::$'.$path[2],
@@ -37,10 +38,10 @@ final class YamlMetadataExtractor
                     false,
                 );
             }
-            if (4 === \count($path) && 'properties' === $path[1]) {
+            if ($this->isConstraint($occurrence)) {
                 $symbols[] = new MetadataSourceSymbol(
                     MetadataSymbolKind::Constraint,
-                    $path[3],
+                    $path[\count($path) - 1],
                     $uri,
                     $occurrence->keyRange,
                     false,
@@ -68,13 +69,31 @@ final class YamlMetadataExtractor
         foreach ($this->yaml->parse($text) as $occurrence) {
             $path = $occurrence->path;
             $count = \count($path);
-            if ($count < 5 || 'properties' !== $path[1]) {
+            if (!$this->isPropertyMapping($occurrence) || $this->isConstraint($occurrence) || !\in_array($count - 2, $occurrence->sequenceDepths, true)) {
                 continue;
             }
             $options[] = new ConstraintOptionReference($path[$count - 2], $path[$count - 1], $occurrence->keyRange);
         }
 
         return $options;
+    }
+
+    /**
+     * Symfony reads a constraint from a sequence entry and an option from a
+     * mapping key, so nested constraints such as the entries of `All` never
+     * name an option of their parent.
+     */
+    private function isConstraint(ConfigurationOccurrence $occurrence): bool
+    {
+        return $this->isPropertyMapping($occurrence)
+            && \in_array(\count($occurrence->path) - 1, $occurrence->sequenceDepths, true);
+    }
+
+    private function isPropertyMapping(ConfigurationOccurrence $occurrence): bool
+    {
+        return \count($occurrence->path) > 3
+            && str_contains($occurrence->path[0], '\\')
+            && 'properties' === $occurrence->path[1];
     }
 
     public function completionContext(string $text, int $offset): ?MetadataCompletionContext
