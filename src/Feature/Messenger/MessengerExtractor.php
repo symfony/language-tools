@@ -9,6 +9,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
 use Symfony\Lsp\Parser\Php\PhpTypeKind;
 
 final class MessengerExtractor
@@ -62,7 +63,7 @@ final class MessengerExtractor
             }
             $parents = $this->phpParents($php);
             foreach ($php->methodCalls as $call) {
-                if ('dispatch' !== $call->method || !$php->receiverHasType($call, ...self::BUS_TYPES)) {
+                if ('dispatch' !== $call->method || PhpReceiverMatch::Matches !== $php->matchReceiver($call, ...self::BUS_TYPES)) {
                     continue;
                 }
                 $messageArgument = $call->positionalArgument(0);

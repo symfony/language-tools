@@ -9,6 +9,7 @@ use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 
@@ -130,18 +131,12 @@ final class PhpTranslationReferenceExtractor
 
     private function hasGlobalParameterReceiver(PhpMethodCall $call, PhpDocument $document): bool
     {
-        return $document->receiverHasType($call, ...self::GLOBAL_PARAMETER_TRANSLATORS);
+        return PhpReceiverMatch::Matches === $document->matchReceiver($call, ...self::GLOBAL_PARAMETER_TRANSLATORS);
     }
 
-    /**
-     * Whether the receiver is declared with a type that no translator can
-     * satisfy. An undeclared receiver stays eligible: its type can live in
-     * another file.
-     */
     private function hasUnrelatedReceiver(PhpMethodCall $call, PhpDocument $document): bool
     {
-        return [] !== $document->receiverVariables($call)
-            && !$document->receiverHasType($call, ...self::TRANSLATORS);
+        return PhpReceiverMatch::Unrelated === $document->matchReceiver($call, ...self::TRANSLATORS);
     }
 
     private function domain(?PhpArgument $argument): ?string

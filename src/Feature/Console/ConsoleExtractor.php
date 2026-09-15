@@ -11,6 +11,7 @@ use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 use Symfony\Lsp\Parser\Php\PhpTypeKind;
@@ -48,7 +49,7 @@ final class ConsoleExtractor
 
         $references = [];
         foreach ($php->methodCalls as $call) {
-            if (!\in_array($call->method, ['getArgument', 'getOption'], true) || !$php->receiverHasType($call, self::INPUT_INTERFACE)) {
+            if (!\in_array($call->method, ['getArgument', 'getOption'], true) || PhpReceiverMatch::Matches !== $php->matchReceiver($call, self::INPUT_INTERFACE)) {
                 continue;
             }
             $name = $call->positionalArgument(0)?->stringLiteral;
@@ -84,7 +85,7 @@ final class ConsoleExtractor
         $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
         $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
         $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
-        if (null === $call || null === $call->className || !$php->receiverHasType($call, self::INPUT_INTERFACE)) {
+        if (null === $call || null === $call->className || PhpReceiverMatch::Matches !== $php->matchReceiver($call, self::INPUT_INTERFACE)) {
             return null;
         }
         $rawPrefix = $match['prefix'][0];

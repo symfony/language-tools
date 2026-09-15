@@ -216,9 +216,15 @@ final class PhpDocument
         return $variables;
     }
 
-    public function receiverHasType(PhpMethodCall $call, string ...$types): bool
+    public function matchReceiver(PhpMethodCall $call, string ...$types): PhpReceiverMatch
     {
-        return array_any($this->receiverVariables($call), static fn (PhpTypedVariable $variable): bool => [] !== array_intersect($types, $variable->types));
+        if ([] === $variables = $this->receiverVariables($call)) {
+            return PhpReceiverMatch::Unknown;
+        }
+
+        return array_any($variables, static fn (PhpTypedVariable $variable): bool => [] !== array_intersect($types, $variable->types))
+            ? PhpReceiverMatch::Matches
+            : PhpReceiverMatch::Unrelated;
     }
 
     public function isVariableVisible(string $name, int $declarationScopeStartOffset, PhpMethodCall $call): bool

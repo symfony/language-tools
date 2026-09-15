@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
+use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
 
 final class RoutePhpReceiverResolver
 {
@@ -25,6 +26,6 @@ final class RoutePhpReceiverResolver
             return null;
         }
 
-        return $document->receiverHasType($call, ...self::ROUTER_TYPES) ? new RoutePhpReceiver(null) : null;
+        return PhpReceiverMatch::Matches === $document->matchReceiver($call, ...self::ROUTER_TYPES) ? new RoutePhpReceiver(null) : null;
     }
 }

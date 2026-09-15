@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
+use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
 
 final class SerializerMetadataExtractor
 {
@@ -90,7 +91,7 @@ final class SerializerMetadataExtractor
         }
 
         return \in_array($call->method, self::CONTEXT_METHODS, true)
-            && ([] === $php->receiverVariables($call) || $php->receiverHasType($call, ...self::SERIALIZERS));
+            && PhpReceiverMatch::Unrelated !== $php->matchReceiver($call, ...self::SERIALIZERS);
     }
 
     /**

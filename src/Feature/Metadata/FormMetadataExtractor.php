@@ -11,6 +11,7 @@ use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
+use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
@@ -232,7 +233,7 @@ final class FormMetadataExtractor
     {
         return match ($call->receiverContext->kind) {
             PhpMethodReceiverKind::This => true,
-            PhpMethodReceiverKind::ThisProperty, PhpMethodReceiverKind::Variable => $php->receiverHasType($call, ...self::FORM_FACTORY_TYPES),
+            PhpMethodReceiverKind::ThisProperty, PhpMethodReceiverKind::Variable => PhpReceiverMatch::Matches === $php->matchReceiver($call, ...self::FORM_FACTORY_TYPES),
             PhpMethodReceiverKind::Other => false,
         };
     }

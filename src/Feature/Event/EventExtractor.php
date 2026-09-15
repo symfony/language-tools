@@ -11,6 +11,7 @@ use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 
 final class EventExtractor
@@ -179,7 +180,7 @@ final class EventExtractor
 
     private function hasEventDispatcherReceiver(PhpDocument $php, PhpMethodCall $call): bool
     {
-        return $php->receiverHasType($call, ...self::DISPATCHER_TYPES);
+        return PhpReceiverMatch::Matches === $php->matchReceiver($call, ...self::DISPATCHER_TYPES);
     }
 
     /**
