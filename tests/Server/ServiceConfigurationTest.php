@@ -35,6 +35,7 @@ use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlScalarDecoder;
+use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
@@ -129,6 +130,7 @@ final class ServiceConfigurationTest extends TestCase
             ApplicationSourceScanner::class,
             DebouncedRuntimeRefreshScheduler::class,
             DiagnosticProviderRegistry::class,
+            GitignoreMatcher::class,
             PersistentSourceIndexStore::class,
             ProjectIndexStatusRegistry::class,
             PublicAssetResolver::class,

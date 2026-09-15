@@ -57,6 +57,37 @@ final class GitignoreMatcherTest extends TestCase
         self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/tmp/app.log'));
     }
 
+    public function testRefreshesResultsWhenANestedGitignoreFileChanges(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/.gitignore', "*.php\n");
+        mkdir($this->temporaryDirectory.'/src');
+        file_put_contents($this->temporaryDirectory.'/src/.gitignore', "!Kernel.php\n");
+        $matcher = new GitignoreMatcher();
+
+        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
+
+        file_put_contents($this->temporaryDirectory.'/src/.gitignore', "!Controller.php\n");
+
+        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
+        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Controller.php'));
+    }
+
+    public function testRefreshesResultsWhenAGitignoreFileAppearsOrDisappears(): void
+    {
+        mkdir($this->temporaryDirectory.'/src');
+        $matcher = new GitignoreMatcher();
+
+        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
+
+        file_put_contents($this->temporaryDirectory.'/src/.gitignore', "Kernel.php\n");
+
+        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
+
+        unlink($this->temporaryDirectory.'/src/.gitignore');
+
+        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
+    }
+
     public function testReincludesEverythingBelowADirectoryRestoredByANegatedPattern(): void
     {
         file_put_contents($this->temporaryDirectory.'/.gitignore', "custom/*\n!custom/static-plugins/\n");
