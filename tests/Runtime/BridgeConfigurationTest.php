@@ -83,6 +83,6 @@ final class BridgeConfigurationTest extends TestCase
         self::assertSame([], $result['errors']);
         self::assertIsArray($result['sections'] ?? null);
         self::assertIsArray($result['sections']['configuration'] ?? null);
-        self::assertSame(['The App\BrokenBundle configuration tree is unavailable.'], $result['sections']['configuration']['warnings'] ?? null);
+        self::assertSame(['The App\BrokenExtension configuration tree is unavailable.'], $result['sections']['configuration']['warnings'] ?? null);
     }
 }

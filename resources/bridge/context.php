@@ -11,7 +11,8 @@ final class SymfonyLspBridgeContext
 
     private ?object $kernel = null;
     private ?object $application = null;
-    private ?array $extensionAliases = null;
+    private ?object $containerBuilder = null;
+    private ?array $extensions = null;
     private ?SymfonyLspBridgeEffectiveConfiguration $effectiveConfiguration = null;
     private ?Throwable $kernelError = null;
     private bool $kernelErrorReported = false;
@@ -58,29 +59,92 @@ final class SymfonyLspBridgeContext
         ];
     }
 
-    // a Composer-installed package is configurable only when a bundle the analyzed kernel registers declares its extension
+    // a Composer-installed package is configurable only when the analyzed kernel registers its extension
     public function hasExtension(string $alias): bool
     {
-        if (null === $this->extensionAliases) {
-            $aliases = [];
-            $kernel = $this->kernel();
-            foreach (method_exists($kernel, 'getBundles') ? $kernel->getBundles() : [] as $bundle) {
-                try {
-                    $extension = is_object($bundle) && method_exists($bundle, 'getContainerExtension')
-                        ? $bundle->getContainerExtension()
-                        : null;
-                    $name = is_object($extension) && method_exists($extension, 'getAlias') ? $extension->getAlias() : null;
-                } catch (Throwable) {
-                    continue;
-                }
-                if (is_string($name) && '' !== $name) {
-                    $aliases[$name] = true;
-                }
+        return isset($this->extensions()[$alias]);
+    }
+
+    /** @return array<string, object> extension aliases mapped to their extension */
+    public function extensions(): array
+    {
+        $this->resolveExtensions();
+
+        return $this->extensions;
+    }
+
+    /** the container the extensions were read from, which their configuration trees are built against */
+    public function containerBuilder(): object
+    {
+        $this->resolveExtensions();
+
+        return $this->containerBuilder;
+    }
+
+    /*
+     * The kernel's own container build is the only place that knows which
+     * extension answers an alias: bundles register their own, bundle builds
+     * register more, and the prepend phase replaces some. A bundle extending
+     * AbstractBundle, for instance, declares a generated extension with an
+     * empty configuration tree and registers its real one while prepending.
+     */
+    private function resolveExtensions(): void
+    {
+        if (null !== $this->extensions) {
+            return;
+        }
+        if (SymfonyLspBridgeEffectiveConfiguration::isSupported()) {
+            try {
+                $container = ($this->effectiveConfiguration ??= new SymfonyLspBridgeEffectiveConfiguration($this->kernel()))->container();
+                $this->containerBuilder = $container;
+                $this->extensions = $container->getExtensions();
+
+                return;
+            } catch (Throwable) {
             }
-            $this->extensionAliases = $aliases;
         }
 
-        return isset($this->extensionAliases[$alias]);
+        // an application whose container cannot be rebuilt still declares extensions on its bundles
+        $this->extensions = [];
+        $this->containerBuilder = $builder = $this->emptyContainerBuilder();
+        $kernel = $this->kernel();
+        foreach (method_exists($kernel, 'getBundles') ? $kernel->getBundles() : [] as $bundle) {
+            try {
+                $extension = is_object($bundle) && method_exists($bundle, 'getContainerExtension')
+                    ? $bundle->getContainerExtension()
+                    : null;
+                $alias = is_object($extension) && method_exists($extension, 'getAlias') ? $extension->getAlias() : null;
+            } catch (Throwable) {
+                continue;
+            }
+            if (is_string($alias) && '' !== $alias) {
+                $this->extensions[$alias] = $extension;
+                $builder->registerExtension($extension);
+            }
+        }
+    }
+
+    private function emptyContainerBuilder(): object
+    {
+        $kernel = $this->kernel();
+        $builder = new Symfony\Component\DependencyInjection\ContainerBuilder();
+        $builder->setParameter('kernel.environment', $this->environment);
+        $builder->setParameter('kernel.debug', $this->debug);
+        $builder->setParameter('kernel.project_dir', realpath($this->project) ?: $this->project);
+        $builder->setParameter('kernel.bundles', array_map(
+            static fn (object $item): string => $item::class,
+            method_exists($kernel, 'getBundles') ? $kernel->getBundles() : [],
+        ));
+        if (method_exists($kernel, 'getContainer')) {
+            $runtimeContainer = $kernel->getContainer();
+            foreach (['kernel.bundles_metadata', 'kernel.build_dir', 'kernel.cache_dir', 'kernel.charset', 'kernel.container_class', 'kernel.logs_dir', 'kernel.runtime_environment'] as $parameterName) {
+                if ($runtimeContainer->hasParameter($parameterName)) {
+                    $builder->setParameter($parameterName, $runtimeContainer->getParameter($parameterName));
+                }
+            }
+        }
+
+        return $builder;
     }
 
     public function configuration(string $name, ?string $path = null): mixed

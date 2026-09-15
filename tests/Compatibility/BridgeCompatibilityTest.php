@@ -163,6 +163,15 @@ final class BridgeCompatibilityTest extends TestCase
             ['default-src', 'report-uri'],
             array_column($shorthandChildren['exact_keys']['children'], 'name'),
         );
+        // an AbstractBundle only declares its real extension while prepending
+        $prependedTrees = array_values(array_filter($configurationBundles, static fn (mixed $bundle): bool => \is_array($bundle) && 'fixture_prepended' === ($bundle['alias'] ?? null)));
+        self::assertCount(1, $prependedTrees);
+        $prependedTree = $prependedTrees[0]['tree'] ?? null;
+        self::assertIsArray($prependedTree);
+        self::assertSame(
+            ['base_uri', 'cache'],
+            array_column(\is_array($prependedTree['children'] ?? null) ? $prependedTree['children'] : [], 'name'),
+        );
         $configurationResources = $configuration['resources'] ?? null;
         self::assertIsArray($configurationResources);
         self::assertContains(realpath($project.'/config/services.yaml'), $configurationResources);

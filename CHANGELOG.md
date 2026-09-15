@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read bundle configuration schemas from the extensions the kernel registers, so a bundle that declares its extension while prepending no longer has every configured key reported as unknown
 - Speed up checks by compiling each `.gitignore` file once per project instead of once per examined file
 - Speed up checks by looking for a suppression directive before parsing a document's comments
 - Read Messenger bus and transport references from Messenger configuration keys instead of any YAML key named like them, so a `$bus` service argument is no longer reported as an unknown bus

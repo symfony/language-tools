@@ -7,45 +7,23 @@ function symfonyLspBridgeConfigurationSection(SymfonyLspBridgeContext $context):
     $warnings = [];
     $complete = true;
     try {
-        $kernel = $context->kernel();
-        $builder = new Symfony\Component\DependencyInjection\ContainerBuilder();
-        $builder->setParameter('kernel.environment', $context->environment());
-        $builder->setParameter('kernel.debug', $context->debug());
-        $builder->setParameter('kernel.project_dir', realpath($project) ?: $project);
-        $builder->setParameter('kernel.bundles', array_map(static fn (object $item): string => $item::class, $kernel->getBundles()));
-        if (method_exists($kernel, 'getContainer')) {
-            $runtimeContainer = $kernel->getContainer();
-            foreach (['kernel.bundles_metadata', 'kernel.build_dir', 'kernel.cache_dir', 'kernel.charset', 'kernel.container_class', 'kernel.logs_dir', 'kernel.runtime_environment'] as $parameterName) {
-                if ($runtimeContainer->hasParameter($parameterName)) {
-                    $builder->setParameter($parameterName, $runtimeContainer->getParameter($parameterName));
-                }
-            }
-        }
-        foreach ($kernel->getBundles() as $bundle) {
-            $extension = $bundle->getContainerExtension();
-            if (null !== $extension) {
-                $builder->registerExtension($extension);
-            }
-        }
-        foreach ($kernel->getBundles() as $bundle) {
+        $builder = $context->containerBuilder();
+        foreach ($context->extensions() as $alias => $extension) {
             try {
-                $extension = $bundle->getContainerExtension();
-                if (null === $extension || !method_exists($extension, 'getConfiguration')) {
+                if (!method_exists($extension, 'getConfiguration')) {
                     continue;
                 }
                 $configuration = $extension->getConfiguration([], $builder);
                 if (null === $configuration) {
                     continue;
                 }
-                $tree = $configuration->getConfigTreeBuilder()->buildTree();
-                $alias = method_exists($extension, 'getAlias') ? $extension->getAlias() : $tree->getName();
                 $bundles[] = [
-                    'alias' => (string) $alias,
-                    'class' => $bundle::class,
-                    'tree' => symfonyLspBridgeNormalizeConfigNode($tree),
+                    'alias' => $alias,
+                    'class' => $extension::class,
+                    'tree' => symfonyLspBridgeNormalizeConfigNode($configuration->getConfigTreeBuilder()->buildTree()),
                 ];
             } catch (Throwable) {
-                $warnings[] = sprintf('The %s configuration tree is unavailable.', $bundle::class);
+                $warnings[] = sprintf('The %s configuration tree is unavailable.', $extension::class);
             }
         }
     } catch (Throwable $error) {

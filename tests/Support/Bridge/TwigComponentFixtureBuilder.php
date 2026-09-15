@@ -18,6 +18,7 @@ final class TwigComponentFixtureBuilder
         $source = $this->prelude->render(<<<'PHP'
             __INSTALLED_VERSIONS__
             __CONSOLE_IO__
+            __CONTAINER_BUILDER__
             namespace Symfony\Component\Console\Exception;
             final class LogicException extends \LogicException
             {

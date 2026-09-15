@@ -12,14 +12,28 @@ final class FakeFrameworkPrelude
         string $applicationConstructor = 'public function __construct(object $kernel) {}',
     ): string {
         return str_replace(
-            ['__INSTALLED_VERSIONS__', '__CONSOLE_IO__', '__FRAMEWORK_APPLICATION__'],
+            ['__INSTALLED_VERSIONS__', '__CONSOLE_IO__', '__CONTAINER_BUILDER__', '__FRAMEWORK_APPLICATION__'],
             [
                 $this->installedVersions($version, $additionalInstalledVersionMethods),
                 $this->consoleIo(),
+                $this->containerBuilder(),
                 null === $applicationMembers ? '' : $this->frameworkConsoleApplication($applicationMembers, $applicationConstructor),
             ],
             $source,
         );
+    }
+
+    public function containerBuilder(): string
+    {
+        return <<<'PHP'
+
+            namespace Symfony\Component\DependencyInjection;
+            final class ContainerBuilder
+            {
+                public function setParameter(string $name, mixed $value): void {}
+                public function registerExtension(object $extension): void {}
+            }
+            PHP;
     }
 
     public function installedVersions(string $version = '8.0.6', string $additionalMethods = '', bool $bracketedNamespace = false): string

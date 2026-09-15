@@ -117,6 +117,37 @@ final class CheckParityTest extends TestCase
         }
     }
 
+    public function testAcceptsConfigurationOfAnExtensionRegisteredWhilePrepending(): void
+    {
+        $fixture = new RuntimeApplicationFixture();
+        $path = $fixture->rootPath.'/config/packages/fixture_prepended.yaml';
+        $text = file_get_contents($path);
+        self::assertIsString($text);
+        $factory = new LanguageServerFactory($fixture->serverVersion);
+        try {
+            $lspDiagnostics = $this->publishedDiagnostics(
+                $factory,
+                $fixture->rootPath,
+                'file://'.$path,
+                'yaml',
+                $text,
+                ['workspaceTrust' => true],
+            );
+            $headlessDiagnostics = $this->headlessDiagnostics(
+                $factory,
+                $fixture->rootPath,
+                'config/packages/fixture_prepended.yaml',
+                false,
+                CheckCommand::EXIT_SUCCESS,
+            );
+
+            $this->assertSameDiagnostics($lspDiagnostics, $headlessDiagnostics);
+            self::assertSame([], $headlessDiagnostics);
+        } finally {
+            $fixture->cleanup();
+        }
+    }
+
     public function testAcceptsRuntimeRouteAliasesInTwig(): void
     {
         $fixture = new RuntimeApplicationFixture();

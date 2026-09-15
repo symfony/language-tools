@@ -19,12 +19,7 @@ final class ConfigurationFixtureBuilder
             {
                 public static function join(string ...$paths): string { return implode('/', $paths); }
             }
-            namespace Symfony\Component\DependencyInjection;
-            final class ContainerBuilder
-            {
-                public function setParameter(string $name, mixed $value): void {}
-                public function registerExtension(object $extension): void {}
-            }
+            __CONTAINER_BUILDER__
             namespace Symfony\Component\Config\Definition;
             abstract class TestNode
             {

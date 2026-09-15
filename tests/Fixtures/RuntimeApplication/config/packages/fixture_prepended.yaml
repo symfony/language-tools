@@ -1,0 +1,4 @@
+fixture_prepended:
+    base_uri: 'https://fixture.example.com'
+    cache:
+        max_age: 60

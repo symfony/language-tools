@@ -1,6 +1,7 @@
 <?php
 
 return [
+    App\Prepended\FixturePrependedBundle::class => ['all' => true],
     App\Shorthand\FixtureShorthandBundle::class => ['all' => true],
     Symfony\Bundle\FrameworkBundle\FrameworkBundle::class => ['all' => true],
     Symfony\Bundle\SecurityBundle\SecurityBundle::class => ['all' => true],

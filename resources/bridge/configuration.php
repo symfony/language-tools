@@ -91,7 +91,7 @@ final class SymfonyLspBridgeEffectiveConfiguration
         return $configuration;
     }
 
-    private function container(): ContainerBuilder
+    public function container(): ContainerBuilder
     {
         if (null !== $this->containerError) {
             throw $this->containerError;
