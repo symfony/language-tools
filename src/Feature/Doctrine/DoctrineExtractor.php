@@ -164,13 +164,8 @@ final class DoctrineExtractor
         if ('Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository' !== $type->parentClassName) {
             return null;
         }
-        $entityClass = $this->repositoryEntityReference($source, $type, $php)?->className;
-        if (null === $entityClass) {
-            $before = substr($text, max(0, $type->startOffset - 1000), min(1000, $type->startOffset));
-            if (preg_match('/@extends\s+(?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?ServiceEntityRepository\s*<\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*>/', $before, $entity)) {
-                $entityClass = $php->resolveName($entity[1]);
-            }
-        }
+        $entityClass = $this->repositoryEntityReference($source, $type, $php)->className
+            ?? $this->documentedEntityClass($text, $source, $type, $php);
         if (null === $entityClass) {
             return null;
         }
@@ -181,6 +176,30 @@ final class DoctrineExtractor
             $uri,
             $this->converter->toRange($text, $type->nameStartOffset, $type->nameEndOffset - $type->nameStartOffset),
         );
+    }
+
+    /**
+     * The entity named by an `@extends ServiceEntityRepository<Entity>` tag in
+     * the doc comment attached to $type, which is the last comment before it
+     * with no statement boundary in between.
+     */
+    private function documentedEntityClass(string $text, string $source, PhpTypeDeclaration $type, PhpDocument $php): ?string
+    {
+        $attached = null;
+        foreach ($this->phpComments->comments($text) as $comment) {
+            if ($comment->endOffset <= $type->startOffset
+                && !preg_match('/[;{}]/', substr($source, $comment->endOffset, $type->startOffset - $comment->endOffset))
+            ) {
+                $attached = $comment;
+            }
+        }
+        if (null === $attached
+            || !preg_match('/@extends\s+(?:[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\\\\)?ServiceEntityRepository\s*<\s*([A-Za-z_\\\\][A-Za-z0-9_\\\\]*)\s*>/', $attached->content, $entity)
+        ) {
+            return null;
+        }
+
+        return $php->resolveName($entity[1]);
     }
 
     private function repositoryEntityReference(string $source, PhpTypeDeclaration $type, PhpDocument $php): ?PhpClassReference

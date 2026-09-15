@@ -292,6 +292,10 @@ final class DoctrineProviderTest extends TestCase
             final class ProductRepository extends ServiceEntityRepository
             {
             }
+
+            final class UndocumentedRepository extends ServiceEntityRepository
+            {
+            }
             PHP;
         $usageText = <<<'PHP'
             <?php
@@ -322,7 +326,10 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame(['name', 'sku'], array_map(static fn (DoctrineField $field): string => $field->name, $entityFacts->entities[0]->fields));
 
         $repositoryFacts = $extractor->extract(new SourceDocument('file:///workspace/src/Repository/ProductRepository.php', 'php', $repositoryText));
-        self::assertSame('App\Entity\Product', $repositoryFacts->repositories[0]->entityClass);
+        self::assertSame(
+            [['App\Repository\ProductRepository', 'App\Entity\Product']],
+            array_map(static fn ($repository): array => [$repository->className, $repository->entityClass], $repositoryFacts->repositories),
+        );
 
         $usageFacts = $extractor->extract(new SourceDocument('file:///workspace/src/Service/ProductFinder.php', 'php', $usageText));
         $fieldReferences = array_values(array_filter(

@@ -56,6 +56,9 @@ Symfony Language Tools recognizes ``#[ORM\Entity]`` and
 ``#[ORM\MappedSuperclass]`` classes, ``#[ORM\Column]`` fields and Doctrine
 association attributes. Repository classes are resolved from the entity's
 ``repositoryClass`` option and direct ``ServiceEntityRepository`` subclasses.
+A repository's entity comes from its ``parent::__construct()`` call or from an
+``@extends ServiceEntityRepository<Entity>`` tag in its own doc comment, so a
+second repository in the same file no longer inherits the first one's entity.
 
 Go to Definition connects ``repositoryClass`` references to repository classes
 and repository constructor entity references back to entity classes. Hover
