@@ -5,10 +5,14 @@ namespace Symfony\Lsp\Feature\Route;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 
 final class PhpRouteDeclarationExtractor
 {
+    private const ROUTING_CONFIGURATOR = 'Symfony\\Component\\Routing\\Loader\\Configurator\\RoutingConfigurator';
+    private const ROUTE_COLLECTION = 'Symfony\\Component\\Routing\\RouteCollection';
+
     public function __construct(
         private readonly PositionConverter $positionConverter,
         private readonly PhpParserInterface $parser,
@@ -49,7 +53,7 @@ final class PhpRouteDeclarationExtractor
             if ('add' !== $call->method || !preg_match('/^\$(\w+)$/', $call->receiver, $variable)) {
                 continue;
             }
-            $collectionVariables ??= $this->collectionVariableOffsets($source->text);
+            $collectionVariables ??= $this->collectionVariableOffsets($document, $source->text);
             $declaredAt = $collectionVariables[$variable[1]] ?? null;
             if (null === $declaredAt || $declaredAt > $call->startOffset) {
                 continue;
@@ -80,22 +84,22 @@ final class PhpRouteDeclarationExtractor
     /**
      * @return array<string, int> First offset at which each variable is bound to a route collection
      */
-    private function collectionVariableOffsets(string $text): array
+    private function collectionVariableOffsets(PhpDocument $document, string $text): array
     {
-        if (!preg_match_all(
-            '/RoutingConfigurator\s+\$(\w+)\b|\$(\w+)\s*=\s*new\s+(?:\\\\?RouteCollection|[^\s;(]*\\\\RouteCollection)\b/s',
-            $text,
-            $matches,
-            \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE,
-        )) {
-            return [];
-        }
-
         $offsets = [];
-        foreach ($matches as $match) {
-            $variable = '' === ($match[1][0] ?? '') ? ($match[2][0] ?? '') : $match[1][0];
-            if ('' !== $variable) {
-                $offsets[$variable] ??= $match[0][1];
+        foreach ($document->typedVariables as $variable) {
+            if (\in_array(self::ROUTING_CONFIGURATOR, $variable->types, true)) {
+                $offsets[$variable->name] ??= $variable->nameStartOffset;
+            }
+        }
+        foreach ($document->objectCreations as $creation) {
+            if (self::ROUTE_COLLECTION !== $creation->className) {
+                continue;
+            }
+            $before = substr($text, 0, $creation->startOffset);
+            $statement = substr($before, max((int) strrpos($before, ';'), (int) strrpos($before, '{')));
+            if (preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/D', $statement, $assignment)) {
+                $offsets[$assignment[1]] ??= $creation->startOffset;
             }
         }
 

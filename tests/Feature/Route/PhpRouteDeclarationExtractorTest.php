@@ -169,6 +169,33 @@ final class PhpRouteDeclarationExtractorTest extends TestCase
         ));
     }
 
+    public function testIgnoresCollectionVariablesThatOnlyAppearInTextualMentions(): void
+    {
+        $text = <<<'PHP'
+            <?php
+            namespace App\Scaffold;
+
+            /**
+             * Builds menus, mirroring RoutingConfigurator $routes usage.
+             */
+            final class Generator
+            {
+                public const TEMPLATE = 'return function (RoutingConfigurator $routes) {};';
+
+                public function build(object $routes): void
+                {
+                    $routes->add('scaffold_item', '/scaffold');
+                }
+            }
+            PHP;
+
+        $declarations = (new PhpRouteDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
+            new SourceDocument('file:///workspace/src/Scaffold/Generator.php', 'php', $text),
+        );
+
+        self::assertSame([], $declarations);
+    }
+
     public function testIgnoresCollectionCallsThatPrecedeTheCollection(): void
     {
         $text = <<<'PHP'

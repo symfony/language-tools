@@ -97,7 +97,10 @@ Definition and Links
 --------------------
 
 Definition requests navigate to matching named PHP ``#[Route]`` attributes,
-PHP routing configurator calls or YAML route declarations. YAML routes nested
+PHP routing configurator calls or YAML route declarations. A configurator call
+counts when its receiver is a parameter typed ``RoutingConfigurator`` or a
+variable assigned a ``RouteCollection``, so a mention of either in a comment or
+a string doesn't turn unrelated ``add()`` calls into routes. YAML routes nested
 under ``when@environment`` sections are indexed by their route names. Route
 references also become document links when exactly one source declaration is
 known.
