@@ -646,6 +646,36 @@ final class TranslationExtractorTest extends TestCase
         );
     }
 
+    public function testIgnoresTransCallsOnReceiversDeclaredWithAnUnrelatedType(): void
+    {
+        $references = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Service/Notifier.php', 'php', <<<'PHP'
+            <?php
+            namespace App\Service;
+
+            use Doctrine\DBAL\Connection;
+            use Symfony\Contracts\Translation\TranslatorInterface;
+
+            final class Notifier
+            {
+                public function __construct(private TranslatorInterface $translator, private Connection $connection) {}
+
+                public function run(TranslatorInterface $translator, Connection $db, $untyped): void
+                {
+                    $translator->trans('typed.parameter.key');
+                    $this->translator->trans('typed.property.key');
+                    $db->trans('BEGIN');
+                    $this->connection->trans('COMMIT');
+                    $untyped->trans('unknown.receiver.key');
+                }
+            }
+            PHP))->references;
+
+        self::assertSame(
+            ['typed.parameter.key', 'typed.property.key', 'unknown.receiver.key'],
+            array_map(static fn ($reference): string => $reference->key, $references),
+        );
+    }
+
     public function testReadsTranslationTagsFromDirectivesOnlyAndResolvesTheirDomain(): void
     {
         $references = $this->extractor()->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'

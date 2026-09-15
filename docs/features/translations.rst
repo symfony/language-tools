@@ -9,6 +9,9 @@ Completion
 
 Translation key completion is available in recognized PHP ``trans()`` calls,
 ``TranslatableMessage`` objects, the ``t()`` helper and Twig's ``trans`` filter.
+A ``trans()`` call is ignored when its receiver is declared with a type no
+translator can satisfy; an undeclared receiver stays recognized because its type
+can live in another file.
 The ``t()`` helper is recognized when it resolves to Symfony's translation
 function through a function import, an alias or a fully qualified call; an
 unimported bare ``t()`` call is ignored. Imported, aliased and fully qualified

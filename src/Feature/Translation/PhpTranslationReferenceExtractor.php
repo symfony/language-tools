@@ -21,6 +21,11 @@ final class PhpTranslationReferenceExtractor
         'Symfony\\Component\\Translation\\LoggingTranslator',
         'Symfony\\Component\\Translation\\Translator',
     ];
+    private const TRANSLATORS = [
+        ...self::GLOBAL_PARAMETER_TRANSLATORS,
+        'Symfony\\Contracts\\Translation\\TranslatorInterface',
+        'Symfony\\Component\\Translation\\TranslatorInterface',
+    ];
 
     public function __construct(
         private readonly PositionConverter $converter,
@@ -94,7 +99,7 @@ final class PhpTranslationReferenceExtractor
     {
         $calls = [];
         foreach ($document->methodCalls as $call) {
-            if ('trans' !== $call->method) {
+            if ('trans' !== $call->method || $this->hasUnrelatedReceiver($call, $document)) {
                 continue;
             }
             $key = ($call->argument('id') ?? $call->namedOrPositionalArgument('key', 0))?->stringLiteral;
@@ -126,6 +131,17 @@ final class PhpTranslationReferenceExtractor
     private function hasGlobalParameterReceiver(PhpMethodCall $call, PhpDocument $document): bool
     {
         return $document->receiverHasType($call, ...self::GLOBAL_PARAMETER_TRANSLATORS);
+    }
+
+    /**
+     * Whether the receiver is declared with a type that no translator can
+     * satisfy. An undeclared receiver stays eligible: its type can live in
+     * another file.
+     */
+    private function hasUnrelatedReceiver(PhpMethodCall $call, PhpDocument $document): bool
+    {
+        return [] !== $document->receiverVariables($call)
+            && !$document->receiverHasType($call, ...self::TRANSLATORS);
     }
 
     private function domain(?PhpArgument $argument): ?string
