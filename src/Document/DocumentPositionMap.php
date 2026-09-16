@@ -11,8 +11,16 @@ final class DocumentPositionMap
         private readonly string $text,
         private readonly string $encoding,
     ) {
+        $length = \strlen($this->text);
         $offset = 0;
-        while (false !== $offset = strpos($this->text, "\n", $offset)) {
+        while ($offset < $length) {
+            $offset += strcspn($this->text, "\r\n", $offset);
+            if ($offset >= $length) {
+                break;
+            }
+            if ("\r" === $this->text[$offset] && "\n" === ($this->text[$offset + 1] ?? '')) {
+                ++$offset;
+            }
             $this->lineStarts[] = ++$offset;
         }
     }
@@ -67,9 +75,9 @@ final class DocumentPositionMap
         $lineEnd = $this->lineStarts[$line + 1] ?? \strlen($this->text);
         if ($lineEnd > $lineStart && "\n" === $this->text[$lineEnd - 1]) {
             --$lineEnd;
-            if ($lineEnd > $lineStart && "\r" === $this->text[$lineEnd - 1]) {
-                --$lineEnd;
-            }
+        }
+        if ($lineEnd > $lineStart && "\r" === $this->text[$lineEnd - 1]) {
+            --$lineEnd;
         }
 
         return $lineEnd;
