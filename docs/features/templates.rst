@@ -121,9 +121,9 @@ Completion inside the ``#[Template]`` attribute expects the template name as
 the attribute's first argument and doesn't recognize aliased attribute
 imports; navigation and diagnostics don't have these restrictions.
 Custom non-filesystem loaders can limit completion and navigation. A loader that
-decorates the filesystem loader, as the Sylius theme bundle does, no longer
-hides the loader paths. Theme directories themselves aren't read, so a template
-that exists only in a theme is reported as missing, and no diagnostic is
-produced for the theme templates themselves.
+decorates the filesystem loader, as the Sylius theme bundle does, doesn't hide
+the loader paths. Sylius theme directories are read from the configured theme
+sources, and every theme resolves, so a template belonging to one theme isn't
+reported as missing on a channel served by another theme.
 
 .. _`Stimulus and Live Components`: stimulus.rst

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read Sylius theme template directories from the configured theme sources, so templates a theme adds resolve and are themselves diagnosed
 - Read Twig loader paths from the filesystem loader a decorating loader hides, so `@Bundle` and `@!Bundle` templates resolve on applications that decorate `twig.loader`
 - Register the `@!Bundle` namespace and prefer a bundle's `Resources/views` over its `templates` directory when rebuilding loader paths by convention
 - Resolve template names the way Twig's filesystem loader does, so a leading `/`, repeated slashes, backslash separators and `.` or `..` segments no longer report an existing template as missing

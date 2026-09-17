@@ -457,6 +457,38 @@ final class BridgeSectionsTest extends TestCase
         self::assertStringEndsWith('/templates', $byNamespace['(None)'][0]);
     }
 
+    public function testReadsTemplatePathsFromSyliusThemeDirectories(): void
+    {
+        (new TwigFixtureBuilder($this->workspace))->writeThemedTwigApplicationWithThemes();
+
+        $process = $this->bridge->run(['--sections=twig']);
+
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $snapshot);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['twig'] ?? null);
+        $paths = $result['sections']['twig']['paths'] ?? null;
+        self::assertIsArray($paths);
+        $byNamespace = [];
+        foreach ($paths as $path) {
+            self::assertIsArray($path);
+            self::assertIsString($path['namespace'] ?? null);
+            self::assertIsString($path['path'] ?? null);
+            $byNamespace[$path['namespace']][] = $path['path'];
+        }
+        $theme = realpath($this->workspace->path).'/themes/TestTheme/templates';
+        self::assertContains($theme, $byNamespace['(None)'] ?? []);
+        self::assertSame([$theme.'/bundles/SyliusShopBundle'], $byNamespace['@SyliusShop'] ?? null);
+        foreach ($byNamespace as $namespace => $namespacePaths) {
+            foreach ($namespacePaths as $path) {
+                self::assertStringNotContainsString('NotATheme', $path, $namespace);
+            }
+        }
+    }
+
     public function testUsesEffectiveConfigurationForConventionTwigPaths(): void
     {
         (new TwigFixtureBuilder($this->workspace))->writeThemedTwigApplicationWithEffectiveConfiguration();

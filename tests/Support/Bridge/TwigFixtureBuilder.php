@@ -213,6 +213,63 @@ PHP,
         ));
     }
 
+    public function writeThemedTwigApplicationWithThemes(): void
+    {
+        $this->workspace->makeDirectory('templates');
+        $this->workspace->write('themes/TestTheme/composer.json', json_encode(['name' => 'acme/test-theme', 'type' => 'sylius-theme'], \JSON_THROW_ON_ERROR));
+        $this->workspace->write('themes/TestTheme/templates/shop/home.html.twig', '<p>home</p>');
+        $this->workspace->write('themes/TestTheme/templates/bundles/SyliusShopBundle/custom/_promo.html.twig', '<p>promo</p>');
+        $this->workspace->makeDirectory('themes/NotATheme/templates');
+        $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
+            __INSTALLED_VERSIONS__
+            __CONTAINER_BUILDER__
+            namespace Twig;
+            final class Environment {}
+            __CONSOLE_IO__
+            namespace App;
+            final class ThemeExtension
+            {
+                public function getAlias(): string { return 'sylius_theme'; }
+            }
+            final class ThemeBundle
+            {
+                public function getName(): string { return 'SyliusThemeBundle'; }
+                public function getPath(): string { return __DIR__; }
+                public function getContainerExtension(): object { return new ThemeExtension(); }
+            }
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+                public function getBundles(): array { return [new ThemeBundle()]; }
+            }
+            __FRAMEWORK_APPLICATION__
+            PHP,
+            applicationMembers: <<<'PHP'
+    public function has(string $name): bool { return true; }
+    public function run(object $input, object $output): int
+    {
+        // a theme loader hides every filesystem path from debug:twig
+        $themes = [
+            'enabled' => true,
+            'filename' => 'composer.json',
+            'scan_depth' => 1,
+            'directories' => [\dirname(__DIR__).'/themes'],
+        ];
+        $result = 'debug:twig' === $input->arguments['command']
+            ? ['globals' => ['app' => []], 'loader_paths' => []]
+            : [
+                'twig' => ['default_path' => \dirname(__DIR__).'/templates', 'paths' => []],
+                'sylius_theme' => ['sources' => ['filesystem' => $themes]],
+            ];
+        $output->write(json_encode($result, JSON_THROW_ON_ERROR));
+
+        return 0;
+    }
+PHP,
+        ));
+    }
+
     public function writeTwigApplicationWithoutDebugCommand(): void
     {
         $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
