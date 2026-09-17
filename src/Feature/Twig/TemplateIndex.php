@@ -205,10 +205,41 @@ final class TemplateIndex
 
     private function normalize(string $name): string
     {
-        while (str_starts_with($name, './') && !str_starts_with($name, './@')) {
-            $name = substr($name, 2);
+        $name = (string) preg_replace('#/{2,}#', '/', str_replace('\\', '/', $name));
+        if (str_starts_with($name, '@')) {
+            $separator = strpos($name, '/');
+            if (false === $separator) {
+                return $name;
+            }
+            $shortname = $this->normalizeSegments(substr($name, $separator + 1));
+
+            return null === $shortname ? $name : substr($name, 0, $separator + 1).$shortname;
+        }
+        $normalized = $this->normalizeSegments($name);
+        if (null === $normalized) {
+            return $name;
         }
 
-        return $name;
+        // Twig reads the namespace from the first character, so a main namespace
+        // name keeps one slash instead of being stripped into a namespaced one
+        return str_starts_with($normalized, '@') ? '/'.$normalized : $normalized;
+    }
+
+    /** @return ?string null when the name escapes the loader root */
+    private function normalizeSegments(string $name): ?string
+    {
+        $segments = [];
+        foreach (explode('/', ltrim($name, '/')) as $segment) {
+            if ('..' === $segment) {
+                if ([] === $segments) {
+                    return null;
+                }
+                array_pop($segments);
+            } elseif ('.' !== $segment) {
+                $segments[] = $segment;
+            }
+        }
+
+        return implode('/', $segments);
     }
 }

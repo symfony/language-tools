@@ -33,9 +33,11 @@ as ``@Admin/dashboard.html.twig`` are supported. The ``include()`` and
 ``source()`` functions recognize positional and named template arguments.
 Completion expects named arguments in their declared order; navigation also
 recognizes reordered named arguments. Static names use Twig's string escape
-semantics. Completion and navigation resolve a leading ``./`` on regular
-loader-root names. Before an ``@`` prefix, it keeps the name in Twig's main
-namespace.
+semantics. Completion and navigation normalize names the way Twig's filesystem
+loader does: backslash separators, repeated slashes, leading ``/`` and ``./``
+prefixes, and ``.`` and ``..`` segments all resolve to the same template. Before
+an ``@`` prefix, a leading ``/`` or ``./`` keeps the name in Twig's main
+namespace, and a name that escapes the loader root never resolves.
 
 Navigation and Links
 --------------------

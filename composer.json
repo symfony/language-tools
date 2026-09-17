@@ -18,10 +18,11 @@
         "symfony/yaml": "^8.1"
     },
     "require-dev": {
+        "php-cs-fixer/shim": "^3.87",
         "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^11.5",
         "symfony/phpunit-bridge": "^7.4|^8.0",
-        "php-cs-fixer/shim": "^3.87"
+        "twig/twig": "^3.28"
     },
     "autoload": {
         "psr-4": {
