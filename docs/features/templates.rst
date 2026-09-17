@@ -29,8 +29,10 @@ Controller and controller-helper calls recognize named ``view`` and
 implicitly captured by arrow functions remain recognized across nested lexical
 scopes.
 Both regular names such as ``article/show.html.twig`` and namespaced names such
-as ``@Admin/dashboard.html.twig`` are supported. The ``include()`` and
-``source()`` functions recognize positional and named template arguments.
+as ``@Admin/dashboard.html.twig`` are supported, including the ``@!Bundle`` form
+that TwigBundle registers so an override can extend the template it overrides.
+The ``include()`` and ``source()`` functions recognize positional and named
+template arguments.
 Completion expects named arguments in their declared order; navigation also
 recognizes reordered named arguments. Static names use Twig's string escape
 semantics. Completion and navigation normalize names the way Twig's filesystem
@@ -118,8 +120,10 @@ through dependencies aren't recognized.
 Completion inside the ``#[Template]`` attribute expects the template name as
 the attribute's first argument and doesn't recognize aliased attribute
 imports; navigation and diagnostics don't have these restrictions.
-Custom non-filesystem loaders can limit completion and navigation. Theme engines
-such as Sylius are supported through common application and bundle template
-conventions.
+Custom non-filesystem loaders can limit completion and navigation. A loader that
+decorates the filesystem loader, as the Sylius theme bundle does, no longer
+hides the loader paths. Theme directories themselves aren't read, so a template
+that exists only in a theme is reported as missing, and no diagnostic is
+produced for the theme templates themselves.
 
 .. _`Stimulus and Live Components`: stimulus.rst

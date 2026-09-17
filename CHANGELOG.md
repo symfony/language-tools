@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Read Twig loader paths from the filesystem loader a decorating loader hides, so `@Bundle` and `@!Bundle` templates resolve on applications that decorate `twig.loader`
+- Register the `@!Bundle` namespace and prefer a bundle's `Resources/views` over its `templates` directory when rebuilding loader paths by convention
 - Resolve template names the way Twig's filesystem loader does, so a leading `/`, repeated slashes, backslash separators and `.` or `..` segments no longer report an existing template as missing
 - Treat a lone carriage return as a line terminator in document positions, so positions in files with classic Mac or mixed line endings no longer drift onto earlier lines
 

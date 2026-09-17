@@ -34,6 +34,9 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
             if ([] === $paths) {
                 // theme loaders, such as the Sylius theme bundle, decorate the
                 // filesystem loader and hide every path from debug:twig
+                $paths = symfonyLspBridgeTwigLoaderPaths($application);
+            }
+            if ([] === $paths) {
                 $paths = symfonyLspBridgeTwigConventionPaths($context);
             }
         } catch (Throwable $error) {
@@ -53,6 +56,86 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
     ];
 
     return $section;
+}
+
+/*
+ * Reads the paths from the filesystem loaders the Twig environment actually
+ * uses, which a decorating loader keeps reachable but hides from debug:twig.
+ * The environment is private, so it is read from the debug:twig command that
+ * already received it.
+ */
+function symfonyLspBridgeTwigLoaderPaths(object $application): array
+{
+    $paths = [];
+    try {
+        if (!$application->has('debug:twig')) {
+            return [];
+        }
+        $command = $application->find('debug:twig');
+        if ($command instanceof Symfony\Component\Console\Command\LazyCommand) {
+            $command = $command->getCommand();
+        }
+        $environment = null;
+        foreach ((new ReflectionObject($command))->getProperties() as $property) {
+            $value = $property->isInitialized($command) ? $property->getValue($command) : null;
+            if ($value instanceof Twig\Environment) {
+                $environment = $value;
+                break;
+            }
+        }
+        if (null === $environment) {
+            return [];
+        }
+        foreach (symfonyLspBridgeTwigFilesystemLoaders($environment->getLoader()) as $loader) {
+            foreach ($loader->getNamespaces() as $namespace) {
+                foreach ($loader->getPaths($namespace) as $path) {
+                    if (is_string($path) && '' !== $path) {
+                        $paths[] = [
+                            'namespace' => Twig\Loader\FilesystemLoader::MAIN_NAMESPACE === $namespace ? '(None)' : '@'.$namespace,
+                            'path' => $path,
+                        ];
+                    }
+                }
+            }
+        }
+    } catch (Throwable) {
+        return [];
+    }
+
+    return $paths;
+}
+
+/*
+ * Collects every filesystem loader reachable from a loader, following chain
+ * loaders and the inner loader a decorating loader holds in a property.
+ */
+function symfonyLspBridgeTwigFilesystemLoaders(object $loader, array &$visited = [], int $depth = 0): array
+{
+    if ($depth > 5 || in_array($loader, $visited, true)) {
+        return [];
+    }
+    $visited[] = $loader;
+    if ($loader instanceof Twig\Loader\FilesystemLoader) {
+        return [$loader];
+    }
+    $loaders = [];
+    if ($loader instanceof Twig\Loader\ChainLoader) {
+        foreach ($loader->getLoaders() as $inner) {
+            $loaders = array_merge($loaders, symfonyLspBridgeTwigFilesystemLoaders($inner, $visited, $depth + 1));
+        }
+
+        return $loaders;
+    }
+    foreach ((new ReflectionObject($loader))->getProperties() as $property) {
+        $value = $property->isInitialized($loader) ? $property->getValue($loader) : null;
+        foreach (is_array($value) ? $value : [$value] as $candidate) {
+            if ($candidate instanceof Twig\Loader\LoaderInterface) {
+                $loaders = array_merge($loaders, symfonyLspBridgeTwigFilesystemLoaders($candidate, $visited, $depth + 1));
+            }
+        }
+    }
+
+    return $loaders;
 }
 
 /*
@@ -90,15 +173,22 @@ function symfonyLspBridgeTwigConventionPaths(SymfonyLspBridgeContext $context): 
                 }
                 $bundleName = (string) $bundle->getName();
                 $namespace = '@'.(str_ends_with($bundleName, 'Bundle') ? substr($bundleName, 0, -6) : $bundleName);
-                $candidates = [
-                    $project.'/templates/bundles/'.$bundleName,
-                    rtrim((string) $bundle->getPath(), '/\\').'/Resources/views',
-                    rtrim((string) $bundle->getPath(), '/\\').'/templates',
-                ];
-                foreach ($candidates as $directory) {
-                    if (is_dir($directory)) {
-                        $paths[] = ['namespace' => $namespace, 'path' => $directory];
-                    }
+                $bundlePath = rtrim((string) $bundle->getPath(), '/\\');
+                $directories = [];
+                if (is_dir($directory = $project.'/templates/bundles/'.$bundleName)) {
+                    $directories[] = $directory;
+                }
+                if (is_dir($directory = $bundlePath.'/Resources/views') || is_dir($directory = $bundlePath.'/templates')) {
+                    $directories[] = $directory;
+                }
+                foreach ($directories as $directory) {
+                    $paths[] = ['namespace' => $namespace, 'path' => $directory];
+                }
+                if ([] !== $directories) {
+                    // TwigBundle registers the bundle views directory under a
+                    // second namespace, so an override can extend the template
+                    // it overrides
+                    $paths[] = ['namespace' => '@!'.substr($namespace, 1), 'path' => end($directories)];
                 }
             }
         }

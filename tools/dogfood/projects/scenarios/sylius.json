@@ -289,24 +289,6 @@
             "messageHash": "e01876d3811ec01eebd8ed16ccc5537299ce175aa794dfa770ae95ae103c90ef"
         },
         {
-            "path": "src/Sylius/Bundle/AdminBundle/templates/shared/form_theme.html.twig",
-            "code": "template.not_found",
-            "severity": "error",
-            "range": {
-                "start": {
-                    "line": 0,
-                    "character": 12
-                },
-                "end": {
-                    "line": 0,
-                    "character": 40
-                }
-            },
-            "kind": "application",
-            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
-            "messageHash": "bb2bdaf4ac95512cc3f9a125539b62d11df41eac902b96f102ba56f77eba58b6"
-        },
-        {
             "path": "src/Sylius/Bundle/AdminBundle/templates/shared/grid/action/delete.html.twig",
             "code": "twig_component.not_found",
             "severity": "error",
@@ -1045,24 +1027,6 @@
             "messageHash": "850e6c490856a8b7bdc733fd59bdb4720b49d346db337f4f5d234659a45d33b2"
         },
         {
-            "path": "src/Sylius/Bundle/ShopBundle/templates/form/theme.html.twig",
-            "code": "template.not_found",
-            "severity": "error",
-            "range": {
-                "start": {
-                    "line": 0,
-                    "character": 12
-                },
-                "end": {
-                    "line": 0,
-                    "character": 40
-                }
-            },
-            "kind": "application",
-            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
-            "messageHash": "bb2bdaf4ac95512cc3f9a125539b62d11df41eac902b96f102ba56f77eba58b6"
-        },
-        {
             "path": "src/Sylius/Bundle/ShopBundle/templates/grid/action/delete.html.twig",
             "code": "twig_component.not_found",
             "severity": "error",
@@ -1261,24 +1225,6 @@
             "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
         },
         {
-            "path": "src/Sylius/Bundle/UiBundle/templates/form/theme.html.twig",
-            "code": "template.not_found",
-            "severity": "error",
-            "range": {
-                "start": {
-                    "line": 0,
-                    "character": 12
-                },
-                "end": {
-                    "line": 0,
-                    "character": 37
-                }
-            },
-            "kind": "application",
-            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
-            "messageHash": "4f9c9d2926f4bbdb4942301264f4550e9cec07062302578f68df8fab359f262a"
-        },
-        {
             "path": "src/Sylius/Bundle/UserBundle/tests/Functional/app/config/config.yml",
             "code": "parameter.not_found",
             "severity": "error",
@@ -1313,24 +1259,6 @@
             "kind": "application",
             "reason": "This application-owned test fixture refers to symbols from its isolated test configuration, not the selected application kernel.",
             "messageHash": "5de2c03207ff1d0ceeee082215ac99a3b45bfeb71993430fd5e3d1c935c1a57f"
-        },
-        {
-            "path": "templates/bundles/ApiPlatformBundle/SwaggerUi/index.html.twig",
-            "code": "template.not_found",
-            "severity": "error",
-            "range": {
-                "start": {
-                    "line": 0,
-                    "character": 12
-                },
-                "end": {
-                    "line": 0,
-                    "character": 51
-                }
-            },
-            "kind": "application",
-            "reason": "This pinned source reference is unresolved in the configured runtime template paths; retain the exact finding for review when pins change.",
-            "messageHash": "078231c9ef9d28c6dd2dfd92ce8074478eefa9daf02b874550a8807665f446d9"
         }
     ]
 }

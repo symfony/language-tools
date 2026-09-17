@@ -143,6 +143,76 @@ PHP,
         $this->workspace->write('vendor/autoload.php', $source);
     }
 
+    public function writeTwigApplicationWithDecoratedLoader(): void
+    {
+        $this->workspace->makeDirectory('templates');
+        $this->workspace->makeDirectory('src/ShopBundle/templates');
+        $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
+            __INSTALLED_VERSIONS__
+            namespace Twig\Loader;
+            interface LoaderInterface {}
+            final class FilesystemLoader implements LoaderInterface
+            {
+                public const MAIN_NAMESPACE = '__main__';
+                public function __construct(private array $paths) {}
+                public function getNamespaces(): array { return array_keys($this->paths); }
+                public function getPaths(string $namespace): array { return $this->paths[$namespace] ?? []; }
+            }
+            final class ChainLoader implements LoaderInterface
+            {
+                public function __construct(private array $loaders) {}
+                public function getLoaders(): array { return $this->loaders; }
+            }
+            namespace Sylius\Theme;
+            final class ThemedTemplateLoader implements \Twig\Loader\LoaderInterface
+            {
+                public function __construct(private \Twig\Loader\LoaderInterface $decoratedLoader) {}
+            }
+            namespace Twig;
+            final class Environment
+            {
+                public function __construct(private object $loader) {}
+                public function getLoader(): object { return $this->loader; }
+            }
+            namespace Symfony\Bridge\Twig\Command;
+            final class DebugCommand
+            {
+                public function __construct(private \Twig\Environment $twig) {}
+            }
+            __CONSOLE_IO__
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+            }
+            __FRAMEWORK_APPLICATION__
+            PHP,
+            applicationMembers: <<<'PHP'
+    public function has(string $name): bool { return true; }
+    public function find(string $name): object
+    {
+        // the bundle views directory is registered a second time under "!Shop"
+        $filesystem = new \Twig\Loader\FilesystemLoader([
+            '__main__' => [\dirname(__DIR__).'/templates'],
+            'Shop' => [\dirname(__DIR__).'/src/ShopBundle/templates'],
+            '!Shop' => [\dirname(__DIR__).'/src/ShopBundle/templates'],
+        ]);
+        $chain = new \Twig\Loader\ChainLoader([new \Sylius\Theme\ThemedTemplateLoader($filesystem)]);
+
+        return new \Symfony\Bridge\Twig\Command\DebugCommand(new \Twig\Environment($chain));
+    }
+    public function run(object $input, object $output): int
+    {
+        // a theme loader hides every filesystem path from debug:twig
+        $output->write(json_encode(['globals' => ['app' => []], 'loader_paths' => []], JSON_THROW_ON_ERROR));
+
+        return 0;
+    }
+PHP,
+        ));
+    }
+
     public function writeTwigApplicationWithoutDebugCommand(): void
     {
         $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'

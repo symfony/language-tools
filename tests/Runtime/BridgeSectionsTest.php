@@ -423,6 +423,38 @@ final class BridgeSectionsTest extends TestCase
         }
         self::assertSame([realpath($this->workspace->path).'/src/ShopBundle/templates'], $byNamespace['@Shop'] ?? null);
         self::assertSame([realpath($this->workspace->path).'/templates'], $byNamespace['(None)'] ?? null);
+        self::assertSame([realpath($this->workspace->path).'/src/ShopBundle/templates'], $byNamespace['@!Shop'] ?? null);
+    }
+
+    public function testReadsLoaderPathsFromTheLoaderADecoratorHides(): void
+    {
+        (new TwigFixtureBuilder($this->workspace))->writeTwigApplicationWithDecoratedLoader();
+
+        $process = $this->bridge->run(['--sections=twig']);
+
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $snapshot);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['twig'] ?? null);
+        $paths = $result['sections']['twig']['paths'] ?? null;
+        self::assertIsArray($paths);
+        $byNamespace = [];
+        foreach ($paths as $path) {
+            self::assertIsArray($path);
+            self::assertIsString($path['namespace'] ?? null);
+            self::assertIsString($path['path'] ?? null);
+            $byNamespace[$path['namespace']][] = $path['path'];
+        }
+        self::assertSame(['(None)', '@!Shop', '@Shop'], array_keys($byNamespace));
+        foreach (['@Shop', '@!Shop'] as $namespace) {
+            self::assertCount(1, $byNamespace[$namespace]);
+            self::assertStringEndsWith('/src/ShopBundle/templates', $byNamespace[$namespace][0]);
+        }
+        self::assertCount(1, $byNamespace['(None)']);
+        self::assertStringEndsWith('/templates', $byNamespace['(None)'][0]);
     }
 
     public function testUsesEffectiveConfigurationForConventionTwigPaths(): void
