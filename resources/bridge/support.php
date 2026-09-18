@@ -20,8 +20,10 @@ function symfonyLspBridgeDiscardApplicationErrorLogs(): void
     }
 
     try {
-        Symfony\Component\ErrorHandler\ErrorHandler::register(null, false)
-            ->setDefaultLogger(new Psr\Log\NullLogger(), E_ALL, true);
+        $handler = Symfony\Component\ErrorHandler\ErrorHandler::register(null, false);
+        $handler->setDefaultLogger(new Psr\Log\NullLogger(), E_ALL, true);
+        // a handler registered here throws every warning and notice by default, which would fail a boot PHP itself completes
+        $handler->throwAt(0, true);
     } catch (Throwable) {
     }
 }

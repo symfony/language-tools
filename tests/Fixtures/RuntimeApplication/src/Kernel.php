@@ -11,6 +11,19 @@ final class Kernel extends BaseKernel
 {
     use MicroKernelTrait;
 
+    public function boot(): void
+    {
+        $warning = $this->booted ? false : getenv('SYMFONY_LSP_TEST_KERNEL_BOOT_WARNING');
+        if (false !== $warning && '' !== $warning) {
+            if (false === file_put_contents($warning, "warned\n", \FILE_APPEND | \LOCK_EX)) {
+                throw new \RuntimeException('Unable to record the kernel boot warning.');
+            }
+            trigger_error('FIXTURE_BOOT_WARNING', \E_USER_WARNING);
+        }
+
+        parent::boot();
+    }
+
     protected function build(ContainerBuilder $container): void
     {
         parent::build($container);
