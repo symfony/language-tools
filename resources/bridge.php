@@ -31,6 +31,7 @@ require __DIR__.'/bridge/context.php';
 require __DIR__.'/bridge/support.php';
 require __DIR__.'/bridge/container.php';
 require __DIR__.'/bridge/configuration.php';
+require __DIR__.'/bridge/sylius.php';
 require __DIR__.'/bridge/sections/routes.php';
 require __DIR__.'/bridge/sections/container.php';
 require __DIR__.'/bridge/sections/twig.php';

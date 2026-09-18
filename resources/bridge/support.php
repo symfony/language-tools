@@ -186,3 +186,20 @@ function symfonyLspBridgeSplitDebugValues(mixed $value): array
 
     return preg_split('/[|, ]+/', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
 }
+
+/** @return list<string> the subdirectory names of a directory, sorted */
+function symfonyLspBridgeDirectoryEntries(string $directory): array
+{
+    if (!is_dir($directory)) {
+        return [];
+    }
+    $entries = [];
+    foreach (scandir($directory) ?: [] as $entry) {
+        if ('.' !== $entry && '..' !== $entry && is_dir($directory.'/'.$entry)) {
+            $entries[] = $entry;
+        }
+    }
+    sort($entries);
+
+    return $entries;
+}
