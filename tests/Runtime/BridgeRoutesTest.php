@@ -142,6 +142,24 @@ final class BridgeRoutesTest extends TestCase
         self::assertTrue($result['sections']['routes']['complete']);
     }
 
+    public function testReportsAnEmptyRouteSetWhenRoutingIsDisabled(): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeRoutingDisabledApplication();
+
+        $process = $this->bridge->run(['--sections=routes']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors']);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertIsArray($result['sections']['routes'] ?? null);
+        self::assertTrue($result['sections']['routes']['complete']);
+        self::assertSame([], $result['sections']['routes']['items']);
+        self::assertSame([], $result['sections']['routes']['contextParameters']);
+        self::assertSame([], $result['sections']['routes']['resources']);
+    }
+
     #[DataProvider('localizedAliasVersionProvider')]
     public function testExposesCanonicalAliasesOnlyOnSupportedRoutingVersions(string $version, bool $supported, ?string $normalizedVersion = null): void
     {

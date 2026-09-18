@@ -4,6 +4,10 @@ Routing Integration
 The routing integration understands route names and parameters in the selected
 Symfony environment, together with PHP, YAML and Twig declarations and usages.
 
+An application can disable routing, as CLI-only projects do. Its route set is
+then empty instead of unavailable: runtime metadata stays complete and the
+remaining features keep working.
+
 Supported Contexts
 ------------------
 

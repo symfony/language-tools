@@ -9,77 +9,9 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
     } else {
         try {
             $application = $context->application();
-            $routes = symfonyLspBridgeRunJsonCommand($application, [
-                'command' => 'debug:router',
-                '--format' => 'json',
-                '--show-aliases' => true,
-                ...$context->commandOptions(),
-            ]);
-
-            $items = [];
-            $supportsCanonicalLocalizedAliases = symfonyLspBridgeSupportsCanonicalLocalizedRouteAliases();
-            foreach ($routes as $name => $route) {
-                if (!is_string($name) || !is_array($route)) {
-                    continue;
-                }
-
-                $methods = is_array($route['methods'] ?? null)
-                    ? array_values($route['methods'])
-                    : symfonyLspBridgeSplitDebugValues($route['method'] ?? null);
-                $schemes = is_array($route['schemes'] ?? null)
-                    ? array_values($route['schemes'])
-                    : symfonyLspBridgeSplitDebugValues($route['scheme'] ?? null);
-                $host = is_string($route['host'] ?? null) && !in_array($route['host'], ['', 'ANY'], true)
-                    ? $route['host']
-                    : null;
-                $defaults = is_array($route['defaults'] ?? null) ? $route['defaults'] : [];
-                $requirements = [];
-                foreach (is_array($route['requirements'] ?? null) ? $route['requirements'] : [] as $key => $value) {
-                    if (is_string($key) && (is_string($value) || is_int($value) || is_float($value))) {
-                        $requirements[$key] = (string) $value;
-                    }
-                }
-                $canonical = null;
-                $canonicalDefault = $defaults['_canonical_route'] ?? null;
-                $locale = $defaults['_locale'] ?? null;
-                if (is_string($canonicalDefault) && is_string($locale) && $name === $canonicalDefault.'.'.$locale) {
-                    $canonical = $canonicalDefault;
-                }
-                $item = [
-                    'name' => $name,
-                    'path' => is_string($route['path'] ?? null) ? $route['path'] : null,
-                    'methods' => $methods,
-                    'schemes' => $schemes,
-                    'host' => $host,
-                    'controller' => is_string($defaults['_controller'] ?? null)
-                        ? $defaults['_controller']
-                        : null,
-                    'defaults' => array_values(array_filter(
-                        array_keys($defaults),
-                        static fn (mixed $key): bool => is_string($key),
-                    )),
-                    'requirements' => $requirements,
-                    'canonical' => $canonical,
-                    'alias' => null,
-                ];
-                $items[] = $item;
-                foreach (is_array($route['aliases'] ?? null) ? $route['aliases'] : [] as $alias) {
-                    if (!is_string($alias)) {
-                        continue;
-                    }
-                    $aliasCanonical = null;
-                    if ($supportsCanonicalLocalizedAliases && is_string($locale) && str_ends_with($alias, '.'.$locale)) {
-                        $aliasCanonical = substr($alias, 0, -strlen($locale) - 1);
-                    }
-                    $items[] = [
-                        ...$item,
-                        'name' => $alias,
-                        'canonical' => $aliasCanonical,
-                        'alias' => $name,
-                    ];
-                }
-            }
-
+            $items = symfonyLspBridgeRoutingEnabled($context, $application)
+                ? symfonyLspBridgeRouteItems($application, $context->commandOptions())
+                : [];
             usort($items, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
             $contextParameters = symfonyLspBridgeRouteContextParameterNames($context);
             $resources = symfonyLspBridgeRouteResourcePaths($context);
@@ -97,6 +29,101 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
     }
 
     return $section ?? null;
+}
+
+/*
+ * An application can disable routing, as CLI-only projects do: FrameworkBundle
+ * then registers neither the debug:router command nor the router service, and
+ * the route set is empty instead of unavailable.
+ */
+function symfonyLspBridgeRoutingEnabled(SymfonyLspBridgeContext $context, object $application): bool
+{
+    if ($application->has('debug:router')) {
+        return true;
+    }
+
+    try {
+        return $context->kernel()->getContainer()->has('router');
+    } catch (Throwable) {
+        return false;
+    }
+}
+
+/** @return list<array<string, mixed>> */
+function symfonyLspBridgeRouteItems(object $application, array $commandOptions): array
+{
+    $routes = symfonyLspBridgeRunJsonCommand($application, [
+        'command' => 'debug:router',
+        '--format' => 'json',
+        '--show-aliases' => true,
+        ...$commandOptions,
+    ]);
+
+    $items = [];
+    $supportsCanonicalLocalizedAliases = symfonyLspBridgeSupportsCanonicalLocalizedRouteAliases();
+    foreach ($routes as $name => $route) {
+        if (!is_string($name) || !is_array($route)) {
+            continue;
+        }
+
+        $methods = is_array($route['methods'] ?? null)
+            ? array_values($route['methods'])
+            : symfonyLspBridgeSplitDebugValues($route['method'] ?? null);
+        $schemes = is_array($route['schemes'] ?? null)
+            ? array_values($route['schemes'])
+            : symfonyLspBridgeSplitDebugValues($route['scheme'] ?? null);
+        $host = is_string($route['host'] ?? null) && !in_array($route['host'], ['', 'ANY'], true)
+            ? $route['host']
+            : null;
+        $defaults = is_array($route['defaults'] ?? null) ? $route['defaults'] : [];
+        $requirements = [];
+        foreach (is_array($route['requirements'] ?? null) ? $route['requirements'] : [] as $key => $value) {
+            if (is_string($key) && (is_string($value) || is_int($value) || is_float($value))) {
+                $requirements[$key] = (string) $value;
+            }
+        }
+        $canonical = null;
+        $canonicalDefault = $defaults['_canonical_route'] ?? null;
+        $locale = $defaults['_locale'] ?? null;
+        if (is_string($canonicalDefault) && is_string($locale) && $name === $canonicalDefault.'.'.$locale) {
+            $canonical = $canonicalDefault;
+        }
+        $item = [
+            'name' => $name,
+            'path' => is_string($route['path'] ?? null) ? $route['path'] : null,
+            'methods' => $methods,
+            'schemes' => $schemes,
+            'host' => $host,
+            'controller' => is_string($defaults['_controller'] ?? null)
+                ? $defaults['_controller']
+                : null,
+            'defaults' => array_values(array_filter(
+                array_keys($defaults),
+                static fn (mixed $key): bool => is_string($key),
+            )),
+            'requirements' => $requirements,
+            'canonical' => $canonical,
+            'alias' => null,
+        ];
+        $items[] = $item;
+        foreach (is_array($route['aliases'] ?? null) ? $route['aliases'] : [] as $alias) {
+            if (!is_string($alias)) {
+                continue;
+            }
+            $aliasCanonical = null;
+            if ($supportsCanonicalLocalizedAliases && is_string($locale) && str_ends_with($alias, '.'.$locale)) {
+                $aliasCanonical = substr($alias, 0, -strlen($locale) - 1);
+            }
+            $items[] = [
+                ...$item,
+                'name' => $alias,
+                'canonical' => $aliasCanonical,
+                'alias' => $name,
+            ];
+        }
+    }
+
+    return $items;
 }
 
 function symfonyLspBridgeSupportsCanonicalLocalizedRouteAliases(): bool

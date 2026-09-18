@@ -101,6 +101,7 @@ final class RouteFixtureBuilder
             }
             PHP,
             applicationMembers: <<<'PHP'
+    public function has(string $command): bool { return 'debug:router' === $command; }
     public function run(object $input, object $output): int
     {
         $output->write("\n ! [NOTE] Some deprecation notice written to the console output.\n\n");
@@ -158,6 +159,40 @@ PHP,
         $this->workspace->write('vendor/autoload.php', str_replace('namespace App;', 'namespace '.$kernelNamespace.';', $source));
     }
 
+    /**
+     * Mirrors CLI-only applications: FrameworkBundle registers neither the
+     * debug:router command nor the router service when routing is disabled.
+     */
+    public function writeRoutingDisabledApplication(): void
+    {
+        $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
+            __INSTALLED_VERSIONS__
+            __CONSOLE_IO__
+            namespace App;
+            final class Container
+            {
+                public function has(string $id): bool { return false; }
+                public function hasParameter(string $name): bool { return false; }
+                public function get(string $id): object { throw new \RuntimeException(sprintf('The "%s" service does not exist.', $id)); }
+            }
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function getContainer(): Container { return new Container(); }
+                public function shutdown(): void {}
+            }
+            __FRAMEWORK_APPLICATION__
+            PHP,
+            applicationMembers: <<<'PHP'
+    public function has(string $command): bool { return false; }
+    public function run(object $input, object $output): int
+    {
+        throw new \RuntimeException(sprintf('The "%s" command must never run.', $input->arguments['command']));
+    }
+PHP,
+        ));
+    }
+
     public function writeMultiRootKernelApplication(): void
     {
         $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
@@ -184,6 +219,7 @@ PHP,
             __FRAMEWORK_APPLICATION__
             PHP,
             applicationMembers: <<<'PHP'
+    public function has(string $command): bool { return 'debug:router' === $command; }
     public function run(object $input, object $output): int
     {
         $output->write(json_encode([
@@ -255,6 +291,7 @@ PHP,
             __FRAMEWORK_APPLICATION__
             PHP,
             applicationMembers: <<<'PHP'
+    public function has(string $command): bool { return 'debug:router' === $command; }
     public function run(object $input, object $output): int
     {
         $application = strtolower(substr($this->kernel::class, 0, strrpos($this->kernel::class, '\\')));
@@ -345,6 +382,7 @@ PHP,
             __FRAMEWORK_APPLICATION__
             PHP,
             applicationMembers: <<<'PHP'
+    public function has(string $command): bool { return true; }
     public function run(object $input, object $output): int
     {
         $command = $input->arguments['command'];
