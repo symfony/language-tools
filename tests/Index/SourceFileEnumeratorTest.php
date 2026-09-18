@@ -7,10 +7,10 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Index\SourceFileEnumerator;
-use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class SourceFileEnumeratorTest extends TestCase
 {
@@ -141,9 +141,52 @@ final class SourceFileEnumeratorTest extends TestCase
         ], $this->sorted($withExcluded));
     }
 
+    public function testEnumeratesApplicationDirectoriesNamedLikeDependencyDirectories(): void
+    {
+        $files = [
+            '.git/config.yaml',
+            'assets/node_modules/pkg/package.json',
+            'assets/vendor/installed.php',
+            'node_modules/pkg/package.json',
+            'src/var/Value.php',
+            'templates/vendor/show.html.twig',
+            'var/cache/app.php',
+            'vendor/acme/src/Thing.php',
+        ];
+        foreach ($files as $file) {
+            mkdir(\dirname($this->directory.'/'.$file), 0777, true);
+            file_put_contents($this->directory.'/'.$file, '');
+        }
+        file_put_contents($this->directory.'/.gitignore', "/var/\n/assets/vendor/\n");
+
+        self::assertSame(['src/var/Value.php', 'templates/vendor/show.html.twig'], $this->relativeFiles($this->project));
+    }
+
+    public function testEnumeratesTheDirectoryComposerInstallsIntoInsteadOfEveryVendorDirectory(): void
+    {
+        foreach (['libraries/acme/Thing.php', 'vendor/acme/Thing.php'] as $file) {
+            mkdir(\dirname($this->directory.'/'.$file), 0777, true);
+            file_put_contents($this->directory.'/'.$file, '<?php');
+        }
+        $project = new Project($this->directory, 'file://'.$this->directory, 'libraries');
+
+        self::assertSame(['vendor/acme/Thing.php'], $this->relativeFiles($project));
+    }
+
     private function enumerator(): SourceFileEnumerator
     {
-        return new SourceFileEnumerator(new GitignoreMatcher(), $this->fileScope);
+        return ProjectPaths::enumerator($this->fileScope);
+    }
+
+    /** @return list<string> */
+    private function relativeFiles(Project $project): array
+    {
+        $files = [];
+        foreach ($this->enumerator()->files($project) as $path) {
+            $files[] = str_replace('\\', '/', Path::makeRelative($path, $this->directory));
+        }
+
+        return $this->sorted($files);
     }
 
     /**

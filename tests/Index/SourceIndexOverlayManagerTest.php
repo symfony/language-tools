@@ -13,7 +13,6 @@ use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Index\PhpParseHealthResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceFactsInterface;
-use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexOverlayManager;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
@@ -23,12 +22,12 @@ use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class SourceIndexOverlayManagerTest extends TestCase
@@ -54,7 +53,8 @@ final class SourceIndexOverlayManagerTest extends TestCase
                 $projects,
                 $documents,
                 new UriToPathConverter(),
-                new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler())),
+                ProjectPaths::policy(),
+                ProjectPaths::enumerator(new ProjectFileScopeRegistry(new GlobPatternCompiler())),
                 $pipeline,
                 new PhpParseHealthResolver(new TolerantPhpParser(new Parser())),
                 $health,
@@ -87,13 +87,14 @@ final class SourceIndexOverlayManagerTest extends TestCase
             $provider = new OverlayRecordingProvider();
             $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), [$provider]);
             $scope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
-            $files = new SourceFileEnumerator(new GitignoreMatcher(), $scope);
+            $files = ProjectPaths::enumerator($scope);
             $health = new SourceOverlayHealthRegistry();
             $parser = new CountingPhpParser(new TolerantPhpParser(new Parser()));
             $manager = new SourceIndexOverlayManager(
                 $projects,
                 $documents,
                 new UriToPathConverter(),
+                ProjectPaths::policy(),
                 $files,
                 $pipeline,
                 new PhpParseHealthResolver($parser),
@@ -148,7 +149,8 @@ final class SourceIndexOverlayManagerTest extends TestCase
                 $projects,
                 $documents,
                 $uris,
-                new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler())),
+                ProjectPaths::policy(),
+                ProjectPaths::enumerator(new ProjectFileScopeRegistry(new GlobPatternCompiler())),
                 new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), [$provider]),
                 new PhpParseHealthResolver(new TolerantPhpParser(new Parser())),
                 $health,

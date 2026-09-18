@@ -42,7 +42,7 @@ final class DiagnosticCheckHarness
             return new DiagnosticCheckResult('report-not-json', $process->exitCode, [], $milliseconds, null, $analysisMode);
         }
         $analyzedFiles = $this->analyzedFiles($report);
-        $timings = [$process->cpuMilliseconds, $this->profileMilliseconds($report), $this->phases($report), $this->projectPhases($report)];
+        $timings = [$process->cpuMilliseconds, $this->profileMilliseconds($report), $this->phases($report), $this->projectPhases($report), $this->errors($report)];
         $failure = $this->verify($report, $process->exitCode, $analysisMode);
         if (null !== $failure) {
             return new DiagnosticCheckResult($failure, $process->exitCode, [], $milliseconds, $analyzedFiles, $analysisMode, ...$timings);
@@ -75,6 +75,23 @@ final class DiagnosticCheckHarness
     private function checkTimeout(ProjectConfiguration $configuration): int
     {
         return 2 * $configuration->indexTimeout + self::CHECK_BUDGET_MARGIN;
+    }
+
+    /**
+     * @param array<mixed> $report
+     *
+     * @return list<string>
+     */
+    private function errors(array $report): array
+    {
+        $errors = [];
+        foreach (\is_array($report['errors'] ?? null) ? $report['errors'] : [] as $error) {
+            if (\is_array($error) && \is_string($error['message'] ?? null)) {
+                $errors[] = $error['message'];
+            }
+        }
+
+        return $errors;
     }
 
     /** @return array<mixed>|null */

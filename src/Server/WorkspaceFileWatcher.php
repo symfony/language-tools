@@ -23,6 +23,7 @@ final class WorkspaceFileWatcher
         private readonly ClientInterface $client,
         private readonly ProjectRegistry $projects,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly ProjectPathPolicy $paths,
     ) {
     }
 
@@ -122,7 +123,7 @@ final class WorkspaceFileWatcher
         $path = Path::canonicalize($path);
         foreach ($this->projects->all() as $project) {
             if (Path::canonicalize($project->rootPath) === \dirname($path)
-                && !\in_array(basename($path), ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)
+                && !$this->paths->isExcluded($project, $path)
                 && preg_match('/^[A-Za-z0-9_.-]+$/D', basename($path))
             ) {
                 return true;
@@ -148,10 +149,11 @@ final class WorkspaceFileWatcher
     {
         $directories = [];
         foreach (scandir($project->rootPath) ?: [] as $entry) {
-            if ('.' === $entry || '..' === $entry || \in_array($entry, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
+            if ('.' === $entry || '..' === $entry) {
                 continue;
             }
-            if (preg_match('/^[A-Za-z0-9_.-]+$/D', $entry) && is_dir($project->rootPath.'/'.$entry)) {
+            $path = Path::join($project->rootPath, $entry);
+            if (preg_match('/^[A-Za-z0-9_.-]+$/D', $entry) && is_dir($path) && !$this->paths->isExcluded($project, $path)) {
                 $directories[] = $entry;
             }
         }

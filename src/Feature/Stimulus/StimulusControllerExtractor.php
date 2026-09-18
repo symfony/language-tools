@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Feature\Stimulus;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokens;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectPathResolver;
 
 final class StimulusControllerExtractor
@@ -93,7 +92,7 @@ final class StimulusControllerExtractor
         if (null === $path || !preg_match('#^assets/(?:[^/]+/)*?controllers/(.*?)(?:_|-)controller\.[jt]s$#', $path, $match)) {
             return null;
         }
-        if ([] !== array_intersect(explode('/', $path), ProjectPathPolicy::EXCLUDED_DIRECTORIES)) {
+        if (!$this->pathResolver->isApplicationOwned($project, $uri)) {
             return null;
         }
 
@@ -109,6 +108,6 @@ final class StimulusControllerExtractor
         $segments = explode('/', $path);
         array_pop($segments);
 
-        return \in_array('assets', $segments, true) && [] === array_intersect($segments, ProjectPathPolicy::EXCLUDED_DIRECTORIES);
+        return \in_array('assets', $segments, true) && $this->pathResolver->isApplicationOwned($project, $uri);
     }
 }

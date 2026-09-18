@@ -12,6 +12,7 @@ final class DiagnosticCheckResult
      * @param float|null              $profileMilliseconds       total reported by the check's own profile
      * @param array<string, float>    $phasesMilliseconds        check phases from the profile
      * @param array<string, float>    $projectPhasesMilliseconds project phases summed over the analyzed projects
+     * @param list<string>            $errors                    redacted operational errors the check reported
      */
     public function __construct(
         public readonly ?string $failure,
@@ -24,6 +25,7 @@ final class DiagnosticCheckResult
         public readonly ?float $profileMilliseconds = null,
         public readonly array $phasesMilliseconds = [],
         public readonly array $projectPhasesMilliseconds = [],
+        public readonly array $errors = [],
     ) {
     }
 
@@ -46,6 +48,7 @@ final class DiagnosticCheckResult
             'profileMilliseconds' => $this->profileMilliseconds,
             'phasesMilliseconds' => $this->phasesMilliseconds,
             'projectPhasesMilliseconds' => $this->projectPhasesMilliseconds,
+            'errors' => $this->errors,
             'diagnostics' => $this->diagnostics,
         ];
     }

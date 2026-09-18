@@ -15,7 +15,6 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticSuppressor;
 use Symfony\Lsp\Feature\PartialParseDiagnosticFilter;
-use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -25,14 +24,13 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
-use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class DiagnosticProviderRegistryTest extends TestCase
 {
@@ -189,17 +187,29 @@ final class DiagnosticProviderRegistryTest extends TestCase
 
     public function testSuppressesDiagnosticsInDependencyOwnedDocuments(): void
     {
-        foreach ([
-            'file:///workspace/vendor/acme/bundle/templates/alert.html.twig',
-            'file:///workspace/node_modules/lib/index.js',
-            'file:///workspace/var/cache/dev/template.php',
-        ] as $uri) {
-            [$registry, $client] = $this->registry($uri);
+        $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
+        mkdir($root, 0777, true);
+        file_put_contents($root.'/.gitignore', "/var/\n");
+        $converter = new UriToPathConverter();
 
-            $registry->publish(['textDocument' => ['uri' => $uri]]);
+        try {
+            foreach ([
+                'vendor/acme/bundle/templates/alert.html.twig',
+                'node_modules/lib/index.js',
+                'var/cache/dev/template.php',
+            ] as $relativePath) {
+                mkdir($root.'/'.\dirname($relativePath), 0777, true);
+                file_put_contents($root.'/'.$relativePath, '');
+                $uri = $converter->toUri($root.'/'.$relativePath);
+                [$registry, $client] = $this->registryForProjectDocument($root, $uri, 'twig', '', [], new StubDiagnosticProvider([$this->diagnostic('stub')]));
 
-            self::assertCount(1, $client->notifications, $uri);
-            self::assertSame([], $client->notifications[0]['params']['diagnostics'], $uri);
+                $registry->publish(['textDocument' => ['uri' => $uri]]);
+
+                self::assertCount(1, $client->notifications, $uri);
+                self::assertSame([], $client->notifications[0]['params']['diagnostics'], $uri);
+            }
+        } finally {
+            (new Filesystem())->remove($root);
         }
     }
 
@@ -255,10 +265,9 @@ final class DiagnosticProviderRegistryTest extends TestCase
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
-            new ProjectPathResolver($converter),
             $fileScope,
             $converter,
-            new SourceFileEnumerator(new GitignoreMatcher(), $fileScope),
+            ProjectPaths::policy(),
             new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
             new DiagnosticSuppressor(
                 new PositionConverter(),

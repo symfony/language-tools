@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Skip only the directory Composer installs into, `node_modules/`, `.git/`, the server's own cache and the paths the project's `.gitignore` excludes, so application directories such as `templates/vendor/` are analyzed
+- Read the Composer `vendor-dir` from `composer.json`, so a project that installs its dependencies elsewhere no longer analyzes them
+- Prune ignored directories while scanning a project instead of discarding their files afterwards
+- Apply the project's ignore rules to rename and code actions, which never edit a generated file now
 - Compare configuration key paths segment by segment, so a key that contains dots is no longer reported as a duplicate of a nested path
 - Resolve a template name to the first loader path that holds it, so navigation opens the application override instead of the directory it overrides
 - Read Sylius theme template directories from the configured theme sources, so templates a theme adds resolve and are themselves diagnosed

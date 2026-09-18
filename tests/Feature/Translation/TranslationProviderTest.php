@@ -21,10 +21,10 @@ use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class TranslationProviderTest extends TestCase
 {
@@ -294,7 +294,7 @@ final class TranslationProviderTest extends TestCase
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $pathResolver = new ProjectPathResolver(new UriToPathConverter());
+            $pathResolver = ProjectPaths::resolver();
             $actions = (new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver)))->actions([
                 'textDocument' => ['uri' => $uri],
                 'range' => $diagnostics[0]['range'],
@@ -354,7 +354,7 @@ final class TranslationProviderTest extends TestCase
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $pathResolver = new ProjectPathResolver(new UriToPathConverter());
+            $pathResolver = ProjectPaths::resolver();
             $actions = (new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver)))->actions([
                 'textDocument' => ['uri' => $uri],
                 'range' => $diagnostics[0]['range'],

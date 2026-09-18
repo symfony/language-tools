@@ -9,6 +9,7 @@ use Amp\DeferredCancellation;
 use Amp\Sync\KeyedMutex;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Server\ServerLogger;
@@ -35,6 +36,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         private readonly ProjectIndexStatusRegistry $statuses,
         private readonly ProgressReporterInterface $progress,
         private readonly SourceIndexStoreInterface $store,
+        private readonly ProjectPathPolicy $paths,
         private readonly SourceFileEnumerator $files,
         private readonly KeyedMutex $mutex,
         private readonly ServerLogger $logger,
@@ -178,7 +180,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         $projectKey = $project->rootPath;
         $indexed = \array_key_exists($projectKey, $this->entries);
         $entries = $indexed ? $this->entries[$projectKey] : $this->store->loadMetadata($project);
-        if ($this->files->isExcluded($project, $location->path) || $this->files->gitignoreExcluded($project->rootPath, $location->path)) {
+        if ($this->files->isExcluded($project, $location->path) || $this->paths->isExcluded($project, $location->path)) {
             if (isset($entries[$location->relativePath])) {
                 $this->providers->remove($project, $location->uri);
                 unset($entries[$location->relativePath]);

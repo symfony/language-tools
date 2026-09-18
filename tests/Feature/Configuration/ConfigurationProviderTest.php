@@ -35,12 +35,12 @@ use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\SavedDocumentMatcher;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class ConfigurationProviderTest extends TestCase
 {
@@ -1697,7 +1697,7 @@ final class ConfigurationProviderTest extends TestCase
         $values = new ConfigurationValueValidator($environmentIndexes, new EnvironmentExpressionParser());
         $validationReconciler = new ConfigurationValidationReconciler(
             $validations,
-            new SavedDocumentMatcher(new ProjectPathResolver($uriConverter)),
+            new SavedDocumentMatcher(ProjectPaths::resolver()),
             $runtimeConfiguration,
             $converter,
             $protocol,
@@ -1706,7 +1706,7 @@ final class ConfigurationProviderTest extends TestCase
         return new ConfigurationProviderFixture(
             new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
-            new ConfigurationDiagnosticProvider($resolver, new ProjectPathResolver($uriConverter), $converter, $protocol, $indexes, $routeIndexes, $runtimeConfiguration, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
+            new ConfigurationDiagnosticProvider($resolver, ProjectPaths::resolver(), $converter, $protocol, $indexes, $routeIndexes, $runtimeConfiguration, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
             new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter, $documentParser),
             $documents,
             $converter,

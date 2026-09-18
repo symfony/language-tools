@@ -6,6 +6,7 @@ use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectStateInterface;
 
 /**
@@ -114,7 +115,7 @@ final class PersistentSourceIndexStore implements SourceIndexStoreInterface, Pro
 
     public function path(Project $project): string
     {
-        return Path::join($project->rootPath, 'var/symfony-lsp', $this->serverVersion, 'index/source.jsonl');
+        return Path::join($project->rootPath, ProjectPathPolicy::STORAGE_PATH, $this->serverVersion, 'index/source.jsonl');
     }
 
     /**

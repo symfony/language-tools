@@ -47,6 +47,7 @@ final class ProjectDiscoveryTest extends TestCase
         mkdir($this->temporaryDirectory.'/.hidden', 0777, true);
         mkdir($this->temporaryDirectory.'/apps/admin', 0777, true);
         mkdir($this->temporaryDirectory.'/apps/ignored', 0777, true);
+        file_put_contents($this->temporaryDirectory.'/.gitignore', "/vendor/\n");
         mkdir($this->temporaryDirectory.'/vendor/package', 0777, true);
         foreach (['.hidden', 'apps/admin', 'apps/ignored', 'vendor/package'] as $path) {
             file_put_contents($this->temporaryDirectory.'/'.$path.'/composer.json', json_encode([
@@ -70,6 +71,30 @@ final class ProjectDiscoveryTest extends TestCase
         $projects = $discovery->discover($workspace, ['apps/admin']);
         self::assertCount(1, $projects);
         self::assertSame($this->temporaryDirectory.'/apps/admin', $projects[0]->rootPath);
+    }
+
+    public function testSkipsProjectsInstalledInTheDeclaredComposerVendorDirectory(): void
+    {
+        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+            'type' => 'project',
+            'config' => ['vendor-dir' => 'libraries'],
+            'require' => ['symfony/framework-bundle' => '^8.0'],
+        ], \JSON_THROW_ON_ERROR));
+        mkdir($this->temporaryDirectory.'/libraries/package', 0777, true);
+        file_put_contents($this->temporaryDirectory.'/libraries/package/composer.json', json_encode([
+            'type' => 'project',
+            'require' => ['symfony/framework-bundle' => '^8.0'],
+        ], \JSON_THROW_ON_ERROR));
+
+        $projects = (new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()))->discover([
+            ['uri' => 'file://'.$this->temporaryDirectory],
+        ]);
+
+        self::assertSame(
+            [$this->temporaryDirectory],
+            array_map(static fn (Project $project): string => $project->rootPath, $projects),
+        );
+        self::assertSame('libraries', $projects[0]->vendorPath);
     }
 
     public function testSkipsGitignoredProjectsUnlessExplicitlyConfigured(): void

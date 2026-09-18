@@ -52,7 +52,25 @@ final class ProjectDiscovery
 
         usort($projects, static fn (Project $left, Project $right): int => strcmp($left->rootPath, $right->rootPath));
 
-        return $projects;
+        return array_values(array_filter(
+            $projects,
+            static fn (Project $project): bool => !self::isInstalledDependency($project, $projects),
+        ));
+    }
+
+    /** @param list<Project> $projects */
+    private static function isInstalledDependency(Project $project, array $projects): bool
+    {
+        foreach ($projects as $candidate) {
+            if ($candidate === $project || null === $candidate->vendorPath) {
+                continue;
+            }
+            if (Path::isBasePath(Path::join($candidate->rootPath, $candidate->vendorPath), $project->rootPath)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -93,12 +111,13 @@ final class ProjectDiscovery
             ->files()
             ->name('composer.json')
             ->in($directory)
-            ->exclude(ProjectPathPolicy::EXCLUDED_DIRECTORIES)
+            ->filter(fn (\SplFileInfo $file): bool => !$this->gitignore->isIgnored($directory, $file->getPathname()), true)
+            ->exclude(ProjectPathPolicy::TOOL_DIRECTORIES)
             ->ignoreDotFiles(false)
             ->ignoreVCS(false)
             ->ignoreUnreadableDirs();
-        foreach ($this->gitignore->filter($files, $directory) as $path) {
-            yield \dirname($path);
+        foreach ($files as $path => $file) {
+            yield \dirname(Path::canonicalize($path));
         }
     }
 
@@ -134,7 +153,29 @@ final class ProjectDiscovery
             return null;
         }
 
-        return new Project($rootPath, rtrim($rootUri, '/'));
+        return new Project($rootPath, rtrim($rootUri, '/'), $this->vendorPath($rootPath, $composer));
+    }
+
+    /**
+     * Composer installs dependencies in `vendor/` unless the project declares another directory.
+     *
+     * @param array<array-key, mixed> $composer
+     */
+    private function vendorPath(string $rootPath, array $composer): ?string
+    {
+        $config = \is_array($composer['config'] ?? null) ? $composer['config'] : [];
+        $vendorDir = $config['vendor-dir'] ?? 'vendor';
+        if (!\is_string($vendorDir) || '' === $vendorDir) {
+            return 'vendor';
+        }
+
+        $root = Path::canonicalize($rootPath);
+        $vendorPath = Path::canonicalize(Path::isAbsolute($vendorDir) ? $vendorDir : Path::join($root, $vendorDir));
+        if ($root === $vendorPath || !Path::isBasePath($root, $vendorPath)) {
+            return null;
+        }
+
+        return str_replace('\\', '/', Path::makeRelative($vendorPath, $root));
     }
 
     /**

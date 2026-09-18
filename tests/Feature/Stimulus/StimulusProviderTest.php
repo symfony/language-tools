@@ -31,10 +31,10 @@ use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class StimulusProviderTest extends TestCase
 {
@@ -250,7 +250,7 @@ final class StimulusProviderTest extends TestCase
         $controllerNameNormalizer = new StimulusControllerNameNormalizer();
 
         return new StimulusExtractor(
-            new StimulusControllerExtractor($converter, new ProjectPathResolver(new UriToPathConverter()), $controllerNameNormalizer, new StimulusControllerSourceAnalyzer($converter)),
+            new StimulusControllerExtractor($converter, ProjectPaths::resolver(), $controllerNameNormalizer, new StimulusControllerSourceAnalyzer($converter)),
             new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
             new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
             $tokenizer,

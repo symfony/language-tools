@@ -7,6 +7,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 
 final class BridgeInstaller implements RuntimeInitializerInterface
 {
@@ -27,7 +28,7 @@ final class BridgeInstaller implements RuntimeInitializerInterface
     {
         $files = $this->bundleFiles();
         $hash = hash('sha256', serialize($files));
-        $baseDirectory = Path::join($project->rootPath, 'var/symfony-lsp', $this->serverVersion);
+        $baseDirectory = Path::join($project->rootPath, ProjectPathPolicy::STORAGE_PATH, $this->serverVersion);
         $this->filesystem->mkdir($baseDirectory);
 
         $directory = Path::join($baseDirectory, $hash);

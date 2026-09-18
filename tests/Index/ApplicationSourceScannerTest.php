@@ -31,7 +31,6 @@ use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceFactsInterface;
-use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexFileProcessor;
 use Symfony\Lsp\Index\SourceIndexJsonLinesCodec;
 use Symfony\Lsp\Index\SourceIndexOverlayManager;
@@ -55,7 +54,6 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -65,6 +63,7 @@ use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 use function Amp\async;
 use function Amp\delay;
@@ -801,7 +800,7 @@ PHP;
         ?ServerLogger $logger = null,
     ): ApplicationSourceScanner {
         $documents ??= new DocumentStore();
-        $files = new SourceFileEnumerator(new GitignoreMatcher(), $this->fileScope);
+        $files = ProjectPaths::enumerator($this->fileScope);
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), $providers);
         $health = new SourceOverlayHealthRegistry();
 
@@ -810,6 +809,7 @@ PHP;
             $statuses ?? new ProjectIndexStatusRegistry(),
             new NullProgressReporter(),
             $store,
+            ProjectPaths::policy(),
             $files,
             $mutex ?? new LocalKeyedMutex(),
             $logger ?? new ServerLogger(null, new SensitiveDataRedactor()),
@@ -819,6 +819,7 @@ PHP;
                 $this->projects,
                 $documents,
                 new UriToPathConverter(),
+                ProjectPaths::policy(),
                 $files,
                 $pipeline,
                 new PhpParseHealthResolver(new TolerantPhpParser(new Parser())),

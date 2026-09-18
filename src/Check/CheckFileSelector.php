@@ -8,6 +8,7 @@ use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -16,6 +17,7 @@ final class CheckFileSelector
 {
     public function __construct(
         private readonly ProjectRegistry $projects,
+        private readonly ProjectPathPolicy $paths,
         private readonly SourceFileEnumerator $files,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly ProjectConfiguration $projectConfiguration,
@@ -188,10 +190,10 @@ final class CheckFileSelector
             if (null === $project) {
                 return \sprintf('The selected file "%s" is outside every discovered Symfony project.', $selector['selector']);
             }
-            if (!$this->files->belongsToProject($project, $path)) {
-                return \sprintf('The selected file "%s" is in an excluded dependency or cache directory.', $selector['selector']);
+            if ($this->paths->isToolOwned($project, $path)) {
+                return \sprintf('The selected file "%s" is in a directory Composer, npm or Git owns.', $selector['selector']);
             }
-            if ($this->files->gitignoreExcluded($project->rootPath, $path)) {
+            if ($this->paths->isIgnored($project, $path)) {
                 return \sprintf('The selected file "%s" is ignored by the project .gitignore rules.', $selector['selector']);
             }
             if (null === $this->files->languageId($path)) {

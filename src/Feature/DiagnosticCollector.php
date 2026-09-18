@@ -3,10 +3,8 @@
 namespace Symfony\Lsp\Feature;
 
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathPolicy;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -16,10 +14,9 @@ final class DiagnosticCollector
     public function __construct(
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
-        private readonly ProjectPathResolver $pathResolver,
         private readonly ProjectFileScopeRegistry $fileScope,
         private readonly UriToPathConverter $uriToPathConverter,
-        private readonly SourceFileEnumerator $files,
+        private readonly ProjectPathPolicy $paths,
         private readonly PartialParseDiagnosticFilter $partialParseFilter,
         private readonly DiagnosticSuppressor $suppressor,
         private readonly iterable $providers,
@@ -143,24 +140,14 @@ final class DiagnosticCollector
         if (null === $project) {
             return false;
         }
-        $relativePath = $this->pathResolver->relative($project, $uri);
-        if (null === $relativePath) {
+        $path = $this->uriToPathConverter->convert($uri);
+        if (null === $path) {
             return false;
         }
-        $path = $this->uriToPathConverter->convert($uri);
-        if (null !== $path && $this->files->gitignoreExcluded($project->rootPath, $path)) {
-            return true;
-        }
-        if (!$includeExcluded && null !== $path && $this->fileScope->isExcluded($project, $path)) {
+        if (!$includeExcluded && $this->fileScope->isExcluded($project, $path)) {
             return true;
         }
 
-        foreach (explode('/', $relativePath) as $segment) {
-            if (\in_array($segment, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->paths->isExcluded($project, $path);
     }
 }

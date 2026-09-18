@@ -8,8 +8,7 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\ProjectDocumentReader;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
-use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class ProjectDocumentReaderTest extends TestCase
 {
@@ -24,7 +23,7 @@ final class ProjectDocumentReaderTest extends TestCase
         mkdir($this->temporaryDirectory.'/src', 0777, true);
         $this->project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $this->documents = new DocumentStore();
-        $this->reader = new ProjectDocumentReader($this->documents, new ProjectPathResolver(new UriToPathConverter()));
+        $this->reader = new ProjectDocumentReader($this->documents, ProjectPaths::resolver());
     }
 
     protected function tearDown(): void

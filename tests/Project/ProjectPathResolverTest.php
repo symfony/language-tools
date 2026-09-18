@@ -6,15 +6,15 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class ProjectPathResolverTest extends TestCase
 {
     #[DataProvider('relativePathProvider')]
     public function testResolvesUrisRelativeToTheProject(Project $project, string $uri, ?string $expected): void
     {
-        self::assertSame($expected, (new ProjectPathResolver(new UriToPathConverter()))->relative($project, $uri));
+        self::assertSame($expected, ProjectPaths::resolver()->relative($project, $uri));
     }
 
     public function testKeepsExternalSymlinksReadOnlyWithoutRejectingInternalSymlinks(): void
@@ -33,7 +33,7 @@ final class ProjectPathResolverTest extends TestCase
         symlink($directory.'/external', $root.'/vendor/symfony');
         $converter = new UriToPathConverter();
         $project = new Project($root, $converter->toUri($root));
-        $resolver = new ProjectPathResolver($converter);
+        $resolver = ProjectPaths::resolver();
 
         try {
             self::assertTrue($resolver->isApplicationOwned($project, $converter->toUri($root.'/src/InternalLink.php')));
@@ -43,6 +43,26 @@ final class ProjectPathResolverTest extends TestCase
             self::assertFalse($resolver->isApplicationOwned($project, $converter->toUri($root.'/vendor/symfony/External.php')));
         } finally {
             (new Filesystem())->remove($directory);
+        }
+    }
+
+    public function testOwnsApplicationDirectoriesNamedLikeDependencyDirectories(): void
+    {
+        $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
+        mkdir($root.'/templates/vendor', 0777, true);
+        mkdir($root.'/vendor/acme', 0777, true);
+        mkdir($root.'/var/cache', 0777, true);
+        file_put_contents($root.'/.gitignore', "/var/\n/vendor/\n");
+        $converter = new UriToPathConverter();
+        $project = new Project($root, $converter->toUri($root));
+        $resolver = ProjectPaths::resolver($converter);
+
+        try {
+            self::assertTrue($resolver->isApplicationOwned($project, $converter->toUri($root.'/templates/vendor/show.html.twig')));
+            self::assertFalse($resolver->isApplicationOwned($project, $converter->toUri($root.'/vendor/acme/Thing.php')));
+            self::assertFalse($resolver->isApplicationOwned($project, $converter->toUri($root.'/var/cache/app.php')));
+        } finally {
+            (new Filesystem())->remove($root);
         }
     }
 

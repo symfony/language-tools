@@ -23,8 +23,7 @@ use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
-use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class TwigCallableMethodResolverTest extends TestCase
 {
@@ -108,7 +107,7 @@ final class TwigCallableMethodResolverTest extends TestCase
         $callableIndexes->forProject($project)->replace((new TwigCallableDeclarationExtractor(new PositionConverter(), $parser))->extract(new SourceDocument($uri, 'php', $source)));
         $resolver = new TwigCallableMethodResolver(
             $classIndexes,
-            new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
+            new ProjectDocumentReader($documents, ProjectPaths::resolver()),
             $countingParser,
             $callableIndexes,
         );
@@ -226,7 +225,7 @@ final class TwigCallableMethodResolverTest extends TestCase
         $callableIndexes->forProject($project)->replace((new TwigCallableDeclarationExtractor(new PositionConverter(), $parser))->extract(new SourceDocument($uri, 'php', $source)));
         $resolver = new TwigCallableMethodResolver(
             $classIndexes,
-            new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
+            new ProjectDocumentReader($documents, ProjectPaths::resolver()),
             $parser,
             $callableIndexes,
         );

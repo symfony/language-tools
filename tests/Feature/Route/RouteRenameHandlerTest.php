@@ -32,10 +32,10 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class RouteRenameHandlerTest extends TestCase
 {
@@ -136,7 +136,7 @@ final class RouteRenameHandlerTest extends TestCase
             ),
             $sourceIndexes,
             $routes,
-            new ProjectPathResolver(new UriToPathConverter()),
+            ProjectPaths::resolver(),
         );
 
         $edit = $handler->rename([
@@ -225,7 +225,7 @@ final class RouteRenameHandlerTest extends TestCase
             ),
             $sourceIndexes,
             $routes,
-            new ProjectPathResolver(new UriToPathConverter()),
+            ProjectPaths::resolver(),
         );
 
         return [$handler, [

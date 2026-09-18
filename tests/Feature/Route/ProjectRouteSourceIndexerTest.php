@@ -27,7 +27,6 @@ use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PhpParseHealthResolver;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
-use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexFileProcessor;
 use Symfony\Lsp\Index\SourceIndexOverlayManager;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
@@ -42,17 +41,16 @@ use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class ProjectRouteSourceIndexerTest extends TestCase
 {
@@ -126,7 +124,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
                     new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
                     RouteReferenceExtractorFactory::create($positionConverter, $parser),
                     new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
-                    new ProjectPathResolver(new UriToPathConverter()),
+                    ProjectPaths::resolver(),
                 ),
                 new DependencyInjectionSourceIndexer(
                     $classIndexes,
@@ -196,7 +194,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             RouteReferenceExtractorFactory::create($positionConverter),
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
-            new ProjectPathResolver(new UriToPathConverter()),
+            ProjectPaths::resolver(),
         );
         $scanner = $this->scanner($projects, $documents, [$indexer]);
 
@@ -257,7 +255,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             RouteReferenceExtractorFactory::create($positionConverter, $parser),
             new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
-            new ProjectPathResolver(new UriToPathConverter()),
+            ProjectPaths::resolver(),
         );
         $scanner = $this->scanner($projects, $documents, [
             $indexer,
@@ -320,7 +318,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
     private function scanner(ProjectRegistry $projects, DocumentStore $documents, array $providers): ApplicationSourceScanner
     {
         $store = new InMemorySourceIndexStore();
-        $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler()));
+        $files = ProjectPaths::enumerator(new ProjectFileScopeRegistry(new GlobPatternCompiler()));
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), $providers);
         $health = new SourceOverlayHealthRegistry();
 
@@ -329,6 +327,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             new ProjectIndexStatusRegistry(),
             new NullProgressReporter(),
             $store,
+            ProjectPaths::policy(),
             $files,
             new LocalKeyedMutex(),
             new ServerLogger(null, new SensitiveDataRedactor()),
@@ -338,6 +337,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
                 $projects,
                 $documents,
                 new UriToPathConverter(),
+                ProjectPaths::policy(),
                 $files,
                 $pipeline,
                 new PhpParseHealthResolver(new TolerantPhpParser(new Parser())),

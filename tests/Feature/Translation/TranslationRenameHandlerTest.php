@@ -12,10 +12,9 @@ use Symfony\Lsp\Feature\Translation\TranslationReferenceResolver;
 use Symfony\Lsp\Feature\Translation\TranslationRenameHandler;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class TranslationRenameHandlerTest extends TestCase
 {
@@ -40,7 +39,7 @@ final class TranslationRenameHandlerTest extends TestCase
             new TranslationReferenceResolver(new DocumentContextResolver($documents, $projects), $converter, $extractor),
             new LspProtocolMapper(),
             $indexes,
-            new ProjectPathResolver(new UriToPathConverter()),
+            ProjectPaths::resolver(),
         );
         $position = $converter->toPosition($reference, strpos($reference, 'article.title') + 1);
 

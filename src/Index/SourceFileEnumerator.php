@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Index;
 
 use Symfony\Component\Filesystem\Path;
-use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathPolicy;
@@ -32,7 +31,7 @@ final class SourceFileEnumerator
     ];
 
     public function __construct(
-        private readonly GitignoreMatcher $gitignore,
+        private readonly ProjectPathPolicy $paths,
         private readonly ProjectFileScopeRegistry $fileScope,
     ) {
     }
@@ -55,46 +54,7 @@ final class SourceFileEnumerator
             return;
         }
 
-        $issues = [];
-        $rootDotenvPaths = [];
-        $rawFiles = (function () use ($project, $includeExcluded, $root, &$issues, &$rootDotenvPaths): \Generator {
-            foreach ($this->traverse($project, $includeExcluded, $root) as $entry) {
-                if (isset($entry['directory'])) {
-                    $issues[] = $entry;
-
-                    continue;
-                }
-                if ('dotenv' === $this->languageId($entry['path']) && $root === \dirname($entry['path'])) {
-                    $rootDotenvPaths[$entry['path']] = true;
-                }
-                yield $entry['path'];
-            }
-        })();
-
-        $yielded = [];
-        $issueOffset = 0;
-        foreach ($this->gitignore->filter($rawFiles, $root) as $path) {
-            while (isset($issues[$issueOffset])) {
-                $issue = $issues[$issueOffset++];
-                if (!$this->gitignore->isIgnored($root, $issue['directory'])) {
-                    yield $issue;
-                }
-            }
-            $path = Path::canonicalize($path);
-            $yielded[$path] = true;
-            yield ['path' => $path];
-        }
-        while (isset($issues[$issueOffset])) {
-            $issue = $issues[$issueOffset++];
-            if (!$this->gitignore->isIgnored($root, $issue['directory'])) {
-                yield $issue;
-            }
-        }
-        foreach (array_keys($rootDotenvPaths) as $path) {
-            if (!isset($yielded[$path])) {
-                yield ['path' => $path];
-            }
-        }
+        yield from $this->traverse($project, $includeExcluded, $root);
     }
 
     /** @return \Generator<int, array{path: string}|array{directory: string, error: 'outside'|'unreadable'}> */
@@ -115,7 +75,7 @@ final class SourceFileEnumerator
                 }
                 $path = Path::join($directory, $entry);
                 if (is_dir($path)) {
-                    if (\in_array($entry, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
+                    if ($this->paths->isExcluded($project, $path)) {
                         continue;
                     }
                     if (!$includeExcluded && $this->fileScope->isDirectoryExcluded($project, $path)) {
@@ -138,6 +98,9 @@ final class SourceFileEnumerator
                     continue;
                 }
                 if (!is_file($path) || null === $this->languageId($path)) {
+                    continue;
+                }
+                if ($this->paths->isExcluded($project, $path)) {
                     continue;
                 }
                 if (!$includeExcluded && $this->fileScope->isExcluded($project, $path)) {
@@ -167,34 +130,9 @@ final class SourceFileEnumerator
         return self::LANGUAGE_IDS[$extension] ?? null;
     }
 
-    public function gitignoreExcluded(string $rootPath, string $path): bool
-    {
-        if ('dotenv' === $this->languageId($path) && Path::canonicalize($rootPath) === \dirname(Path::canonicalize($path))) {
-            return false;
-        }
-
-        return $this->gitignore->isIgnored($rootPath, $path);
-    }
-
     public function isExcluded(Project $project, string $path): bool
     {
         return $this->fileScope->isExcluded($project, $path);
-    }
-
-    public function belongsToProject(Project $project, string $path): bool
-    {
-        $relativePath = $this->relativePath($project, $path);
-        if (null === $relativePath) {
-            return false;
-        }
-
-        foreach (explode('/', $relativePath) as $part) {
-            if (\in_array($part, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     public function relativePath(Project $project, string $path): ?string

@@ -6,9 +6,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Check\CheckFileSelector;
-use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\AnalysisSettings;
-use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
@@ -16,6 +14,7 @@ use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class CheckFileSelectorTest extends TestCase
 {
@@ -42,7 +41,8 @@ final class CheckFileSelectorTest extends TestCase
         $globPatterns = new GlobPatternCompiler();
         $this->selector = new CheckFileSelector(
             $projects,
-            new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry($globPatterns)),
+            ProjectPaths::policy(),
+            ProjectPaths::enumerator(new ProjectFileScopeRegistry($globPatterns)),
             $uriToPathConverter,
             $projectConfiguration,
             $globPatterns,
@@ -98,5 +98,23 @@ final class CheckFileSelectorTest extends TestCase
             'templates/admin/page.twig',
             'templates/page.twig',
         ]];
+    }
+
+    public function testSelectsApplicationFilesInDirectoriesNamedLikeDependencyDirectories(): void
+    {
+        mkdir($this->directory.'/templates/vendor', 0777, true);
+        mkdir($this->directory.'/vendor/acme', 0777, true);
+        file_put_contents($this->directory.'/templates/vendor/show.html.twig', '');
+        file_put_contents($this->directory.'/vendor/acme/Thing.php', '<?php');
+
+        self::assertSame(
+            ['templates/vendor/show.html.twig'],
+            array_column($this->selector->select($this->directory, ['templates/vendor/show.html.twig']), 'workspacePath'),
+        );
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The selected file "vendor/acme/Thing.php" is in a directory Composer, npm or Git owns.');
+
+        $this->selector->select($this->directory, ['vendor/acme/Thing.php']);
     }
 }

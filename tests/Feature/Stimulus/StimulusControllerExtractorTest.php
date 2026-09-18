@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Feature\Stimulus;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerDeclaration;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
@@ -11,8 +12,8 @@ use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
 use Symfony\Lsp\Feature\Stimulus\StimulusControllerSourceAnalyzer;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class StimulusControllerExtractorTest extends TestCase
 {
@@ -93,30 +94,40 @@ final class StimulusControllerExtractorTest extends TestCase
         self::assertSame([['example', true], ['clipboard', false]], array_map(static fn ($declaration): array => [$declaration->name, $declaration->lazy], $declarations));
     }
 
-    #[DataProvider('ignoredControllerPathProvider')]
-    public function testIgnoresControllerNamedAssetsOutsideIndexableControllerDirectories(string $uri): void
+    public function testIgnoresControllersOutsideIndexableControllerDirectories(): void
     {
-        self::assertSame([], $this->extractNames($uri, 'export default class extends Controller {}'));
+        self::assertSame([], $this->extractNames('file:///workspace/assets/Feature/scripts/feature_widget_controller.ts', 'export default class extends Controller {}'));
     }
 
-    /** @return iterable<string, array{string}> */
-    public static function ignoredControllerPathProvider(): iterable
+    public function testIgnoresControllersTheProjectDeclaresAsGenerated(): void
     {
-        yield 'outside a controller directory' => ['file:///workspace/assets/Feature/scripts/feature_widget_controller.ts'];
-        yield 'inside an excluded directory' => ['file:///workspace/assets/vendor/controllers/feature_widget_controller.ts'];
+        $root = sys_get_temp_dir().'/symfony-lsp-stimulus-'.bin2hex(random_bytes(6));
+        mkdir($root.'/assets/vendor/controllers', 0777, true);
+        file_put_contents($root.'/.gitignore', "/assets/vendor/\n");
+        $path = $root.'/assets/vendor/controllers/feature_widget_controller.ts';
+        file_put_contents($path, 'export default class extends Controller {}');
+
+        try {
+            self::assertSame([], $this->extractNames((new UriToPathConverter())->toUri($path), 'export default class extends Controller {}', $root));
+        } finally {
+            (new Filesystem())->remove($root);
+        }
     }
 
     /** @return list<string> */
-    private function extractNames(string $uri, string $text): array
+    private function extractNames(string $uri, string $text, ?string $rootPath = null): array
     {
-        return array_map(static fn ($declaration): string => $declaration->name, $this->extractDeclarations($uri, $text));
+        return array_map(static fn ($declaration): string => $declaration->name, $this->extractDeclarations($uri, $text, $rootPath));
     }
 
     /** @return list<StimulusControllerDeclaration> */
-    private function extractDeclarations(string $uri, string $text): array
+    private function extractDeclarations(string $uri, string $text, ?string $rootPath = null): array
     {
-        $extractor = new StimulusControllerExtractor(new PositionConverter(), new ProjectPathResolver(new UriToPathConverter()), new StimulusControllerNameNormalizer(), new StimulusControllerSourceAnalyzer(new PositionConverter()));
+        $extractor = new StimulusControllerExtractor(new PositionConverter(), ProjectPaths::resolver(), new StimulusControllerNameNormalizer(), new StimulusControllerSourceAnalyzer(new PositionConverter()));
+        $project = null === $rootPath
+            ? new Project('/workspace', 'file:///workspace')
+            : new Project($rootPath, (new UriToPathConverter())->toUri($rootPath));
 
-        return $extractor->extract(new Project('/workspace', 'file:///workspace'), $uri, $text, (new JavaScriptTokenizer())->tokenize($text));
+        return $extractor->extract($project, $uri, $text, (new JavaScriptTokenizer())->tokenize($text));
     }
 }

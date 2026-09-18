@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 
@@ -13,6 +14,7 @@ final class SourceIndexOverlayManager
         private readonly ProjectRegistry $projects,
         private readonly DocumentStore $documents,
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly ProjectPathPolicy $paths,
         private readonly SourceFileEnumerator $files,
         private readonly SourceIndexProviderPipeline $providers,
         private readonly PhpParseHealthResolver $parseHealth,
@@ -28,9 +30,8 @@ final class SourceIndexOverlayManager
         if (null === $document || null === $project || null === $path) {
             return;
         }
-        if (!$this->files->belongsToProject($project, $path)
+        if ($this->paths->isExcluded($project, $path)
             || (!$includeExcluded && $this->files->isExcluded($project, $path))
-            || $this->files->gitignoreExcluded($project->rootPath, $path)
         ) {
             $this->providers->removeOverlay($project, $uri);
             $this->overlayHealth->clear($uri);
@@ -66,7 +67,7 @@ final class SourceIndexOverlayManager
     {
         $project = $this->projects->forDocumentUri($uri);
         $path = $this->uriToPathConverter->convert($uri);
-        if (null === $project || null === $path || !$this->files->belongsToProject($project, $path)) {
+        if (null === $project || null === $path || $this->paths->isToolOwned($project, $path)) {
             return null;
         }
         $relativePath = $this->files->relativePath($project, $path);

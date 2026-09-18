@@ -19,8 +19,7 @@ use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
-use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class TwigComponentExtractorTest extends TestCase
 {
@@ -130,7 +129,7 @@ final class TwigComponentExtractorTest extends TestCase
     {
         $converter = new PositionConverter();
 
-        $names = new TwigComponentNameResolver(new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())));
+        $names = new TwigComponentNameResolver(new TemplateNameResolver(ProjectPaths::resolver()));
         $comments = new TwigCommentParser();
 
         return new TwigComponentExtractor(

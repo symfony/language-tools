@@ -31,10 +31,9 @@ use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class LiveComponentProviderTest extends TestCase
 {
@@ -219,7 +218,7 @@ final class LiveComponentProviderTest extends TestCase
     private function extractor(PositionConverter $converter, ?TwigCommentParser $comments = null): TwigComponentExtractor
     {
         $comments ??= new TwigCommentParser();
-        $names = new TwigComponentNameResolver(new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())));
+        $names = new TwigComponentNameResolver(new TemplateNameResolver(ProjectPaths::resolver()));
 
         return new TwigComponentExtractor(
             new TolerantPhpParser(new Parser()),

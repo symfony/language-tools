@@ -30,10 +30,9 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 class TwigCallableProviderTestCase extends TestCase
 {
@@ -85,7 +84,7 @@ class TwigCallableProviderTestCase extends TestCase
         $protocol = new LspProtocolMapper();
         $methodResolver = new TwigCallableMethodResolver(
             $classIndexes,
-            new ProjectDocumentReader($documents, new ProjectPathResolver(new UriToPathConverter())),
+            new ProjectDocumentReader($documents, ProjectPaths::resolver()),
             $phpParser,
             $indexes,
         );

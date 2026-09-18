@@ -8,11 +8,16 @@ the application; others require runtime indexing.
 Use the `headless diagnostics checker`_ to run the same Symfony diagnostics
 against saved files in local automation and CI.
 
-Symfony Language Tools honors your ``.gitignore`` rules, including for files
-opened in the editor, and always skips ``.git/``, ``node_modules/``, ``var/``,
-``vendor/`` and frontend lock files. Project ``excludePaths`` can omit
-additional embedded fixtures or generated sources. Project-root dotenv files
-remain available for environment variable names, but their values aren't read.
+Symfony Language Tools analyzes the files your project owns. It skips the
+directory Composer installs into (the ``vendor-dir`` declared in
+``composer.json``), ``node_modules/`` and ``.git/`` directories, and frontend
+lock files. Everything else generated, such as ``var/`` and ``assets/vendor/``,
+is skipped through your ``.gitignore`` rules, which are honored everywhere,
+including for files opened in the editor. A directory that only shares one of
+those names, such as ``templates/vendor/``, is analyzed. Project
+``excludePaths`` can omit embedded fixtures or generated sources that aren't
+ignored. Project-root dotenv files remain available for environment variable
+names, but their values aren't read.
 
 PHP call recognition through typed properties requires a named declaring class;
 properties in anonymous classes aren't inferred. Rename is unavailable while

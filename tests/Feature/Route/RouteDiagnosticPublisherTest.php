@@ -30,7 +30,6 @@ use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -43,14 +42,13 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
-use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class RouteDiagnosticPublisherTest extends TestCase
 {
@@ -251,7 +249,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $sourceIndexes, $templateIndexes);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $provider = new RouteCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, new ProjectPathResolver(new UriToPathConverter()));
+            $provider = new RouteCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver());
 
             $actions = $provider->actions([
                 'textDocument' => ['uri' => $uri],
@@ -328,10 +326,9 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
-            new ProjectPathResolver($uriConverter),
             $fileScope,
             $uriConverter,
-            new SourceFileEnumerator(new GitignoreMatcher(), $fileScope),
+            ProjectPaths::policy(),
             new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
@@ -468,10 +465,9 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
-            new ProjectPathResolver($uriConverter),
             $fileScope,
             $uriConverter,
-            new SourceFileEnumerator(new GitignoreMatcher(), $fileScope),
+            ProjectPaths::policy(),
             new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(

@@ -56,12 +56,12 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigTypeDeclarationParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class TemplateProviderTest extends TestCase
@@ -128,7 +128,7 @@ final class TemplateProviderTest extends TestCase
         $indexer = new TemplateSourceIndexer(
             $indexes,
             $this->templateReferenceExtractor($converter, parser: $parser),
-            new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter())),
+            new TemplateNameResolver(ProjectPaths::resolver()),
         );
         $project = new Project('/workspace', 'file:///workspace');
         $uri = 'file:///workspace/src/Controller.php';
@@ -805,7 +805,7 @@ final class TemplateProviderTest extends TestCase
 
     private function templateNameResolver(): TemplateNameResolver
     {
-        return new TemplateNameResolver(new ProjectPathResolver(new UriToPathConverter()));
+        return new TemplateNameResolver(ProjectPaths::resolver());
     }
 
     public function testIndexesTemplatesWithoutATwigExtension(): void
@@ -928,7 +928,7 @@ final class TemplateProviderTest extends TestCase
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
         $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
-        $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, new UriToPathConverter(), new ProjectPathResolver(new UriToPathConverter()), new LspProtocolMapper(), $classIndexes);
+        $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, new UriToPathConverter(), ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes);
 
         $actions = $provider->actions([
             'textDocument' => ['uri' => $uri],
@@ -977,7 +977,7 @@ final class TemplateProviderTest extends TestCase
         try {
             $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, $converter, new ProjectPathResolver($converter), new LspProtocolMapper(), $classIndexes);
+            $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, $converter, ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes);
 
             self::assertSame([], $provider->actions([
                 'textDocument' => ['uri' => $uri],

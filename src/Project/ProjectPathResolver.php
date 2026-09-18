@@ -8,6 +8,7 @@ final class ProjectPathResolver
 {
     public function __construct(
         private readonly UriToPathConverter $uriToPathConverter,
+        private readonly ProjectPathPolicy $paths,
     ) {
     }
 
@@ -24,22 +25,16 @@ final class ProjectPathResolver
 
     public function isApplicationOwned(Project $project, string $uri): bool
     {
-        $relativePath = $this->relative($project, $uri);
-        if (null === $relativePath) {
+        $path = $this->uriToPathConverter->convert($uri);
+        if (null === $path || null === $this->relative($project, $uri) || $this->paths->isExcluded($project, $path)) {
             return false;
-        }
-        foreach (explode('/', $relativePath) as $segment) {
-            if (\in_array($segment, ProjectPathPolicy::EXCLUDED_DIRECTORIES, true)) {
-                return false;
-            }
         }
 
         $root = realpath($project->rootPath);
         if (false === $root) {
             return true;
         }
-        $path = $this->uriToPathConverter->convert($uri);
-        if (null === $path || null === $resolvedPath = $this->resolveExistingPath($path)) {
+        if (null === $resolvedPath = $this->resolveExistingPath($path)) {
             return false;
         }
 

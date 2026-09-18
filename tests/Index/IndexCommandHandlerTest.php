@@ -13,7 +13,6 @@ use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Index\PhpParseHealthResolver;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
-use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Index\SourceIndexFileProcessor;
 use Symfony\Lsp\Index\SourceIndexOverlayManager;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
@@ -21,7 +20,6 @@ use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\AnalysisSettings;
-use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -38,6 +36,7 @@ use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class IndexCommandHandlerTest extends TestCase
 {
@@ -198,7 +197,7 @@ final class IndexCommandHandlerTest extends TestCase
     {
         $documents = new DocumentStore();
         $store = new InMemorySourceIndexStore();
-        $files = new SourceFileEnumerator(new GitignoreMatcher(), new ProjectFileScopeRegistry(new GlobPatternCompiler()));
+        $files = ProjectPaths::enumerator(new ProjectFileScopeRegistry(new GlobPatternCompiler()));
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), []);
         $health = new SourceOverlayHealthRegistry();
 
@@ -207,6 +206,7 @@ final class IndexCommandHandlerTest extends TestCase
             $statuses,
             new NullProgressReporter(),
             $store,
+            ProjectPaths::policy(),
             $files,
             new LocalKeyedMutex(),
             new ServerLogger(null, new SensitiveDataRedactor()),
@@ -216,6 +216,7 @@ final class IndexCommandHandlerTest extends TestCase
                 $projects,
                 $documents,
                 new UriToPathConverter(),
+                ProjectPaths::policy(),
                 $files,
                 $pipeline,
                 new PhpParseHealthResolver(new TolerantPhpParser(new Parser())),

@@ -20,11 +20,10 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class DependencyInjectionDiagnosticProviderTest extends TestCase
 {
@@ -138,7 +137,7 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
             $serviceIndexes,
             $parameterIndexes,
             $sourceIndexes,
-            new ProjectPathResolver(new UriToPathConverter()),
+            ProjectPaths::resolver(),
             $runtimeConfiguration,
         );
     }

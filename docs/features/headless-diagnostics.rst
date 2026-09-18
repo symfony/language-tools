@@ -87,12 +87,13 @@ it appears. For example, ``**.twig`` selects Twig files at every depth and
 ``src/**.php`` selects PHP files directly or recursively under ``src/``. Quote
 patterns so that the shell passes them unchanged to the checker.
 
-Files under ``.git/``, ``node_modules/``, ``var/`` or ``vendor/`` are skipped.
-Files excluded by ``.gitignore`` are also skipped, except project-root dotenv
-files (``.env*``), which Symfony reads even when ignored. This exception
+Files under the directory Composer installs into, ``node_modules/`` and
+``.git/`` are skipped. Files excluded by ``.gitignore`` are also skipped, which
+is how generated directories such as ``var/`` are left out, except project-root
+dotenv files (``.env*``), which Symfony reads even when ignored. This exception
 applies to default and explicit selections. The default selection also skips
 project ``excludePaths``. An explicit file, directory or pattern can select
-those configured exclusions, but it can't bypass the excluded directories or
+those configured exclusions, but it can't bypass the dependency directories or
 other ``.gitignore`` rules.
 
 Runtime analysis is enabled by default and boots the application with the

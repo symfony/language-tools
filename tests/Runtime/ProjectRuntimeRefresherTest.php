@@ -8,10 +8,8 @@ use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceFileChange;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
-use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
@@ -19,6 +17,7 @@ use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlanner;
 use Symfony\Lsp\Runtime\RuntimeRefreshSchedulerInterface;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class ProjectRuntimeRefresherTest extends TestCase
 {
@@ -155,7 +154,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
         return [
             new ProjectRuntimeRefresher(
                 $projects,
-                new ProjectPathResolver(new UriToPathConverter()),
+                ProjectPaths::resolver(),
                 $workspaceTrust,
                 $scheduler,
                 new ProjectIndexStatusRegistry(),
