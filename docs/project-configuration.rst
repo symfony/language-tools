@@ -53,6 +53,10 @@ support check. When a compatible
 Symfony CLI starts the server or checker, its project-aware
 ``symfony php`` command becomes the lower-precedence PHP default.
 
+Runtime analysis runs the application only to read its metadata, so the
+deprecations, notices and warnings raised by that run are discarded instead of
+being written to the application's log files.
+
 Configuring Multiple Projects
 -----------------------------
 

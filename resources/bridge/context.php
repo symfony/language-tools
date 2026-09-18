@@ -319,6 +319,7 @@ final class SymfonyLspBridgeContext
                 $this->removeDirectory($directory);
             }
         }
+        symfonyLspBridgeDiscardApplicationErrorLogs();
         if (method_exists($kernel, 'boot')) {
             $kernel->boot();
         }

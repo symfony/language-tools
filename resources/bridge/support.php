@@ -6,6 +6,26 @@ function symfonyLspBridgeExcludedDirectories(): array
     return ['.git', 'node_modules', 'var', 'vendor'];
 }
 
+/*
+ * The application is booted only to be read, so the deprecations, notices and
+ * warnings raised by that boot must never reach the application's own loggers
+ * and log files. A discarding logger installed before the kernel boots also
+ * drops what the error handler buffered during bootstrap, and Symfony's error
+ * handler configurator keeps it instead of the application loggers.
+ */
+function symfonyLspBridgeDiscardApplicationErrorLogs(): void
+{
+    if (!class_exists(Symfony\Component\ErrorHandler\ErrorHandler::class) || !class_exists(Psr\Log\NullLogger::class)) {
+        return;
+    }
+
+    try {
+        Symfony\Component\ErrorHandler\ErrorHandler::register(null, false)
+            ->setDefaultLogger(new Psr\Log\NullLogger(), E_ALL, true);
+    } catch (Throwable) {
+    }
+}
+
 function symfonyLspBridgeFinalizeSection(array $section): array
 {
     $section['generation'] = hash('sha256', json_encode($section, JSON_THROW_ON_ERROR));

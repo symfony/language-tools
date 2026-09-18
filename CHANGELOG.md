@@ -14,6 +14,7 @@
 - Resolve template names the way Twig's filesystem loader does, so a leading `/`, repeated slashes, backslash separators and `.` or `..` segments no longer report an existing template as missing
 - Treat a lone carriage return as a line terminator in document positions, so positions in files with classic Mac or mixed line endings no longer drift onto earlier lines
 - Report an empty route set for applications that disable routing, so CLI-only projects no longer fail with unavailable routing metadata
+- Discard the deprecations, notices and warnings raised while reading the application, so runtime analysis no longer fills the project's log files
 
 ## 0.20.3 (2026-09-15)
 

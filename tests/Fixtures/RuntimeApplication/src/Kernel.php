@@ -29,6 +29,22 @@ final class Kernel extends BaseKernel
                 }
             });
         }
+        $deprecation = getenv('SYMFONY_LSP_TEST_CONFIGURATION_COMPILE_DEPRECATION');
+        if (false !== $deprecation && '' !== $deprecation) {
+            $container->addCompilerPass(new class($deprecation) implements CompilerPassInterface {
+                public function __construct(private readonly string $path)
+                {
+                }
+
+                public function process(ContainerBuilder $container): void
+                {
+                    if (false === file_put_contents($this->path, "deprecated\n", \FILE_APPEND | \LOCK_EX)) {
+                        throw new \RuntimeException('Unable to record the configuration compilation deprecation.');
+                    }
+                    @trigger_error('FIXTURE_COMPILE_DEPRECATION', \E_USER_DEPRECATED);
+                }
+            });
+        }
         $failure = getenv('SYMFONY_LSP_TEST_CONFIGURATION_COMPILE_FAILURE');
         if (false !== $failure && '' !== $failure) {
             $container->addCompilerPass(new class($failure) implements CompilerPassInterface {
