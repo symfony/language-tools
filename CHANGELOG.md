@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Resolve a template name to the first loader path that holds it, so navigation opens the application override instead of the directory it overrides
 - Read Sylius theme template directories from the configured theme sources, so templates a theme adds resolve and are themselves diagnosed
 - Read Twig loader paths from the filesystem loader a decorating loader hides, so `@Bundle` and `@!Bundle` templates resolve on applications that decorate `twig.loader`
 - Register the `@!Bundle` namespace and prefer a bundle's `Resources/views` over its `templates` directory when rebuilding loader paths by convention

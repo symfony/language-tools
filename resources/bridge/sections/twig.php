@@ -39,13 +39,16 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
             if ([] === $paths) {
                 $paths = symfonyLspBridgeTwigConventionPaths($context);
             }
-            $paths = array_merge($paths, symfonyLspBridgeSyliusThemePaths($context));
+            // the theme loader answers before the loader it decorates
+            $paths = array_merge(symfonyLspBridgeSyliusThemePaths($context), $paths);
         } catch (Throwable $error) {
             $context->addError('twig', $error);
         }
     }
     $paths = array_values(array_unique($paths, SORT_REGULAR));
-    usort($paths, static fn (array $a, array $b): int => [$a['namespace'], $a['path']] <=> [$b['namespace'], $b['path']]);
+    // a name resolves against the paths of its namespace in order, so grouping
+    // must keep the order each namespace was registered in
+    usort($paths, static fn (array $a, array $b): int => $a['namespace'] <=> $b['namespace']);
     sort($globals);
     $section = [
         'complete' => $complete,

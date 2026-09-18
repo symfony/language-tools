@@ -33,7 +33,9 @@ final class TemplateIndex
     {
         $this->runtime = [];
         foreach ($templates as $template) {
-            $this->runtime[$template->name] = $template;
+            // Twig resolves a name against its loader paths in order, so the
+            // first declaration of a name wins over the paths it overrides
+            $this->runtime[$template->name] ??= $template;
         }
         $this->complete = $complete;
     }

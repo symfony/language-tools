@@ -62,6 +62,7 @@ use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class TemplateProviderTest extends TestCase
 {
@@ -826,6 +827,29 @@ final class TemplateProviderTest extends TestCase
             @unlink($root.'/templates/index.html');
             @rmdir($root.'/templates');
             @rmdir($root);
+        }
+    }
+
+    public function testResolvesAnOverriddenTemplateToTheFirstLoaderPath(): void
+    {
+        $workspace = new TestWorkspace();
+        $override = $workspace->write('templates/bundles/ShopBundle/index.html.twig', 'override');
+        $workspace->write('vendor/shop/templates/index.html.twig', 'bundle');
+        $project = new Project($workspace->rootPath, 'file://'.$workspace->rootPath);
+        $indexes = $this->templateIndexes();
+
+        try {
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
+                'complete' => true,
+                'paths' => [
+                    ['namespace' => '@Shop', 'path' => $workspace->path('templates/bundles/ShopBundle')],
+                    ['namespace' => '@Shop', 'path' => $workspace->path('vendor/shop/templates')],
+                ],
+            ]);
+
+            self::assertSame('file://'.$override, $indexes->forProject($project)->get('@Shop/index.html.twig')?->uri);
+        } finally {
+            $workspace->cleanup();
         }
     }
 

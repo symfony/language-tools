@@ -421,7 +421,13 @@ final class BridgeSectionsTest extends TestCase
             self::assertIsString($path['namespace'] ?? null);
             $byNamespace[$path['namespace']][] = $path['path'];
         }
-        self::assertSame([realpath($this->workspace->path).'/src/ShopBundle/templates'], $byNamespace['@Shop'] ?? null);
+        // the application override answers before the bundle directory it overrides
+        $shop = $byNamespace['@Shop'] ?? [];
+        self::assertCount(2, $shop);
+        self::assertIsString($shop[0]);
+        self::assertIsString($shop[1]);
+        self::assertStringEndsWith('/templates/bundles/ShopBundle', $shop[0]);
+        self::assertStringEndsWith('/src/ShopBundle/templates', $shop[1]);
         self::assertSame([realpath($this->workspace->path).'/templates'], $byNamespace['(None)'] ?? null);
         self::assertSame([realpath($this->workspace->path).'/src/ShopBundle/templates'], $byNamespace['@!Shop'] ?? null);
     }

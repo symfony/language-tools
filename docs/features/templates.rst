@@ -45,8 +45,9 @@ Navigation and Links
 --------------------
 
 Hover shows the resolved template file. Go to Definition and document links open
-the resolved file. Find All References lists statically recognized PHP and Twig
-references.
+the resolved file, picking the same file Twig loads when several loader paths
+hold the name, so an application override wins over the directory it overrides.
+Find All References lists statically recognized PHP and Twig references.
 
 Variables
 ---------

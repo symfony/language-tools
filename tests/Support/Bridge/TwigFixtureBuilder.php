@@ -96,6 +96,7 @@ final class TwigFixtureBuilder
     private function writeThemedTwigApplicationWithConfiguration(string $configurationSupport, string $kernelConfiguration, string $commandConfiguration): void
     {
         $this->workspace->makeDirectory('templates');
+        $this->workspace->makeDirectory('templates/bundles/ShopBundle');
         $this->workspace->makeDirectory('src/ShopBundle/templates');
         $source = str_replace(
             ['__CONFIGURATION_SUPPORT__', '__KERNEL_CONFIGURATION__', '__COMMAND_CONFIGURATION__'],
