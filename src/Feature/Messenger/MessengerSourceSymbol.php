@@ -12,6 +12,7 @@ final class MessengerSourceSymbol
         public readonly string $uri,
         public readonly Range $range,
         public readonly bool $declaration,
+        public readonly ?string $environment = null,
     ) {
     }
 }

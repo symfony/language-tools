@@ -40,6 +40,7 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 
 final class MessengerProviderTest extends TestCase
 {
@@ -529,7 +530,7 @@ YAML;
         $relationshipResolver = new MessengerRelationshipResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
         $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, $comments, new TolerantPhpParser(new Parser()));
         $relationshipProvider = new MessengerRelationshipProvider($protocol, $indexes, $relationshipResolver);
-        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $classIndexes, $phpParser, $converter);
+        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $classIndexes, $phpParser, $converter, EnvironmentScopes::resolver());
         $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
 
         $completionParams = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus }') + 4));
@@ -596,6 +597,7 @@ YAML;
             $classIndexes,
             $phpParser,
             $converter,
+            EnvironmentScopes::resolver(),
         );
 
         $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -625,6 +627,67 @@ YAML;
         yield 'saved invalid signature' => ['string', 'string', true];
         yield 'open valid signature replaces saved invalid signature' => ['string', '\\stdClass', false];
         yield 'open invalid signature replaces saved valid signature' => ['\\stdClass', 'string', true];
+    }
+
+    /** @param list<string> $expectedCodes */
+    #[DataProvider('environmentScopedTransportProvider')]
+    public function testDiagnosesTransportsOnlyInTheEnvironmentThatLoadsThem(string $uri, string $yaml, string $environment, array $expectedCodes): void
+    {
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'yaml', 1, $yaml));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $converter = new PositionConverter();
+        $phpParser = new TolerantPhpParser(new Parser());
+        $extractor = new MessengerExtractor(
+            $converter,
+            $phpParser,
+            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+        );
+        $indexes = new MessengerIndexRegistry();
+        $indexes->forProject($project)->replace([], [new MessengerTransport('async', false)], [], [], true);
+        $sourceIndexes = new MessengerSourceIndexRegistry();
+        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'yaml', $yaml)));
+        $provider = new MessengerDiagnosticProvider(
+            new DocumentContextResolver($documents, $projects),
+            new LspProtocolMapper(),
+            $indexes,
+            $sourceIndexes,
+            new DependencyInjectionSourceIndexRegistry(),
+            $phpParser,
+            $converter,
+            EnvironmentScopes::resolver($environment),
+        );
+
+        self::assertSame($expectedCodes, array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+    }
+
+    /** @return iterable<string, array{string, string, string, list<string>}> */
+    public static function environmentScopedTransportProvider(): iterable
+    {
+        $directoryYaml = <<<'YAML'
+            framework:
+                messenger:
+                    transports:
+                        sync: 'sync://'
+                    routing:
+                        'App\Message\Ping': sync
+            YAML;
+        $sectionYaml = <<<'YAML'
+            when@test:
+                framework:
+                    messenger:
+                        transports:
+                            sync: 'sync://'
+                        routing:
+                            'App\Message\Ping': sync
+            YAML;
+
+        yield 'inactive package directory' => ['file:///workspace/config/packages/test/messenger.yaml', $directoryYaml, 'dev', []];
+        yield 'active package directory' => ['file:///workspace/config/packages/test/messenger.yaml', $directoryYaml, 'test', ['messenger.unknown_transport']];
+        yield 'inactive environment section' => ['file:///workspace/config/packages/messenger.yaml', $sectionYaml, 'dev', []];
+        yield 'active environment section' => ['file:///workspace/config/packages/messenger.yaml', $sectionYaml, 'test', ['messenger.unknown_transport']];
+        yield 'base section' => ['file:///workspace/config/packages/messenger.yaml', $directoryYaml, 'dev', ['messenger.unknown_transport']];
     }
 
     public function testParsesOnlyDocumentsDeclaringRuntimeHandlers(): void
@@ -672,6 +735,7 @@ YAML;
             $classIndexes,
             $parser,
             $converter,
+            EnvironmentScopes::resolver(),
         );
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $serviceUri]]));

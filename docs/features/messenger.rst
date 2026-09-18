@@ -88,17 +88,23 @@ Diagnostics
 -----------
 
 After runtime indexing completes, unknown bus and transport references are
-reported as errors. PHP handlers with a scalar first parameter are reported when
-Messenger assigns an object message to that method. The signature check is
-matched to the handler's declaring class and method, so same-named methods on
-other classes are ignored. These diagnostics are suppressed when runtime
-indexing is unavailable or incomplete.
+reported as errors. References under ``when@...`` and in conventional
+environment-specific files such as ``config/packages/<environment>/`` are
+diagnosed only when that environment is selected, so a transport that exists
+only in ``test`` isn't reported while checking ``dev``. PHP handlers with a
+scalar first parameter are reported when Messenger assigns an object message to
+that method. The signature check is matched to the handler's declaring class and
+method, so same-named methods on other classes are ignored. These diagnostics
+are suppressed when runtime indexing is unavailable or incomplete.
 
 Limitations
 -----------
 
 Internal framework messages and handlers can appear when Symfony registers them
 on an application bus.
+
+Environment-specific file detection follows Symfony's conventional ``config/``
+layout. Custom conditional imports aren't inferred from application code.
 
 Inherited handler relationships are available only for parent classes and
 interfaces declared in indexed application source. Relationships that can't be

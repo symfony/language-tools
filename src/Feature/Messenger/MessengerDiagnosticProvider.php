@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Runtime\EnvironmentScopeResolver;
 
 final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
 {
@@ -24,6 +25,7 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly PhpParserInterface $parser,
         private readonly PositionConverter $converter,
+        private readonly EnvironmentScopeResolver $environments,
     ) {
     }
 
@@ -42,10 +44,17 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
         if (!$index->isComplete()) {
             return [];
         }
-        $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
+        $symbols = [];
+        if ($this->environments->includesDocument($request->project, $request->document->uri)) {
+            $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
+            $symbols = $facts instanceof MessengerSourceFacts ? $facts->symbols : [];
+        }
         $diagnostics = [];
-        foreach ($facts instanceof MessengerSourceFacts ? $facts->symbols : [] as $symbol) {
-            if ($symbol->declaration || MessengerSymbolKind::Message === $symbol->kind) {
+        foreach ($symbols as $symbol) {
+            if ($symbol->declaration
+                || MessengerSymbolKind::Message === $symbol->kind
+                || !$this->environments->includesSection($request->project, $symbol->environment)
+            ) {
                 continue;
             }
             $known = MessengerSymbolKind::Bus === $symbol->kind ? null !== $index->bus($symbol->name) : null !== $index->transport($symbol->name);

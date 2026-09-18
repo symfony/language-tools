@@ -7,7 +7,7 @@ namespace Symfony\Lsp\Index;
  */
 final class SourceIndexJsonLinesCodec
 {
-    private const SCHEMA_VERSION = 11;
+    private const SCHEMA_VERSION = 12;
 
     public function __construct(private readonly string $serverVersion)
     {

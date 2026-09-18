@@ -106,6 +106,7 @@ final class MessengerExtractor
             $path = $occurrence->path;
             $parent = \array_slice($path, 0, -1);
             $key = [] === $path ? '' : $path[\count($path) - 1];
+            $environment = 'base' === $occurrence->scope ? null : substr($occurrence->scope, \strlen('when@'));
             $keyOffset = $this->converter->toByteOffset($text, $occurrence->keyRange->start);
             $declarationKind = match (\array_slice($parent, -3)) {
                 ['framework', 'messenger', 'buses'] => MessengerSymbolKind::Bus,
@@ -114,16 +115,16 @@ final class MessengerExtractor
             };
             $routedMessage = self::ROUTING === \array_slice($parent, -3);
             if (null !== $declarationKind) {
-                $symbols[] = $this->symbol($declarationKind, $key, $uri, $text, $keyOffset, true);
+                $symbols[] = $this->symbol($declarationKind, $key, $uri, $text, $keyOffset, true, environment: $environment);
             }
             $referenceKind = $this->referenceKind($path, $parent, $key);
             $reference = null === $referenceKind ? null : $this->referenceName($occurrence->value);
             if (null !== $reference) {
                 [$name, $nameOffset] = $reference;
-                $symbols[] = $this->symbol($referenceKind, $name, $uri, $text, $this->converter->toByteOffset($text, $occurrence->valueRange->start) + $nameOffset, false);
+                $symbols[] = $this->symbol($referenceKind, $name, $uri, $text, $this->converter->toByteOffset($text, $occurrence->valueRange->start) + $nameOffset, false, environment: $environment);
             }
             if ($routedMessage) {
-                $symbols[] = $this->symbol(MessengerSymbolKind::Message, ltrim($key, '\\'), $uri, $text, $keyOffset, false, \strlen($key));
+                $symbols[] = $this->symbol(MessengerSymbolKind::Message, ltrim($key, '\\'), $uri, $text, $keyOffset, false, \strlen($key), $environment);
             }
             $senders = 'senders' === $key
                 ? self::ROUTING === \array_slice($parent, -4, 3)
@@ -134,7 +135,7 @@ final class MessengerExtractor
             $valueOffset = $this->converter->toByteOffset($text, $occurrence->valueRange->start);
             preg_match_all('/[A-Za-z_][A-Za-z0-9_.-]*/', $occurrence->value, $names, \PREG_OFFSET_CAPTURE);
             foreach ($names[0] as [$name, $relativeOffset]) {
-                $symbols[] = $this->symbol(MessengerSymbolKind::Transport, $name, $uri, $text, $valueOffset + $relativeOffset, false);
+                $symbols[] = $this->symbol(MessengerSymbolKind::Transport, $name, $uri, $text, $valueOffset + $relativeOffset, false, environment: $environment);
             }
         }
 
@@ -192,9 +193,9 @@ final class MessengerExtractor
         return [$value, $offset];
     }
 
-    private function symbol(MessengerSymbolKind $kind, string $name, string $uri, string $text, int $offset, bool $declaration, ?int $length = null): MessengerSourceSymbol
+    private function symbol(MessengerSymbolKind $kind, string $name, string $uri, string $text, int $offset, bool $declaration, ?int $length = null, ?string $environment = null): MessengerSourceSymbol
     {
-        return new MessengerSourceSymbol($kind, $name, $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + ($length ?? \strlen($name)))), $declaration);
+        return new MessengerSourceSymbol($kind, $name, $uri, new Range($this->converter->toPosition($text, $offset), $this->converter->toPosition($text, $offset + ($length ?? \strlen($name)))), $declaration, $environment);
     }
 
     /** @return array<string, list<string>> */

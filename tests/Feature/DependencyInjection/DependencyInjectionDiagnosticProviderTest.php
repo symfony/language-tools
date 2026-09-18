@@ -22,8 +22,7 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
-use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 
 final class DependencyInjectionDiagnosticProviderTest extends TestCase
 {
@@ -128,8 +127,6 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         );
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
-        $runtimeConfiguration = new RuntimeConfiguration();
-        $runtimeConfiguration->configure(['environment' => $environment]);
 
         return new DependencyInjectionDiagnosticProvider(
             new DocumentContextResolver($documents, $projects),
@@ -137,8 +134,7 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
             $serviceIndexes,
             $parameterIndexes,
             $sourceIndexes,
-            ProjectPaths::resolver(),
-            $runtimeConfiguration,
+            EnvironmentScopes::resolver($environment),
         );
     }
 }

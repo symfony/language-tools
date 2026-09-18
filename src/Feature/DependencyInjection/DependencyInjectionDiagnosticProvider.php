@@ -4,9 +4,8 @@ namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
-use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Runtime\EnvironmentScopeResolver;
 
 final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderInterface
 {
@@ -16,8 +15,7 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
         private readonly ServiceIndexRegistry $serviceIndexes,
         private readonly ParameterIndexRegistry $parameterIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
-        private readonly ProjectPathResolver $projectPaths,
-        private readonly RuntimeConfiguration $runtimeConfiguration,
+        private readonly EnvironmentScopeResolver $environments,
     ) {
     }
 
@@ -32,23 +30,21 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
         if (null === $request || !\in_array($request->document->languageId, ['php', 'yaml'], true)) {
             return null;
         }
-        $environment = $this->runtimeConfiguration->environment($request->project);
         $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
         if (!$facts instanceof DependencyInjectionSourceFacts) {
             return [];
         }
-        $relativePath = $this->projectPaths->relative($request->project, $request->document->uri);
-        if (null !== $relativePath && !$this->includesEnvironment($relativePath, $environment)) {
+        if (!$this->environments->includesDocument($request->project, $request->document->uri)) {
             return [];
         }
 
         $localServices = array_fill_keys(array_map(
             static fn (ServiceDeclaration $declaration): string => $declaration->id,
-            array_filter($facts->services, fn (ServiceDeclaration $declaration): bool => $this->includesScope($declaration->environment, $environment)),
+            array_filter($facts->services, fn (ServiceDeclaration $declaration): bool => $this->environments->includesSection($request->project, $declaration->environment)),
         ), true);
         $localParameters = array_fill_keys(array_map(
             static fn (ParameterDeclaration $declaration): string => $declaration->name,
-            array_filter($facts->parameters, fn (ParameterDeclaration $declaration): bool => $this->includesScope($declaration->environment, $environment)),
+            array_filter($facts->parameters, fn (ParameterDeclaration $declaration): bool => $this->environments->includesSection($request->project, $declaration->environment)),
         ), true);
         $serviceIndex = $this->serviceIndexes->forProject($request->project);
         $parameterIndex = $this->parameterIndexes->forProject($request->project);
@@ -58,7 +54,7 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
 
         $diagnostics = [];
         foreach ($facts->references as $reference) {
-            if (!$this->includesScope($reference->environment, $environment)) {
+            if (!$this->environments->includesSection($request->project, $reference->environment)) {
                 continue;
             }
             if (DependencyInjectionSymbolKind::Service === $reference->kind) {
@@ -88,22 +84,5 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
         }
 
         return $diagnostics;
-    }
-
-    private function includesScope(?string $scope, string $environment): bool
-    {
-        return null === $scope || $scope === $environment;
-    }
-
-    private function includesEnvironment(string $relativePath, string $environment): bool
-    {
-        if (preg_match('#^config/(?:packages|routes)/([^/]+)/#D', $relativePath, $matches)) {
-            return $environment === $matches[1];
-        }
-        if (preg_match('#^config/services_([^/]+)\.(?:php|ya?ml)$#iD', $relativePath, $matches)) {
-            return $environment === $matches[1];
-        }
-
-        return true;
     }
 }
