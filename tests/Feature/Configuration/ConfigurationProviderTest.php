@@ -76,6 +76,30 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testSeparatesKeysContainingDotsFromNestedPaths(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = <<<'YAML'
+            framework:
+                items:
+                    'a.b':
+                        name: true
+                    'a.b.name':
+                        name: true
+
+            YAML;
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+
+        $fixture->documents->update($uri, 2, $text."        'a.b': {}\n");
+        self::assertSame(
+            ['config.duplicate_key'],
+            array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'),
+        );
+    }
+
     public function testAcceptsSingularAliasesForArrayEntries(): void
     {
         $fixture = $this->providers();

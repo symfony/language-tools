@@ -81,7 +81,8 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
                 continue;
             }
             $key = implode('.', $path);
-            $identity = $occurrence->scope.'|'.$key;
+            // a key may contain dots, so the flattened label cannot identify a path
+            $identity = implode("\0", [$occurrence->scope, ...$path]);
             if (isset($seen[$identity]) && !$occurrence->sequenceItem()) {
                 $diagnostics[] = $this->diagnostic($occurrence->keyRange, 1, 'config.duplicate_key', \sprintf('Configuration key "%s" is duplicated.', $key));
             }

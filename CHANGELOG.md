@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Compare configuration key paths segment by segment, so a key that contains dots is no longer reported as a duplicate of a nested path
 - Resolve a template name to the first loader path that holds it, so navigation opens the application override instead of the directory it overrides
 - Read Sylius theme template directories from the configured theme sources, so templates a theme adds resolve and are themselves diagnosed
 - Read Twig loader paths from the filesystem loader a decorating loader hides, so `@Bundle` and `@!Bundle` templates resolve on applications that decorate `twig.loader`
