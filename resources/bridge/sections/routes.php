@@ -9,9 +9,9 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
     } else {
         try {
             $application = $context->application();
-            $items = symfonyLspBridgeRoutingEnabled($context, $application)
-                ? symfonyLspBridgeRouteItems($application, $context->commandOptions())
-                : [];
+            $items = symfonyLspBridgeRoutingDisabled($context, $application)
+                ? []
+                : symfonyLspBridgeRouteItems($application, $context->commandOptions());
             usort($items, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
             $contextParameters = symfonyLspBridgeRouteContextParameterNames($context);
             $resources = symfonyLspBridgeRouteResourcePaths($context);
@@ -34,16 +34,17 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
 /*
  * An application can disable routing, as CLI-only projects do: FrameworkBundle
  * then registers neither the debug:router command nor the router service, and
- * the route set is empty instead of unavailable.
+ * the route set is empty instead of unavailable. Both signals are required, so
+ * an application that only hides one of them is still reported as a failure.
  */
-function symfonyLspBridgeRoutingEnabled(SymfonyLspBridgeContext $context, object $application): bool
+function symfonyLspBridgeRoutingDisabled(SymfonyLspBridgeContext $context, object $application): bool
 {
     if ($application->has('debug:router')) {
-        return true;
+        return false;
     }
 
     try {
-        return $context->kernel()->getContainer()->has('router');
+        return !$context->kernel()->getContainer()->has('router');
     } catch (Throwable) {
         return false;
     }

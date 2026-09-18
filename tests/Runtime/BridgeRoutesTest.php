@@ -144,7 +144,7 @@ final class BridgeRoutesTest extends TestCase
 
     public function testReportsAnEmptyRouteSetWhenRoutingIsDisabled(): void
     {
-        (new RouteFixtureBuilder($this->workspace))->writeRoutingDisabledApplication();
+        (new RouteFixtureBuilder($this->workspace))->writeRoutingSignalsApplication(debugRouterCommand: false, routerService: false);
 
         $process = $this->bridge->run(['--sections=routes']);
 
@@ -158,6 +158,41 @@ final class BridgeRoutesTest extends TestCase
         self::assertSame([], $result['sections']['routes']['items']);
         self::assertSame([], $result['sections']['routes']['contextParameters']);
         self::assertSame([], $result['sections']['routes']['resources']);
+    }
+
+    #[DataProvider('unavailableRouteMetadataProvider')]
+    public function testReportsUnavailableRouteMetadataWhenRoutingIsNotProvenDisabled(bool $debugRouterCommand, ?bool $routerService): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeRoutingSignalsApplication($debugRouterCommand, $routerService);
+
+        $process = $this->bridge->run(['--sections=routes', '--error-details=1']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertArrayNotHasKey('routes', $result['sections']);
+        $errors = $result['errors'] ?? null;
+        self::assertIsArray($errors);
+        self::assertCount(1, $errors);
+        $error = $errors[0] ?? null;
+        self::assertIsArray($error);
+        self::assertSame('routes', $error['section'] ?? null);
+        $cause = $error['cause'] ?? null;
+        self::assertIsArray($cause);
+        $chain = $cause['chain'] ?? null;
+        self::assertIsArray($chain);
+        $firstCause = $chain[0] ?? null;
+        self::assertIsArray($firstCause);
+        self::assertSame('CANARY_ROUTE_COMMAND_FAILURE', $firstCause['message'] ?? null);
+    }
+
+    /** @return iterable<string, array{0: bool, 1: bool|null}> */
+    public static function unavailableRouteMetadataProvider(): iterable
+    {
+        yield 'failing command' => [true, true];
+        yield 'command removed while the router service remains' => [false, true];
+        yield 'no container to inspect' => [false, null];
     }
 
     #[DataProvider('localizedAliasVersionProvider')]

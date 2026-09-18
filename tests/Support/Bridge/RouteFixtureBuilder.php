@@ -160,36 +160,50 @@ PHP,
     }
 
     /**
-     * Mirrors CLI-only applications: FrameworkBundle registers neither the
-     * debug:router command nor the router service when routing is disabled.
+     * Mirrors the routing signals FrameworkBundle registers: an application
+     * with routing enabled exposes both the debug:router command and the
+     * router service, and a CLI-only application exposes neither. Running
+     * debug:router always fails here, so a reported failure proves the section
+     * ran the command and an empty route set proves it did not.
+     *
+     * @param bool|null $routerService null when the kernel exposes no container
      */
-    public function writeRoutingDisabledApplication(): void
+    public function writeRoutingSignalsApplication(bool $debugRouterCommand, ?bool $routerService): void
     {
-        $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
-            __INSTALLED_VERSIONS__
-            __CONSOLE_IO__
-            namespace App;
+        $container = null === $routerService ? '' : str_replace('__ROUTER_SERVICE__', var_export(true === $routerService, true), <<<'PHP'
             final class Container
             {
-                public function has(string $id): bool { return false; }
+                public function has(string $id): bool { return 'router' === $id && __ROUTER_SERVICE__; }
                 public function hasParameter(string $name): bool { return false; }
                 public function get(string $id): object { throw new \RuntimeException(sprintf('The "%s" service does not exist.', $id)); }
             }
-            final class Kernel
-            {
-                public function __construct(string $environment, bool $debug) {}
-                public function getContainer(): Container { return new Container(); }
-                public function shutdown(): void {}
-            }
-            __FRAMEWORK_APPLICATION__
-            PHP,
-            applicationMembers: <<<'PHP'
-    public function has(string $command): bool { return false; }
+            PHP);
+
+        $this->workspace->write('vendor/autoload.php', $this->prelude->render(
+            str_replace(
+                ['__CONTAINER__', '__KERNEL_CONTAINER_ACCESSOR__'],
+                [$container, null === $routerService ? '' : 'public function getContainer(): Container { return new Container(); }'],
+                <<<'PHP'
+                    __INSTALLED_VERSIONS__
+                    __CONSOLE_IO__
+                    namespace App;
+                    __CONTAINER__
+                    final class Kernel
+                    {
+                        public function __construct(string $environment, bool $debug) {}
+                        __KERNEL_CONTAINER_ACCESSOR__
+                        public function shutdown(): void {}
+                    }
+                    __FRAMEWORK_APPLICATION__
+                    PHP,
+            ),
+            applicationMembers: str_replace('__DEBUG_ROUTER_COMMAND__', var_export($debugRouterCommand, true), <<<'PHP'
+    public function has(string $command): bool { return __DEBUG_ROUTER_COMMAND__; }
     public function run(object $input, object $output): int
     {
-        throw new \RuntimeException(sprintf('The "%s" command must never run.', $input->arguments['command']));
+        throw new \RuntimeException('CANARY_ROUTE_COMMAND_FAILURE');
     }
-PHP,
+PHP),
         ));
     }
 
