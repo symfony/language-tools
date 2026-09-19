@@ -59,7 +59,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
         );
     }
 
-    public function testLogsSanitizedSectionCausesOnlyInVerboseMode(): void
+    public function testLogsSanitizedSectionCausesWithTheFailureItself(): void
     {
         $client = new ReportingClient();
         $statuses = new ProjectIndexStatusRegistry();
@@ -76,7 +76,6 @@ final class ReportingRuntimeInitializerTest extends TestCase
         ]]);
         $log = new WritableBuffer();
         $logger = new ServerLogger($log, new SensitiveDataRedactor());
-        $logger->configure('verbose');
         $initializer = new ReportingRuntimeInitializer(
             $this->failingInitializer($error),
             $client,
@@ -88,14 +87,13 @@ final class ReportingRuntimeInitializerTest extends TestCase
 
         $log->close();
         self::assertStringContainsString(
-            '[debug] Runtime section "twig": RuntimeException at src/TwigExtension.php:24: [redacted]',
-            $log->buffer(),
-        );
-        self::assertStringContainsString(
-            '[debug]   at App\\TwigExtension->getFunctions (src/TwigExtension.php:20)',
+            "[error] The project bridge could not load runtime metadata: twig.\n"
+            ."Runtime section \"twig\": RuntimeException at src/TwigExtension.php:24: [redacted]\n"
+            .'  at App\\TwigExtension->getFunctions (src/TwigExtension.php:20)',
             $log->buffer(),
         );
         self::assertStringNotContainsString('user:pass', $log->buffer());
+        self::assertStringNotContainsString('ReportingRuntimeInitializer.php', $log->buffer());
         $message = $client->notifications[0]['params']['message'] ?? null;
         self::assertIsString($message);
         self::assertStringNotContainsString('DATABASE_URL', $message);

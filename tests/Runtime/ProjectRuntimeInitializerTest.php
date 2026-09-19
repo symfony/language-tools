@@ -125,9 +125,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('--debug=1', $processRunner->command[5]);
         self::assertSame('--sections=routes,container', $processRunner->command[6]);
         self::assertSame('--configuration-generation=0', $processRunner->command[7]);
-        self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[8]);
-        self::assertMatchesRegularExpression('{^--release-metadata-cache=.+/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[9]);
-        self::assertNotContains('--error-details=1', $processRunner->command);
+        self::assertSame('--error-details=1', $processRunner->command[8]);
+        self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[9]);
+        self::assertMatchesRegularExpression('{^--release-metadata-cache=.+/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[10]);
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
         self::assertSame(90.0, $processRunner->timeout);
         self::assertSame([
@@ -253,8 +253,8 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertStringStartsWith('/app/var/symfony-lsp/test/', $processRunner->command[6]);
         self::assertStringEndsWith('/bridge.php', $processRunner->command[6]);
         self::assertSame('--project=/app', $processRunner->command[7]);
-        self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[12]);
-        self::assertMatchesRegularExpression('{^--release-metadata-cache=/app/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[13]);
+        self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[13]);
+        self::assertMatchesRegularExpression('{^--release-metadata-cache=/app/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[14]);
         self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
         self::assertFileExists($this->temporaryDirectory.substr($processRunner->command[6], \strlen('/app')));
     }

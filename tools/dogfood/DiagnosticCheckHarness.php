@@ -63,6 +63,8 @@ final class DiagnosticCheckHarness
             'check',
             '--format=json',
             '--profile',
+            // the structured cause of an operational failure is what makes a red matrix run diagnosable
+            '--verbose',
             'source-only' === $configuration->analysisMode ? '--source-only' : '--runtime-indexing',
             '--workspace='.$applicationRoot,
             '--environment='.$configuration->environment,
@@ -86,8 +88,28 @@ final class DiagnosticCheckHarness
     {
         $errors = [];
         foreach (\is_array($report['errors'] ?? null) ? $report['errors'] : [] as $error) {
-            if (\is_array($error) && \is_string($error['message'] ?? null)) {
-                $errors[] = $error['message'];
+            if (!\is_array($error) || !\is_string($error['message'] ?? null)) {
+                continue;
+            }
+            $cause = \is_array($error['cause'] ?? null) ? $error['cause'] : [];
+            $errors[] = $error['message'].(\is_string($cause['message'] ?? null) ? ' Cause: '.$cause['message'] : '');
+            foreach (\is_array($cause['sections'] ?? null) ? $cause['sections'] : [] as $section) {
+                if (!\is_array($section)) {
+                    continue;
+                }
+                $name = \is_string($section['section'] ?? null) ? $section['section'] : 'runtime';
+                foreach (\is_array($section['chain'] ?? null) ? $section['chain'] : [] as $link) {
+                    if (!\is_array($link) || !\is_string($link['class'] ?? null) || !\is_string($link['message'] ?? null)) {
+                        continue;
+                    }
+                    $errors[] = \sprintf(
+                        '  %s: %s%s: %s',
+                        $name,
+                        $link['class'],
+                        \is_string($link['origin'] ?? null) ? ' at '.$link['origin'] : '',
+                        $link['message'],
+                    );
+                }
             }
         }
 

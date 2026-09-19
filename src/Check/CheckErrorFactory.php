@@ -10,7 +10,12 @@ use Symfony\Lsp\Runtime\RuntimeMetadataException;
 use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 
-/** @phpstan-import-type CheckError from CheckResult */
+/**
+ * @phpstan-import-type CheckError from CheckResult
+ * @phpstan-import-type CheckErrorCause from CheckResult
+ * @phpstan-import-type RuntimeMetadataCause from RuntimeMetadataException
+ * @phpstan-import-type RuntimeMetadataSectionError from RuntimeMetadataException
+ */
 final class CheckErrorFactory
 {
     public function __construct(
@@ -172,21 +177,42 @@ final class CheckErrorFactory
         ];
     }
 
-    /** @return array{class: class-string<\Throwable>, message: string} */
+    /**
+     * Section causes come from the application, so they stay behind `--verbose`.
+     *
+     * @return CheckErrorCause
+     */
     private function cause(\Throwable $cause, string $workspace, bool $verbose = false): array
     {
-        if ($verbose && $cause instanceof RuntimeMetadataException) {
-            $message = implode("\n", array_map(
-                fn (string $line): string => $this->redactor->redact($line, [$workspace]),
-                [$cause->getMessage(), ...$cause->detailLines()],
-            ));
-        } else {
-            $message = $this->redactor->redact($cause->getMessage(), [$workspace]);
+        $entry = [
+            'class' => $cause::class,
+            'message' => $this->redactor->redact($cause->getMessage(), [$workspace]),
+        ];
+        if ($verbose && $cause instanceof RuntimeMetadataException && [] !== $cause->sectionErrors) {
+            $entry['sections'] = array_map(
+                fn (array $sectionError): array => [
+                    'section' => $sectionError['section'],
+                    'chain' => array_map(fn (array $link): array => $this->causeLink($link, $workspace), $sectionError['chain']),
+                ],
+                $cause->sectionErrors,
+            );
         }
 
+        return $entry;
+    }
+
+    /**
+     * @param RuntimeMetadataCause $link
+     *
+     * @return RuntimeMetadataCause
+     */
+    private function causeLink(array $link, string $workspace): array
+    {
         return [
-            'class' => $cause::class,
-            'message' => $message,
+            'class' => $link['class'],
+            'message' => $this->redactor->redact($link['message'], [$workspace]),
+            ...isset($link['origin']) ? ['origin' => $this->redactor->redact($link['origin'], [$workspace])] : [],
+            'frames' => array_map(fn (string $frame): string => $this->redactor->redact($frame, [$workspace]), $link['frames']),
         ];
     }
 

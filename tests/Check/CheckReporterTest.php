@@ -14,10 +14,13 @@ use Symfony\Lsp\Check\CheckResult;
 use Symfony\Lsp\Check\GitLabCheckReporter;
 use Symfony\Lsp\Check\SarifCheckReporter;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
+use Symfony\Lsp\Runtime\RuntimeMetadataException;
 
 /**
  * @phpstan-type GitLabIssue array{description: string, check_name: string, fingerprint: string, severity: string, location: array{path: string, lines: array{begin: int}}}
- * @phpstan-type SarifNotification array{descriptor: array{id: string}, properties: array<string, mixed>, exception?: array{kind: string, message: string}, locations?: list<array{physicalLocation: array{artifactLocation: array{uri: string}}}>}
+ * @phpstan-type SarifStackFrame array{location: array{message: array{text: string}}}
+ * @phpstan-type SarifException array{kind: string, message: string, stack?: array{frames: list<SarifStackFrame>}, innerExceptions?: list<array{kind: string, message: string, stack?: array{frames: list<SarifStackFrame>}}>}
+ * @phpstan-type SarifNotification array{descriptor: array{id: string}, properties: array<string, mixed>, exception?: SarifException, locations?: list<array{physicalLocation: array{artifactLocation: array{uri: string}}}>}
  * @phpstan-type SarifResult array{ruleId: string, ruleIndex: int, level: string, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, startColumn: int, endLine: int, endColumn: int}}}>, suppressions?: list<array{status: string}>, partialFingerprints: array{'symfonyLsp/v1': string}, properties: array<string, mixed>}
  * @phpstan-type SarifRun array{tool: array{driver: array{rules: list<array{id: string}>}}, columnKind: string, invocations: list<array{executionSuccessful: bool, exitCode: int, toolConfigurationNotifications?: list<SarifNotification>, toolExecutionNotifications?: list<SarifNotification>}>, results: list<SarifResult>}
  * @phpstan-type SarifReport array{'$schema': string, version: string, runs: list<SarifRun>}
@@ -202,6 +205,56 @@ final class CheckReporterTest extends TestCase
         self::assertStringContainsString('Cause: UnexpectedValueException: Invalid diagnostic.', $verbose);
         self::assertStringNotContainsString('Add --verbose', $verbose);
         self::assertStringNotContainsString('Invalid diagnostic.', $github);
+    }
+
+    public function testReportsRuntimeSectionCausesAsStructuredDataInEveryMachineFormat(): void
+    {
+        $result = $this->fixtureResult([[
+            'category' => 'operational',
+            'message' => 'The project bridge could not boot the application kernel.',
+            'project' => 'apps/api',
+            'cause' => [
+                'class' => RuntimeMetadataException::class,
+                'message' => 'The project bridge could not boot the application kernel.',
+                'sections' => [[
+                    'section' => 'runtime',
+                    'chain' => [[
+                        'class' => 'ErrorException',
+                        'message' => 'Warning: Undefined array key "TABLE_PREFIX"',
+                        'origin' => 'src/Kernel.php:24',
+                        'frames' => ['App\\Kernel->boot (src/Kernel.php:24)'],
+                    ]],
+                ]],
+            ],
+        ]]);
+
+        /** @var array{errors: list<array{cause?: array{sections?: list<array<string, mixed>>}}>} $json */
+        $json = json_decode($this->reporter()->render($result, 'json', true, 12), true, flags: \JSON_THROW_ON_ERROR);
+        /** @var SarifReport $sarif */
+        $sarif = json_decode($this->reporter()->render($result, 'sarif', true, 12), true, flags: \JSON_THROW_ON_ERROR);
+        $verbose = $this->reporter()->render($result, 'human', true, 12);
+
+        self::assertSame([[
+            'section' => 'runtime',
+            'chain' => [[
+                'class' => 'ErrorException',
+                'message' => 'Warning: Undefined array key "TABLE_PREFIX"',
+                'origin' => 'src/Kernel.php:24',
+                'frames' => ['App\\Kernel->boot (src/Kernel.php:24)'],
+            ]],
+        ]], $json['errors'][0]['cause']['sections'] ?? null);
+
+        $inner = $sarif['runs'][0]['invocations'][0]['toolExecutionNotifications'][0]['exception']['innerExceptions'][0] ?? null;
+        self::assertIsArray($inner);
+        self::assertSame('ErrorException', $inner['kind']);
+        self::assertSame('src/Kernel.php:24: Warning: Undefined array key "TABLE_PREFIX"', $inner['message']);
+        self::assertSame('App\\Kernel->boot (src/Kernel.php:24)', $inner['stack']['frames'][0]['location']['message']['text'] ?? null);
+
+        self::assertStringContainsString(
+            '  Kernel boot: ErrorException at src/Kernel.php:24: Warning: Undefined array key "TABLE_PREFIX"',
+            $verbose,
+        );
+        self::assertStringContainsString('    at App\\Kernel->boot (src/Kernel.php:24)', $verbose);
     }
 
     public function testEscapesGitHubWorkflowCommands(): void

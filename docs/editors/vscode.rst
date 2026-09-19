@@ -117,9 +117,11 @@ Untrusted workspaces remain in static-only mode. See `Symfony integrations`_
 for details.
 
 Use `Docker support`_ when the PHP command runs in a container.
+A runtime failure always reports the failing section and the sanitized
+application exception that caused it, with relative code locations and
+argument-free frames, in the output channel.
 ``symfonyLsp.trace`` adds redacted protocol messages to the output channel and
-is disabled by default. The ``verbose`` level also records sanitized runtime
-section failure causes with relative code locations and argument-free frames.
+is disabled by default.
 
 The PHP suggestion setting is optional. Symfony Language Tools is designed to
 coexist with a general PHP language server such as Intelephense or PHP Tools.

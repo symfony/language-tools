@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Check;
 
+/** @phpstan-import-type CheckErrorCause from CheckResult */
 final class CheckReporter
 {
     public function __construct(
@@ -22,6 +23,36 @@ final class CheckReporter
             'sarif' => $this->sarif->render($view),
             default => $this->human($view, $verbose),
         };
+    }
+
+    /**
+     * @param CheckErrorCause $cause
+     *
+     * @return non-empty-list<string>
+     */
+    public function causeLines(array $cause, string $indent = ''): array
+    {
+        $lines = [$indent.\sprintf('Cause: %s: %s', $cause['class'], $cause['message'])];
+        foreach ($cause['sections'] ?? [] as $sectionError) {
+            foreach ($sectionError['chain'] as $index => $link) {
+                $lines[] = $indent.\sprintf(
+                    '%s: %s%s: %s',
+                    match (true) {
+                        0 !== $index => 'Caused by',
+                        'runtime' === $sectionError['section'] => 'Kernel boot',
+                        default => \sprintf('Runtime section "%s"', $sectionError['section']),
+                    },
+                    $link['class'],
+                    isset($link['origin']) ? ' at '.$link['origin'] : '',
+                    $link['message'],
+                );
+                foreach ($link['frames'] as $frame) {
+                    $lines[] = $indent.'  at '.$frame;
+                }
+            }
+        }
+
+        return $lines;
     }
 
     /** @param list<string> $codes */
@@ -126,9 +157,9 @@ HELP;
                 $error['message'],
             );
             if (isset($error['cause'])) {
-                $lines[] = $verbose
-                    ? \sprintf('  Cause: %s: %s', $error['cause']['class'], $error['cause']['message'])
-                    : '  Add --verbose to show the cause.';
+                array_push($lines, ...$verbose
+                    ? $this->causeLines($error['cause'], '  ')
+                    : ['  Add --verbose to show the cause.']);
             }
         }
 

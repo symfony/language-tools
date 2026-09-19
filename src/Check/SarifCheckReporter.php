@@ -3,7 +3,12 @@
 namespace Symfony\Lsp\Check;
 
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
+use Symfony\Lsp\Runtime\RuntimeMetadataException;
 
+/**
+ * @phpstan-import-type CheckError from CheckResult
+ * @phpstan-import-type RuntimeMetadataCause from RuntimeMetadataException
+ */
 final class SarifCheckReporter
 {
     private const SCHEMA = 'https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json';
@@ -184,7 +189,7 @@ final class SarifCheckReporter
     }
 
     /**
-     * @param array{category: string, message: string, project?: string, environment?: string, workspacePath?: string, provider?: string, cause?: array{class: string, message: string}} $error
+     * @param CheckError $error
      *
      * @return array<string, mixed>
      */
@@ -213,9 +218,41 @@ final class SarifCheckReporter
                 'kind' => $error['cause']['class'],
                 'message' => $error['cause']['message'],
             ];
+            $inner = [];
+            foreach ($error['cause']['sections'] ?? [] as $sectionError) {
+                foreach ($sectionError['chain'] as $link) {
+                    $inner[] = $this->causeException($link);
+                }
+            }
+            if ([] !== $inner) {
+                $notification['exception']['innerExceptions'] = $inner;
+            }
         }
 
         return $notification;
+    }
+
+    /**
+     * @param RuntimeMetadataCause $link
+     *
+     * @return array<string, mixed>
+     */
+    private function causeException(array $link): array
+    {
+        $exception = [
+            'kind' => $link['class'],
+            'message' => isset($link['origin']) ? $link['origin'].': '.$link['message'] : $link['message'],
+        ];
+        if ([] !== $link['frames']) {
+            $exception['stack'] = [
+                'message' => ['text' => $link['class']],
+                'frames' => array_map(static fn (string $frame): array => [
+                    'location' => ['message' => ['text' => $frame]],
+                ], $link['frames']),
+            ];
+        }
+
+        return $exception;
     }
 
     /** @return array<string, mixed> */

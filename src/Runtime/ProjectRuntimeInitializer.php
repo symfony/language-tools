@@ -55,7 +55,8 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 '--debug=1',
                 '--sections='.implode(',', $sections),
                 '--configuration-generation='.$this->configurationValidation->generation($project),
-                ...($this->logger->isVerbose() ? ['--error-details=1'] : []),
+                // the cause of a failure is reported and logged, never persisted, so it is always collected
+                '--error-details=1',
                 ...('' === $this->releaseMetadataUrl || !$this->configuration->releaseMetadata($project) ? [] : [
                     '--release-metadata-url='.$this->releaseMetadataUrl,
                     '--release-metadata-cache='.$this->pathMapper->toContainer($project, \dirname($bridge).'/release-metadata.json'),

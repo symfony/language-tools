@@ -48,9 +48,19 @@ final class ServerLogger implements TrafficLoggerInterface
         $this->traffic('outbound', $line);
     }
 
-    public function error(\Throwable $error, ?string $context = null): void
+    /**
+     * Detail lines describe why the error happened, so they are logged with it;
+     * the server's own frames stay behind verbose tracing.
+     *
+     * @param list<string> $detail
+     * @param list<string> $roots
+     */
+    public function error(\Throwable $error, ?string $context = null, array $detail = [], array $roots = []): void
     {
-        $message = $this->redactor->redact(null === $context ? $error->getMessage() : $context.': '.$error->getMessage());
+        $message = $this->redactor->redact(null === $context ? $error->getMessage() : $context.': '.$error->getMessage(), $roots);
+        foreach ($detail as $line) {
+            $message .= "\n".$this->redactor->redact($line, $roots);
+        }
         if ($this->isVerbose()) {
             foreach ($this->trace($error) as $line) {
                 $message .= "\n".$this->redactor->redact($line);

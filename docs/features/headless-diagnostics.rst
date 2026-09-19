@@ -232,6 +232,14 @@ classes, messages, relative code locations and argument-free frames in human
 output. GitHub annotations remain generic. Use ``-v``, ``-vv`` or ``-vvv`` as
 short aliases for ``--verbose``.
 
+A verbose JSON report carries each runtime section cause under
+``errors[].cause.sections``, where every entry names the failing section and
+lists the exception chain with its class, message, relative code location and
+argument-free frames. SARIF reports the same chain as ``innerExceptions`` on the
+notification's exception. Reading the failing section and the first chain entry
+is enough to tell whether an incomplete analysis comes from the application or
+from Symfony Language Tools.
+
 Once JSON, GitLab or SARIF is selected successfully, later invocation,
 configuration, indexing and internal failures still produce a valid structured
 report.

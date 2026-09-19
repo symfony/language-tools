@@ -2,7 +2,14 @@
 
 namespace Symfony\Lsp\Check;
 
-/** @phpstan-type CheckError array{category: string, message: string, project?: string, environment?: string, workspacePath?: string, provider?: string, cause?: array{class: string, message: string}} */
+use Symfony\Lsp\Runtime\RuntimeMetadataException;
+
+/**
+ * @phpstan-import-type RuntimeMetadataSectionError from RuntimeMetadataException
+ *
+ * @phpstan-type CheckErrorCause array{class: string, message: string, sections?: non-empty-list<RuntimeMetadataSectionError>}
+ * @phpstan-type CheckError array{category: string, message: string, project?: string, environment?: string, workspacePath?: string, provider?: string, cause?: CheckErrorCause}
+ */
 final class CheckResult
 {
     /**

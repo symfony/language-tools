@@ -109,10 +109,10 @@ Run ``:checkhealth vim.lsp`` first. Confirm that ``symfony-lsp`` is available
 on ``PATH``, the buffer has one ``symfony_lsp`` client and the project contains
 a FrameworkBundle requirement.
 
-Set ``trace`` to ``messages`` or ``verbose`` temporarily to add redacted
-protocol traffic to Neovim's LSP log. The ``verbose`` level also records
-sanitized runtime section failure causes with relative code locations and
-argument-free frames. Restore it to ``off`` after troubleshooting.
+Neovim's LSP log already names the failing section of a runtime failure and the
+sanitized application exception that caused it, with relative code locations and
+argument-free frames. Set ``trace`` to ``messages`` or ``verbose`` temporarily
+to add redacted protocol traffic, then restore it to ``off``.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
 .. _`project configuration`: ../project-configuration.rst

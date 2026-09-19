@@ -16,6 +16,8 @@
 - Report an empty route set for applications that disable routing, so CLI-only projects no longer fail with unavailable routing metadata
 - Discard the deprecations, notices and warnings raised while reading the application, so runtime analysis no longer fills the project's log files
 - Diagnose Messenger bus and transport references under `when@...` and in `config/packages/<environment>/` only when that environment is selected, so a transport defined for another environment is no longer reported as unknown
+- Report verbose runtime section causes as structured data under `errors[].cause.sections` in JSON and as `innerExceptions` in SARIF instead of a single joined message
+- Log the failing section and the application exception behind a runtime failure with the failure itself, so the cause no longer requires verbose tracing
 
 ## 0.20.3 (2026-09-15)
 

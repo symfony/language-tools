@@ -31,7 +31,7 @@ use function Amp\Future\await;
  *     diagnostics: list<array{code: string, path: string, baseline: string}>,
  *     baseline: array{stale: list<array<string, mixed>>},
  *     summary: array{active: int, matched: int, blocking: int, stale: int},
- *     errors: list<array{category: string, message: string, cause?: array{class: string, message: string}}>
+ *     errors: list<array{category: string, message: string, cause?: array{class: string, message: string, sections?: list<array{section: string, chain: list<array{class: string, message: string, origin?: string, frames: list<string>}>}>}}>
  * }
  */
 final class CheckExecutableTest extends TestCase
@@ -496,6 +496,7 @@ final class CheckExecutableTest extends TestCase
         self::assertSame('The project bridge could not load runtime metadata: twig.', $report['errors'][0]['message']);
         self::assertSame(PartialRuntimeMetadataException::class, $report['errors'][0]['cause']['class'] ?? null);
         self::assertStringNotContainsString('CANARY_TWIG_FAILURE', $report['errors'][0]['cause']['message']);
+        self::assertArrayNotHasKey('sections', $report['errors'][0]['cause']);
         self::assertSame(1, $report['summary']['blocking']);
 
         $verbose = $this->execute(
@@ -504,18 +505,20 @@ final class CheckExecutableTest extends TestCase
         );
         $verboseReport = $this->decodeReport($verbose['stdout']);
 
-        self::assertStringContainsString(
-            'Runtime section "twig": RuntimeException at src/TwigExtension.php:24: CANARY_TWIG_FAILURE',
-            $verboseReport['errors'][0]['cause']['message'] ?? '',
+        self::assertSame(
+            'The project bridge could not load runtime metadata: twig.',
+            $verboseReport['errors'][0]['cause']['message'] ?? null,
         );
-        self::assertStringContainsString(
+        $section = $verboseReport['errors'][0]['cause']['sections'][0] ?? [];
+        self::assertSame('twig', $section['section'] ?? null);
+        self::assertSame('RuntimeException', $section['chain'][0]['class'] ?? null);
+        self::assertSame('CANARY_TWIG_FAILURE', $section['chain'][0]['message']);
+        self::assertSame('src/TwigExtension.php:24', $section['chain'][0]['origin'] ?? null);
+        self::assertStringStartsWith(
             'App\\TwigExtension->getFunctions (src/TwigExtension.php:20)',
-            $verboseReport['errors'][0]['cause']['message'] ?? '',
+            $section['chain'][0]['frames'][0] ?? '',
         );
-        self::assertStringContainsString(
-            'App\\FinalFrame->run (src/FinalFrame.php:99)',
-            $verboseReport['errors'][0]['cause']['message'] ?? '',
-        );
+        self::assertSame('App\\FinalFrame->run (src/FinalFrame.php:99)', $section['chain'][0]['frames'][4] ?? null);
     }
 
     public function testMatchesBaselinesWithoutUpdatingOrEnforcingThemDuringPartialRuntimeAnalysis(): void

@@ -7,6 +7,7 @@ use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 
+/** @phpstan-import-type CheckError from CheckResult */
 final class CheckCommand
 {
     public const EXIT_SUCCESS = 0;
@@ -115,13 +116,13 @@ final class CheckCommand
         );
     }
 
-    /** @param array{category: string, message: string, project?: string, provider?: string, cause?: array{class: string, message: string}} $error */
+    /** @param CheckError $error */
     private function errorOutput(array $error, bool $verbose): string
     {
         $output = (isset($error['project']) ? '['.$error['project'].'] ' : '').$error['message']."\n";
         if (isset($error['cause'])) {
             $output .= $verbose
-                ? \sprintf('Cause: %s: %s', $error['cause']['class'], $error['cause']['message'])."\n"
+                ? implode("\n", $this->reporter->causeLines($error['cause']))."\n"
                 : "Add --verbose to show the cause.\n";
         }
 

@@ -37,6 +37,7 @@ final class DiagnosticCheckHarnessTest extends TestCase
             'check',
             '--format=json',
             '--profile',
+            '--verbose',
             '--runtime-indexing',
             '--workspace='.$this->directory,
             '--environment=prod',
@@ -199,6 +200,33 @@ final class DiagnosticCheckHarnessTest extends TestCase
             static fn (array $diagnostic): array => [$diagnostic['range']['start']['line'], $diagnostic['range']['start']['character']],
             $result->diagnostics,
         ));
+    }
+
+    public function testRecordsTheFailingSectionAndCauseOfAnOperationalError(): void
+    {
+        $result = $this->check(self::report(['errors' => [[
+            'category' => 'operational',
+            'message' => 'The project bridge could not boot the application kernel.',
+            'cause' => [
+                'class' => 'Symfony\\Lsp\\Runtime\\RuntimeMetadataException',
+                'message' => 'The project bridge could not boot the application kernel.',
+                'sections' => [[
+                    'section' => 'runtime',
+                    'chain' => [[
+                        'class' => 'ErrorException',
+                        'message' => 'Warning: Undefined array key "TABLE_PREFIX"',
+                        'origin' => 'app/AppKernel.php:224',
+                        'frames' => ['AppKernel->boot (app/AppKernel.php:224)'],
+                    ]],
+                ]],
+            ],
+        ]]]));
+
+        self::assertSame('check-errors', $result->failure);
+        self::assertSame([
+            'The project bridge could not boot the application kernel. Cause: The project bridge could not boot the application kernel.',
+            '  runtime: ErrorException at app/AppKernel.php:224: Warning: Undefined array key "TABLE_PREFIX"',
+        ], $result->errors);
     }
 
     #[DataProvider('rejectionProvider')]
