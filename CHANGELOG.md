@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.21.0 (2026-09-19)
 
 - Skip only the directory Composer installs into, `node_modules/`, `.git/`, the server's own cache and the paths the project's `.gitignore` excludes, so application directories such as `templates/vendor/` are analyzed
