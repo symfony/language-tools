@@ -1,46 +1,44 @@
 Environment Variables
 =====================
 
-Symfony Language Tools recognizes environment variable declarations from
-``.env`` files and references from ``%env(...)%`` expressions without reading
-or displaying their values.
+Completion, navigation and diagnostics for ``%env()%`` expressions and the
+variables your ``.env`` files declare.
 
-Completion
-----------
+Where It Works
+--------------
 
-Completion is available inside ``%env(...)%`` expressions in PHP, XML, YAML
-and Twig files. It suggests environment variable names and processors installed
-in the selected Symfony environment. Expressions inside comments are ignored.
+* ``%env(...)%`` expressions in YAML, PHP, Twig and XML files;
+* ``.env``, ``.env.local``, ``.env.test`` and any other file whose name starts
+  with ``.env``: each assignment declares a variable, and ``$NAME`` or
+  ``${NAME}`` interpolations reference one.
 
-For example, completion after ``json:`` suggests known variable names:
+In the Editor
+-------------
 
-.. code-block:: yaml
-
-    # config/services.yaml
-    parameters:
-        app.payload: '%env(json:APP_PAYLOAD)%'
-
-Hover and Navigation
---------------------
-
-Hover shows the variable name, declaration files, processor chain, expected
-type and whether a declaration has a default. Go to Definition navigates to the
-matching declaration in a ``.env`` file. Find All References includes
-recognized expressions in PHP, YAML, Twig and other ``.env`` files.
+* completion for variable names and for processors inside ``%env(``;
+* hover shows the processor chain, the type the first processor returns and
+  the files that declare the variable. Values are never shown;
+* go to definition opens the ``.env`` line that declares the variable, and
+  find references lists its uses.
 
 Diagnostics
 -----------
 
-Diagnostics report unknown processors, malformed processor chains and
-processor result types that are incompatible with a statically known bundle
-configuration type. A missing declaration isn't an error because the variable
-can be supplied by the shell, a deployment platform or a secrets provider.
+* ``env.malformed_chain``: the expression isn't closed, a processor segment
+  is empty, or a processor that takes an argument is missing one. Works
+  without the running application;
+* ``env.unknown_processor``: no such processor is installed. Needs the running
+  application, which is where the installed processors are read from;
+* ``env.incompatible_type``: in a configuration file, the expression returns a
+  type the configuration key doesn't accept. Reported as a warning.
 
-A doubled ``%%`` is an escaped percent sign, as in Symfony parameter values and
-in ``sprintf()`` formats, so ``%%env(APP_URL)%%`` is neither a reference nor a
-malformed expression.
+Limitations
+-----------
 
-Privacy
--------
-
-Environment values are never displayed or written to logs.
+* variable names are read from ``.env`` files only. A variable provided by
+  the shell, the platform or a secrets vault has no completion and no
+  definition, and a variable that no file declares isn't reported;
+* only ``%env()%`` expressions are recognized in PHP: ``$_ENV``, ``$_SERVER``
+  and ``getenv()`` aren't;
+* the variable name inside the expression has to be written literally;
+* rename isn't available.

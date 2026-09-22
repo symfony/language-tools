@@ -1,195 +1,119 @@
-Symfony Language Tools Documentation
-====================================
+Symfony Language Tools
+======================
 
-Symfony Language Tools brings Symfony-specific features to your editor:
-completion, hover, navigation, references, rename and diagnostics for routes,
-services, templates, translations and more. It implements the Language Server
-Protocol, so its Symfony features are independent of any particular editor, and
-it runs alongside a general PHP language server instead of replacing it.
+Symfony Language Tools makes your editor understand Symfony: route names,
+service IDs, template names, translation keys, environment variables, bundle
+configuration and more get completion, hover, navigation, references, rename
+and diagnostics. It implements the Language Server Protocol, so it works in
+any compatible editor, and it complements a general PHP language server
+instead of replacing it.
 
-Setting Up Your Client
-----------------------
+There are two ways to use it:
 
-Symfony Language Tools officially supports the following clients. Use the
-corresponding page for installation, configuration and troubleshooting:
+* `in your editor`_, while you write code;
+* `on the command line`_, to check a project in CI or before a commit.
 
-* `VS Code`_: install the Symfony Language Tools extension from the Visual
-  Studio Marketplace. It bundles the language server, so no separate download
-  is needed;
-* `Neovim`_: install the server with Mason or from a standalone release, then
-  enable it through ``nvim-lspconfig``;
-* `Zed`_: install the development extension from source while registry
-  publication is pending. It downloads and runs the server automatically on
-  Linux and Apple Silicon macOS;
-* `OpenCode`_: install the standalone server, then configure it as a custom
-  language server for Symfony-aware diagnostics and navigation.
-
-Any other editor with a Language Server Protocol client can run the
-standalone server: see `installing a release`_ below and configure your client
-to start ``symfony-lsp``.
-
-Project Configuration
----------------------
-
-Use ``.symfony-lsp.json`` to share project settings between editors and the
-command-line checker. See `project configuration`_ for all options and
-multi-project examples.
-
-Features
---------
-
-Symfony Language Tools understands routing, dependency injection, Twig
-templates, translations, environment variables, bundle configuration, Console
-commands, Messenger, events, security, form and validation metadata,
-AssetMapper, Stimulus and Doctrine. Each integration page documents its
-supported declarations,
-references and editor features. See the `supported integrations`_
-for the complete feature matrix.
-
-Tested with Real Applications
------------------------------
-
-Symfony Language Tools is continuously tested with real applications
-across supported Symfony versions:
-
-* `Kimai`_ and `Mautic`_ on Symfony 6.4;
-* `Sulu Demo`_, `Sulu Skeleton`_, `Sylius`_, `Shopware`_ and
-  `Pimcore Skeleton`_ on Symfony 7.4;
-* `Symfony Demo`_ on Symfony 8.1.
-
-`CoreShop`_ is additionally tested in source-only mode, without booting its
-application or validating runtime metadata.
-
-These applications cover conventional, legacy and distribution-specific
-bootstraps, large codebases, bundle ecosystems and different Symfony features.
+Both use the same analysis and the same `Symfony integrations`_.
 
 Requirements
 ------------
 
-The language server supports the maintained Symfony versions listed in
-Symfony's `release metadata`_ and the next development branch, including the
-next major's ``.0`` branch after an ``X.4`` branch. Your application must have
-its Composer dependencies installed and provide a PHP command compatible with
-its Symfony version. The PHP command doesn't have to
-run on your machine: applications that run in a container are officially
-supported through `Docker support`_.
+An application on a maintained Symfony version, with its Composer
+dependencies installed and a PHP command compatible with it. That command
+doesn't have to run on your machine: applications running in a container are
+supported; see `Docker support`_.
 
-.. _`installing a release`:
+Installing
+----------
 
-Installing a Standalone Release
--------------------------------
+**VS Code**: install the Symfony Language Tools extension from the
+`Visual Studio Marketplace`_. It bundles the server.
 
-The VS Code extension bundles the language server, and the Zed extension
-downloads it automatically. For a manual installation or a custom binary,
-download the archive for your platform from the GitHub release:
+.. code-block:: terminal
 
-* ``linux-x64`` or ``linux-arm64``;
-* ``macos-arm64``;
-* ``windows-x64``.
+    $ code --install-extension symfony.language-tools
 
-The Linux executables are statically linked, so the same archive runs on glibc
-and musl distributions, including Alpine.
+**Neovim**: install the server, then enable it through ``nvim-lspconfig``.
+See the `Neovim guide`_.
 
-Intel macOS isn't supported. Build the server from source to run it on an
-Intel Mac.
+**Zed**: install the extension from source while registry publication is
+pending. It downloads the server for you. See the `Zed guide`_.
 
-Extract the archive to get the self-contained ``symfony-lsp`` executable. On
-Windows, it has an ``.exe`` suffix.
+**OpenCode**: install the server, then declare it as a custom language
+server. See the `OpenCode guide`_.
 
-The release also contains ``SHA256SUMS``. Verify the archive checksum before
-running it.
+**Any other client, and the command line**: download the standalone server
+below.
 
-Verify the Unix executable before configuring an editor:
+Installing the Standalone Server
+--------------------------------
+
+Download the archive for your platform from the `GitHub release`_:
+``linux-x64``, ``linux-arm64``, ``macos-arm64`` or ``windows-x64``. The Linux
+executables are statically linked, so the same archive runs on glibc and musl
+distributions, including Alpine. Intel macOS isn't supported; build from
+source there.
+
+The release also contains ``SHA256SUMS``. Verify the archive, extract it and
+check that the executable runs:
 
 .. code-block:: terminal
 
     $ ./symfony-lsp --version
 
-The macOS binaries aren't signed or notarized. If macOS quarantines an archive
-downloaded from the release, remove the quarantine attribute
-from the extracted directory after verifying where the archive came from:
+The macOS binaries aren't signed. If macOS quarantines the archive, remove
+the attribute after checking where it came from:
 
 .. code-block:: terminal
 
     $ xattr -dr com.apple.quarantine /path/to/symfony-lsp-vX.Y.Z-macos-arm64
 
-Run ``./symfony-lsp`` without arguments to start the Language Server Protocol
-connection over standard input and standard output. Pass ``--socket=<port>``
-to connect to a client listening on that local port instead. On Windows, the
-bundled runtime cannot serve the protocol over standard input and output, so
-clients must use the socket transport there; the bundled VS Code extension
-does this automatically.
+Point your editor at that executable. Started without arguments, it speaks
+the protocol over standard input and output; ``--socket=<port>`` connects to
+a client listening on a local port instead. Windows clients must use the
+socket, which the VS Code extension does on its own.
 
-The server raises PHP's ``memory_limit`` to ``2G`` when the configured limit
-is lower. Set the ``SYMFONY_LSP_MEMORY_LIMIT`` environment variable to
-override the limit with any PHP memory limit value, such as ``512M``, ``4G``
-or ``-1`` for no limit.
+The server raises PHP's memory limit to 2 GB. Set
+``SYMFONY_LSP_MEMORY_LIMIT`` to override it, for example ``4G`` or ``-1``.
 
-Running Diagnostics Without an Editor
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To upgrade, replace the executable while the editor is stopped. The first
+start after an upgrade rebuilds the project index.
 
-Use the same executable to check saved Symfony project files in local automation
-or CI:
+Building from Source
+--------------------
 
-.. code-block:: terminal
-
-    $ ./symfony-lsp check
-
-The command can produce human, JSON, GitHub Actions, GitLab Code Quality and
-SARIF reports, select blocking diagnostic codes and maintain an
-occurrence-specific baseline. Runtime analysis executes application code; pass
-``--source-only`` when it must remain disabled.
-See `Running Diagnostics Without an Editor`_ for configuration, output,
-baseline and exit-status details.
-
-Upgrading
-~~~~~~~~~
-
-Download the new archive for the same platform, stop the editor client and
-replace the executable. Verify the installed version, then restart
-or reload the editor:
-
-.. code-block:: terminal
-
-    $ ./symfony-lsp --version
-
-The first workspace initialization after an upgrade rebuilds the project
-index.
-
-Installing the Server from Source
----------------------------------
-
-Source installations require PHP 8.4.1 or later and Composer 2. Clone this
-repository outside the Symfony application that you want to edit. Install the
-server dependencies and build the native parser extension:
+Source installations need PHP 8.4.1 or later and Composer 2. Clone the
+repository outside the application you want to edit, then:
 
 .. code-block:: terminal
 
     $ composer install
     $ composer tree-sitter:build
-
-The development executable is ``bin/symfony-lsp``. On Unix, no additional PHP
-extension configuration is required. Verify that it starts:
-
-.. code-block:: terminal
-
     $ ./bin/symfony-lsp --version
 
-.. _`VS Code`: editors/vscode.rst
-.. _`Neovim`: editors/neovim.rst
-.. _`Zed`: editors/zed.rst
-.. _`OpenCode`: editors/opencode.rst
-.. _`project configuration`: project-configuration.rst
-.. _`supported integrations`: features/index.rst
-.. _`Running Diagnostics Without an Editor`: features/headless-diagnostics.rst
+Tested with Real Applications
+-----------------------------
+
+Symfony Language Tools is continuously tested against `Kimai`_ and `Mautic`_
+on Symfony 6.4, `Sulu Demo`_, `Sulu Skeleton`_, `Sylius`_, `Shopware`_ and
+`Pimcore Skeleton`_ on Symfony 7.4, and `Symfony Demo`_ on Symfony 8.1. These
+cover conventional, legacy and distribution-specific bootstraps, large
+codebases and different Symfony features.
+
+.. _`in your editor`: editors/index.rst
+.. _`on the command line`: check.rst
+.. _`Symfony integrations`: features/index.rst
 .. _`Docker support`: docker.rst
-.. _`release metadata`: https://symfony.com/releases.json
+.. _`Neovim guide`: editors/neovim.rst
+.. _`Zed guide`: editors/zed.rst
+.. _`OpenCode guide`: editors/opencode.rst
+.. _`Visual Studio Marketplace`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools
+.. _`GitHub release`: https://github.com/symfony/language-tools/releases
 .. _`Kimai`: https://github.com/kimai/kimai
 .. _`Mautic`: https://github.com/mautic/mautic
 .. _`Sulu Demo`: https://github.com/sulu/sulu-demo
 .. _`Sulu Skeleton`: https://github.com/sulu/skeleton
 .. _`Sylius`: https://github.com/Sylius/Sylius
 .. _`Shopware`: https://github.com/shopware/shopware
-.. _`CoreShop`: https://github.com/coreshop/CoreShop
 .. _`Pimcore Skeleton`: https://github.com/pimcore/skeleton
 .. _`Symfony Demo`: https://github.com/symfony/demo

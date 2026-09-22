@@ -1,87 +1,52 @@
-Forms, Validation and Serializer Metadata
-=========================================
+Forms, Validation and Serializer
+================================
 
-Symfony Language Tools understands form options, validation constraints,
-serializer groups and project mappings.
+Completion, hover and diagnostics for form options, validation constraints and
+serializer groups. Form types and constraint options come from the running
+application; see `how it works`_.
 
-Forms
------
+Where It Works
+--------------
 
-Form option completion and hover are available in literal option arrays passed
-to ``createForm()``, ``createNamed()``, and form builder ``add()`` calls when
-the whole form type argument is a static ``::class`` reference. A creator call
-counts when it is made on ``$this``, as in a controller, or on a value typed as
-a form factory; a same-named method on an unrelated object is ignored. PHP's
-case-insensitive ``class`` keyword is recognized in any letter case. The form
-type and options must be passed positionally. Required options are identified in
-completion and hover details.
+* form options: the options array of ``createForm()``, ``createNamed()`` and
+  ``$builder->add()``;
+* validation constraints: constraint attributes such as ``#[Assert\Length]``,
+  and YAML validation mapping under a class's ``properties``;
+* serializer groups: ``#[Groups]`` and ``#[Context]`` arguments, ``groups``
+  entries passed to the serializer or to a controller's ``json()`` call, and
+  ``groups`` keys in YAML serializer mapping.
 
-After runtime indexing, definitely unknown literal options are diagnosed for
-known form types. Options declared by form type extensions are known, including
-on the types that inherit them from an extended parent type. Dynamic option
-arrays and unresolved form types are ignored.
-A type argument that concatenates, wraps or computes a class name is dynamic,
-even when it contains a ``::class`` reference. It doesn't trigger option
-completion or diagnostics. Quoted strings in nested option values can contain
-closing brackets without hiding later options.
+In the Editor
+-------------
 
-For form types that configure a static ``data_class`` with ``setDefaults()``
-or ``setDefault()``, literal field names passed to
-``FormBuilderInterface::add()`` are linked to the corresponding class property.
-Explicit closure captures and implicit arrow-function captures of the typed
-builder remain recognized across nested lexical scopes. Property completion is
-available while entering the field name and is scoped to the method that
-declares the typed form builder. Hover shows the PHP property
-signature and description. Go to Definition opens the declaration.
-Find All References includes the form field and mapped validation or serializer
-metadata.
+* completion for form type options, for the fields of the form's data class in
+  ``$builder->add()``, for constraint names inside an unfinished attribute and
+  for constraint options;
+* hover shows the type of a form option and whether it's required, the
+  constraint an option belongs to, and how many times a serializer group is
+  used;
+* go to definition and find references for constraints, mapped classes and
+  serializer groups.
 
-Literal ``property_path`` options are followed when they contain one property
-name. Unmapped fields, dynamic option arrays, inherited or dynamic
-``data_class`` values and nested property paths are ignored. Completion and
-navigation require the property to be declared directly on the data class;
-inherited and trait properties aren't resolved.
+Diagnostics
+-----------
 
-Validation
-----------
+Both need the running application:
 
-Constraint and constraint-option completion is available in PHP attributes and
-YAML validation mappings. PHP completion supports constraints imported
-individually, with aliases or through the ``Constraints`` namespace. Direct
-imports only suggest matching imported constraints. Runtime indexing adds
-installed Symfony constraints and their constructor options. Metadata for
-available constraints remains active
-when optional integrations aren't installed. Project constraint classes
-extending ``Constraint`` are recognized from project files.
+* ``form.unknown_option``: the form type doesn't accept this option, including
+  the options it inherits from its parent types;
+* ``validation.unknown_constraint_option``: the constraint doesn't accept this
+  option.
 
-Definitely unknown options are diagnosed only when the constraint itself is
-known. In PHP, the attribute must resolve to an installed constraint; unrelated
-attributes that share its short name are ignored. In YAML, a mapping is read
-only under a class name key, and Symfony's own distinction is applied: a
-sequence entry declares a constraint while a mapping key declares an option, so
-the nested constraints of ``All``, ``Collection`` or ``Sequentially`` are
-recognized as constraints instead of options of their parent. Validation applies
-to top-level named arguments; positional values and expressions nested inside
-argument values are ignored. Every constraint in a grouped PHP attribute is
-indexed. Go to Definition and Find All References connect application constraint
-classes to static PHP and YAML usages.
+Limitations
+-----------
 
-Serializer Groups and Mapped Properties
----------------------------------------
+* option completion and option diagnostics cover the constraints shipped by
+  the Symfony Validator. Constraints from other packages or from your own code
+  are completed by name and navigable, but their options aren't checked;
+* only named arguments are checked, so ``#[Assert\Length(10)]`` is left alone;
+* field completion in ``$builder->add()`` needs the form type to declare a
+  ``data_class`` as a static value;
+* rename isn't available.
 
-Known serializer groups are completed in resolved PHP ``Groups`` attributes,
-including imported aliases and fully qualified names, in literal ``groups``
-context arrays and in YAML mappings. Unrelated attributes that share the
-``Groups`` short name are ignored. A ``groups`` context entry is read from
-``Context`` attributes, serializer and normalizer calls, and a controller's
-``json()`` helper, so an identically named key elsewhere, such as validation
-groups of a constraint, is left alone. Hover and Find All References show their
-statically recognized occurrences.
-
-Go to Definition connects YAML validation and serializer class and property
-mappings to application PHP declarations. Hover shows the PHP property signature
-and description. Property completion is available under YAML ``properties`` and
-``attributes`` mappings.
-
-Unknown serializer groups, dynamic arrays and options that cannot be resolved
-exactly aren't diagnosed.
+.. _`how it works`: index.rst

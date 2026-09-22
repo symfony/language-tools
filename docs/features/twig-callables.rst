@@ -1,108 +1,44 @@
 Twig Functions and Filters
 ==========================
 
-Symfony Language Tools connects custom Twig functions and filters in templates
-to declarations in application PHP files. It complements generic Twig syntax
-and completion support from the editor.
+Completion, navigation and argument checking for the Twig functions and
+filters your project declares. This works from your source files, with no
+runtime analysis.
 
-Supported Declarations
-----------------------
+Where It Works
+--------------
 
-Functions and filters returned by extension ``getFunctions()`` and
-``getFilters()`` methods with ``TwigFunction`` and ``TwigFilter`` are recognized
-when their names are string literals. Statically resolvable class method
-callables declared as arrays or first-class callables are also resolved.
+In any Twig directive: after ``|`` for filters, and anywhere an expression is
+allowed for functions.
 
-Public methods declared with Twig's ``#[AsTwigFunction]`` and
-``#[AsTwigFilter]`` attributes are recognized too::
+Declarations are read from ``new TwigFunction()`` and ``new TwigFilter()``
+inside the ``getFunctions()`` and ``getFilters()`` methods of an extension,
+and from the ``#[AsTwigFunction]`` and ``#[AsTwigFilter]`` attributes on
+public methods.
 
-    use Twig\Attribute\AsTwigFilter;
-    use Twig\Attribute\AsTwigFunction;
+In the Editor
+-------------
 
-    final class ProductExtension
-    {
-        #[AsTwigFunction('product_label')]
-        public function productLabel(Product $product): string
-        {
-            return $product->name;
-        }
-
-        #[AsTwigFilter('short_description')]
-        public function shortDescription(string $description): string
-        {
-            return mb_strimwidth($description, 0, 80, '...');
-        }
-    }
-
-The attribute's injected-parameter options and variadic methods are honored
-when completing and validating arguments.
-
-Completion
-----------
-
-Function names are completed in Twig expressions, and filter names after a
-``|`` pipe. Suggestions come from the recognized application declarations
-and replace the identifier being typed. Completion also works for directives
-written inside quoted HTML attributes, such as
-``<img src="{{ product|image }}">``. Text inside string literals and comments
-is never completed.
-
-Inside a recognized call, argument names are completed from the resolved
-PHP callable. Union, intersection and disjunctive normal form (DNF) parameter
-types are supported. Variable-like text inside default expressions is not
-treated as a parameter.
-Registration options such as ``needs_environment``, ``needs_context`` and
-``is_variadic`` determine which names Twig injects or accepts dynamically.
-Parenthesized literal arrays and Boolean values behave like their
-unparenthesized equivalents. When options come from a constant or variable,
-injected parameters are inferred from
-the callable signature and argument diagnostics are suppressed. Injected
-parameters and the filtered value are never suggested, and names already used
-in the call are omitted.
-
-.. code-block:: twig
-
-    {{ product|image(width: 200, lazy: true) }}
-
-References
-----------
-
-Find All References lists recognized function and filter usages across
-application templates. You can request references from the name in a Twig
-template, from the static name in a ``TwigFunction``, ``TwigFilter``,
-``AsTwigFunction`` or ``AsTwigFilter`` declaration, or from the registered PHP
-method when the callable is statically resolved.
+* completion for function and filter names, and for the named arguments of a
+  recognized call;
+* hover shows the PHP method behind the callable, its signature and its
+  description;
+* go to definition opens that method, and find references lists the template
+  usages and the declaration.
 
 Diagnostics
 -----------
 
-A named argument that doesn't match any parameter of the resolved PHP
-callable is reported as an error, including when other argument values contain
-nested function calls. String contents, member calls, hash literal keys and
-macro declarations aren't interpreted as function calls. Unrecognized, dynamic
-and variadic callables aren't diagnosed. Argument diagnostics wait until the
-callable's PHP source file has valid syntax.
-
-Hover
------
-
-Hover describes the custom function or filter. When its callable resolves to an
-application method, hover also shows the PHP signature and documentation
-summary without PHPDoc tags.
-
-Definition
-----------
-
-Go to Definition opens the callable method when its source is available, and
-otherwise opens the function or filter registration.
+* ``twig_callable.unknown_argument``: the callable has no parameter with that
+  name. Nothing is reported when the callable takes variadic arguments or
+  when its declaration can't be read completely.
 
 Limitations
 -----------
 
-Dynamic names and non-public attributed methods are ignored. A static name
-with a dynamic callable supports completion, references and navigation to its
-registration, but method navigation and signature-based features are
-unavailable. A ``self::class`` callable inside an anonymous class is treated as
-dynamic instead of being attributed to the enclosing named class. Functions
-and filters provided only by dependencies are left to a general Twig language
-server.
+* only callables declared in your project are known. Twig's built-in
+  functions and filters, and those provided by installed packages, are left
+  to a general Twig language server;
+* a ``TwigFunction`` or ``TwigFilter`` created outside ``getFunctions()`` or
+  ``getFilters()``, in a helper method for example, isn't recognized;
+* rename isn't available.

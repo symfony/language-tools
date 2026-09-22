@@ -1,143 +1,62 @@
-Routing Integration
-===================
+Routes
+======
 
-The routing integration understands route names and parameters in the selected
-Symfony environment, together with PHP, YAML and Twig declarations and usages.
+Completion, navigation and diagnostics for route names and their parameters.
+Route names come from the running application, so most of this page needs
+runtime analysis; see `how it works`_.
 
-An application can disable routing, as CLI-only projects do. Its route set is
-then empty instead of unavailable: runtime metadata stays complete and the
-remaining features keep working.
+Where It Works
+--------------
 
-Supported Contexts
-------------------
+* PHP: ``generateUrl()`` and ``redirectToRoute()`` in a controller extending
+  ``AbstractController``, and ``generate()``, ``generateUrl()`` or
+  ``redirectToRoute()`` on a property or parameter typed ``RouterInterface``
+  or ``UrlGeneratorInterface``;
+* Twig: ``path()`` and ``url()``;
+* declarations: ``#[Route]`` attributes with an explicit name, PHP routing
+  configurators and YAML files in ``config/routes.yaml`` or
+  ``config/routes/``.
 
-Route names are recognized in these PHP calls when the receiver can be resolved
-to Symfony's controller or routing APIs:
+In the Editor
+-------------
 
-* ``AbstractController::generateUrl()``;
-* ``AbstractController::redirectToRoute()``;
-* ``RouterInterface::generate()``;
-* ``UrlGeneratorInterface::generate()``.
-
-Controller helpers remain recognized when an application controller inherits
-from ``AbstractController`` through one or more project base classes. Router
-and URL generator calls are recognized when the receiver is a parameter or
-property declared in the same class or function with Symfony's
-``RouterInterface`` or ``UrlGeneratorInterface`` type. Explicit closure captures
-and implicit arrow-function captures remain recognized across nested lexical
-scopes. Application types with similar names, untyped receivers and values
-returned by another call aren't recognized. Twig's ``path()`` and ``url()``
-functions are also supported. The server avoids suggestions when it can't
-establish that a similarly named method belongs to a Symfony API. Twig route
-functions recognize positional arguments
-and the named ``name`` and ``parameters`` arguments. Completion expects named
-arguments in their declared order, and in Twig it is offered only inside a
-directive, never in markup or a comment; navigation and diagnostics also
-recognize reordered named arguments. Static
-Twig route names and quoted parameter keys use Twig's string escape semantics.
-Twig parameter mappings support explicit entries such as
-``{slug: article.slug}`` and shorthand entries such as ``{year, month}``.
-Runtime route aliases, including controller aliases such as
-``App\Controller\ArticleController::show``, are recognized by hover and
-diagnostics. Completion, navigation, references and rename use the declared
-route name. Localized aliases without a locale suffix are recognized starting
-with Symfony Routing 7.4.6, 8.0.6 and 8.1. Development snapshots of these
-maintained branches are supported too.
-
-Route Name Completion
----------------------
-
-Place the cursor after a route-name prefix and invoke completion:
-
-.. code-block:: php
-
-    // src/Controller/ArticleController.php
-    namespace App\Controller;
-
-    use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-
-    final class ArticleController extends AbstractController
-    {
-        public function show(): void
-        {
-            $this->generateUrl('article_');
-        }
-    }
-
-The suggestions come from the configured Symfony environment. Internationalized
-routes use their canonical names without locale suffixes.
-
-Route Parameter Completion
---------------------------
-
-For a statically known route name, completion is available for string keys in
-PHP short arrays and Twig parameter maps:
-
-.. code-block:: php
-
-    $this->generateUrl('article_show', ['sl']);
-
-The equivalent Twig context is:
-
-.. code-block:: twig
-
-    {{ path('article_show', {'sl'}) }}
-
-If ``article_show`` has the path ``/article/{slug}``, completion suggests
-``slug``. Parameters already present in the map aren't suggested again.
-Suggestions include placeholders from the route path and host.
-
-Hover
------
-
-Hover over a recognized route name to display:
-
-* the route name and alias target;
-* the path and host;
-* allowed methods and schemes;
-* default parameter names and requirements;
-* the controller.
-
-Definition and Links
---------------------
-
-Definition requests navigate to matching named PHP ``#[Route]`` attributes,
-PHP routing configurator calls or YAML route declarations. A configurator call
-counts when its receiver is a parameter typed ``RoutingConfigurator`` or a
-variable assigned a ``RouteCollection``, so a mention of either in a comment or
-a string doesn't turn unrelated ``add()`` calls into routes. YAML routes nested
-under ``when@environment`` sections are indexed by their route names. Route
-references also become document links when exactly one source declaration is
-known.
-
-References and Rename
----------------------
-
-Reference requests can start from a route reference, named PHP ``#[Route]``
-attribute, PHP routing configurator call or YAML route declaration. Results
-include statically recognized PHP and Twig usages.
-
-Rename updates application-owned declarations and static references. The edit
-requires confirmation because dynamic route references may remain unchanged.
-It never edits ``vendor/`` or generated files, and a rename to an existing
-route name is rejected.
+* completion for route names, and for parameter keys in a literal parameter
+  array once the route name is known;
+* hover shows the path, host, allowed methods and schemes, default parameter
+  names, requirements, the controller and the aliased route when there is one;
+* go to definition, find references and rename across PHP, Twig and YAML.
+  Rename asks for confirmation because dynamic route names can't be updated,
+  and it never edits files outside your project;
+* a route reference becomes a clickable link when exactly one declaration
+  matches;
+* a quick fix adds the missing parameters to a PHP short array or a Twig
+  parameter map.
 
 Diagnostics
 -----------
 
-A statically known route name that doesn't exist is reported as an error. A
-route call with a complete literal short or long parameter array also reports
-required path or host parameters that are missing, even while the surrounding
-call is unfinished. Parameters with route
-defaults or values already configured in the router request context are
-optional. Parameter maps
-that are variables, contain a dynamic top-level key or use top-level array
-unpacking aren't diagnosed. Nested arrays and unpacking inside a parameter value
-don't make the parameter map dynamic. A quick fix adds missing parameters to
-PHP short arrays and Twig parameter maps; it isn't available for PHP
-``array(...)`` syntax.
+Both need the running application:
 
-Only high-confidence Symfony contexts are diagnosed. Twig route references are
-diagnosed only in files loaded by the selected environment's Twig loader. Editor
-diagnostics update while typing, while ``symfony-lsp check`` analyzes saved
-files.
+* ``route.not_found``: the route name doesn't exist in the selected
+  environment;
+* ``route.missing_parameters``: a literal parameter array doesn't provide
+  every parameter the route path or host requires. Parameters with a default
+  or a value in the router request context are optional.
+
+Twig files are diagnosed only when the selected environment's Twig loader
+actually loads them.
+
+Limitations
+-----------
+
+* XML route files aren't supported;
+* a ``#[Route]`` attribute without an explicit name isn't a navigation or
+  rename target;
+* YAML routes are recognized in ``config/routes.yaml``, ``config/routes.yml``
+  and ``config/routes/`` only;
+* a parameter array built from a variable, a dynamic key or top-level
+  unpacking isn't diagnosed;
+* the missing-parameter quick fix doesn't rewrite the long ``array(...)``
+  syntax.
+
+.. _`how it works`: index.rst

@@ -1,113 +1,52 @@
-Messenger Integration
-=====================
+Messenger
+=========
 
-The Messenger integration understands buses, transports, routed message
-classes and handlers in the configured Symfony environment, together with PHP
-and YAML declarations.
+Completion, navigation and diagnostics for buses and transports, and
+navigation between messages and their handlers. Needs the running
+application; see `how it works`_.
 
-In YAML, bus and transport references are read from ``default_bus`` and
-``failure_transport`` under ``framework.messenger`` and from the ``bus`` and
-``from_transport`` attributes of service tags. Keys that only share those
-names, such as a ``$bus`` service argument, are ignored. Routed transports are
-read from every ``routing`` notation: a single name, a list, and a ``senders``
-key in block or inline style. In PHP, a bus name is read from a
-``BusNameStamp`` instantiation only when the class resolves to the Symfony
-stamp, so a same-named class from another namespace and text inside a string
-literal are ignored.
+Where It Works
+--------------
 
-Completion
-----------
+* YAML: bus and transport declarations under ``framework.messenger``,
+  ``default_bus``, ``failure_transport``, the ``routing`` map, and the
+  ``bus`` and ``from_transport`` attributes of a service tag;
+* PHP: the ``bus:``, ``fromTransport:`` and ``handles:`` arguments of
+  ``#[AsMessageHandler]``, ``new BusNameStamp('...')``, ``$bus->dispatch(new
+  Message())`` and ``new Envelope(new Message())``.
 
-Bus name completion is available in recognized ``bus`` and ``default_bus``
-options and in ``BusNameStamp`` arguments. Transport completion is available in
-``fromTransport``, ``from_transport`` and ``failure_transport`` options.
-``AsMessageHandler`` attribute completion recognizes imported aliases and fully
-qualified names, while unrelated attributes that share its short name are
-ignored. YAML routing entries also complete transport names:
+In the Editor
+-------------
 
-.. code-block:: yaml
-
-    # config/packages/messenger.yaml
-    framework:
-        messenger:
-            default_bus: command.bus
-            failure_transport: failed
-            routing:
-                App\Message\GenerateReport: asy
-
-The suggestions use bus and transport names from the configured application.
-
-Hover
------
-
-Hover over a recognized bus to display whether it is the default bus and how
-many message classes it handles. Transport hover displays whether it is the
-failure transport and how many message classes are routed to it.
-
-Hover over a message or handler class to display its transports,
-handlers and buses.
-
-Definition and References
--------------------------
-
-Definition requests on YAML bus and transport names navigate to their
-application-owned declarations. References include recognized configuration
-options, handler attributes and routing entries.
-
-The server recognizes message classes in these PHP contexts:
-
-* ``$bus->dispatch(new Message())``;
-* ``new Envelope(new Message())``;
-* the ``handles`` argument of ``#[AsMessageHandler]``.
-
-Imported aliases of ``AsMessageHandler`` are recognized. Every repeatable
-handler attribute is indexed when several are grouped in one attribute block.
-Typed parameters are matched only inside their declaring method or through
-explicit closure captures and implicit arrow-function captures across nested
-lexical scopes. Typed properties, including promoted properties, remain
-available across methods.
-Named and unpacked arguments aren't treated as positional message arguments.
-
-From a dispatch site, definition results include the message class and its
-registered handlers. From a message class, definition navigates to handlers and
-references include recognized dispatch sites. Handler classes navigate back to
-the message classes they handle. Handler relationships inherited through
-application-owned parent classes and interfaces are included for named classes,
-interfaces and enums. Anonymous classes don't contribute inherited handler
-relationships. Commented-out PHP attributes and calls are ignored, as are YAML
-bus and transport options.
-
-Code Lenses
------------
-
-Message classes display the number of handlers above the class name. Handler
-classes display the number of message classes they handle. Selecting a code lens
-opens the related locations.
+* completion for bus and transport names;
+* hover shows, for a bus, whether it's the default one and how many messages
+  it handles; for a transport, whether it's the failure transport and how many
+  messages are routed to it; for a message, its transports and handlers; for a
+  handler, its messages and buses;
+* go to definition and find references between messages, handlers, buses and
+  transports;
+* a code lens above a message class lists its handler classes, and a code lens
+  above a handler class lists the message classes it handles.
 
 Diagnostics
 -----------
 
-After runtime indexing completes, unknown bus and transport references are
-reported as errors. References under ``when@...`` and in conventional
-environment-specific files such as ``config/packages/<environment>/`` are
-diagnosed only when that environment is selected, so a transport that exists
-only in ``test`` isn't reported while checking ``dev``. PHP handlers with a
-scalar first parameter are reported when Messenger assigns an object message to
-that method. The signature check is matched to the handler's declaring class and
-method, so same-named methods on other classes are ignored. These diagnostics
-are suppressed when runtime indexing is unavailable or incomplete.
+* ``messenger.unknown_bus``: no such bus in the selected environment;
+* ``messenger.unknown_transport``: no such transport in the selected
+  environment;
+* ``messenger.invalid_handler_signature``: the handler can't accept the
+  message class it's registered for.
+
+Declarations that belong to another environment, in ``when@test`` or
+``config/packages/test/``, aren't reported when you analyze ``dev``.
 
 Limitations
 -----------
 
-Internal framework messages and handlers can appear when Symfony registers them
-on an application bus.
+* a dispatch is recognized when the message is created directly in the call,
+  not when it's passed through a variable;
+* the handler signature check applies to handlers whose first parameter is
+  typed with scalar types only;
+* rename isn't available for bus and transport names.
 
-Environment-specific file detection follows Symfony's conventional ``config/``
-layout. Custom conditional imports aren't inferred from application code.
-
-Inherited handler relationships are available only for parent classes and
-interfaces declared in indexed application source. Relationships that can't be
-identified from an incomplete PHP type declaration are omitted until the
-declaration is completed. An unfinished parent class name doesn't prevent
-other declarations in the file from remaining available.
+.. _`how it works`: index.rst

@@ -1,100 +1,51 @@
 Translations
 ============
 
-Symfony Language Tools combines the selected environment's translation
-catalogue with translation resources from the project.
+Completion, navigation and diagnostics for translation keys and domains.
 
-Completion
-----------
+Where It Works
+--------------
 
-Translation key completion is available in recognized PHP ``trans()`` calls,
-``TranslatableMessage`` objects, the ``t()`` helper and Twig's ``trans`` filter.
-A ``trans()`` call is ignored when its receiver is declared with a type no
-translator can satisfy; an undeclared receiver stays recognized because its type
-can live in another file.
-The ``t()`` helper is recognized when it resolves to Symfony's translation
-function through a function import, an alias or a fully qualified call; an
-unimported bare ``t()`` call is ignored. Imported, aliased and fully qualified
-``t()`` calls honor literal ``domain`` and ``parameters`` arguments the same
-way ``trans()`` calls do. Key suggestions are scoped to the domain the call
-selects: its literal ``domain`` argument, or the default domain when it sets
-none, which in Twig is the one a ``trans_default_domain`` tag declares. When
-the call selects a domain that is only known at runtime, no key is suggested
-rather than keys from another domain. Literal PHP keys are recognized when
-they are the first argument, either positionally or as ``id:`` for ``trans()``
-and ``message:`` for ``t()`` and ``TranslatableMessage``. Literal PHP domains
-are recognized in positional and named arguments, including after dynamic
-parameter expressions. Literal Twig keys follow Twig's string escape rules in
-completion and navigation. Literal Twig domains are recognized in positional
-and named ``trans`` filter arguments. Domain, locale and message placeholder
-completion are available in statically recognized call arguments.
+* PHP: ``trans()`` on a translator, ``new TranslatableMessage()`` and the
+  ``t()`` helper;
+* Twig: the ``trans`` filter, the ``trans()`` and ``t()`` functions and
+  ``{% trans %}`` blocks, with ``{% trans_default_domain %}`` taken into
+  account;
+* catalogs under ``translations/``, named ``<domain>.<locale>.<extension>``
+  with the ``yaml``, ``yml``, ``json``, ``xlf``, ``xliff`` and ``php``
+  extensions, plus ``translations/<locale>/<domain>.ini``.
 
-Resources
----------
+In the Editor
+-------------
 
-Definitions are read from YAML, JSON, XLIFF and PHP resources under a
-``translations/`` directory. Nested YAML and JSON keys use dot notation. YAML
-messages follow YAML quoting, escape, folded block and literal block semantics.
-PHP messages can use quoted strings, heredocs or nowdocs. INI catalogs using a
-locale directory, such as ``Translations/en_US/messages.ini``, are recognized
-too; their messages can be quoted or unquoted, and comment lines and trailing
-``;`` comments are ignored. Escaped quotes and backslashes in quoted messages
-are decoded. XLIFF units inside comments, CDATA sections, processing
-instructions and DOCTYPE declarations are ignored. Alternative translations and
-ignorable segments don't replace a unit's messages. Each XLIFF 2 segment keeps
-its own source and target. Mixed-content source and target values are supported.
-XLIFF keys and messages decode only predefined and numeric XML references.
-Declared and external entities stay literal and aren't loaded or expanded.
-Source-derived keys keep ranges over their exact raw XML content. Unsaved
-resource changes are available immediately, and changes made by external tools
-are picked up while the server is running.
-
-An XLIFF catalog that exceeds the analysis limit fails the project's source
-indexing rather than exposing a partial set of declarations. Split a large
-catalog into smaller resources to keep all declarations available.
-
-ICU brace placeholders such as ``{name}`` are only interpreted in ICU
-catalogs, identified by the ``+intl-icu`` domain suffix. In plain catalogs,
-braces are literal text and only ``%name%`` placeholders are interpreted.
-
-Hover and Navigation
---------------------
-
-Hover shows the key, domain, available locales and message from the selected
-development catalogue. Go to Definition navigates to source resources. Find All
-References and rename cover statically recognized PHP and Twig keys.
-
-The body of a Twig ``{% trans %}`` tag is recognized as a key, including
-whitespace-control forms such as ``{%- trans -%}``, and its domain comes from a
-``from`` argument. Only real tags count: a tag written inside a Twig string
-literal is ignored.
+* completion for keys and domains;
+* hover shows the domain, the locales that define the key and the message;
+* go to definition opens the catalog entry, and find references lists the
+  usages of a key;
+* rename updates a key and its usages;
+* a quick fix adds a missing key to the catalog of its domain.
 
 Diagnostics
 -----------
 
-Placeholders the message expects but a supplied literal parameter map doesn't
-provide are reported. Extra parameters and literal global parameters registered
-with ``addGlobalParameter()`` are accepted. ICU parameter names may be bare,
-such as ``name``, or brace-wrapped, such as ``{name}``. If a global parameter
-name is dynamic, placeholder diagnostics are suppressed because the available
-names can't be determined. Calls without a parameter map, with dynamic
-expressions or with unpacked parameter arrays aren't diagnosed. Missing-key
-diagnostics are disabled by default because external translation providers can
-make the runtime catalogue incomplete.
+* ``translation.placeholders``: the parameters passed to a translation don't
+  match the placeholders in the message. Works without the running
+  application;
+* ``translation.not_found`` and ``translation.domain_not_found``: the key or
+  the domain doesn't exist. Both are off by default, because catalogs can be
+  loaded from a translation provider the tool can't see. Enable
+  ``translationDiagnostics`` in `project configuration`_, or pass
+  ``--translation-diagnostics`` to a `command-line check`_.
 
-Enable missing-key diagnostics in ``.symfony-lsp.json``:
+Limitations
+-----------
 
-.. code-block:: json
+* a call whose domain isn't a literal string is ignored;
+* rename changes the last segment of a dotted key, not its prefix, so
+  ``form.label.name`` can become ``form.label.title`` but not
+  ``form.title.name``;
+* the quick fix appends to a YAML catalog, and only when the domain has
+  exactly one YAML catalog directly under ``translations/``.
 
-    {
-        "version": 1,
-        "translationDiagnostics": true
-    }
-
-A quick fix on a missing-key diagnostic adds the key to an existing YAML
-catalog for the selected domain under ``translations/``.
-
-Project-specific overrides can enable the setting independently for each
-application in a multi-project workspace. See the `project configuration`_.
-
-.. _`project configuration`: ../project-configuration.rst
+.. _`project configuration`: ../configuration.rst
+.. _`command-line check`: ../check.rst

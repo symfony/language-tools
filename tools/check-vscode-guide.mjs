@@ -12,7 +12,7 @@ const packageIgnore = await fs.readFile(path.join(root, 'editor/vscode/.vscodeig
 const captureScript = await fs.readFile(path.join(root, 'tools/capture-vscode-guide'), 'utf8');
 const tourScript = await fs.readFile(path.join(root, 'tools/generate-vscode-guide-tour'), 'utf8');
 
-const referenceSection = reference.split('Supported Integrations\n----------------------')[1]?.split('Runtime Indexing and Trust')[0];
+const referenceSection = reference.split('Supported Integrations\n----------------------')[1]?.split('Running Your Application')[0];
 if (!referenceSection) {
     throw new Error('Unable to find the supported integration matrix');
 }

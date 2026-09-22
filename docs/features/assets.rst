@@ -1,60 +1,41 @@
-AssetMapper and Importmaps
-==========================
+Assets
+======
 
-Symfony Language Tools understands AssetMapper logical paths and importmap
-entrypoints. AssetMapper features are enabled only when
-``symfony/asset-mapper`` is installed in the selected application; plain
-files under the ``public/`` document root are supported in every
-application.
+Completion, navigation and diagnostics for asset paths and importmap
+entrypoints. AssetMapper logical paths come from the running application; see
+`how it works`_.
 
-Completion
-----------
+Where It Works
+--------------
 
-Logical asset-path completion is available in static Twig ``asset()`` calls
-using the positional path or named ``path`` argument with the default asset
-package. Importmap entrypoint completion is available for a string or list
-passed to Twig ``importmap()``.
+In the Twig ``asset()`` and ``importmap()`` functions.
 
-Both are completed only where the cursor sits inside a Twig directive, so
-look-alike text in markup is left alone.
+In the Editor
+-------------
 
-Named asset packages, absolute public paths and dynamic expressions are ignored
-because they don't identify an AssetMapper logical path exactly.
-
-Navigation and References
--------------------------
-
-Hover shows the logical path, source file and whether an asset comes from a
-vendor path. Go to Definition and document links open the mapped source file,
-including bundle-provided assets under ``vendor/``.
-
-Importmap hover shows the configured path and package version when available.
-Go to Definition opens the entrypoint declaration in ``importmap.php``. Find All
-References lists statically recognized Twig usages for assets and entrypoints.
-Static ``asset()`` references recognize positional and named ``path`` arguments.
-Escaped characters in these static helper arguments follow Twig's string rules.
-
-Static ``importmap()`` references are recognized only as real calls whose first
-argument is a string or a list of strings; script attributes passed as a second
-argument don't prevent recognition. Look-alike text in strings, comments and
-``verbatim`` blocks, method calls on an object and dynamic list entries are
-ignored.
+* completion for asset paths, from AssetMapper when it's installed and from
+  the files in ``public/`` otherwise, and for importmap entrypoint names;
+* hover shows the file an asset resolves to, whether it comes from a package,
+  and the path and version of an importmap entry;
+* go to definition opens the asset file, find references lists its usages, and
+  an asset path in a template becomes a clickable link.
 
 Diagnostics
 -----------
 
-An unknown static importmap entrypoint is reported as an error. Dynamic
-entrypoint expressions are ignored.
+* ``importmap.unknown_entrypoint``: ``importmap.php`` declares no such
+  entrypoint. Needs the running application.
 
-Unknown ``asset()`` paths aren't diagnosed. Symfony's asset package can
-legitimately fall back to a public path that isn't part of AssetMapper.
+Asset paths themselves aren't diagnosed.
 
-Public Assets
--------------
+Limitations
+-----------
 
-When an ``asset()`` path doesn't match an AssetMapper logical path, it is
-resolved against the application's ``public/`` directory. Hover shows the
-resolved file, and Go to Definition and document links open it. Completion
-suggests files from ``public/``, including build artifacts and installed
-bundle assets when they exist on disk. Applications without AssetMapper, such
-as Webpack Encore setups, get the same behavior.
+* AssetMapper paths need ``symfony/asset-mapper`` and runtime analysis. The
+  ``public/`` fallback works without either;
+* completion from ``public/`` stops after 5000 files and refreshes at most
+  every ten seconds, so a large public directory is listed partially;
+* an ``asset()`` call that names another asset package is skipped;
+* rename isn't available.
+
+.. _`how it works`: index.rst

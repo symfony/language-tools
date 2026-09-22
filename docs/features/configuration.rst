@@ -1,114 +1,58 @@
 Bundle Configuration
 ====================
 
-Symfony Language Tools understands configuration options for installed bundles
-in the selected environment, including required options, default values, enum
-values, examples and deprecations. It supports common aliases, shorthand and
-normalized values such as a cache pool's ``adapter``, Doctrine's default
-connection ``url``, ``~`` and ``true`` for array options. Dash-form keys are
-preserved when a bundle disables key normalization, including inside sequence
-entries, and converted to underscores elsewhere, matching Symfony's
-configuration processing; keys that mix dashes and underscores, or whose
-underscore twin exists in the same mapping, stay literal, as in Symfony.
-Singular aliases that expand into array entries accept scalar values, such as
-``custom_authenticator``. Extensible sections allow custom keys while validating
-their known children. Generated PHP builder methods resolve to their exact
-configuration keys, so ``processPsr3Messages()`` matches
-``process_psr_3_messages``.
+Completion, hover and diagnostics for the configuration of the bundles your
+application registers. The schemas come from the running application, so
+without it this integration has nothing to offer; see `how it works`_.
 
-Completion
-----------
+Where It Works
+--------------
 
-Configuration completion is available in YAML, XML and PHP configuration
-files. YAML suggestions follow the current indentation and mapping path. PHP
-suggestions recognize the bundle configuration DSL, including chains split
-across lines, chains separated by comments or nullsafe calls, named entries
-such as ``firewall('main')``, and leaf setters and scalar shortcuts that stay
-at their current level. Their root key comes from the declared builder type of
-the variable in scope, including renamed ``use`` imports. XML suggestions
-follow the current element path. Commented configuration constructs are
-ignored. XML structure, hover and diagnostics tolerate ``>`` inside quoted
-attributes and recover valid siblings after malformed markup. Comments, CDATA
-sections, processing instructions and DOCTYPE declarations are treated as
-opaque content.
+In the YAML, XML and PHP configuration files under ``config/``. Routing files
+are left to the `routes`_ integration.
 
-YAML value completion suggests allowed enum values. Suggested keys include
-type and description details when the bundle provides them.
+Only the sections that apply to the selected environment are analyzed: the
+main body of each file and its ``when@dev`` section when you analyze ``dev``.
 
-Hover
------
+In the Editor
+-------------
 
-Hover shows a node's full configuration path, type, description, required
-state, default summary, allowed values, example and deprecation marker. Default
-summaries describe the value's type without exporting runtime values.
+* completion for configuration keys and for the values of a key with a fixed
+  set of choices;
+* hover shows the full key path, the expected type, the description, whether
+  the key is required, its default, its allowed values, an example and its
+  deprecation;
+* a YAML ``resource`` import becomes a clickable link.
 
 Diagnostics
 -----------
 
-Diagnostics report statically provable configuration errors, including unknown
-or duplicate keys, invalid scalar types, invalid enum values, deprecated nodes
-and malformed structures. Fluent PHP builder calls that set leaf values stay at
-their current configuration level, while child builder calls continue into
-nested options. An option that also accepts a scalar, such as
-``processPsr3Messages(true)`` or ``tokenHandler('App\TokenHandler')``, stays at
-its current level when the call passes a scalar and continues into nested
-options when it passes an array, matching the generated builder. Calls that
-select or set named entries, such as ``firewall('main')``, keep literal entry
-names in diagnostic and hover paths.
-Builder chains are followed through nullsafe calls and comments between calls,
-and their root key comes from the declared builder type of the variable,
-including renamed ``use`` imports. Chains on variables declared with a type
-that isn't a configuration builder are ignored, in diagnostics, hover and
-completion alike.
-YAML diagnostics recognize scalar values accepted from backed PHP enum cases
-and match ``!php/enum`` tags to the declared cases. Other values are read with
-Symfony's own YAML parser, so every notation it supports is recognized,
-including numbers written as ``60_000``, ``+60``, ``0x1A`` or ``0o17``. PHP
-arguments are checked only when they are literals; expressions, enum cases and
-class constants stay opaque because their runtime values can't be determined
-statically. Tagged YAML values, such as ``!php/const``, stay opaque for the same
-reason.
-Tabs are reported wherever they indent YAML structure, including after leading
-spaces and on otherwise blank lines. Tabs inside block scalar content, quoted
-continuation lines, flow collection continuations and values are valid YAML and
-stay unreported. Malformed inline collections don't hide indentation errors
-later in the file.
-YAML aliases and merge keys are resolved before validation. Direct alias
-diagnostics point to the alias reference. Inherited mapping keys and values are
-checked at their effective configuration paths, with diagnostics pointing to the
-corresponding ``<<`` key. Symfony Language Tools suppresses diagnostics when a
-root key doesn't belong to an installed bundle, so application service and
-import sections aren't mistaken for bundle configuration. Files in conventional
-routing locations, including ``config/routes/`` and ``config/routes.yaml``, are
-analyzed as routes instead. Files loaded by the selected environment's router
-receive the same treatment, including files in custom locations. Diagnostics are
-limited to the application's own ``config/``
-directory because configuration files elsewhere, such as bundle test fixtures,
-can target another kernel.
+* ``config.unknown_key``: no registered bundle declares this key;
+* ``config.invalid_type``: the value doesn't match the type the key expects;
+* ``config.deprecated_key``: the bundle deprecated this key;
+* ``config.duplicate_key``: the same key is set twice in the file;
+* ``config.malformed_structure``: the file can't be read as configuration,
+  for example a YAML file indented with tabs or invalid XML.
 
-Unknown keys, invalid types and invalid enum values are reported as warnings.
-When runtime analysis confirms that saved application configuration is invalid,
-the confirmed failure is reported as an error.
+The first three are reported as warnings, never errors, because a bundle can
+accept keys that its schema doesn't describe. Name them in
+``--fail-on`` to block a `command-line check`_ on them.
 
-Selected Environments
----------------------
-
-Completion and validation use the configured Symfony environment. Only the
-selected environment can produce confirmed semantic errors.
-
-Imports and Refreshes
----------------------
-
-Relative YAML ``resource`` imports are exposed as document links. Only parsed
-``resource`` values become links, so matching text in comments, block scalars
-and other values is ignored. Glob patterns and bundle-relative ``@Bundle``
-resources are skipped. Configuration changes are picked up after saving, while
-the current open file continues to reflect unsaved edits.
+When the application itself rejects your configuration, the error Symfony
+reports wins: it's shown at the place that caused it when Symfony pinpoints
+it, and the other findings in the project's configuration files are lowered to
+warnings until the application boots again.
 
 Limitations
 -----------
 
-Custom validation callbacks and options built dynamically by application code
-may not be diagnosed. YAML alias and merge diagnostics are deferred for
-incomplete documents; aliases and merges inside sequence items aren't resolved.
-XML entity declarations and external identifiers aren't loaded or expanded.
+* nothing is validated for a key whose node accepts arbitrary children, since
+  anything is valid there;
+* PHP configuration values are checked when they're literal;
+* YAML values with a tag, such as ``!php/const``, are left alone;
+* go to definition, references and rename aren't available for configuration
+  keys.
+
+.. _`how it works`: index.rst
+.. _`routes`: routing.rst
+.. _`command-line check`: ../check.rst

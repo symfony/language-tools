@@ -1,76 +1,48 @@
-Using Symfony Language Tools with Zed
-=====================================
+Zed
+===
 
-Symfony Language Tools uses Zed's Language Server Protocol client alongside a
-general PHP language server. The Zed extension finds or downloads the latest
-stable standalone server for the current supported platform.
+Zed runs Symfony Language Tools alongside a general PHP language server. The
+extension finds ``symfony-lsp`` on ``PATH`` or downloads the latest stable
+release for you.
 
-Platform Support
-----------------
-
-The Zed integration supports Linux on x86-64 and ARM64 systems, and macOS on
-ARM64 systems.
-
-.. warning::
-
-    Windows is not supported. Zed starts language servers over standard input
-    and output, while the self-contained Windows server requires the socket
-    transport.
-
-.. warning::
-
-    Intel macOS is not supported. The release doesn't contain an Intel macOS
-    server, so the extension reports an unsupported platform instead of
-    downloading one.
+Linux on x86-64 and ARM64 and macOS on ARM64 are supported. Windows isn't:
+Zed speaks to language servers over standard input and output, which the
+Windows server can't do. Intel macOS isn't either, since no release is built
+for it.
 
 Installing the Extension
 ------------------------
 
-The extension isn't published in Zed's registry yet. Until it is listed,
-install it from source as a development extension:
+The extension isn't in Zed's registry yet, so install it from source:
 
-#. Install `Rust with rustup`_.
-#. Add the WebAssembly target used by Zed extensions:
+#. install `Rust with rustup`_ and add Zed's WebAssembly target:
 
    .. code-block:: terminal
 
        $ rustup target add wasm32-wasip2
 
-#. Clone the repository:
+#. clone the repository:
 
    .. code-block:: terminal
 
        $ git clone https://github.com/symfony/language-tools.git
 
-#. In Zed, open the command palette and run
-   ``zed: install dev extension``.
-#. Select the clone's ``editor/zed/`` directory. Zed compiles and loads the
-   extension.
+#. in Zed, run ``zed: install dev extension`` from the command palette and
+   select the clone's ``editor/zed/`` directory.
 
-Open Zed's Extensions page and confirm that Symfony Language Tools is marked as
-``DEV``. Open a PHP or Twig file, then run
-``dev: open language server logs`` to confirm that the server starts.
+The Extensions page then lists Symfony Language Tools as ``DEV``. Open a PHP
+file and run ``dev: open language server logs`` to confirm it started.
 
-Also install Zed's PHP extension for PHP syntax and general PHP language
-features. Install the Twig and XML extensions when you edit those file types.
+Install Zed's PHP extension too, plus the Twig and XML extensions if you edit
+those files. The server starts for PHP, Twig, YAML, JSON, XML, JavaScript and
+TypeScript files.
 
-The extension uses ``symfony-lsp`` from ``PATH`` when available. Otherwise, it
-downloads the matching server archive from the latest stable GitHub release.
+Configuration
+-------------
 
-Symfony Language Tools starts for PHP, Twig, YAML, JSON, XML, JavaScript and
-TypeScript files. It discovers Symfony applications from their
-``composer.json`` files and provides no project features when a worktree
-contains no full-stack Symfony application.
-
-Workspace Trust
----------------
-
-Symfony Language Tools asks before executing application code when no trust
-decision was configured. Accept the prompt only for a workspace whose code you
-trust. The decision lasts for the current language server process.
-
-Set an explicit decision in Zed's ``settings.json`` when the configuration is
-already scoped to a trusted project:
+Shared settings belong in ``.symfony-lsp.json``; see
+`project configuration`_. Override them for Zed only in ``settings.json``, and
+answer the trust question up front:
 
 .. code-block:: json
 
@@ -79,30 +51,6 @@ already scoped to a trusted project:
             "symfony-language-tools": {
                 "initialization_options": {
                     "workspaceTrust": true
-                }
-            }
-        }
-    }
-
-Set ``workspaceTrust`` to ``false`` to keep every project in static-only mode.
-
-Configuration
--------------
-
-Put shared settings in ``.symfony-lsp.json``; see the
-`project configuration`_.
-
-Configure Zed-only overrides under the ``symfony-language-tools`` language
-server:
-
-.. code-block:: json
-
-    {
-        "lsp": {
-            "symfony-language-tools": {
-                "initialization_options": {
-                    "workspaceTrust": true,
-                    "trace": "off"
                 },
                 "settings": {
                     "environment": "test"
@@ -111,11 +59,11 @@ server:
         }
     }
 
-Use the same setting names as ``.symfony-lsp.json`` for Zed-only overrides.
-See `Docker support`_ when the PHP command runs in a container. Restart the
-language server after changing its configuration.
+Without ``workspaceTrust``, the server asks before running your application.
+Set it to ``false`` to never run it. ``projectRoots`` and ``trace`` belong to
+``initialization_options``. Restart the server after a change.
 
-Override the executable or set its memory limit through the binary settings:
+Use the binary settings for another executable or a larger memory limit:
 
 .. code-block:: json
 
@@ -132,15 +80,13 @@ Override the executable or set its memory limit through the binary settings:
         }
     }
 
-Remove ``path`` to keep automatic server discovery and downloading while
-setting only the environment variable.
+Omit ``path`` to keep automatic discovery and only set the environment.
 
 Code Lenses
 -----------
 
-Zed disables code lenses by default. Enable them to display Symfony reference
-counts above Messenger handlers, event listeners, Twig components and Stimulus
-controllers:
+Zed hides code lenses by default. Enable them to see the Symfony navigation
+lenses:
 
 .. code-block:: json
 
@@ -148,22 +94,13 @@ controllers:
         "code_lens": "on"
     }
 
-Selecting a Symfony code lens opens the related locations in Zed.
-
 Troubleshooting
 ---------------
 
-Open Zed's language server logs and confirm that Symfony Language Tools started
-for the worktree. If the automatic download fails, install ``symfony-lsp`` on
-``PATH`` or configure an absolute binary path.
+Open Zed's language server logs. They report why an application failed to
+boot. If the automatic download fails, put ``symfony-lsp`` on ``PATH`` or set
+an absolute ``binary.path``. Set ``trace`` to ``messages`` temporarily to add
+redacted protocol traffic.
 
-If runtime information is unavailable, verify that the project has Composer
-dependencies installed, the workspace is trusted and ``phpCommand`` can run the
-application. The logs already name the failing section and the sanitized
-application exception that caused it, with relative code locations and
-argument-free frames. Set ``trace`` to ``messages`` or ``verbose`` temporarily
-for redacted protocol logging, then restore it to ``off``.
-
-.. _`Docker support`: ../docker.rst
-.. _`project configuration`: ../project-configuration.rst
+.. _`project configuration`: ../configuration.rst
 .. _`Rust with rustup`: https://rust-lang.org/tools/install/

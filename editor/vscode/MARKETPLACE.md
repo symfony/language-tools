@@ -50,27 +50,22 @@ It complements your PHP language server; keep it enabled.
 
 | Integration | Completion | Hover | Definition | References | Rename | Diagnostics |
 | --- | :-: | :-: | :-: | :-: | :-: | :-: |
-| Routing | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Dependency injection | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Console commands | ✓ | · | · | · | · | ✓ |
+| Routes | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Services and parameters | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Translations | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Environment variables | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Bundle configuration | ✓ | ✓ | · | · | · | ✓ |
+| Console commands | ✓ | · | · | · | · | ✓ |
 | Messenger | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Events | ✓ | ✓ | ✓ | ✓ | · | ✓ |
 | Security | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| Forms, validation and serializer metadata | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| AssetMapper and public assets | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| Stimulus and Live Components | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| Doctrine entities and repositories | ✓ | ✓ | ✓ | ✓ | · | · |
-
-### Twig
-
-| Integration | Completion | Hover | Definition | References | Rename | Diagnostics |
-| --- | :-: | :-: | :-: | :-: | :-: | :-: |
-| Template names | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| Functions and filters | ✓ | ✓ | ✓ | ✓ | · | ✓ |
-| PHP constants and enums | ✓ | ✓ | ✓ | ✓ | · | · |
+| Forms, validation and serializer | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| Doctrine | ✓ | ✓ | ✓ | ✓ | · | · |
+| Assets | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| Stimulus | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| Twig templates | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| Twig functions and filters | ✓ | ✓ | ✓ | ✓ | · | ✓ |
+| PHP constants and enums in Twig | ✓ | ✓ | ✓ | ✓ | · | · |
 
 A dot marks an intentionally unsupported combination. Document links, quick
 fixes and code lenses are covered in the

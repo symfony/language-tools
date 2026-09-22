@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Rewrite the public documentation for users, with separate guides for editor and command-line use
+- Correct the documented capabilities of every integration against the implementation
+
 ## 0.21.0 (2026-09-19)
 
 - Skip only the directory Composer installs into, `node_modules/`, `.git/`, the server's own cache and the paths the project's `.gitignore` excludes, so application directories such as `templates/vendor/` are analyzed

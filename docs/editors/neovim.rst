@@ -1,78 +1,46 @@
-Using Symfony Language Tools with Neovim
-========================================
+Neovim
+======
 
-Symfony Language Tools uses Neovim's built-in LSP client through the
-conventional ``nvim-lspconfig`` configuration. Install the language server
-separately, then enable its configuration in Neovim.
-
-Installing the Server
----------------------
-
-Install the ``symfony-lsp`` package with Mason when your registry includes it:
+Neovim's built-in LSP client starts Symfony Language Tools through the
+``nvim-lspconfig`` configuration. Install the server first, with Mason when
+your registry includes it:
 
 .. code-block:: vim
 
     :MasonInstall symfony-lsp
 
-Alternatively, use the `standalone guide`_ to download a release and make
-``symfony-lsp`` available on ``PATH``.
+Otherwise download a release and put ``symfony-lsp`` on ``PATH``; see
+`installing the server`_.
 
-Enabling the Language Server
-----------------------------
+Enabling It
+-----------
 
-Install `nvim-lspconfig`_, then enable Symfony Language Tools from ``init.lua``:
+Install `nvim-lspconfig`_, then add this to ``init.lua``:
 
 .. code-block:: lua
 
     vim.lsp.enable('symfony_lsp')
 
-If your installed ``nvim-lspconfig`` version doesn't include ``symfony_lsp``,
-copy ``editor/neovim/lsp/symfony_lsp.lua`` from this repository to
+If your ``nvim-lspconfig`` version doesn't ship ``symfony_lsp``, copy
+``editor/neovim/lsp/symfony_lsp.lua`` from this repository into
 ``lsp/symfony_lsp.lua`` in your Neovim configuration directory.
 
-Symfony Language Tools starts for PHP, Twig, YAML, JSON, XML, JavaScript,
-TypeScript and dotenv buffers under a ``composer.json`` or Git workspace. Neovim
-recognizes ``.twig`` files without another plugin. Keep a general PHP language
-server active for PHP types, diagnostics and non-Symfony completion.
-
-Workspace Trust
----------------
-
-Symfony Language Tools asks before executing application code when no trust
-decision was configured. Accept the prompt only for a workspace whose code you
-trust. The decision lasts for the current language server process.
-
-Set an explicit decision when the Neovim configuration is already scoped to a
-trusted project:
-
-.. code-block:: lua
-
-    vim.lsp.config('symfony_lsp', {
-        init_options = {
-            workspaceTrust = true,
-        },
-    })
-
-    vim.lsp.enable('symfony_lsp')
-
-Set ``workspaceTrust = false`` to keep every project in static-only mode. You
-can use Neovim's trusted local configuration support to keep this decision in a
-project ``.nvim.lua`` file rather than enabling runtime indexing globally.
+The server starts for PHP, Twig, YAML, JSON, XML, JavaScript, TypeScript and
+dotenv buffers in a workspace containing ``composer.json``. Keep a general PHP
+language server enabled alongside it.
 
 Configuration
 -------------
 
-Put shared settings in ``.symfony-lsp.json``; see the
-`project configuration`_.
-
-Override settings for Neovim only before enabling the language server:
+Shared settings belong in ``.symfony-lsp.json``; see
+`project configuration`_. Override them for Neovim only, and answer the trust
+question up front, before enabling the server:
 
 .. code-block:: lua
 
     vim.lsp.config('symfony_lsp', {
         init_options = {
             workspaceTrust = true,
-            trace = 'off',
         },
         settings = {
             symfonyLsp = {
@@ -83,12 +51,15 @@ Override settings for Neovim only before enabling the language server:
 
     vim.lsp.enable('symfony_lsp')
 
-Use the same setting names as ``.symfony-lsp.json`` for client-only overrides.
-See `Docker support`_ when the PHP command runs in a container. Restart the
-language client after changing its configuration.
+Without ``workspaceTrust``, the server asks before running your application,
+and the answer lasts until the client stops. Set it to ``false`` to never run
+it. Keep the decision in a project-local ``.nvim.lua`` rather than enabling it
+globally.
 
-Set the ``SYMFONY_LSP_MEMORY_LIMIT`` environment variable to change the
-server's PHP memory limit for large projects:
+``projectRoots`` and ``trace`` belong to ``init_options``, not ``settings``.
+Restart the client after changing its configuration.
+
+Set the server's memory limit through its environment:
 
 .. code-block:: lua
 
@@ -99,22 +70,17 @@ server's PHP memory limit for large projects:
 Code Lenses
 -----------
 
-Neovim maps ``grx`` to code lens execution by default. Symfony code lenses open
-their related locations in the quickfix list.
+Neovim doesn't fetch code lenses unless you enable them with
+``vim.lsp.codelens.enable()``. Once enabled, ``grx`` runs the lens under the
+cursor and Symfony lenses fill the quickfix list with the related locations.
 
 Troubleshooting
 ---------------
 
-Run ``:checkhealth vim.lsp`` first. Confirm that ``symfony-lsp`` is available
-on ``PATH``, the buffer has one ``symfony_lsp`` client and the project contains
-a FrameworkBundle requirement.
+Run ``:checkhealth vim.lsp`` and confirm that the buffer has a ``symfony_lsp``
+client. Neovim's LSP log reports why an application failed to boot. Set
+``trace`` to ``messages`` temporarily to add redacted protocol traffic.
 
-Neovim's LSP log already names the failing section of a runtime failure and the
-sanitized application exception that caused it, with relative code locations and
-argument-free frames. Set ``trace`` to ``messages`` or ``verbose`` temporarily
-to add redacted protocol traffic, then restore it to ``off``.
-
-.. _`standalone guide`: ../index.rst#installing-a-standalone-release
-.. _`project configuration`: ../project-configuration.rst
-.. _`Docker support`: ../docker.rst
+.. _`installing the server`: ../index.rst
+.. _`project configuration`: ../configuration.rst
 .. _`nvim-lspconfig`: https://github.com/neovim/nvim-lspconfig

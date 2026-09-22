@@ -1,130 +1,60 @@
-Twig Templates and Components
-=============================
+Twig Templates
+==============
 
-Symfony Language Tools understands template names resolved through Twig
-filesystem loader paths. It complements generic Twig syntax support from the
-editor.
+Completion, navigation and diagnostics for template names, template variables
+and Twig components. Template names resolve through the loader paths of the
+running application; see `how it works`_.
 
-Completion
-----------
+Where It Works
+--------------
 
-Template completion is available in PHP ``render()`` calls on receivers with
-a native ``Twig\Environment`` type, in ``render()`` and ``renderView()`` calls
-on ``ControllerHelper`` receivers, in the same calls on ``$this`` in Symfony
-controller subclasses, in the ``#[Template]`` attribute and in these Twig
-contexts:
+* Twig: ``{% extends %}``, ``{% include %}``, ``{% embed %}``,
+  ``{% import %}``, ``{% from %}``, ``{% use %}``, and the ``include()`` and
+  ``source()`` functions;
+* PHP: ``render()`` and ``renderView()`` in a controller extending
+  ``AbstractController`` or on a receiver typed ``Twig\Environment``, and the
+  ``#[Template]`` attribute.
 
-* ``extends``;
-* ``include``;
-* ``embed``;
-* ``import`` and ``from``;
-* ``use``;
-* the ``include()`` and ``source()`` functions.
+In the Editor
+-------------
 
-In Twig, completion is offered only where the cursor sits inside a directive.
-
-Controller and controller-helper calls recognize named ``view`` and
-``parameters`` arguments; Twig environment calls recognize named ``name`` and
-``context`` arguments. Typed receivers explicitly captured by closures or
-implicitly captured by arrow functions remain recognized across nested lexical
-scopes.
-Both regular names such as ``article/show.html.twig`` and namespaced names such
-as ``@Admin/dashboard.html.twig`` are supported, including the ``@!Bundle`` form
-that TwigBundle registers so an override can extend the template it overrides.
-The ``include()`` and ``source()`` functions recognize positional and named
-template arguments.
-Completion expects named arguments in their declared order; navigation also
-recognizes reordered named arguments. Static names use Twig's string escape
-semantics. Completion and navigation normalize names the way Twig's filesystem
-loader does: backslash separators, repeated slashes, leading ``/`` and ``./``
-prefixes, and ``.`` and ``..`` segments all resolve to the same template. Before
-an ``@`` prefix, a leading ``/`` or ``./`` keeps the name in Twig's main
-namespace, and a name that escapes the loader root never resolves.
-
-Navigation and Links
---------------------
-
-Hover shows the resolved template file. Go to Definition and document links open
-the resolved file, picking the same file Twig loads when several loader paths
-hold the name, so an application override wins over the directory it overrides.
-Find All References lists statically recognized PHP and Twig references.
-
-Variables
----------
-
-Variable completion and hover are available in Twig templates for Twig globals,
-outer literal keys passed in complete short or long arrays to recognized PHP
-render calls and literal names listed in the ``vars`` argument of the
-``#[Template]`` attribute. Render calls recognize positional context arrays and
-the named ``parameters`` or ``context`` arguments described above. Twig
-component
-templates also expose public component properties.
-
-Variables declared by Twig's ``types`` tag are completed with their declared
-type and required or optional status. Declared types follow Twig's string
-escape semantics, so single-quoted types keep escape sequences such as ``\n``
-literal. Documentation comments attached to type declarations are included in
-completion details and hover.
-
-Unknown or unpacked direct entries don't hide other known direct literal keys,
-but Symfony Language Tools doesn't infer values propagated through dynamic
-arrays, includes, inheritance or arbitrary PHP expressions.
+* completion for template names, including ``@Bundle`` namespaces;
+* hover shows which file a template name resolves to;
+* go to definition and find references for template names, and a template
+  reference becomes a clickable link;
+* a quick fix creates a missing template under ``templates/``;
+* completion and hover for the variables a template receives: Twig globals,
+  the keys passed to ``render()``, the names listed in ``#[Template]`` and the
+  types declared with ``{% types %}``.
 
 Twig Components
 ---------------
 
-Component names and public properties are completed in ``<twig:...>`` tags,
-including bundle-provided and anonymous components. Hover shows the component
-class, template and public properties. Go to Definition opens the component
-class or anonymous component template. For bundle components such as
-``ux:icon``, it opens the vendor class. Find All References and code lenses
-show statically recognized component usages.
-
-Symfony Language Tools recognizes ``#[AsTwigComponent]`` and
-``#[AsLiveComponent]`` classes, templates under ``templates/components/``,
-``<twig:...>`` tags and static ``component()`` function calls using positional
-or named ``name`` arguments. Escaped characters in static component names
-follow Twig's string rules. Imported
-aliases of the component attributes are recognized. Live Component properties
-and actions are included in completion and navigation. Unknown
-static component names are reported only in applications that enable
-``symfony/ux-twig-component``, and only after all registered components,
-including bundle components, are known. Applications without that integration
-keep their own ``component()`` Twig function undiagnosed.
-
-``<twig:...>`` tags and ``data-live-action-param`` attributes are recognized
-only where a template renders them as markup. Look-alike text in comments,
-strings, Twig statements and ``verbatim`` blocks is ignored, and so are action
-names built from a Twig expression. Quoted expressions after an unfinished
-directive remain ignored, while markup on following lines stays available.
-
-Stimulus controllers and Live Component actions and events are documented in
-`Stimulus and Live Components`_.
+Component names and their properties are completed in ``<twig:Name>`` tags.
+Hover, go to definition and find references connect a component tag to its
+class and its template, a code lens above a component class opens its
+template, and Live Component events are completed inside ``emit()``.
 
 Diagnostics
 -----------
 
-A missing static template name is reported after the configured Twig loader
-paths are known. Twig files outside those loader paths aren't diagnosed. Dynamic
-template expressions, including concatenated names, are ignored.
-Files owned by dependencies, such as bundle templates under ``vendor/``, are
-never diagnosed. A quick fix creates missing application templates under
-the ``templates/`` directory; namespaced ``@Bundle`` names are excluded.
+Both need the running application:
+
+* ``template.not_found``: the template name doesn't resolve to any loader
+  path of the selected environment;
+* ``twig_component.not_found``: no such Twig component. Needs
+  ``symfony/ux-twig-component``.
+
+Templates outside every loader path of the application aren't diagnosed, so
+fixtures and unused template directories stay quiet.
 
 Limitations
 -----------
 
-PHP receiver recognition uses native types and controller inheritance visible
-in project source files. Untyped Twig environment variables, inherited receiver
-properties, calls written in traits and controller ancestry available only
-through dependencies aren't recognized.
-Completion inside the ``#[Template]`` attribute expects the template name as
-the attribute's first argument and doesn't recognize aliased attribute
-imports; navigation and diagnostics don't have these restrictions.
-Custom non-filesystem loaders can limit completion and navigation. A loader that
-decorates the filesystem loader, as the Sylius theme bundle does, doesn't hide
-the loader paths. Sylius theme directories are read from the configured theme
-sources, and every theme resolves, so a template belonging to one theme isn't
-reported as missing on a channel served by another theme.
+* without the running application, only names under ``templates/`` are known
+  and no template diagnostics are reported;
+* a template name built from a variable isn't resolved;
+* ``component('...')`` calls are navigated and diagnosed but not completed;
+* rename isn't available for template names.
 
-.. _`Stimulus and Live Components`: stimulus.rst
+.. _`how it works`: index.rst

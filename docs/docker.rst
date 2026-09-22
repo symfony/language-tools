@@ -25,9 +25,12 @@ For a Docker Compose service named ``php`` that mounts the project at
         "containerProjectRoot": "/app"
     }
 
-Start the container before opening your project. Symfony Language Tools uses
-``phpCommand`` to run the application and maps container paths back to files on
-your machine.
+Start the container before opening your project. The container must mount the
+project at ``containerProjectRoot``: paths are translated between both sides
+by swapping that prefix.
+
+Raise ``bridgeTimeout`` when the application needs more than 300 seconds to
+boot in the container.
 
 If It Doesn't Work
 ------------------
@@ -52,10 +55,11 @@ Then check that:
 Good to Know
 ------------
 
-* Runtime indexing still requires a trusted workspace and debug mode, and
-  static features never execute PHP.
-* When ``vendor/`` lives only in the container, Symfony features work but the
-  editor cannot open vendor files that don't exist on your machine.
-* Any other isolated PHP command works the same way, for example in a virtual
-  machine: set ``containerProjectRoot`` to the project path that this command
-  sees, and share the project files between both sides.
+* running the application still requires debug mode, and your editor still
+  asks for workspace trust. ``symfony-lsp check`` has no such prompt and runs
+  the application unless you pass ``--source-only``;
+* when ``vendor/`` lives only in the container, Symfony features work but your
+  editor can't open vendor files that don't exist on your machine;
+* any other isolated PHP command works the same way, in a virtual machine for
+  example: set ``containerProjectRoot`` to the project path that command sees
+  and share the project files between both sides.

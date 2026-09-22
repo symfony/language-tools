@@ -1,151 +1,79 @@
-Using Symfony Language Tools with VS Code
-=========================================
+VS Code
+=======
 
-The bundled VS Code extension configures the Symfony Language Tools client,
-workspace trust, file associations and project settings. It requires VS Code
-1.91 or later.
-
-The `Marketplace overview`_ walks through installation, indexing and core
-features with the public Symfony Demo application, and includes an animated
-tour of every supported integration and editor workflow.
-
-Installing the Extension
-------------------------
-
-Install the stable Symfony Language Tools extension from the
-`Visual Studio Marketplace`_:
+The extension bundles the language server, so there's nothing else to
+install. It requires VS Code 1.91 or later.
 
 .. code-block:: terminal
 
     $ code --install-extension symfony.language-tools
 
-Versions with a prerelease suffix are published separately on the prerelease
-channel:
+Add ``--pre-release`` for prerelease versions. VSCodium users install the
+matching ``.vsix`` from the `GitHub release`_:
 
 .. code-block:: terminal
 
-    $ code --install-extension symfony.language-tools --pre-release
-
-The Marketplace selects the package matching the extension host. Packages are
-available for Linux x64 and ARM64, musl-based Linux x64 and ARM64 such as
-Alpine, macOS ARM64 and Windows x64. Each package contains the matching
-self-contained language server, so ``symfonyLsp.serverPath`` doesn't need to be
-configured.
-
-The extension always runs where the workspace is. When you attach VS Code to a
-container or a remote host, the Marketplace installs the package for that
-platform, not for your local machine.
-
-You can also download the matching ``.vsix`` file from the GitHub release and
-install it directly:
-
-.. code-block:: terminal
-
-    $ code --install-extension /path/to/downloaded-extension.vsix
     $ codium --install-extension /path/to/downloaded-extension.vsix
 
-Twig Support
-------------
+The Marketplace picks the package for the machine that hosts the workspace,
+so a container or remote host gets its own. Packages exist for Linux x64 and
+ARM64, musl-based Linux, macOS ARM64 and Windows x64.
 
-The extension registers ``.twig`` and ``.html.twig`` files as the ``twig``
-language so Symfony features work without another extension. It deliberately
-doesn't provide generic Twig syntax highlighting, formatting or built-in symbol
-completion.
+Trust the workspace: VS Code disables the extension in Restricted Mode.
 
-Optional extensions can provide those editor features alongside Symfony Language
-Tools:
+Twig Files
+----------
 
-* Modern Twig (``Stanislav.vscode-twig``) provides generic Twig diagnostics,
-  completion, hover and signature help;
-* Twig Language 2 (``mblode.twig-language-2``) provides syntax highlighting,
-  snippets, Emmet support and formatting;
-* djLint (``monosans.djlint``) provides template formatting and linting.
+The extension registers ``.twig`` and ``.html.twig`` as the ``twig`` language
+so Symfony features work without another extension. It provides no Twig
+syntax highlighting, formatting or generic Twig completion; install an
+extension such as Modern Twig or Twig Language 2 for those. Files associated
+with the ``html`` language are recognized too.
 
-Some extensions associate Twig files with the ``html`` language. Symfony
-Language Tools also recognizes ``.twig`` files in that configuration.
+Status and Commands
+-------------------
 
-Index Status and Commands
--------------------------
+The status bar shows the state of the application whose file you're editing,
+and the selected environment once it's ready. Select it for details,
+including when stale information was last refreshed.
 
-The status bar shows the source and runtime index state for the application
-owning the active document. It identifies indexing, static-only, stale,
-partial-runtime warning and failed states and displays the selected environment
-when both indexes are ready. Select the status bar item to show details,
-including when stale runtime information was last updated.
+The command palette offers ``Symfony Language Tools: Refresh Index``,
+``Show Index Status``, ``Switch Environment`` and ``Switch Kernel``. Leave
+the kernel input empty to detect it again.
 
-The command palette provides these commands:
+Settings
+--------
 
-* ``Symfony Language Tools: Refresh Index`` rebuilds source and runtime indexes;
-* ``Symfony Language Tools: Show Index Status`` reports each discovered
-  application;
-* ``Symfony Language Tools: Switch Environment`` selects an environment and
-  rebuilds its runtime index;
-* ``Symfony Language Tools: Switch Kernel`` selects the kernel class or
-  application entry point to analyze and rebuilds its runtime index. Leave the
-  input empty to detect the kernel again.
+Shared project settings belong in ``.symfony-lsp.json``; see
+`project configuration`_. Every setting from that file also exists as
+``symfonyLsp.<name>`` in VS Code and overrides it for VS Code only.
 
-Configuration
--------------
+These four are specific to VS Code:
 
-Open the Symfony application as a VS Code workspace. Put shared settings in
-``.symfony-lsp.json``; see the `project configuration`_.
+* ``symfonyLsp.serverPath``: path to another server executable, for a build
+  from source or a standalone release;
+* ``symfonyLsp.memoryLimit``: PHP memory limit of the server process, such as
+  ``4G`` or ``-1``. Empty keeps the default of 2 GB;
+* ``symfonyLsp.trace``: adds redacted protocol messages to the output
+  channel. ``off`` by default;
+* ``symfonyLsp.projectRoots``: the applications to analyze.
 
-Use ``.vscode/settings.json`` for VS Code-specific settings or explicit editor
-overrides:
+Run ``Developer: Reload Window`` after changing any of those four. The others
+apply immediately.
 
-.. code-block:: json
-
-    {
-        "symfonyLsp.memoryLimit": "4G",
-        "symfonyLsp.trace": "off",
-        "php.suggest.basic": false
-    }
-
-VS Code settings under ``symfonyLsp`` override values from
-``.symfony-lsp.json`` for VS Code only.
-
-``symfonyLsp.serverPath`` overrides the bundled executable and must be an
-absolute path. Use it for a server built from source or a separately downloaded
-standalone release.
-
-``symfonyLsp.memoryLimit`` sets the PHP memory limit of the language server
-process for large projects, for example ``4G`` or ``-1`` for no limit. Leave
-it empty to keep the server default of ``2G``.
-
-The extension forwards VS Code's workspace trust decision to the server.
-Untrusted workspaces remain in static-only mode. See `Symfony integrations`_
-for details.
-
-Use `Docker support`_ when the PHP command runs in a container.
-A runtime failure always reports the failing section and the sanitized
-application exception that caused it, with relative code locations and
-argument-free frames, in the output channel.
-``symfonyLsp.trace`` adds redacted protocol messages to the output channel and
-is disabled by default.
-
-The PHP suggestion setting is optional. Symfony Language Tools is designed to
-coexist with a general PHP language server such as Intelephense or PHP Tools.
-Keep that server enabled for PHP diagnostics, types and general completion.
-
-Run ``Developer: Reload Window`` after changing ``symfonyLsp.serverPath`` or
-``symfonyLsp.memoryLimit``. Use
-``Symfony Language Tools: Switch Environment`` to change the active environment
-without restarting the extension, and
-``Symfony Language Tools: Switch Kernel`` for applications with several
-kernels. The status bar details report the selected kernel when one is set.
+Keep a general PHP language server such as Intelephense or PHP Tools enabled
+for PHP types, diagnostics and completion.
 
 Troubleshooting
 ---------------
 
-Open ``View > Output`` and select ``Symfony Language Tools`` to inspect startup,
-configuration and indexing errors. If the server doesn't start, verify that:
+Open ``View > Output`` and select ``Symfony Language Tools``. It reports
+startup, configuration and indexing failures, including the reason an
+application failed to boot.
 
-* the installed extension package matches the extension host's platform;
-* a configured ``symfonyLsp.serverPath`` points to an executable file;
-* the workspace settings contain a valid project PHP command.
+If the server doesn't start, check that ``symfonyLsp.serverPath``, when set,
+points to an existing executable, and that the installed package matches the
+platform running the workspace.
 
-.. _`Symfony integrations`: ../features/index.rst
-.. _`project configuration`: ../project-configuration.rst
-.. _`Docker support`: ../docker.rst
-.. _`Marketplace overview`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools
-.. _`Visual Studio Marketplace`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools
+.. _`project configuration`: ../configuration.rst
+.. _`GitHub release`: https://github.com/symfony/language-tools/releases
