@@ -270,6 +270,67 @@ final class RouteDiagnosticPublisherTest extends TestCase
         }
     }
 
+    public function testSuggestsOnlyCloseKnownRoutesForMissingNames(): void
+    {
+        foreach ([
+            ['php', 'file:///workspace/src/Controller.php', <<<'PHP'
+                <?php
+                class ArticleController extends AbstractController
+                {
+                    public function show(): void
+                    {
+                        $this->redirectToRoute('blog_index_paginate');
+                    }
+                }
+                PHP, ['Replace with "blog_index_paginated"']],
+            ['twig', 'file:///workspace/templates/page.html.twig', "{{ path('BLOG_INDEX_PAGINATED') }}", ['Replace with "blog_index_paginated"']],
+            ['twig', 'file:///workspace/templates/page.html.twig', "{{ path('completely_unrelated') }}", []],
+        ] as [$languageId, $uri, $text, $expected]) {
+            $documents = new DocumentStore();
+            $documents->open(new Document($uri, $languageId, 1, $text));
+            $projects = new ProjectRegistry();
+            $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+            $indexes = new RouteIndexRegistry();
+            $indexes->forProject($project)->replace(
+                new Route('blog_index_paginated', '/blog/{page}', [], [], null, null),
+                new Route('other_page', '/other', [], [], null, null),
+            );
+            $converter = new PositionConverter();
+            $classIndexes = new DependencyInjectionSourceIndexRegistry();
+            $phpExtractor = RouteReferenceExtractorFactory::create($converter);
+            $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser()));
+            $templateIndexes = new TemplateIndexRegistry($classIndexes);
+            $templateIndexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration('page.html.twig', $uri, new Range(new Position(0, 0), new Position(0, 0))));
+            $sourceIndexes = $this->sourceIndexes($project, $uri, $languageId, $text, $classIndexes, $phpExtractor, $twigExtractor);
+            $resolver = new DocumentContextResolver($documents, $projects);
+            $protocol = new LspProtocolMapper();
+            $diagnostics = (new RouteDiagnosticPublisher($resolver, $protocol, $indexes, $sourceIndexes, $templateIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]);
+            self::assertIsArray($diagnostics);
+            self::assertSame('route.not_found', $diagnostics[0]['code'] ?? null);
+            $actions = (new RouteCodeActionProvider($resolver, $converter, $protocol, $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver()))->actions([
+                'textDocument' => ['uri' => $uri],
+                'range' => $diagnostics[0]['range'],
+                'context' => ['diagnostics' => $diagnostics],
+            ]);
+
+            self::assertSame($expected, array_column($actions ?? [], 'title'));
+            foreach ($actions ?? [] as $action) {
+                self::assertSame([
+                    'title' => 'Replace with "blog_index_paginated"',
+                    'kind' => 'quickfix',
+                    'diagnostics' => [$diagnostics[0]],
+                    'edit' => ['documentChanges' => [[
+                        'textDocument' => ['uri' => $uri, 'version' => 1],
+                        'edits' => [[
+                            'range' => $diagnostics[0]['range'],
+                            'newText' => 'blog_index_paginated',
+                        ]],
+                    ]]],
+                ], $action);
+            }
+        }
+    }
+
     public function testDiagnosesUnknownRoutesInTwig(): void
     {
         $uri = 'file:///workspace/templates/navigation.html.twig';

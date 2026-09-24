@@ -43,7 +43,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
             : $this->phpExtractor->extract($document, $this->classIndexes->forProject($request->project));
         $actions = [];
         foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
-            if (!\is_array($diagnostic) || 'route.missing_parameters' !== ($diagnostic['code'] ?? null)) {
+            if (!\is_array($diagnostic) || !\in_array($diagnostic['code'] ?? null, ['route.not_found', 'route.missing_parameters'], true)) {
                 continue;
             }
             $range = $diagnostic['range'] ?? null;
@@ -55,6 +55,22 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
                     continue;
                 }
                 $routeIndex = $this->indexes->forProject($request->project);
+                if ('route.not_found' === $diagnostic['code']) {
+                    if ($routeIndex->isComplete() && null === $routeIndex->get($reference->name)) {
+                        foreach ($this->closeNames($routeIndex, $reference->name) as $name) {
+                            $actions[] = [
+                                'title' => \sprintf('Replace with "%s"', $name),
+                                'kind' => 'quickfix',
+                                'diagnostics' => [$diagnostic],
+                                'edit' => ['documentChanges' => [[
+                                    'textDocument' => ['uri' => $request->document->uri, 'version' => $request->document->version],
+                                    'edits' => [$this->protocol->textEdit($reference->range, $name)],
+                                ]]],
+                            ];
+                        }
+                    }
+                    break;
+                }
                 $route = $routeIndex->get($reference->name);
                 if (null === $route || null === $reference->providedParameters) {
                     continue;
@@ -79,6 +95,25 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         }
 
         return $actions;
+    }
+
+    /** @return list<string> */
+    private function closeNames(RouteIndex $index, string $name): array
+    {
+        if ('' === $name) {
+            return [];
+        }
+        $matches = [];
+        $threshold = \strlen($name) < 8 ? 1 : 2;
+        foreach ($index->matching('') as $route) {
+            $distance = levenshtein(strtolower($name), strtolower($route->name));
+            if ($distance <= $threshold) {
+                $matches[] = ['name' => $route->name, 'distance' => $distance];
+            }
+        }
+        usort($matches, static fn (array $a, array $b): int => ($a['distance'] <=> $b['distance']) ?: strcmp($a['name'], $b['name']));
+
+        return array_column(\array_slice($matches, 0, 3), 'name');
     }
 
     /**

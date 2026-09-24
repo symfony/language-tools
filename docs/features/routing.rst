@@ -29,8 +29,8 @@ In the Editor
   and it never edits files outside your project;
 * a route reference becomes a clickable link when exactly one declaration
   matches;
-* a quick fix adds the missing parameters to a PHP short array or a Twig
-  parameter map.
+* a quick fix suggests close route names for a misspelled reference; another
+  adds missing parameters to a PHP short array or a Twig parameter map.
 
 Diagnostics
 -----------
