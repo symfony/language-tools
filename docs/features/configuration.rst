@@ -11,8 +11,9 @@ Where It Works
 In the YAML, XML and PHP configuration files under ``config/``. Routing files
 are left to the `routes`_ integration.
 
-Only the sections that apply to the selected environment are analyzed: the
-main body of each file and its ``when@dev`` section when you analyze ``dev``.
+YAML configuration keys and values are checked in every ``when@...`` section,
+regardless of the selected environment. Completion and hover use the selected
+environment's bundle configuration.
 
 In the Editor
 -------------
@@ -47,10 +48,13 @@ warnings until the application boots again.
 Limitations
 -----------
 
+* select the relevant environment to check configuration for a bundle registered
+  only in that environment;
 * nothing is validated for a key whose node accepts arbitrary children, since
   anything is valid there;
 * PHP configuration values are checked when they're literal;
-* YAML values with a tag, such as ``!php/const``, are left alone;
+* tagged YAML values such as ``!php/const`` are not type-checked; enum
+  cases are checked when the allowed cases are known;
 * go to definition, references and rename aren't available for configuration
   keys.
 

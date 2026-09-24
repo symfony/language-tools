@@ -360,13 +360,30 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
     }
 
-    public function testIgnoresInactiveEnvironmentSemantics(): void
+    public function testDiagnosesConfigurationInEveryEnvironmentBlock(): void
     {
         $fixture = $this->providers();
-        $uri = 'file:///workspace/config/framework.yaml';
-        $fixture->documents->open(new Document($uri, 'yaml', 1, "when@test:\n    framework:\n        mystery: true\n"));
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, <<<'YAML'
+            framework:
+                router:
+                    utf8: true
+            when@prod:
+                framework:
+                    router:
+                        utf8: 'not-a-bool'
+                    bogus_prod_key: 1
+            when@test:
+                framework:
+                    router:
+                        mode: dev
+                test_only_bundle:
+                    option: true
+            YAML));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        self::assertSame(['config.invalid_type', 'config.unknown_key', 'config.deprecated_key'], array_column($diagnostics, 'code'));
+        self::assertSame([6, 7, 11], array_column(array_column(array_column($diagnostics, 'range'), 'start'), 'line'));
     }
 
     public function testDoesNotTreatEnvironmentOverridesAsDuplicates(): void
@@ -1706,7 +1723,7 @@ final class ConfigurationProviderTest extends TestCase
         return new ConfigurationProviderFixture(
             new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
-            new ConfigurationDiagnosticProvider($resolver, ProjectPaths::resolver(), $converter, $protocol, $indexes, $routeIndexes, $runtimeConfiguration, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
+            new ConfigurationDiagnosticProvider($resolver, ProjectPaths::resolver(), $converter, $protocol, $indexes, $routeIndexes, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
             new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter, $documentParser),
             $documents,
             $converter,

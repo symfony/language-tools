@@ -11,7 +11,6 @@ use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterface
 {
@@ -22,7 +21,6 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         private readonly LspProtocolMapper $protocol,
         private readonly ConfigurationIndexRegistry $indexes,
         private readonly RouteIndexRegistry $routeIndexes,
-        private readonly RuntimeConfiguration $runtimeConfiguration,
         private readonly YamlConfigurationParser $yaml,
         private readonly ConfigurationValueValidator $values,
         private readonly PhpConfigurationAnalyzer $php,
@@ -67,14 +65,10 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
     /** @return list<array<array-key, mixed>> */
     private function diagnoseYaml(Document $document, Project $project, ConfigurationIndex $index): array
     {
-        $environmentScope = 'when@'.$this->runtimeConfiguration->environment($project);
         $occurrences = $this->yaml->parse($document->text, $index, resolveAliasesAndMerges: true);
         $diagnostics = [];
         $seen = [];
         foreach ($occurrences as $occurrence) {
-            if (!\in_array($occurrence->scope, ['base', $environmentScope], true)) {
-                continue;
-            }
             $path = $occurrence->path;
             $root = $path[0] ?? null;
             if (null === $root || \in_array($root, ['parameters', 'services'], true) || !isset($index->roots()[$root])) {
