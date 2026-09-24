@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Suggest close existing names for missing templates, translations, configuration keys, Messenger, Security, Stimulus, Twig components and form or constraint options
 - Suggest close route names as quick fixes for unknown PHP and Twig route references
 - Rewrite the public documentation for users, with separate guides for editor and command-line use
 - Correct the documented capabilities of every integration against the implementation

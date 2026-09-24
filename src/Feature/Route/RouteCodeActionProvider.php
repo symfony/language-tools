@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -23,6 +24,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         private readonly RouteReferenceExtractor $phpExtractor,
         private readonly TwigRouteReferenceExtractor $twigExtractor,
         private readonly ProjectPathResolver $pathResolver,
+        private readonly UnknownNameCodeActionBuilder $unknownNames,
     ) {
     }
 
@@ -57,17 +59,13 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
                 $routeIndex = $this->indexes->forProject($request->project);
                 if ('route.not_found' === $diagnostic['code']) {
                     if ($routeIndex->isComplete() && null === $routeIndex->get($reference->name)) {
-                        foreach ($this->closeNames($routeIndex, $reference->name) as $name) {
-                            $actions[] = [
-                                'title' => \sprintf('Replace with "%s"', $name),
-                                'kind' => 'quickfix',
-                                'diagnostics' => [$diagnostic],
-                                'edit' => ['documentChanges' => [[
-                                    'textDocument' => ['uri' => $request->document->uri, 'version' => $request->document->version],
-                                    'edits' => [$this->protocol->textEdit($reference->range, $name)],
-                                ]]],
-                            ];
-                        }
+                        array_push($actions, ...$this->unknownNames->replacements(
+                            $request->document,
+                            $diagnostic,
+                            $reference->range,
+                            $reference->name,
+                            array_map(static fn (Route $route): string => $route->name, $routeIndex->matching('')),
+                        ));
                     }
                     break;
                 }
@@ -95,25 +93,6 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
         }
 
         return $actions;
-    }
-
-    /** @return list<string> */
-    private function closeNames(RouteIndex $index, string $name): array
-    {
-        if ('' === $name) {
-            return [];
-        }
-        $matches = [];
-        $threshold = \strlen($name) < 8 ? 1 : 2;
-        foreach ($index->matching('') as $route) {
-            $distance = levenshtein(strtolower($name), strtolower($route->name));
-            if ($distance <= $threshold) {
-                $matches[] = ['name' => $route->name, 'distance' => $distance];
-            }
-        }
-        usort($matches, static fn (array $a, array $b): int => ($a['distance'] <=> $b['distance']) ?: strcmp($a['name'], $b['name']));
-
-        return array_column(\array_slice($matches, 0, 3), 'name');
     }
 
     /**

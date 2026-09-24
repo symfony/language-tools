@@ -6,6 +6,7 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -21,6 +22,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
         private readonly ProjectPathResolver $pathResolver,
         private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
+        private readonly UnknownNameCodeActionBuilder $unknownNames,
     ) {
     }
 
@@ -48,6 +50,15 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
                 ) {
                     continue;
                 }
+                $index = $this->indexes->forProject($request->project);
+                $replacements = $index->isComplete() ? $this->unknownNames->replacements(
+                    $request->document,
+                    $diagnostic,
+                    $reference->range,
+                    $reference->name,
+                    array_map(static fn (TemplateDeclaration $template): string => $template->name, $index->matching('')),
+                ) : [];
+                array_push($actions, ...$replacements);
                 $path = $this->path($request->project->rootPath, $reference->name);
                 if (null === $path || is_file($path)) {
                     continue;
@@ -60,7 +71,7 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
                     'title' => \sprintf('Create template "%s"', $reference->name),
                     'kind' => 'quickfix',
                     'diagnostics' => [$diagnostic],
-                    'isPreferred' => true,
+                    'isPreferred' => [] === $replacements,
                     'edit' => ['documentChanges' => [[
                         'kind' => 'create',
                         'uri' => $uri,

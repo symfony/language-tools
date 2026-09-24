@@ -26,7 +26,8 @@ In the Editor
   lazy, and its custom authenticators; over a provider, its type and the
   firewalls using it; over a role, the roles it inherits and the roles that
   inherit it;
-* go to definition and find references for firewalls, providers and roles.
+* go to definition and find references for firewalls, providers and roles;
+* a quick fix suggests close firewall or provider names.
 
 Diagnostics
 -----------

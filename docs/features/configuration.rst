@@ -22,7 +22,8 @@ In the Editor
 * hover shows the full key path, the expected type, the description, whether
   the key is required, its default, its allowed values, an example and its
   deprecation;
-* a YAML ``resource`` import becomes a clickable link.
+* a YAML ``resource`` import becomes a clickable link;
+* a quick fix suggests close keys under the same parent in YAML, PHP and XML.
 
 Diagnostics
 -----------

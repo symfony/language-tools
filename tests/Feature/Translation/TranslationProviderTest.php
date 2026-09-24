@@ -15,6 +15,7 @@ use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationMessage;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
 use Symfony\Lsp\Feature\Translation\TranslationReferenceResolver;
+use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -295,7 +296,7 @@ final class TranslationProviderTest extends TestCase
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
             $pathResolver = ProjectPaths::resolver();
-            $actions = (new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver)))->actions([
+            $actions = (new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver), new UnknownNameCodeActionBuilder(new LspProtocolMapper())))->actions([
                 'textDocument' => ['uri' => $uri],
                 'range' => $diagnostics[0]['range'],
                 'context' => ['diagnostics' => $diagnostics],
@@ -322,6 +323,40 @@ final class TranslationProviderTest extends TestCase
             @rmdir($root.'/translations');
             @rmdir($root);
         }
+    }
+
+    public function testSuggestsAKeyOnlyFromItsTranslationDomain(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = "<?php \$translator->trans('news.lates');";
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 2, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $converter = new PositionConverter();
+        $extractor = TranslationExtractorTestFactory::create($converter, new TwigCommentParser());
+        $indexes = new TranslationIndexRegistry();
+        $indexes->forProject($project)->replaceRuntime(true);
+        $indexes->forProject($project)->replaceSources(
+            $extractor->extract(new SourceDocument('file:///workspace/translations/messages.en.yaml', 'yaml', "'news.latest': Latest\n")),
+            $extractor->extract(new SourceDocument('file:///workspace/translations/admin.en.yaml', 'yaml', "'news.lates': Wrong domain\n")),
+            $extractor->extract(new SourceDocument($uri, 'php', $text)),
+        );
+        $reference = $extractor->extract(new SourceDocument($uri, 'php', $text))->references[0];
+        $protocol = new LspProtocolMapper();
+        $diagnostic = $protocol->diagnostic($reference->range, 1, 'translation.not_found', 'Missing translation.');
+        $paths = ProjectPaths::resolver();
+        $actionProvider = new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, $protocol, $extractor, $indexes, new UriToPathConverter(), $paths, new ProjectDocumentReader($documents, $paths), new UnknownNameCodeActionBuilder($protocol));
+        $params = ['textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => [$diagnostic]]];
+        $actions = $actionProvider->actions($params);
+
+        self::assertSame(['Replace with "news.latest"'], array_column($actions ?? [], 'title'));
+        self::assertSame(['documentChanges' => [[
+            'textDocument' => ['uri' => $uri, 'version' => 2],
+            'edits' => [['range' => $diagnostic['range'], 'newText' => 'news.latest']],
+        ]]], $actions[0]['edit'] ?? null);
+        $indexes->forProject($project)->replaceRuntime(true, new TranslationMessage('news.lates', 'messages', 'en', 'Already present'));
+        self::assertSame([], $actionProvider->actions($params));
     }
 
     public function testComputesTheInsertionPointFromTheOpenUnsavedTranslationTarget(): void
@@ -355,7 +390,7 @@ final class TranslationProviderTest extends TestCase
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
             $pathResolver = ProjectPaths::resolver();
-            $actions = (new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver)))->actions([
+            $actions = (new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver), new UnknownNameCodeActionBuilder(new LspProtocolMapper())))->actions([
                 'textDocument' => ['uri' => $uri],
                 'range' => $diagnostics[0]['range'],
                 'context' => ['diagnostics' => $diagnostics],

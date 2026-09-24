@@ -14,6 +14,8 @@ final class XmlConfigurationOccurrence
         public readonly int $startOffset,
         public readonly int $endOffset,
         public readonly array $attributes,
+        public readonly bool $selfClosing,
+        public readonly ?int $closingNameOffset,
     ) {
     }
 }

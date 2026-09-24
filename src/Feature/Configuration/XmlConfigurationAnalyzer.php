@@ -21,6 +21,14 @@ final class XmlConfigurationAnalyzer
         $document = $this->parser->parse($source);
         $events = [];
         $contexts = [];
+        $closingNames = [];
+        foreach ($document->events as $event) {
+            if ($event instanceof XmlElementEnd && null !== $event->identity
+                && preg_match('/\G<\/\s*([^\s>]+)/', $source, $match, \PREG_OFFSET_CAPTURE, $event->startOffset)
+            ) {
+                $closingNames[$event->identity] = [$match[1][0], $match[1][1]];
+            }
+        }
         foreach ($document->events as $event) {
             if (!$event instanceof XmlElementStart) {
                 continue;
@@ -40,12 +48,15 @@ final class XmlConfigurationAnalyzer
                     $attribute->nameEndOffset,
                 );
             }
+            $closingName = $closingNames[$event->identity] ?? null;
             $events[] = new XmlConfigurationOccurrence(
                 $path,
                 $event->qualifiedName,
                 $event->nameStartOffset,
                 $event->nameEndOffset,
                 $attributes,
+                $event->selfClosing,
+                null !== $closingName && $closingName[0] === $event->qualifiedName ? $closingName[1] : null,
             );
         }
         foreach ($document->diagnostics as $diagnostic) {

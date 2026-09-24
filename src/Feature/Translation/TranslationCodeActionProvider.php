@@ -9,6 +9,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\ProjectDocumentReader;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
+use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
@@ -25,6 +26,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly ProjectPathResolver $pathResolver,
         private readonly ProjectDocumentReader $reader,
+        private readonly UnknownNameCodeActionBuilder $unknownNames,
     ) {
     }
 
@@ -49,17 +51,27 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
             foreach ($references as $reference) {
                 if (!$this->protocol->sameRange($reference->range, $range)
                     || [] !== $this->indexes->forProject($request->project)->declarations($reference->domain, $reference->key)
+                    || [] !== $this->indexes->forProject($request->project)->messages($reference->domain, $reference->key)
                 ) {
                     continue;
                 }
+                $index = $this->indexes->forProject($request->project);
+                $replacements = $index->isComplete() ? $this->unknownNames->replacements(
+                    $request->document,
+                    $diagnostic,
+                    $reference->range,
+                    $reference->key,
+                    $index->keys($reference->domain, ''),
+                ) : [];
+                array_push($actions, ...$replacements);
                 $targetPath = $this->target($request->project->rootPath, $reference->domain);
                 if (null === $targetPath) {
-                    continue;
+                    break;
                 }
                 $targetUri = $this->uri($targetPath);
                 $target = $this->reader->read($request->project, $targetUri);
                 if (null === $target) {
-                    continue;
+                    break;
                 }
                 $position = $this->converter->toPosition($target->text, \strlen($target->text));
                 $escapedKey = str_replace("'", "''", $reference->key);
@@ -68,7 +80,7 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
                     'title' => \sprintf('Add translation "%s" to %s', $reference->key, basename($targetPath)),
                     'kind' => 'quickfix',
                     'diagnostics' => [$diagnostic],
-                    'isPreferred' => true,
+                    'isPreferred' => [] === $replacements,
                     'edit' => ['documentChanges' => [[
                         'textDocument' => ['uri' => $targetUri, 'version' => $target->version],
                         'edits' => [$this->protocol->textEdit(new Range($position, $position), $newText)],

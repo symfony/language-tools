@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Stimulus\StimulusCodeActionProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionProvider;
@@ -22,6 +23,7 @@ use Symfony\Lsp\Feature\Stimulus\StimulusReferenceExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusRelationshipProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusSourceIndexRegistry;
+use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -38,6 +40,36 @@ use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class StimulusProviderTest extends TestCase
 {
+    public function testSuggestsCloseStimulusControllerNames(): void
+    {
+        $uri = 'file:///workspace/templates/search.html.twig';
+        $text = '<div data-controller="searc"></div>';
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'twig', 2, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $converter = new PositionConverter();
+        $extractor = $this->createExtractor($converter);
+        $indexes = new StimulusIndexRegistry();
+        $indexes->forProject($project)->replace(true, new StimulusController('search', '/workspace/assets/controllers/search_controller.js', false, false, [], [], [], [], []));
+        $sources = new StimulusSourceIndexRegistry();
+        $sources->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'twig', $text)));
+        $resolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $stimulus = new StimulusResolver($resolver, $converter, $protocol, $indexes, $sources, $extractor);
+        $diagnostics = (new StimulusDiagnosticProvider($resolver, $protocol, $indexes, $sources, $stimulus))->diagnostics(['textDocument' => ['uri' => $uri]]);
+        self::assertIsArray($diagnostics);
+        $actions = (new StimulusCodeActionProvider($resolver, $protocol, $indexes, $sources, $stimulus, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
+            'textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => $diagnostics],
+        ]);
+
+        self::assertSame(['Replace with "search"'], array_column($actions ?? [], 'title'));
+        self::assertSame(['documentChanges' => [[
+            'textDocument' => ['uri' => $uri, 'version' => 2],
+            'edits' => [['range' => $diagnostics[0]['range'], 'newText' => 'search']],
+        ]]], $actions[0]['edit'] ?? null);
+    }
+
     public function testProvidesStimulusControllersActionsTargetsAndNavigation(): void
     {
         $project = new Project('/workspace', 'file:///workspace');

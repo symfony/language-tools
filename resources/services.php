@@ -54,6 +54,7 @@ use Symfony\Lsp\Feature\Twig\TwigComponentDiagnosticProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolProvider;
 use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
+use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
@@ -142,6 +143,7 @@ return static function (ContainerConfigurator $container): void {
     $services->set(DiagnosticCollector::class);
     $services->set(DiagnosticSuppressor::class);
     $services->set(PartialParseDiagnosticFilter::class);
+    $services->set(UnknownNameCodeActionBuilder::class);
     $featureGroups = [
         'Route' => [],
         'DependencyInjection' => [],

@@ -22,7 +22,8 @@ In the Editor
 * hover shows which file a template name resolves to;
 * go to definition and find references for template names, and a template
   reference becomes a clickable link;
-* a quick fix creates a missing template under ``templates/``;
+* a quick fix suggests a close template name or creates a missing template
+  under ``templates/``;
 * completion and hover for the variables a template receives: Twig globals,
   the keys passed to ``render()``, the names listed in ``#[Template]`` and the
   types declared with ``{% types %}``.
@@ -34,6 +35,7 @@ Component names and their properties are completed in ``<twig:Name>`` tags.
 Hover, go to definition and find references connect a component tag to its
 class and its template, a code lens above a component class opens its
 template, and Live Component events are completed inside ``emit()``.
+A quick fix suggests a close component name when one is available.
 
 Diagnostics
 -----------

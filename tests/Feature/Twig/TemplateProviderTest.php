@@ -40,6 +40,7 @@ use Symfony\Lsp\Feature\Twig\TwigComponentRelationshipProvider;
 use Symfony\Lsp\Feature\Twig\TwigComponentResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
 use Symfony\Lsp\Feature\Twig\TwigVariableProvider;
+use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceParseHealth;
@@ -928,7 +929,7 @@ final class TemplateProviderTest extends TestCase
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
         $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
-        $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, new UriToPathConverter(), ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes);
+        $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, new UriToPathConverter(), ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes, new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
 
         $actions = $provider->actions([
             'textDocument' => ['uri' => $uri],
@@ -944,6 +945,40 @@ final class TemplateProviderTest extends TestCase
         self::assertIsArray($action['edit']['documentChanges'] ?? null);
         self::assertIsArray($action['edit']['documentChanges'][0]);
         self::assertSame('file:///workspace/templates/missing.html.twig', $action['edit']['documentChanges'][0]['uri'] ?? null);
+    }
+
+    public function testSuggestsKnownTemplateAlongsideCreatingMissingTemplate(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = "{{ include('artcle/show.html.twig') }}";
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'twig', 3, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $indexes = $this->templateIndexes($classIndexes);
+        $converter = new PositionConverter();
+        $extractor = $this->templateReferenceExtractor($converter);
+        $indexes->forProject($project)->replaceRuntime(true,
+            new TemplateDeclaration('page.html.twig', $uri, $converter->toRange($text, 0, 0)),
+            new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', $converter->toRange($text, 0, 0)),
+        );
+        $indexes->forProject($project)->replaceReferences(...$extractor->extractCandidates(new SourceDocument($uri, 'twig', $text)));
+        $resolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $diagnostics = (new TemplateNavigationProvider($resolver, new PositionedSourceSymbolResolver($converter), $protocol, $extractor, $indexes, $classIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]);
+        self::assertIsArray($diagnostics);
+        $actions = (new TemplateCodeActionProvider($resolver, $extractor, $indexes, new UriToPathConverter(), ProjectPaths::resolver(), $protocol, $classIndexes, new UnknownNameCodeActionBuilder($protocol)))->actions([
+            'textDocument' => ['uri' => $uri],
+            'context' => ['diagnostics' => $diagnostics],
+        ]);
+
+        self::assertSame(['Replace with "article/show.html.twig"', 'Create template "artcle/show.html.twig"'], array_column($actions ?? [], 'title'));
+        self::assertSame([true, false], array_column($actions ?? [], 'isPreferred'));
+        self::assertSame(['documentChanges' => [[
+            'textDocument' => ['uri' => $uri, 'version' => 3],
+            'edits' => [['range' => $diagnostics[0]['range'], 'newText' => 'article/show.html.twig']],
+        ]]], $actions[0]['edit'] ?? null);
     }
 
     public function testDoesNotCreateTemplatesThroughExternalSymlinks(): void
@@ -977,7 +1012,7 @@ final class TemplateProviderTest extends TestCase
         try {
             $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, $converter, ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes);
+            $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, $converter, ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes, new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
 
             self::assertSame([], $provider->actions([
                 'textDocument' => ['uri' => $uri],

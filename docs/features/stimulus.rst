@@ -27,7 +27,8 @@ In the Editor
   references lists the usages, a controller name in a template becomes a
   clickable link, and a code lens above a controller class counts its usages;
 * Live Component events are completed in ``emit()`` calls, and live actions
-  are navigable from templates.
+  are navigable from templates;
+* a quick fix suggests close controller names in Twig.
 
 Diagnostics
 -----------

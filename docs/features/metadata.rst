@@ -26,7 +26,8 @@ In the Editor
   constraint an option belongs to, and how many times a serializer group is
   used;
 * go to definition and find references for constraints, mapped classes and
-  serializer groups.
+  serializer groups;
+* a quick fix suggests close option names for the same form type or constraint.
 
 Diagnostics
 -----------

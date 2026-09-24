@@ -23,7 +23,8 @@ In the Editor
 * go to definition opens the catalog entry, and find references lists the
   usages of a key;
 * rename updates a key and its usages;
-* a quick fix adds a missing key to the catalog of its domain.
+* a quick fix suggests a close key in the same domain or adds the missing
+  key to its catalog.
 
 Diagnostics
 -----------
@@ -44,7 +45,7 @@ Limitations
 * rename changes the last segment of a dotted key, not its prefix, so
   ``form.label.name`` can become ``form.label.title`` but not
   ``form.title.name``;
-* the quick fix appends to a YAML catalog, and only when the domain has
+* adding a missing key appends to a YAML catalog, and only when the domain has
   exactly one YAML catalog directly under ``translations/``.
 
 .. _`project configuration`: ../configuration.rst

@@ -29,6 +29,7 @@ use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
@@ -249,7 +250,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $sourceIndexes, $templateIndexes);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $provider = new RouteCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver());
+            $provider = new RouteCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
 
             $actions = $provider->actions([
                 'textDocument' => ['uri' => $uri],
@@ -307,7 +308,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $diagnostics = (new RouteDiagnosticPublisher($resolver, $protocol, $indexes, $sourceIndexes, $templateIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
             self::assertSame('route.not_found', $diagnostics[0]['code'] ?? null);
-            $actions = (new RouteCodeActionProvider($resolver, $converter, $protocol, $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver()))->actions([
+            $actions = (new RouteCodeActionProvider($resolver, $converter, $protocol, $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
                 'textDocument' => ['uri' => $uri],
                 'range' => $diagnostics[0]['range'],
                 'context' => ['diagnostics' => $diagnostics],
@@ -319,6 +320,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                     'title' => 'Replace with "blog_index_paginated"',
                     'kind' => 'quickfix',
                     'diagnostics' => [$diagnostics[0]],
+                    'isPreferred' => true,
                     'edit' => ['documentChanges' => [[
                         'textDocument' => ['uri' => $uri, 'version' => 1],
                         'edits' => [[

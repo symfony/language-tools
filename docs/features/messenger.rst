@@ -25,6 +25,7 @@ In the Editor
   handler, its messages and buses;
 * go to definition and find references between messages, handlers, buses and
   transports;
+* a quick fix suggests close bus or transport names for unknown references;
 * a code lens above a message class lists its handler classes, and a code lens
   above a handler class lists the message classes it handles.
 
