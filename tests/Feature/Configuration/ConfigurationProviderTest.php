@@ -169,6 +169,41 @@ final class ConfigurationProviderTest extends TestCase
         );
     }
 
+    public function testCompletesValuesContainingSnippetCharactersVerbatim(): void
+    {
+        $fixture = $this->providers();
+        $uri = 'file:///workspace/config/packages/framework.yaml';
+        $text = "framework:\n    router:\n        strict_reset_mode: ";
+        $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
+
+        $enumCases = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))) ?? [];
+        self::assertSame(
+            ['!php/enum App\\ResetMode::SCHEMA', '!php/enum App\\ResetMode::MIGRATE'],
+            array_column(array_column($enumCases, 'textEdit'), 'newText'),
+        );
+        self::assertSame([1, 1], array_column($enumCases, 'insertTextFormat'));
+
+        $text = "framework:\n    literal_value: ";
+        $fixture->documents->update($uri, 2, $text);
+        $values = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))) ?? [];
+        self::assertSame(
+            ['App\\Mode::FAST', '${placeholder}'],
+            array_column(array_column($values, 'textEdit'), 'newText'),
+        );
+        self::assertSame([1, 1], array_column($values, 'insertTextFormat'));
+
+        $fixture->documents->close($uri);
+        $uri = 'file:///workspace/config/framework.php';
+        $text = '<?php $framework->literalV';
+        $fixture->documents->open(new Document($uri, 'php', 1, $text));
+        $methods = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))) ?? [];
+        self::assertSame(
+            ["literalValue('\${1:App\\\\Mode::FAST}')"],
+            array_column(array_column($methods, 'textEdit'), 'newText'),
+        );
+        self::assertSame([2], array_column($methods, 'insertTextFormat'));
+    }
+
     public function testReadsYamlValuesTheWaySymfonyParsesThem(): void
     {
         $fixture = $this->providers();
@@ -795,6 +830,7 @@ final class ConfigurationProviderTest extends TestCase
         self::assertIsArray($completion[0] ?? null);
         self::assertIsArray($completion[0]['textEdit'] ?? null);
         self::assertSame('cookieSecure(${1:true})', $completion[0]['textEdit']['newText'] ?? null);
+        self::assertSame(2, $completion[0]['insertTextFormat'] ?? null);
     }
 
     public function testReportsPhpAndXmlDiagnosticsAndProvidesHover(): void
@@ -1149,17 +1185,21 @@ final class ConfigurationProviderTest extends TestCase
     {
         $fixture = $this->providers();
         $cases = [
-            ['file:///workspace/config/framework.yaml', 'yaml', "framework:\n    router:\n        mode: ", ['dev', 'prod']],
-            ['file:///workspace/config/framework.php', 'php', '<?php $framework->router()->ut', ['utf8']],
-            ['file:///workspace/config/framework-typed.php', 'php', '<?php function configure(FrameworkConfig $options) { $options->router()->ut', ['utf8']],
-            ['file:///workspace/config/framework-digit.php', 'php', '<?php function configure(FrameworkConfig $options) { $options->psr3()->en', ['enabled']],
-            ['file:///workspace/config/framework.xml', 'xml', '<container><framework:config><framework:ro', ['router']],
-            ['file:///workspace/config/framework-attribute.xml', 'xml', '<container><framework:config><framework:router ut', ['utf8']],
+            ['file:///workspace/config/framework.yaml', 'yaml', "framework:\n    router:\n        mode: ", ['dev', 'prod'], ['dev', 'prod'], [1, 1]],
+            ['file:///workspace/config/framework-key.yaml', 'yaml', "framework:\n    router:\n        ut", ['utf8'], ['utf8: ${1:true}'], [2]],
+            ['file:///workspace/config/framework.php', 'php', '<?php $framework->router()->ut', ['utf8'], ['utf8(${1:true})'], [2]],
+            ['file:///workspace/config/framework-typed.php', 'php', '<?php function configure(FrameworkConfig $options) { $options->router()->ut', ['utf8'], ['utf8(${1:true})'], [2]],
+            ['file:///workspace/config/framework-digit.php', 'php', '<?php function configure(FrameworkConfig $options) { $options->psr3()->en', ['enabled'], ['enabled(${1:true})'], [2]],
+            ['file:///workspace/config/framework.xml', 'xml', '<container><framework:config><framework:ro', ['router'], ['framework:router>'], [1]],
+            ['file:///workspace/config/framework-attribute.xml', 'xml', '<container><framework:config><framework:router ut', ['utf8'], ['utf8="${1}"'], [2]],
         ];
-        foreach ($cases as [$uri, $language, $text, $expected]) {
+        foreach ($cases as [$uri, $language, $text, $expected, $expectedTexts, $expectedFormats]) {
             $fixture->documents->open(new Document($uri, $language, 1, $text));
             $position = $fixture->converter->toPosition($text, \strlen($text));
-            self::assertSame($expected, array_column($fixture->completion->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]) ?? [], 'label'));
+            $items = $fixture->completion->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]) ?? [];
+            self::assertSame($expected, array_column($items, 'label'));
+            self::assertSame($expectedTexts, array_column(array_column($items, 'textEdit'), 'newText'), $text);
+            self::assertSame($expectedFormats, array_column($items, 'insertTextFormat'), $text);
             $fixture->documents->close($uri);
         }
     }
@@ -1613,6 +1653,7 @@ final class ConfigurationProviderTest extends TestCase
                     $this->node('session', 'array', children: [
                         $this->node('cookie_secure', 'enum', allowedValues: [true, false, 'auto']),
                     ]),
+                    $this->node('literal_value', 'enum', allowedValues: ['App\\Mode::FAST', '${placeholder}']),
                     $this->node('items', 'array', prototype: $this->node('item', 'array', children: [
                         $this->node('name', 'boolean'),
                         $this->node('handlers', 'array', prototype: $this->node('handler', 'array', children: [

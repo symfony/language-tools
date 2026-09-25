@@ -91,7 +91,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $items = [];
         foreach ($nodes as $node) {
             if (str_starts_with($node->name, $prefix)) {
-                $items[] = $this->completion($node->name, $node->name.':'.$this->yamlSnippet($node), $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position);
+                $items[] = $this->completion($node->name, $node->name.':', $this->shortDescription($node), $document->text, $offset - \strlen($prefix), $position, snippet: $this->yamlSnippet($node));
             }
         }
 
@@ -115,7 +115,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         foreach ($this->completionChildren($parent) as $node) {
             $method = ConfigurationNode::phpMethodName($node->name);
             if (str_starts_with($method, $context['prefix'])) {
-                $items[] = $this->completion($method, $method.'('.$this->phpSnippet($node).')', $this->shortDescription($node), $document->text, $context['start'], $position);
+                $items[] = $this->completion($method, $method.'(', $this->shortDescription($node), $document->text, $context['start'], $position, snippet: $this->phpSnippet($node), suffix: ')');
             }
         }
 
@@ -136,7 +136,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
             foreach ($this->completionChildren(null === $context['path'] ? null : $index->find($context['path'])) as $node) {
                 $xmlName = str_replace('_', '-', $node->name);
                 if (str_starts_with($xmlName, $context['prefix'])) {
-                    $items[] = $this->completion($xmlName, $xmlName.'="${1}"', $this->shortDescription($node), $document->text, $context['start'], $position);
+                    $items[] = $this->completion($xmlName, $xmlName.'="', $this->shortDescription($node), $document->text, $context['start'], $position, snippet: '${1}', suffix: '"');
                 }
             }
 
@@ -181,7 +181,7 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         }
         if ([] !== $node->allowedValues) {
             $value = $node->allowedValues[0];
-            $snippet = '${1:'.$this->formatValue($value).'}';
+            $snippet = '${1:'.$this->escapeSnippet($this->formatValue($value)).'}';
 
             return \is_string($value) ? "'".$snippet."'" : $snippet;
         }
@@ -212,10 +212,16 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     }
 
     /** @return array<array-key, mixed> */
-    private function completion(string $label, string $newText, string $detail, string $text, int $start, Position $end): array
+    private function completion(string $label, string $literal, string $detail, string $text, int $start, Position $end, string $snippet = '', string $suffix = ''): array
     {
-        $position = $this->converter->toPosition($text, $start);
+        $range = new Range($this->converter->toPosition($text, $start), $end);
+        $newText = '' === $snippet ? $literal.$suffix : $this->escapeSnippet($literal).$snippet.$this->escapeSnippet($suffix);
 
-        return ['label' => $label, 'kind' => 10, 'detail' => $detail, 'insertTextFormat' => 2, 'textEdit' => $this->protocol->textEdit(new Range($position, $end), $newText)];
+        return ['label' => $label, 'kind' => 10, 'detail' => $detail, 'insertTextFormat' => '' === $snippet ? 1 : 2, 'textEdit' => $this->protocol->textEdit($range, $newText)];
+    }
+
+    private function escapeSnippet(string $text): string
+    {
+        return str_replace(['\\', '$', '}'], ['\\\\', '\\$', '\\}'], $text);
     }
 }
