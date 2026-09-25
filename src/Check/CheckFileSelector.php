@@ -6,6 +6,7 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\InvalidConfigurationException;
+use Symfony\Lsp\Project\PathContainment;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\ProjectPathPolicy;
@@ -206,17 +207,11 @@ final class CheckFileSelector
 
     private function assertInsideWorkspace(string $workspace, string $path, string $selector): void
     {
-        if ($workspace !== $path && !Path::isBasePath($workspace, $path)) {
+        if (!PathContainment::contains($workspace, $path)) {
             throw new InvalidConfigurationException(\sprintf('The selected path "%s" is outside the workspace.', $selector));
         }
-        $realPath = realpath($path);
-        $realWorkspace = realpath($workspace);
-        if (false !== $realPath && false !== $realWorkspace) {
-            $realPath = Path::canonicalize($realPath);
-            $realWorkspace = Path::canonicalize($realWorkspace);
-            if ($realWorkspace !== $realPath && !Path::isBasePath($realWorkspace, $realPath)) {
-                throw new InvalidConfigurationException(\sprintf('The selected path "%s" resolves outside the workspace.', $selector));
-            }
+        if (!PathContainment::resolvesInside($workspace, $path)) {
+            throw new InvalidConfigurationException(\sprintf('The selected path "%s" resolves outside the workspace.', $selector));
         }
     }
 
@@ -225,7 +220,7 @@ final class CheckFileSelector
         if (!is_readable($path)) {
             return \sprintf('The application file "%s" is unreadable.', $workspacePath);
         }
-        if (!$this->files->realPathBelongsToProject($project->rootPath, $path)) {
+        if (!PathContainment::resolvesInside($project->rootPath, $path, false)) {
             return \sprintf('The application file "%s" resolves outside its Symfony project.', $workspacePath);
         }
 

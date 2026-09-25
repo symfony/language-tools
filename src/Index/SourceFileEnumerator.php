@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Index;
 
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Project\PathContainment;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathPolicy;
@@ -82,7 +83,7 @@ final class SourceFileEnumerator
                         continue;
                     }
                     if (is_link($path)) {
-                        if (!$this->realPathBelongsToProject($root, $path)) {
+                        if (!PathContainment::resolvesInside($root, $path, false)) {
                             yield ['directory' => $path, 'error' => 'outside'];
                         }
 
@@ -144,18 +145,5 @@ final class SourceFileEnumerator
         }
 
         return Path::makeRelative($path, $root);
-    }
-
-    public function realPathBelongsToProject(string $projectRoot, string $path): bool
-    {
-        $realRoot = realpath($projectRoot);
-        $realPath = realpath($path);
-        if (false === $realRoot || false === $realPath) {
-            return false;
-        }
-        $realRoot = Path::canonicalize($realRoot);
-        $realPath = Path::canonicalize($realPath);
-
-        return $realRoot !== $realPath && Path::isBasePath($realRoot, $realPath);
     }
 }

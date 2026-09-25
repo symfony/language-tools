@@ -6,6 +6,7 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Project\InvalidConfigurationException;
+use Symfony\Lsp\Project\PathContainment;
 
 final class BaselineRepository
 {
@@ -19,27 +20,11 @@ final class BaselineRepository
     {
         $workspace = Path::canonicalize($workspace);
         $path = Path::canonicalize(Path::isAbsolute($displayPath) ? $displayPath : Path::join($workspace, $displayPath));
-        if ($workspace !== $path && !Path::isBasePath($workspace, $path)) {
+        if (!PathContainment::contains($workspace, $path)) {
             throw new InvalidConfigurationException('The baseline path must be inside the workspace.');
         }
-        $realPath = realpath($path);
-        $realWorkspace = realpath($workspace);
-        $ancestor = \dirname($path);
-        while (!file_exists($ancestor) && $ancestor !== \dirname($ancestor)) {
-            $ancestor = \dirname($ancestor);
-        }
-        $realParent = realpath($ancestor);
-        if (false !== $realWorkspace) {
-            $realWorkspace = Path::canonicalize($realWorkspace);
-            foreach ([$realPath, $realParent] as $resolved) {
-                if (false === $resolved) {
-                    continue;
-                }
-                $resolved = Path::canonicalize($resolved);
-                if ($realWorkspace !== $resolved && !Path::isBasePath($realWorkspace, $resolved)) {
-                    throw new InvalidConfigurationException('The baseline path resolves outside the workspace.');
-                }
-            }
+        if (!PathContainment::resolvesInside($workspace, $path)) {
+            throw new InvalidConfigurationException('The baseline path resolves outside the workspace.');
         }
 
         return new BaselineFile(

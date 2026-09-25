@@ -172,7 +172,7 @@ final class ProjectConfiguration
                 throw new InvalidConfigurationException(\sprintf('Every project entry in "%s" must have a non-empty path and an object value.', $path));
             }
             $projectRoot = $this->absolutePath($configuredRoot, $root);
-            if (!$this->isInsideWorkspace($root, $projectRoot)) {
+            if (!PathContainment::contains($root, $projectRoot) || !PathContainment::resolvesInside($root, $projectRoot)) {
                 throw new InvalidConfigurationException(\sprintf('The project entry "%s" in "%s" is outside the workspace.', $configuredRoot, $path));
             }
             $projects[$projectRoot] = $this->analysisSettings->normalizeProject(
@@ -197,7 +197,7 @@ final class ProjectConfiguration
                 throw new InvalidConfigurationException(\sprintf('The configuration option "projectRoots" in "%s" must contain non-empty paths.', $path));
             }
             $projectRoot = $this->absolutePath($configuredRoot, $root);
-            if (!$this->isInsideWorkspace($root, $projectRoot)) {
+            if (!PathContainment::contains($root, $projectRoot) || !PathContainment::resolvesInside($root, $projectRoot)) {
                 throw new InvalidConfigurationException(\sprintf('The project root "%s" in "%s" is outside the workspace.', $configuredRoot, $path));
             }
             $roots[] = $projectRoot;
@@ -209,21 +209,5 @@ final class ProjectConfiguration
     private function absolutePath(string $path, string $root): string
     {
         return Path::canonicalize(Path::isAbsolute($path) ? $path : Path::join($root, $path));
-    }
-
-    private function isInsideWorkspace(string $workspace, string $path): bool
-    {
-        if ($workspace !== $path && !Path::isBasePath($workspace, $path)) {
-            return false;
-        }
-        $realWorkspace = realpath($workspace);
-        $realPath = realpath($path);
-        if (false === $realWorkspace || false === $realPath) {
-            return true;
-        }
-        $realWorkspace = Path::canonicalize($realWorkspace);
-        $realPath = Path::canonicalize($realPath);
-
-        return $realWorkspace === $realPath || Path::isBasePath($realWorkspace, $realPath);
     }
 }

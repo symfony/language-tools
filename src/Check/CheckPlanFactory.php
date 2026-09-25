@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Check;
 
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Project\InvalidConfigurationException;
+use Symfony\Lsp\Project\PathContainment;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\ProjectDiscovery;
@@ -120,16 +121,9 @@ final class CheckPlanFactory
     private function projectRoots(string $workspace, array $roots): array
     {
         $resolved = [];
-        $realWorkspace = realpath($workspace);
         foreach ($roots as $root) {
             $path = Path::canonicalize(Path::isAbsolute($root) ? $root : Path::join($workspace, $root));
-            $realPath = realpath($path);
-            if (($workspace !== $path && !Path::isBasePath($workspace, $path))
-                || (false !== $realWorkspace
-                    && false !== $realPath
-                    && Path::canonicalize($realWorkspace) !== Path::canonicalize($realPath)
-                    && !Path::isBasePath(Path::canonicalize($realWorkspace), Path::canonicalize($realPath)))
-            ) {
+            if (!PathContainment::contains($workspace, $path) || !PathContainment::resolvesInside($workspace, $path)) {
                 throw new InvalidConfigurationException(\sprintf('The project root "%s" is outside the workspace.', $root));
             }
             $resolved[] = $path;

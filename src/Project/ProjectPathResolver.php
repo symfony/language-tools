@@ -30,37 +30,6 @@ final class ProjectPathResolver
             return false;
         }
 
-        $root = realpath($project->rootPath);
-        if (false === $root) {
-            return true;
-        }
-        if (null === $resolvedPath = $this->resolveExistingPath($path)) {
-            return false;
-        }
-
-        $root = Path::canonicalize($root);
-
-        return $root !== $resolvedPath && Path::isBasePath($root, $resolvedPath);
-    }
-
-    private function resolveExistingPath(string $path): ?string
-    {
-        if (file_exists($path) || is_link($path)) {
-            $resolvedPath = realpath($path);
-
-            return false === $resolvedPath ? null : Path::canonicalize($resolvedPath);
-        }
-
-        $parent = \dirname($path);
-        while (!file_exists($parent) && !is_link($parent)) {
-            $next = \dirname($parent);
-            if ($next === $parent) {
-                return null;
-            }
-            $parent = $next;
-        }
-        $resolvedParent = realpath($parent);
-
-        return false === $resolvedParent ? null : Path::join($resolvedParent, Path::makeRelative($path, $parent));
+        return PathContainment::resolvesInside($project->rootPath, $path, false);
     }
 }
