@@ -413,6 +413,47 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame('App\Entity\Category', $fields[1]->targetEntity);
     }
 
+    public function testGivesATargetEntityToAssociationsOnly(): void
+    {
+        $converter = new PositionConverter();
+        $extractor = $this->extractor($converter);
+        $uri = 'file:///workspace/src/Entity/Product.php';
+        $text = <<<'PHP'
+            <?php
+            namespace App\Entity;
+
+            use Doctrine\ORM\Mapping as ORM;
+
+            #[ORM\Entity]
+            class Product
+            {
+                #[ORM\Column(length: 255)]
+                private string $name;
+
+                #[ORM\ManyToOne]
+                private ?Category $category = null;
+            }
+            PHP;
+        $project = new Project('/workspace', 'file:///workspace');
+        $projects = new ProjectRegistry();
+        $projects->replace([$project]);
+        $facts = $extractor->extract(new SourceDocument($uri, 'php', $text));
+        $indexes = new DoctrineIndexRegistry();
+        $indexes->forProject($project)->replace($facts);
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $provider = new DoctrineRelationshipProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor);
+
+        self::assertSame(
+            [null, 'App\Entity\Category'],
+            array_map(static fn (DoctrineField $field): ?string => $field->targetEntity, $facts->entities[0]->fields),
+        );
+        $hover = $provider->hover($this->params($converter, $uri, $text, strpos($text, '$name') + 2));
+        self::assertIsArray($hover);
+        self::assertIsArray($hover['contents'] ?? null);
+        self::assertSame("Doctrine field: `App\Entity\Product::\$name`\n\nType: `string`", $hover['contents']['value'] ?? null);
+    }
+
     public function testScopesRepositoryCompletionToTheContainingMethod(): void
     {
         $extractor = $this->extractor();

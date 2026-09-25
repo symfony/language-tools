@@ -21,8 +21,8 @@ In the Editor
 
 * completion for field and association names, annotated with their Doctrine
   type;
-* hover shows the type and target entity of a field, the repository and field
-  count of an entity, and the entity of a repository;
+* hover shows the type of a field, the target entity of an association, the
+  repository and field count of an entity, and the entity of a repository;
 * go to definition and find references between entities, fields and
   repositories;
 * a code lens above an entity opens its repository, and a code lens above a

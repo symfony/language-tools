@@ -6,6 +6,7 @@
 - Treat `%%` in XML service files as an escaped percent sign, so a literal like `%%message%%` is no longer read as a parameter reference
 - Clear the Doctrine metadata index when a project no longer has Doctrine installed
 - Show every matching hover for a symbol instead of only the first one, so a Doctrine field and its PHP property are both described
+- Show a target entity only for association mappings, so hovering a plain column no longer reports its PHP type as an entity
 
 ## 0.22.0 (2026-09-25)
 

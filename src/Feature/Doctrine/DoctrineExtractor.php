@@ -471,6 +471,9 @@ final class DoctrineExtractor
     /** @param list<PhpAttribute> $attributes */
     private function associationTarget(array $attributes, PhpPropertyDeclaration $property): ?string
     {
+        if ([] === $attributes) {
+            return null;
+        }
         foreach ($attributes as $attribute) {
             $reference = $attribute->argument('targetEntity')?->completeClassReference;
             if (null !== $reference) {
