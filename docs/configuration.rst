@@ -21,7 +21,9 @@ Settings
 
 ``projectRoots``
     The Symfony applications to analyze, relative to the workspace or
-    absolute inside it. Omit it to discover them automatically.
+    absolute inside it. Omit it to discover them automatically. A root
+    outside the workspace is an error, wherever it comes from: this file,
+    the editor settings or ``--project-root``.
 
 ``phpCommand``
     The command that runs your application, such as ``["php"]`` or

@@ -31,7 +31,6 @@ final class WorkspaceConfiguration
             $this->workspaceFolders($params),
             $settings,
             $this->projectRoots($settings),
-            containedProjectRoots: false,
         );
         $this->workspace->discover();
 

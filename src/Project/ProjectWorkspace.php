@@ -22,8 +22,6 @@ final class ProjectWorkspace
 
     private ?string $configurationPath = null;
 
-    private bool $containedProjectRoots = true;
-
     public function __construct(
         private readonly ProjectConfiguration $projectConfiguration,
         private readonly ProjectDiscovery $projectDiscovery,
@@ -40,13 +38,12 @@ final class ProjectWorkspace
      * @param array<array-key, mixed>                 $settings
      * @param list<string>                            $projectRoots
      */
-    public function configure(array $folders, array $settings = [], array $projectRoots = [], ?string $configurationPath = null, bool $containedProjectRoots = true): void
+    public function configure(array $folders, array $settings = [], array $projectRoots = [], ?string $configurationPath = null): void
     {
         $this->folders = $folders;
         $this->settings = $settings;
         $this->projectRoots = $projectRoots;
         $this->configurationPath = $configurationPath;
-        $this->containedProjectRoots = $containedProjectRoots;
         $this->loadConfiguration();
         $this->runtimeConfiguration->configure($settings);
     }
@@ -74,7 +71,7 @@ final class ProjectWorkspace
      */
     public function discover(): array
     {
-        $explicitRoots = $this->resolveRoots($this->projectRoots, $this->folders, $this->containedProjectRoots);
+        $explicitRoots = $this->resolveRoots($this->projectRoots, $this->folders);
         $configuredRoots = [];
         foreach ($this->folders as $folder) {
             $path = $this->uriToPathConverter->convert($folder['uri']);
@@ -130,7 +127,7 @@ final class ProjectWorkspace
      *
      * @return list<array{root: string, paths: list<string>}>
      */
-    private function resolveRoots(array $roots, array $folders, bool $contained = true): array
+    private function resolveRoots(array $roots, array $folders): array
     {
         $resolved = [];
         foreach ($roots as $root) {
@@ -139,7 +136,7 @@ final class ProjectWorkspace
                 throw new InvalidConfigurationException(\sprintf('The project root "%s" is outside the workspace.', $root));
             }
             foreach ($paths as $path) {
-                if ($contained && !$this->isInWorkspace($path)) {
+                if (!$this->isInWorkspace($path)) {
                     throw new InvalidConfigurationException(\sprintf('The project root "%s" is outside the workspace.', $root));
                 }
             }

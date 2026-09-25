@@ -103,11 +103,25 @@ final class WorkspaceConfigurationTest extends TestCase
         $configuration = $this->workspaceConfiguration(new ProjectRegistry(), new RuntimeConfiguration());
 
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage('missing');
+        $this->expectExceptionMessage('The project root "missing" was not discovered as a Symfony project.');
 
         $configuration->initialize([
             'rootUri' => 'file://'.$this->temporaryDirectory,
             'initializationOptions' => ['projectRoots' => ['.', 'missing']],
+        ]);
+    }
+
+    public function testRejectsInitializationProjectRootsOutsideEveryWorkspaceFolder(): void
+    {
+        $configuration = $this->workspaceConfiguration(new ProjectRegistry(), new RuntimeConfiguration());
+        $outside = \dirname($this->temporaryDirectory);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage(\sprintf('The project root "%s" is outside the workspace.', $outside));
+
+        $configuration->initialize([
+            'rootUri' => 'file://'.$this->temporaryDirectory,
+            'initializationOptions' => ['projectRoots' => [$outside]],
         ]);
     }
 

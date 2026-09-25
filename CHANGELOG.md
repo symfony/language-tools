@@ -5,6 +5,7 @@
 - Reuse one YAML parse per document during completion
 - Keep reading YAML keys at their real path when the file contains an unterminated flow collection
 - Complete Security roles in an `IsGranted` attribute written next to another attribute
+- Reject project roots outside the workspace, including the ones an editor passes at initialization
 - Report the same project root errors in the editor and on the command line
 - Keep publishing the diagnostics of the other integrations when one fails in the editor, and log the failure
 - Insert completed configuration values literally, so a value containing `$`, `}` or `\` such as `!php/enum App\Mode::FAST` is no longer mangled as a snippet

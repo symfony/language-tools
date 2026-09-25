@@ -183,10 +183,15 @@ final class CheckParityTest extends TestCase
     public function testReportsTheSameProjectRootFailureInBothFrontends(): void
     {
         $this->workspace->write('library/composer.json', json_encode(['name' => 'acme/library'], \JSON_THROW_ON_ERROR));
-        $expected = 'The project root "library" was not discovered as a Symfony project.';
+        $outside = \dirname($this->workspace->rootPath);
 
-        self::assertSame($expected, $this->headlessProjectRootFailure('library'));
-        self::assertSame($expected, $this->editorProjectRootFailure('library'));
+        foreach ([
+            'library' => 'The project root "library" was not discovered as a Symfony project.',
+            $outside => \sprintf('The project root "%s" is outside the workspace.', $outside),
+        ] as $root => $expected) {
+            self::assertSame($expected, $this->headlessProjectRootFailure((string) $root));
+            self::assertSame($expected, $this->editorProjectRootFailure((string) $root));
+        }
     }
 
     private function headlessProjectRootFailure(string $root): string
