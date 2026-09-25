@@ -21,7 +21,7 @@ final class RouteSourceIndex extends AbstractSourceFactsIndex
     /** @return list<RouteDeclaration> */
     public function declarations(string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->declarationsByName[$name] ?? [];
     }

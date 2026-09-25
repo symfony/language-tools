@@ -30,7 +30,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function names(TwigCallableKind $kind): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->names[$kind->value] ?? [];
     }
@@ -38,7 +38,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
     /** @return list<TwigCallableUsage> */
     public function usages(TwigCallableKind $kind, string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->usages[$kind->value][$name] ?? [];
     }
@@ -46,7 +46,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
     /** @return list<TwigCallableDeclaration> */
     public function declarations(TwigCallableKind $kind, string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->declarations[$kind->value][$name] ?? [];
     }
@@ -54,28 +54,28 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
     /** @return list<TwigCallableDeclaration> */
     public function declarationsForCallable(string $className, string $method): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->declarationsByCallable[TwigCallableKey::from($className, $method)] ?? [];
     }
 
     public function hasCallableDeclarations(): bool
     {
-        $this->derived();
+        $this->derive();
 
         return [] !== $this->declarationsByCallable;
     }
 
     public function method(string $className, string $method): ?TwigCallableSourceMethod
     {
-        $this->derived();
+        $this->derive();
 
         return $this->methods[TwigCallableKey::from($className, $method)] ?? null;
     }
 
     public function declarationAt(string $uri, Position $position): ?TwigCallableDeclaration
     {
-        $this->derived();
+        $this->derive();
 
         return array_find(
             $this->declarationsByUri[$uri] ?? [],

@@ -17,7 +17,7 @@ final class MessengerSourceIndex extends AbstractSourceFactsIndex
     /** @return list<MessengerSourceSymbol> */
     public function symbols(MessengerSymbolKind $kind, string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->symbols->symbols($kind->name, $name);
     }
@@ -25,7 +25,7 @@ final class MessengerSourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function ancestors(string $className): array
     {
-        $this->derived();
+        $this->derive();
         $ancestors = [];
         $pending = $this->parents[ltrim($className, '\\')] ?? [];
         while ([] !== $pending) {

@@ -14,7 +14,7 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
 
     public function definition(string $className): ConsoleEffectiveDefinition
     {
-        $this->derived();
+        $this->derive();
 
         return $this->resolve(ltrim($className, '\\'), []);
     }
@@ -22,7 +22,7 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
     /** @return list<ConsoleCommandDeclaration> */
     public function declarations(string $className): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->declarations[strtolower(ltrim($className, '\\'))] ?? [];
     }

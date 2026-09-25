@@ -34,7 +34,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
 
     public function entity(string $className): ?DoctrineEntity
     {
-        $this->derived();
+        $this->derive();
 
         return $this->entitiesByClass[$className] ?? null;
     }
@@ -42,21 +42,21 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     /** @return list<DoctrineEntity> */
     public function entities(): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->entities;
     }
 
     public function repository(string $className): ?DoctrineRepository
     {
-        $this->derived();
+        $this->derive();
 
         return $this->repositoriesByClass[$className] ?? null;
     }
 
     public function entityForRepository(string $repositoryClass): ?DoctrineEntity
     {
-        $this->derived();
+        $this->derive();
         $repository = $this->repositoriesByClass[$repositoryClass] ?? null;
 
         return null !== $repository ? $this->entitiesByClass[$repository->entityClass] ?? null : $this->entitiesByRepository[$repositoryClass] ?? null;
@@ -65,7 +65,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     /** @return list<DoctrineSourceSymbol> */
     public function relatedSymbols(DoctrineSourceSymbol $selected): array
     {
-        $this->derived();
+        $this->derive();
         $symbols = $this->symbols->symbols($selected->kind->value, $selected->name);
         if (DoctrineSymbolKind::Field !== $selected->kind) {
             return $symbols;

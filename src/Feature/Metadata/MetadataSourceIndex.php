@@ -17,7 +17,7 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
     /** @return list<MetadataSourceSymbol> */
     public function symbols(MetadataSymbolKind $kind, ?string $name = null): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->symbols->symbols($kind->value, $name);
     }
@@ -25,14 +25,14 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function names(MetadataSymbolKind $kind): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->symbols->names($kind->value);
     }
 
     public function formDataClass(string $formClass): ?string
     {
-        $this->derived();
+        $this->derive();
 
         return $this->formDataClasses[strtolower(ltrim($formClass, '\\'))] ?? null;
     }

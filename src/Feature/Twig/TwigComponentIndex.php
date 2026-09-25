@@ -46,7 +46,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<TwigComponent> */
     public function components(): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->components;
     }
@@ -54,14 +54,14 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<TwigComponent> */
     public function declarations(string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->declarations[$name] ?? [];
     }
 
     public function get(string $name): ?TwigComponent
     {
-        $this->derived();
+        $this->derive();
 
         // vendor components, such as ux:icon, only exist in runtime metadata
         return $this->componentsByName[$name]
@@ -72,7 +72,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<TwigComponentReference> */
     public function references(string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return isset($this->caseInsensitiveRuntimeNames[strtolower($name)]) ? $this->caseInsensitiveReferences[strtolower($name)] ?? [] : $this->references[$name] ?? [];
     }
@@ -80,7 +80,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<TwigComponentActionReference> */
     public function actionReferences(string $component, string $action): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->actionReferences[$component][$action] ?? [];
     }
@@ -88,7 +88,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<LiveComponentEvent> */
     public function events(string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->events[$name] ?? [];
     }
@@ -96,7 +96,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function eventNames(): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->eventNames;
     }

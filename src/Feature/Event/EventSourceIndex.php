@@ -16,7 +16,7 @@ final class EventSourceIndex extends AbstractSourceFactsIndex
     /** @return list<EventSourceSymbol> */
     public function symbols(string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->symbols->symbols(self::KIND, ltrim($name, '\\'));
     }

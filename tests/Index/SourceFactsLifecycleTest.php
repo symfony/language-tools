@@ -191,7 +191,7 @@ final class CountingSourceFactsIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function values(): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->values;
     }
@@ -224,7 +224,7 @@ final class ReentrantSourceFactsIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function values(): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->values;
     }

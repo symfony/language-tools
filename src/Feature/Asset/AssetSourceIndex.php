@@ -14,7 +14,7 @@ final class AssetSourceIndex extends AbstractSourceFactsIndex
     /** @return list<AssetSourceSymbol> */
     public function symbols(AssetSymbolKind $kind, ?string $name = null): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->symbols->symbols($kind->value, $name);
     }
@@ -22,7 +22,7 @@ final class AssetSourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function declarationNames(AssetSymbolKind $kind): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->symbols->declarationNames($kind->value);
     }

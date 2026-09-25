@@ -48,7 +48,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<TranslationMessage> */
     public function messages(string $domain, string $key): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->messages[$domain][$key] ?? [];
     }
@@ -56,7 +56,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<TranslationDeclaration> */
     public function declarations(string $domain, string $key): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->declarations[$domain][$key] ?? [];
     }
@@ -64,7 +64,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<TranslationReference> */
     public function references(string $domain, string $key): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->references[$domain][$key] ?? [];
     }
@@ -72,7 +72,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function keys(string $domain, string $prefix): array
     {
-        $this->derived();
+        $this->derive();
 
         return array_values(array_filter(
             $this->keys[$domain] ?? [],
@@ -83,7 +83,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function domains(): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->domains;
     }
@@ -91,7 +91,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function locales(): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->locales;
     }
@@ -104,7 +104,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<string>|null */
     public function globalParameters(): ?array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->dynamicGlobalParameters ? null : $this->globalParameters;
     }

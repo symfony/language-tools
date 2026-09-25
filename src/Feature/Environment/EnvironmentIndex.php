@@ -47,7 +47,7 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function names(): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->names;
     }
@@ -55,7 +55,7 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
     /** @return list<EnvironmentDeclaration> */
     public function declarations(string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->declarations[$name] ?? [];
     }
@@ -63,7 +63,7 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
     /** @return list<EnvironmentReference> */
     public function references(string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->references[$name] ?? [];
     }

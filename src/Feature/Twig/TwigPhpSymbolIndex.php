@@ -30,7 +30,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<TwigPhpSymbolDeclaration> */
     public function typeDeclarations(string $className): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->types[$this->classKey($className)] ?? [];
     }
@@ -38,7 +38,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<TwigPhpSymbolDeclaration> */
     public function memberDeclarations(string $className, string $memberName): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->members[$this->classKey($className)][$memberName] ?? [];
     }
@@ -46,7 +46,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<TwigPhpSymbolReference> */
     public function references(string $className, ?string $memberName): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->references[$this->referenceKey($className, $memberName)] ?? [];
     }
@@ -54,7 +54,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function enumNames(): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->enumNames;
     }
@@ -62,7 +62,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function constantTypeNames(): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->constantTypeNames;
     }
@@ -70,7 +70,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<TwigPhpSymbolDeclaration> */
     public function completableMembers(string $className, bool $enumCasesOnly): array
     {
-        $this->derived();
+        $this->derive();
         $members = [];
         foreach ($this->members[$this->classKey($className)] ?? [] as $name => $declarations) {
             foreach ($declarations as $declaration) {
@@ -88,7 +88,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
 
     public function declarationAt(string $uri, Position $position): ?TwigPhpSymbolDeclaration
     {
-        $this->derived();
+        $this->derive();
 
         return array_find(
             $this->declarationsByUri[$uri] ?? [],

@@ -19,7 +19,7 @@ final class StimulusSourceIndex extends AbstractSourceFactsIndex
     /** @return list<StimulusControllerDeclaration> */
     public function declarations(?string $name = null): array
     {
-        $this->derived();
+        $this->derive();
 
         return null === $name ? $this->declarations : $this->declarationsByName[$name] ?? [];
     }
@@ -27,7 +27,7 @@ final class StimulusSourceIndex extends AbstractSourceFactsIndex
     /** @return list<StimulusReference> */
     public function references(string $controller, ?StimulusMemberKind $kind = null, ?string $member = null): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->references[$controller][$this->referenceKey($kind, $member)] ?? [];
     }

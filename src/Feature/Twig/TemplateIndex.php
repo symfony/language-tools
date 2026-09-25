@@ -46,7 +46,7 @@ final class TemplateIndex extends AbstractSourceFactsIndex
 
     public function get(string $name): ?TemplateDeclaration
     {
-        $this->derived();
+        $this->derive();
 
         return $this->declarations[$this->normalize($name)] ?? null;
     }
@@ -54,7 +54,7 @@ final class TemplateIndex extends AbstractSourceFactsIndex
     /** @return list<TemplateDeclaration> */
     public function matching(string $prefix): array
     {
-        $this->derived();
+        $this->derive();
         $prefix = $this->normalize($prefix);
 
         return array_values(array_filter(
@@ -66,7 +66,7 @@ final class TemplateIndex extends AbstractSourceFactsIndex
     /** @return list<TemplateReference> */
     public function references(string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->supported($this->references[$this->normalize($name)] ?? []);
     }

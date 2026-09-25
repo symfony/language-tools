@@ -14,7 +14,7 @@ final class SecuritySourceIndex extends AbstractSourceFactsIndex
     /** @return list<SecuritySourceSymbol> */
     public function symbols(SecuritySymbolKind $kind, string $name): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->symbols->symbols($kind->value, $name);
     }
@@ -22,7 +22,7 @@ final class SecuritySourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function declarationNames(SecuritySymbolKind $kind): array
     {
-        $this->derived();
+        $this->derive();
 
         return $this->symbols->declarationNames($kind->value);
     }
@@ -30,7 +30,7 @@ final class SecuritySourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function names(SecuritySymbolKind $kind, bool $declarationsOnly = false): array
     {
-        $this->derived();
+        $this->derive();
 
         return $declarationsOnly ? $this->symbols->declarationNames($kind->value) : $this->symbols->names($kind->value);
     }

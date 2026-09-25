@@ -70,7 +70,7 @@ abstract class AbstractSourceFactsIndex implements SourceFactsIndexInterface
     }
 
     /** Rebuilds the derived state built by build() when facts or runtime metadata changed. */
-    final protected function derived(): void
+    final protected function derive(): void
     {
         if (!$this->stale) {
             return;
