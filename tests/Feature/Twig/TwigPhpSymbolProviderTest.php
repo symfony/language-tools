@@ -28,6 +28,7 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class TwigPhpSymbolProviderTest extends TestCase
 {
@@ -91,36 +92,36 @@ final class TwigPhpSymbolProviderTest extends TestCase
                 'kind' => 'markdown',
                 'value' => "PHP class constant: `App\\Model\\ViewOptions::FORMAT`\n\n```php\npublic const FORMAT;\n```\n\nOutput format.",
             ],
-        ], $provider->hover($this->params($twigUri, $twig, 'FORMAT', $converter)));
+        ], $provider->hover(LspRequests::inside($twigUri, $twig, 'FORMAT')));
         self::assertSame([
             'contents' => [
                 'kind' => 'markdown',
                 'value' => "PHP enum: `App\\Model\\Status`\n\n```php\nenum Status: string\n```\n\nWorkflow status.",
             ],
-        ], $provider->hover($this->params($twigUri, $twig, 'App\\\\Model\\\\Status', $converter)));
+        ], $provider->hover(LspRequests::inside($twigUri, $twig, 'App\\\\Model\\\\Status')));
         self::assertSame([
             'contents' => [
                 'kind' => 'markdown',
                 'value' => "PHP enum case: `App\\Model\\Status::Published`\n\n```php\ncase Published;\n```\n\nReady for readers.",
             ],
-        ], $provider->hover($this->params($twigUri, $twig, 'Published', $converter, strpos($twig, ').Published') + 2)));
+        ], $provider->hover(LspRequests::inside($twigUri, $twig, 'Published', (int) strpos($twig, ').Published') + 2)));
 
         $format = $indexes->forProject($project)->memberDeclarations('App\Model\ViewOptions', 'FORMAT')[0];
         self::assertSame([
             $protocol->location($phpUri, $format->range),
-        ], $provider->definition($this->params($twigUri, $twig, 'FORMAT', $converter)));
+        ], $provider->definition(LspRequests::inside($twigUri, $twig, 'FORMAT')));
         $status = $indexes->forProject($project)->typeDeclarations('App\Model\Status')[0];
         self::assertSame([
             $protocol->location($phpUri, $status->range),
-        ], $provider->definition($this->params($twigUri, $twig, 'App\\\\Model\\\\Status', $converter)));
+        ], $provider->definition(LspRequests::inside($twigUri, $twig, 'App\\\\Model\\\\Status')));
 
-        self::assertCount(2, $provider->references($this->params($twigUri, $twig, 'Published', $converter, strpos($twig, ').Published') + 2)) ?? []);
-        self::assertCount(2, $provider->references($this->params($phpUri, $php, 'Published', $converter)) ?? []);
-        self::assertCount(3, $provider->references($this->params($phpUri, $php, 'Status', $converter)) ?? []);
-        $withDeclaration = $this->params($phpUri, $php, 'Published', $converter);
+        self::assertCount(2, $provider->references(LspRequests::inside($twigUri, $twig, 'Published', (int) strpos($twig, ').Published') + 2)) ?? []);
+        self::assertCount(2, $provider->references(LspRequests::inside($phpUri, $php, 'Published')) ?? []);
+        self::assertCount(3, $provider->references(LspRequests::inside($phpUri, $php, 'Status')) ?? []);
+        $withDeclaration = LspRequests::inside($phpUri, $php, 'Published');
         $withDeclaration['context'] = ['includeDeclaration' => true];
         self::assertCount(3, $provider->references($withDeclaration) ?? []);
-        self::assertCount(1, $provider->references($this->params($phpUri, $php, 'ViewOptions', $converter, strpos($php, 'ViewOptions') + 2)) ?? []);
+        self::assertCount(1, $provider->references(LspRequests::inside($phpUri, $php, 'ViewOptions', (int) strpos($php, 'ViewOptions') + 2)) ?? []);
 
         $complete = static function (string $text, ?int $cursor = null) use ($provider, $documents, $converter): array {
             $uri = 'file:///workspace/templates/completion.html.twig';
@@ -177,18 +178,5 @@ final class TwigPhpSymbolProviderTest extends TestCase
             new TwigPhpSymbolReferenceExtractor($converter, new TwigCallArgumentResolver(new TwigArgumentParser())),
             new TwigPhpSymbolCompletionContextResolver($converter, $comments, new TwigDirectiveLocator()),
         );
-    }
-
-    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
-    private function params(string $uri, string $text, string $needle, PositionConverter $converter, int|false|null $offset = null): array
-    {
-        $offset = null === $offset ? strpos($text, $needle) : $offset;
-        self::assertIsInt($offset);
-        $position = $converter->toPosition($text, $offset + intdiv(\strlen($needle), 2));
-
-        return [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ];
     }
 }

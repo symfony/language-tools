@@ -13,6 +13,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class MetadataProviderTest extends MetadataTestCase
 {
@@ -63,15 +64,15 @@ final class MetadataProviderTest extends MetadataTestCase
         $relationshipProvider = new MetadataRelationshipProvider($resolver, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $sourceIndexes, $extractor);
 
         $mappedClass = strpos($mappingText, 'App\Entity\User') + 1;
-        $classDefinition = $relationshipProvider->definition($this->params($converter, $mappingUri, $mappingText, $mappedClass));
+        $classDefinition = $relationshipProvider->definition(LspRequests::offset($mappingUri, $mappingText, $mappedClass));
         self::assertIsArray($classDefinition);
         self::assertSame([$entityUri], array_column($classDefinition, 'uri'));
         $email = strpos($mappingText, 'email') + 1;
-        $definition = $relationshipProvider->definition($this->params($converter, $mappingUri, $mappingText, $email));
+        $definition = $relationshipProvider->definition(LspRequests::offset($mappingUri, $mappingText, $email));
         self::assertIsArray($definition);
         self::assertSame([$entityUri], array_column($definition, 'uri'));
         $admin = strpos($mappingText, 'admin') + 1;
-        $references = $relationshipProvider->references($this->params($converter, $mappingUri, $mappingText, $admin));
+        $references = $relationshipProvider->references(LspRequests::offset($mappingUri, $mappingText, $admin));
         self::assertIsArray($references);
         self::assertCount(2, $references);
     }

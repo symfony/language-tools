@@ -44,7 +44,7 @@ final class SerializerMetadataProviderTest extends MetadataTestCase
         $groupText = "<?php\n\$context = ['groups' => ['ad";
         $documents->open(new Document($groupUri, 'php', 1, $groupText));
 
-        self::assertSame(['admin'], $this->completionLabels($completionProvider, $converter, $groupUri, $groupText, \strlen($groupText)));
+        self::assertSame(['admin'], $this->completionLabels($completionProvider, $groupUri, $groupText, \strlen($groupText)));
     }
 
     public function testIndexesGroupReferencesOnlyInSerializerContexts(): void

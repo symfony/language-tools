@@ -7,7 +7,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Console\ConsoleCommandMetadata;
 use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
@@ -23,6 +22,7 @@ use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class ConsoleProviderTest extends TestCase
 {
@@ -64,7 +64,7 @@ final class ConsoleProviderTest extends TestCase
             true,
         ));
 
-        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $provider->diagnostics(LspRequests::document($uri));
         self::assertIsArray($diagnostics);
         self::assertSame(['console.unknown_argument', 'console.unknown_option'], array_column($diagnostics, 'code'));
         self::assertSame([
@@ -81,11 +81,11 @@ final class ConsoleProviderTest extends TestCase
             true,
         ));
         $cursor = strpos($completionText, "getOption('f") + \strlen("getOption('f");
-        $items = $completionProvider->complete($this->params($uri, $converter->toPosition($completionText, $cursor)));
+        $items = $completionProvider->complete(LspRequests::offset($uri, $completionText, $cursor));
         self::assertSame(['format'], array_column($items ?? [], 'label'));
 
         [$sourceOnlyProvider, $sourceOnlyConverter] = $this->provider($uri, $completionText);
-        $sourceOnlyItems = $sourceOnlyProvider->complete($this->params($uri, $sourceOnlyConverter->toPosition($completionText, $cursor)));
+        $sourceOnlyItems = $sourceOnlyProvider->complete(LspRequests::offset($uri, $completionText, $cursor));
         self::assertSame(['format'], array_column($sourceOnlyItems ?? [], 'label'));
     }
 
@@ -112,17 +112,17 @@ final class ConsoleProviderTest extends TestCase
             PHP;
 
         [$extensible] = $this->provider($uri, $text, new ConsoleCommandMetadata('DynamicCommand', null, [], [], true));
-        self::assertSame([], $extensible->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $extensible->diagnostics(LspRequests::document($uri)));
 
         [$incomplete] = $this->provider($uri, str_replace('$this->addOption($dynamicName);', '', $text), new ConsoleCommandMetadata('DynamicCommand', null, [], [], false));
-        self::assertSame([], $incomplete->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $incomplete->diagnostics(LspRequests::document($uri)));
 
         $staticText = str_replace('$this->addOption($dynamicName);', '', $text);
         [$missing] = $this->provider($uri, $staticText);
-        self::assertSame([], $missing->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $missing->diagnostics(LspRequests::document($uri)));
 
         [$incompleteSection] = $this->provider($uri, $staticText, new ConsoleCommandMetadata('DynamicCommand', null, [], [], true), false);
-        self::assertSame([], $incompleteSection->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $incompleteSection->diagnostics(LspRequests::document($uri)));
     }
 
     public function testCompletesInvokableAttributeAndAdaptedTraitInputNames(): void
@@ -175,8 +175,8 @@ final class ConsoleProviderTest extends TestCase
         $optionCursor = strpos($text, "getOption('d") + \strlen("getOption('d");
         $argumentCursor = strpos($text, "getArgument('s") + \strlen("getArgument('s");
 
-        $options = $provider->complete($this->params($uri, $converter->toPosition($text, $optionCursor)));
-        $arguments = $provider->complete($this->params($uri, $converter->toPosition($text, $argumentCursor)));
+        $options = $provider->complete(LspRequests::offset($uri, $text, $optionCursor));
+        $arguments = $provider->complete(LspRequests::offset($uri, $text, $argumentCursor));
 
         self::assertSame(['dry-run'], array_column($options ?? [], 'label'));
         self::assertSame(['shared', 'source-path'], array_column($arguments ?? [], 'label'));
@@ -203,8 +203,8 @@ final class ConsoleProviderTest extends TestCase
         $inputCursor = strpos($text, '$'."input->getArgument('z") + \strlen('$'."input->getArgument('z");
         $otherCursor = strpos($text, '$'."other->getArgument('z") + \strlen('$'."other->getArgument('z");
 
-        self::assertSame([], $provider->complete($this->params($uri, $converter->toPosition($text, $inputCursor))));
-        self::assertNull($provider->complete($this->params($uri, $converter->toPosition($text, $otherCursor))));
+        self::assertSame([], $provider->complete(LspRequests::offset($uri, $text, $inputCursor)));
+        self::assertNull($provider->complete(LspRequests::offset($uri, $text, $otherCursor)));
     }
 
     /** @return array{ConsoleProvider, PositionConverter} */
@@ -236,11 +236,5 @@ final class ConsoleProviderTest extends TestCase
             $sourceIndexes,
             $extractor,
         ), $converter];
-    }
-
-    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
-    private function params(string $uri, Position $position): array
-    {
-        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 }

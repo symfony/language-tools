@@ -28,6 +28,7 @@ use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class DoctrineProviderTest extends TestCase
 {
@@ -156,11 +157,11 @@ final class DoctrineProviderTest extends TestCase
         $relationshipProvider = new DoctrineRelationshipProvider($resolver, new PositionedSourceSymbolResolver($converter), $protocol, $indexes, $extractor);
         $codeLensProvider = new DoctrineRelationshipCodeLensProvider($resolver, $protocol, $indexes, $extractor);
 
-        self::assertSame(['name'], array_column($completionProvider->complete($this->params($converter, $formCompletionUri, $formCompletionText, \strlen($formCompletionText))) ?? [], 'label'));
-        self::assertSame(['name'], array_column($completionProvider->complete($this->params($converter, $repositoryCompletionUri, $repositoryCompletionText, \strlen($repositoryCompletionText))) ?? [], 'label'));
-        self::assertSame(['category'], array_column($completionProvider->complete($this->params($converter, $managerCompletionUri, $managerCompletionText, \strlen($managerCompletionText))) ?? [], 'label'));
+        self::assertSame(['name'], array_column($completionProvider->complete(LspRequests::offset($formCompletionUri, $formCompletionText, \strlen($formCompletionText))) ?? [], 'label'));
+        self::assertSame(['name'], array_column($completionProvider->complete(LspRequests::offset($repositoryCompletionUri, $repositoryCompletionText, \strlen($repositoryCompletionText))) ?? [], 'label'));
+        self::assertSame(['category'], array_column($completionProvider->complete(LspRequests::offset($managerCompletionUri, $managerCompletionText, \strlen($managerCompletionText))) ?? [], 'label'));
 
-        $fieldParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, "['name'") + 3);
+        $fieldParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, "['name'") + 3);
         self::assertSame([$entityUri], array_column($relationshipProvider->definition($fieldParams) ?? [], 'uri'));
         self::assertCount(3, $relationshipProvider->references($fieldParams) ?? []);
         $fieldHover = $relationshipProvider->hover($fieldParams);
@@ -169,16 +170,16 @@ final class DoctrineProviderTest extends TestCase
         self::assertIsString($fieldHover['contents']['value'] ?? null);
         self::assertStringContainsString('Doctrine field: `App\\Entity\\Product::$name`', $fieldHover['contents']['value']);
 
-        $repositoryParams = $this->params($converter, $entityUri, $entityText, strpos($entityText, 'ProductRepository::class') + 2);
+        $repositoryParams = LspRequests::offset($entityUri, $entityText, strpos($entityText, 'ProductRepository::class') + 2);
         self::assertSame([$repositoryUri], array_column($relationshipProvider->definition($repositoryParams) ?? [], 'uri'));
-        $entityParams = $this->params($converter, $repositoryUri, $repositoryText, strpos($repositoryText, 'Product::class') + 2);
+        $entityParams = LspRequests::offset($repositoryUri, $repositoryText, strpos($repositoryText, 'Product::class') + 2);
         self::assertSame([$entityUri], array_column($relationshipProvider->definition($entityParams) ?? [], 'uri'));
 
-        $entityLenses = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $entityUri]]);
+        $entityLenses = $codeLensProvider->codeLenses(LspRequests::document($entityUri));
         self::assertIsArray($entityLenses);
         self::assertIsArray($entityLenses[0]['command'] ?? null);
         self::assertSame('Repository: App\\Repository\\ProductRepository', $entityLenses[0]['command']['title'] ?? null);
-        $repositoryLenses = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $repositoryUri]]);
+        $repositoryLenses = $codeLensProvider->codeLenses(LspRequests::document($repositoryUri));
         self::assertIsArray($repositoryLenses);
         self::assertIsArray($repositoryLenses[0]['command'] ?? null);
         self::assertSame('Entity: App\\Entity\\Product', $repositoryLenses[0]['command']['title'] ?? null);
@@ -448,7 +449,7 @@ final class DoctrineProviderTest extends TestCase
             [null, 'App\Entity\Category'],
             array_map(static fn (DoctrineField $field): ?string => $field->targetEntity, $facts->entities[0]->fields),
         );
-        $hover = $provider->hover($this->params($converter, $uri, $text, strpos($text, '$name') + 2));
+        $hover = $provider->hover(LspRequests::offset($uri, $text, strpos($text, '$name') + 2));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertSame("Doctrine field: `App\Entity\Product::\$name`\n\nType: `string`", $hover['contents']['value'] ?? null);
@@ -682,17 +683,6 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame(strpos($text, 'active_criteria'), $converter->toByteOffset($text, $fieldReferences[1]->range->start));
     }
 
-    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
-    private function params(PositionConverter $converter, string $uri, string $text, int $offset): array
-    {
-        $position = $converter->toPosition($text, $offset);
-
-        return [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ];
-    }
-
     public function testNavigatesToRuntimeOnlyEntities(): void
     {
         $converter = new PositionConverter();
@@ -721,7 +711,7 @@ final class DoctrineProviderTest extends TestCase
         $documents->open(new Document($usageUri, 'php', 1, $usageText));
         $provider = new DoctrineRelationshipProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor);
 
-        $params = $this->params($converter, $usageUri, $usageText, strpos($usageText, "['title'") + 3);
+        $params = LspRequests::offset($usageUri, $usageText, strpos($usageText, "['title'") + 3);
         self::assertSame([$entityUri], array_column($provider->definition($params) ?? [], 'uri'));
         $hover = $provider->hover($params);
         self::assertIsArray($hover);

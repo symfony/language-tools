@@ -30,6 +30,7 @@ use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ServiceCompletionHandlerTest extends TestCase
@@ -146,7 +147,7 @@ final class ServiceCompletionHandlerTest extends TestCase
         $serviceUri = 'file:///workspace/config/services.yaml';
         $serviceText = "arguments: ['@app.']";
         $documents->open(new Document($serviceUri, 'yaml', 1, $serviceText));
-        $serviceResult = $handler->complete($this->params($serviceUri, $serviceText, $converter));
+        $serviceResult = $handler->complete(LspRequests::offset($serviceUri, $serviceText, \strlen($serviceText) - 2));
 
         self::assertSame(['app.alpha', 'app.beta', 'app.shared'], array_column($serviceResult ?? [], 'label'));
         self::assertSame(
@@ -157,7 +158,7 @@ final class ServiceCompletionHandlerTest extends TestCase
         $parameterUri = 'file:///workspace/config/parameters.yaml';
         $parameterText = "arguments: ['%app.']";
         $documents->open(new Document($parameterUri, 'yaml', 1, $parameterText));
-        $parameterResult = $handler->complete($this->params($parameterUri, $parameterText, $converter));
+        $parameterResult = $handler->complete(LspRequests::offset($parameterUri, $parameterText, \strlen($parameterText) - 2));
 
         self::assertSame(['app.alpha', 'app.beta', 'app.shared'], array_column($parameterResult ?? [], 'label'));
         self::assertSame(
@@ -435,16 +436,5 @@ final class ServiceCompletionHandlerTest extends TestCase
     private function yamlComments(): YamlCommentParser
     {
         return new YamlCommentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
-    }
-
-    /** @return array<string, mixed> */
-    private function params(string $uri, string $text, PositionConverter $converter): array
-    {
-        $position = $converter->toPosition($text, \strlen($text) - 2);
-
-        return [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ];
     }
 }

@@ -18,6 +18,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class FormMetadataProviderTest extends MetadataTestCase
 {
@@ -65,12 +66,12 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($formUri, 'php', $formText)));
 
         $firstRequired = strpos($formText, 'required');
-        self::assertSame(['required'], $this->completionLabels($completionProvider, $converter, $formUri, $formText, $firstRequired + 4));
+        self::assertSame(['required'], $this->completionLabels($completionProvider, $formUri, $formText, $firstRequired + 4));
         $builderRequired = strpos($formText, 'required', $firstRequired + 1);
-        self::assertSame(['required'], $this->completionLabels($completionProvider, $converter, $formUri, $formText, $builderRequired + 4));
+        self::assertSame(['required'], $this->completionLabels($completionProvider, $formUri, $formText, $builderRequired + 4));
         self::assertSame(['form.unknown_option'], array_column($this->diagnostics([$formProvider], $formUri), 'code'));
         $required = strpos($formText, 'required') + 1;
-        self::assertIsArray($this->hover([$formProvider], $converter, $formUri, $formText, $required));
+        self::assertIsArray($this->hover([$formProvider], $formUri, $formText, $required));
     }
 
     public function testCompletesFormOptionsOnlyForCompleteClassReferenceTypeArguments(): void
@@ -195,7 +196,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, new MetadataIndexRegistry(), $sourceIndexes, $extractor);
 
         $titleOffset = strpos($formText, "'title'") + 2;
-        $hover = $relationshipProvider->hover($this->params($converter, $formUri, $formText, $titleOffset));
+        $hover = $relationshipProvider->hover(LspRequests::offset($formUri, $formText, $titleOffset));
         self::assertIsArray($hover);
         $hoverValue = \is_array($hover['contents'] ?? null) ? ($hover['contents']['value'] ?? null) : null;
         self::assertIsString($hoverValue);
@@ -203,12 +204,12 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertStringContainsString('private ?string $title', $hoverValue);
         self::assertStringContainsString('The article title.', $hoverValue);
 
-        $definition = $relationshipProvider->definition($this->params($converter, $formUri, $formText, $titleOffset));
+        $definition = $relationshipProvider->definition(LspRequests::offset($formUri, $formText, $titleOffset));
         self::assertIsArray($definition);
         self::assertSame([$dtoUri], array_column($definition, 'uri'));
 
         $propertyOffset = strpos($dtoText, '$title') + 2;
-        $references = $relationshipProvider->references($this->params($converter, $dtoUri, $dtoText, $propertyOffset));
+        $references = $relationshipProvider->references(LspRequests::offset($dtoUri, $dtoText, $propertyOffset));
         self::assertIsArray($references);
         $referenceUris = [];
         foreach ($references as $reference) {
@@ -217,17 +218,17 @@ final class FormMetadataProviderTest extends MetadataTestCase
         }
         self::assertSame([$dtoUri, $formUri], array_keys($referenceUris));
 
-        self::assertSame(['title'], $this->completionLabels($completionProvider, $converter, $formUri, $formText, strpos($formText, "'title'") + \strlen("'ti")));
-        $headlineDefinition = $relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'headline'") + 2));
+        self::assertSame(['title'], $this->completionLabels($completionProvider, $formUri, $formText, strpos($formText, "'title'") + \strlen("'ti")));
+        $headlineDefinition = $relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'headline'") + 2));
         self::assertIsArray($headlineDefinition);
         self::assertSame([$dtoUri], array_column($headlineDefinition, 'uri'));
-        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'ignored'") + 2)));
-        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'dynamic'") + 2)));
-        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'street'") + 2)));
-        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'named'") + 2)));
-        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'leaked'") + 2)));
-        self::assertNull($relationshipProvider->definition($this->params($converter, $formUri, $formText, strpos($formText, "'unrelated'") + 2)));
-        self::assertSame([], $this->completionLabels($completionProvider, $converter, $formUri, $formText, strpos($formText, "'street'") + \strlen("'str")));
+        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'ignored'") + 2)));
+        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'dynamic'") + 2)));
+        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'street'") + 2)));
+        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'named'") + 2)));
+        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'leaked'") + 2)));
+        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'unrelated'") + 2)));
+        self::assertSame([], $this->completionLabels($completionProvider, $formUri, $formText, strpos($formText, "'street'") + \strlen("'str")));
     }
 
     public function testScopesCompleteMetadataCallsToTheirTypedParameters(): void
@@ -615,6 +616,6 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $text)));
         $resolver = new DocumentContextResolver($documents, $projects);
-        self::assertSame([], (new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $sourceIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], (new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $sourceIndexes))->diagnostics(LspRequests::document($uri)));
     }
 }

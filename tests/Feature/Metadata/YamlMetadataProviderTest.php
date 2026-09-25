@@ -40,6 +40,6 @@ final class YamlMetadataProviderTest extends MetadataTestCase
         $propertyText = "App\\Entity\\User:\n    attributes:\n        em";
         $documents->open(new Document($propertyUri, 'yaml', 1, $propertyText));
 
-        self::assertSame(['email'], $this->completionLabels($completionProvider, $converter, $propertyUri, $propertyText, \strlen($propertyText)));
+        self::assertSame(['email'], $this->completionLabels($completionProvider, $propertyUri, $propertyText, \strlen($propertyText)));
     }
 }

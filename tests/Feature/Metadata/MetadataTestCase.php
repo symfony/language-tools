@@ -21,6 +21,7 @@ use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 abstract class MetadataTestCase extends TestCase
 {
@@ -41,10 +42,10 @@ abstract class MetadataTestCase extends TestCase
     }
 
     /** @return list<string> */
-    protected function completionLabels(CompletionProviderInterface $provider, PositionConverter $converter, string $uri, string $text, int $offset): array
+    protected function completionLabels(CompletionProviderInterface $provider, string $uri, string $text, int $offset): array
     {
         /** @var list<string> $labels */
-        $labels = array_column($provider->complete($this->params($converter, $uri, $text, $offset)) ?? [], 'label');
+        $labels = array_column($provider->complete(LspRequests::offset($uri, $text, $offset)) ?? [], 'label');
 
         return $labels;
     }
@@ -54,10 +55,10 @@ abstract class MetadataTestCase extends TestCase
      *
      * @return array<array-key, mixed>|null
      */
-    protected function hover(array $providers, PositionConverter $converter, string $uri, string $text, int $offset): ?array
+    protected function hover(array $providers, string $uri, string $text, int $offset): ?array
     {
         foreach ($providers as $provider) {
-            if (null !== $hover = $provider->hover($this->params($converter, $uri, $text, $offset))) {
+            if (null !== $hover = $provider->hover(LspRequests::offset($uri, $text, $offset))) {
                 return $hover;
             }
         }
@@ -74,20 +75,12 @@ abstract class MetadataTestCase extends TestCase
     {
         $diagnostics = [];
         foreach ($providers as $provider) {
-            $provided = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+            $provided = $provider->diagnostics(LspRequests::document($uri));
             if (null !== $provided) {
                 array_push($diagnostics, ...$provided);
             }
         }
 
         return $diagnostics;
-    }
-
-    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
-    protected function params(PositionConverter $converter, string $uri, string $text, int $offset): array
-    {
-        $position = $converter->toPosition($text, $offset);
-
-        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 }

@@ -8,7 +8,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
@@ -35,6 +34,7 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class EventProviderTest extends TestCase
 {
@@ -518,19 +518,19 @@ PHP;
         $codeLensProvider = new EventCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
 
         $completionOffset = strpos($dispatcher, "App\\Event\\Ord');") + \strlen('App\\Event\\Ord');
-        self::assertSame(['App\\Event\\OrderPlaced'], array_column($completionProvider->complete($this->params($dispatcherUri, $converter->toPosition($dispatcher, $completionOffset))) ?? [], 'label'));
+        self::assertSame(['App\\Event\\OrderPlaced'], array_column($completionProvider->complete(LspRequests::offset($dispatcherUri, $dispatcher, $completionOffset)) ?? [], 'label'));
         $dispatchPosition = $converter->toPosition($dispatcher, (int) strpos($dispatcher, 'OrderPlaced());'));
-        self::assertStringContainsString('Symfony event', json_encode($relationshipProvider->hover($this->params($dispatcherUri, $dispatchPosition)), \JSON_THROW_ON_ERROR));
-        self::assertSame([$eventUri, $listenerUri], array_column($relationshipProvider->definition($this->params($dispatcherUri, $dispatchPosition)) ?? [], 'uri'));
+        self::assertStringContainsString('Symfony event', json_encode($relationshipProvider->hover(LspRequests::position($dispatcherUri, $dispatchPosition)), \JSON_THROW_ON_ERROR));
+        self::assertSame([$eventUri, $listenerUri], array_column($relationshipProvider->definition(LspRequests::position($dispatcherUri, $dispatchPosition)) ?? [], 'uri'));
 
         $eventPosition = $converter->toPosition($event, (int) strpos($event, 'OrderPlaced'));
-        self::assertContains($dispatcherUri, array_column($relationshipProvider->references($this->params($eventUri, $eventPosition)) ?? [], 'uri'));
-        self::assertSame(['event.invalid_listener_method'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $invalidUri]]) ?? [], 'code'));
-        $eventLens = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $eventUri]])[0] ?? null;
+        self::assertContains($dispatcherUri, array_column($relationshipProvider->references(LspRequests::position($eventUri, $eventPosition)) ?? [], 'uri'));
+        self::assertSame(['event.invalid_listener_method'], array_column($diagnosticProvider->diagnostics(LspRequests::document($invalidUri)) ?? [], 'code'));
+        $eventLens = $codeLensProvider->codeLenses(LspRequests::document($eventUri))[0] ?? null;
         self::assertIsArray($eventLens);
         self::assertIsArray($eventLens['command'] ?? null);
         self::assertSame('1 event listener', $eventLens['command']['title'] ?? null);
-        $listenerLens = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $listenerUri]])[0] ?? null;
+        $listenerLens = $codeLensProvider->codeLenses(LspRequests::document($listenerUri))[0] ?? null;
         self::assertIsArray($listenerLens);
         self::assertIsArray($listenerLens['command'] ?? null);
         self::assertSame('Listens to 1 event', $listenerLens['command']['title'] ?? null);
@@ -575,12 +575,6 @@ PHP;
             new EventYamlListenerAnalyzer($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             new EventSubscriberMapAnalyzer($converter, new BalancedDelimiterMatcher()),
         );
-    }
-
-    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
-    private function params(string $uri, Position $position): array
-    {
-        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 
     public function testScopesEventDispatcherCompletionsToTheirReceiver(): void

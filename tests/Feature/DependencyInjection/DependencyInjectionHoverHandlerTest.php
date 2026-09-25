@@ -32,6 +32,7 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class DependencyInjectionHoverHandlerTest extends TestCase
 {
@@ -89,8 +90,8 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
         );
 
-        $serviceHover = $handler->hover($this->params($uri, $text, 'app.mailer', $converter));
-        $parameterHover = $handler->hover($this->params($uri, $text, 'app.api_key%', $converter));
+        $serviceHover = $handler->hover(LspRequests::inside($uri, $text, 'app.mailer'));
+        $parameterHover = $handler->hover(LspRequests::inside($uri, $text, 'app.api_key%'));
         self::assertIsArray($serviceHover);
         self::assertIsArray($serviceHover['contents']);
         self::assertIsArray($parameterHover);
@@ -178,7 +179,7 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             new DependencyInjectionProjectLookup($serviceIndexes, new ParameterIndexRegistry(), $sourceIndexes),
         );
 
-        $hover = $handler->hover($this->params($uri, $text, 'app.shared', $converter));
+        $hover = $handler->hover(LspRequests::inside($uri, $text, 'app.shared'));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents']);
 
@@ -201,18 +202,5 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
 
             Decoration stack: `app.shared` → `app.inner`
             MARKDOWN, $hover['contents']['value'] ?? null);
-    }
-
-    /** @return array<string, mixed> */
-    private function params(string $uri, string $text, string $needle, PositionConverter $converter): array
-    {
-        $offset = strpos($text, $needle);
-        self::assertIsInt($offset);
-        $position = $converter->toPosition($text, $offset + 1);
-
-        return [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ];
     }
 }

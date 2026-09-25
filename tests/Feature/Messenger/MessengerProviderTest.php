@@ -8,7 +8,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
@@ -41,6 +40,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\EnvironmentScopes;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class MessengerProviderTest extends TestCase
 {
@@ -533,30 +533,30 @@ YAML;
         $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $classIndexes, $phpParser, $converter, EnvironmentScopes::resolver());
         $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
 
-        $completionParams = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus }') + 4));
+        $completionParams = LspRequests::offset($yamlUri, $yaml, strpos($yaml, 'command.bus }') + 4);
         self::assertSame(['command.bus'], array_column($completionProvider->complete($completionParams) ?? [], 'label'));
-        $commentedCompletion = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, '# failure_transport: failed') + \strlen('# failure_transport: fa')));
+        $commentedCompletion = LspRequests::offset($yamlUri, $yaml, strpos($yaml, '# failure_transport: failed') + \strlen('# failure_transport: fa'));
         self::assertNull($completionProvider->complete($commentedCompletion));
-        $argumentCompletion = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, '$bus: null') + \strlen('$bus: nul')));
+        $argumentCompletion = LspRequests::offset($yamlUri, $yaml, strpos($yaml, '$bus: null') + \strlen('$bus: nul'));
         self::assertNull($completionProvider->complete($argumentCompletion));
         $bundleUri = 'file:///workspace/config/packages/other_bundle.yaml';
         $bundleYaml = "other_bundle:\n    bus: com";
         $documents->open(new Document($bundleUri, 'yaml', 1, $bundleYaml));
-        self::assertNull($completionProvider->complete($this->params($bundleUri, $converter->toPosition($bundleYaml, \strlen($bundleYaml)))));
-        $routingCompletion = $this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, "async\nservices") + 3));
+        self::assertNull($completionProvider->complete(LspRequests::offset($bundleUri, $bundleYaml, \strlen($bundleYaml))));
+        $routingCompletion = LspRequests::offset($yamlUri, $yaml, strpos($yaml, "async\nservices") + 3);
         self::assertSame(['async'], array_column($completionProvider->complete($routingCompletion) ?? [], 'label'));
-        $hover = $relationshipProvider->hover($this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'async }') + 2)));
+        $hover = $relationshipProvider->hover(LspRequests::offset($yamlUri, $yaml, strpos($yaml, 'async }') + 2));
         self::assertStringContainsString('Messenger transport', json_encode($hover, \JSON_THROW_ON_ERROR));
-        self::assertSame([$yamlUri], array_column($relationshipProvider->definition($this->params($yamlUri, $converter->toPosition($yaml, strpos($yaml, 'command.bus') + 2))) ?? [], 'uri'));
-        self::assertSame(['messenger.unknown_bus'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $yamlUri]]) ?? [], 'code'));
-        self::assertSame(['messenger.invalid_handler_signature', 'messenger.invalid_handler_signature'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $handlerUri]]) ?? [], 'code'));
+        self::assertSame([$yamlUri], array_column($relationshipProvider->definition(LspRequests::offset($yamlUri, $yaml, strpos($yaml, 'command.bus') + 2)) ?? [], 'uri'));
+        self::assertSame(['messenger.unknown_bus'], array_column($diagnosticProvider->diagnostics(LspRequests::document($yamlUri)) ?? [], 'code'));
+        self::assertSame(['messenger.invalid_handler_signature', 'messenger.invalid_handler_signature'], array_column($diagnosticProvider->diagnostics(LspRequests::document($handlerUri)) ?? [], 'code'));
 
         $messagePosition = $converter->toPosition($message, (int) strpos($message, 'Ping'));
-        self::assertSame([$handlerUri], array_column($relationshipProvider->definition($this->params($messageUri, $messagePosition)) ?? [], 'uri'));
-        self::assertContains($controllerUri, array_column($relationshipProvider->references($this->params($messageUri, $messagePosition)) ?? [], 'uri'));
+        self::assertSame([$handlerUri], array_column($relationshipProvider->definition(LspRequests::position($messageUri, $messagePosition)) ?? [], 'uri'));
+        self::assertContains($controllerUri, array_column($relationshipProvider->references(LspRequests::position($messageUri, $messagePosition)) ?? [], 'uri'));
         $dispatchPosition = $converter->toPosition($controller, (int) strrpos($controller, 'Ping'));
-        self::assertSame([$messageUri, $handlerUri], array_column($relationshipProvider->definition($this->params($controllerUri, $dispatchPosition)) ?? [], 'uri'));
-        $codeLens = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $messageUri]])[0] ?? null;
+        self::assertSame([$messageUri, $handlerUri], array_column($relationshipProvider->definition(LspRequests::position($controllerUri, $dispatchPosition)) ?? [], 'uri'));
+        $codeLens = $codeLensProvider->codeLenses(LspRequests::document($messageUri))[0] ?? null;
         self::assertIsArray($codeLens);
         self::assertIsArray($codeLens['command'] ?? null);
         self::assertSame('1 Messenger handler', $codeLens['command']['title'] ?? null);
@@ -600,7 +600,7 @@ YAML;
             EnvironmentScopes::resolver(),
         );
 
-        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $provider->diagnostics(LspRequests::document($uri));
         if (!$invalid) {
             self::assertSame([], $diagnostics);
 
@@ -659,7 +659,7 @@ YAML;
             EnvironmentScopes::resolver($environment),
         );
 
-        self::assertSame($expectedCodes, array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        self::assertSame($expectedCodes, array_column($provider->diagnostics(LspRequests::document($uri)) ?? [], 'code'));
     }
 
     /** @return iterable<string, array{string, string, string, list<string>}> */
@@ -736,9 +736,9 @@ YAML;
             EnvironmentScopes::resolver(),
         );
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $serviceUri]]));
+        self::assertSame([], $provider->diagnostics(LspRequests::document($serviceUri)));
         self::assertSame([], $parser->sources);
-        self::assertSame(['messenger.invalid_handler_signature'], array_column($provider->diagnostics(['textDocument' => ['uri' => $handlerUri]]) ?? [], 'code'));
+        self::assertSame(['messenger.invalid_handler_signature'], array_column($provider->diagnostics(LspRequests::document($handlerUri)) ?? [], 'code'));
         self::assertSame([$handlerText], $parser->sources);
     }
 
@@ -834,7 +834,7 @@ YAML;
         );
         $position = $converter->toPosition($text, \strlen($text));
 
-        self::assertSame($expectedLabels, array_column($provider->complete($this->params($uri, $position)) ?? [], 'label'));
+        self::assertSame($expectedLabels, array_column($provider->complete(LspRequests::position($uri, $position)) ?? [], 'label'));
     }
 
     /** @return iterable<string, array{string, list<string>}> */
@@ -880,7 +880,7 @@ YAML;
         );
         $position = $converter->toPosition($text, \strlen($text));
 
-        self::assertNull($provider->complete($this->params($uri, $position)));
+        self::assertNull($provider->complete(LspRequests::position($uri, $position)));
     }
 
     private static function handlerSource(string $type): string
@@ -896,11 +896,5 @@ YAML;
                 public function __invoke({$type} \$message): void {}
             }
             PHP;
-    }
-
-    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
-    private function params(string $uri, Position $position): array
-    {
-        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 }

@@ -36,6 +36,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class StimulusProviderTest extends TestCase
@@ -57,7 +58,7 @@ final class StimulusProviderTest extends TestCase
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $stimulus = new StimulusResolver($resolver, $converter, $protocol, $indexes, $sources, $extractor);
-        $diagnostics = (new StimulusDiagnosticProvider($resolver, $protocol, $indexes, $sources, $stimulus))->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = (new StimulusDiagnosticProvider($resolver, $protocol, $indexes, $sources, $stimulus))->diagnostics(LspRequests::document($uri));
         self::assertIsArray($diagnostics);
         $actions = (new StimulusCodeActionProvider($resolver, $protocol, $indexes, $sources, $stimulus, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
             'textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => $diagnostics],
@@ -185,47 +186,47 @@ final class StimulusProviderTest extends TestCase
         $documentLinkProvider = new StimulusDocumentLinkProvider($documentResolver, $uriConverter, $protocol, $indexes, $extractor, $stimulus);
         $codeLensProvider = new StimulusCodeLensProvider($documentResolver, $protocol, $sourceIndexes, $extractor);
 
-        self::assertSame(['search'], array_column($completionProvider->complete($this->params($converter, $controllerCompletionUri, $controllerCompletionText, \strlen($controllerCompletionText))) ?? [], 'label'));
-        $packageControllerCompletion = $completionProvider->complete($this->params($converter, $packageControllerCompletionUri, $packageControllerCompletionText, \strlen($packageControllerCompletionText))) ?? [];
+        self::assertSame(['search'], array_column($completionProvider->complete(LspRequests::offset($controllerCompletionUri, $controllerCompletionText, \strlen($controllerCompletionText))) ?? [], 'label'));
+        $packageControllerCompletion = $completionProvider->complete(LspRequests::offset($packageControllerCompletionUri, $packageControllerCompletionText, \strlen($packageControllerCompletionText))) ?? [];
         self::assertSame(['symfony--ux-autocomplete--autocomplete'], array_column($packageControllerCompletion, 'label'));
         self::assertSame(['@symfony/ux-auto'], array_column($packageControllerCompletion, 'filterText'));
-        self::assertSame(['open'], array_column($completionProvider->complete($this->params($converter, $actionCompletionUri, $actionCompletionText, \strlen($actionCompletionText))) ?? [], 'label'));
-        self::assertSame(['results'], array_column($completionProvider->complete($this->params($converter, $targetCompletionUri, $targetCompletionText, \strlen($targetCompletionText))) ?? [], 'label'));
-        self::assertSame(['onChange'], array_column($completionProvider->complete($this->params($converter, $packageActionCompletionUri, $packageActionCompletionText, \strlen($packageActionCompletionText))) ?? [], 'label'));
-        self::assertSame(['field'], array_column($completionProvider->complete($this->params($converter, $packageTargetCompletionUri, $packageTargetCompletionText, \strlen($packageTargetCompletionText))) ?? [], 'label'));
-        self::assertNull($completionProvider->complete($this->params($converter, $quotedAttributeUri, $quotedAttributeText, \strlen($quotedAttributeText))));
-        self::assertNull($completionProvider->complete($this->params($converter, $markupHelperUri, $markupHelperText, \strlen($markupHelperText))));
+        self::assertSame(['open'], array_column($completionProvider->complete(LspRequests::offset($actionCompletionUri, $actionCompletionText, \strlen($actionCompletionText))) ?? [], 'label'));
+        self::assertSame(['results'], array_column($completionProvider->complete(LspRequests::offset($targetCompletionUri, $targetCompletionText, \strlen($targetCompletionText))) ?? [], 'label'));
+        self::assertSame(['onChange'], array_column($completionProvider->complete(LspRequests::offset($packageActionCompletionUri, $packageActionCompletionText, \strlen($packageActionCompletionText))) ?? [], 'label'));
+        self::assertSame(['field'], array_column($completionProvider->complete(LspRequests::offset($packageTargetCompletionUri, $packageTargetCompletionText, \strlen($packageTargetCompletionText))) ?? [], 'label'));
+        self::assertNull($completionProvider->complete(LspRequests::offset($quotedAttributeUri, $quotedAttributeText, \strlen($quotedAttributeText))));
+        self::assertNull($completionProvider->complete(LspRequests::offset($markupHelperUri, $markupHelperText, \strlen($markupHelperText))));
 
-        $actionParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, '#open') + 2);
+        $actionParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, '#open') + 2);
         self::assertSame([$controllerUri], array_column($relationshipProvider->definition($actionParams) ?? [], 'uri'));
         self::assertCount(3, $relationshipProvider->references($actionParams) ?? []);
         $hover = $relationshipProvider->hover($actionParams);
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertSame('Stimulus action: `search#open`', $hover['contents']['value'] ?? null);
-        $unknownActionParams = $this->params($converter, $unknownActionUri, $unknownActionText, strpos($unknownActionText, 'missing') + 2);
+        $unknownActionParams = LspRequests::offset($unknownActionUri, $unknownActionText, strpos($unknownActionText, 'missing') + 2);
         self::assertNull($relationshipProvider->hover($unknownActionParams));
         self::assertSame([], $relationshipProvider->definition($unknownActionParams));
 
-        $packageControllerParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, 'symfony/ux-autocomplete/autocomplete') + 2);
+        $packageControllerParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, 'symfony/ux-autocomplete/autocomplete') + 2);
         self::assertSame(
             ['file:///workspace/vendor/symfony/ux-autocomplete/assets/dist/controller.js'],
             array_column($relationshipProvider->definition($packageControllerParams) ?? [], 'uri'),
         );
         self::assertCount(5, $relationshipProvider->references($packageControllerParams) ?? []);
         foreach (['onChange', 'field'] as $member) {
-            $memberParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, $member) + 2);
+            $memberParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, $member) + 2);
             self::assertSame(
                 ['file:///workspace/vendor/symfony/ux-autocomplete/assets/dist/controller.js'],
                 array_column($relationshipProvider->definition($memberParams) ?? [], 'uri'),
             );
         }
 
-        $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $usageUri]]) ?? [];
+        $diagnostics = $diagnosticProvider->diagnostics(LspRequests::document($usageUri)) ?? [];
         self::assertSame(['stimulus.unknown_controller'], array_column($diagnostics, 'code'));
         self::assertSame(['Unknown Stimulus controller "missing".'], array_column($diagnostics, 'message'));
-        self::assertGreaterThanOrEqual(4, \count($documentLinkProvider->links(['textDocument' => ['uri' => $usageUri]]) ?? []));
-        $lenses = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $controllerUri]]);
+        self::assertGreaterThanOrEqual(4, \count($documentLinkProvider->links(LspRequests::document($usageUri)) ?? []));
+        $lenses = $codeLensProvider->codeLenses(LspRequests::document($controllerUri));
         self::assertIsArray($lenses);
         self::assertIsArray($lenses[0]['command'] ?? null);
         self::assertSame('3 Stimulus controller usages', $lenses[0]['command']['title'] ?? null);
@@ -270,9 +271,9 @@ final class StimulusProviderTest extends TestCase
         $completionProvider = new StimulusCompletionProvider($documentResolver, $converter, $protocol, $extractor, $stimulus);
         $relationshipProvider = new StimulusRelationshipProvider(new UriToPathConverter(), $protocol, $indexes, $sourceIndexes, $stimulus);
 
-        self::assertSame([], $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $usageUri]]));
-        self::assertSame(['clipboard'], array_column($completionProvider->complete($this->params($converter, $completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
-        self::assertSame([$bootstrapUri], array_column($relationshipProvider->definition($this->params($converter, $usageUri, $usageText, strpos($usageText, 'clipboard') + 2)) ?? [], 'uri'));
+        self::assertSame([], $diagnosticProvider->diagnostics(LspRequests::document($usageUri)));
+        self::assertSame(['clipboard'], array_column($completionProvider->complete(LspRequests::offset($completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
+        self::assertSame([$bootstrapUri], array_column($relationshipProvider->definition(LspRequests::offset($usageUri, $usageText, strpos($usageText, 'clipboard') + 2)) ?? [], 'uri'));
     }
 
     private function createExtractor(PositionConverter $converter): StimulusExtractor
@@ -287,16 +288,5 @@ final class StimulusProviderTest extends TestCase
             new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
             $tokenizer,
         );
-    }
-
-    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
-    private function params(PositionConverter $converter, string $uri, string $text, int $offset): array
-    {
-        $position = $converter->toPosition($text, $offset);
-
-        return [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ];
     }
 }

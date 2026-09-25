@@ -98,17 +98,4 @@ class TwigCallableProviderTestCase extends TestCase
             'relationship' => new TwigCallableRelationshipProvider($documentResolver, $converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $phpParser),
         ];
     }
-
-    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
-    protected function params(string $uri, string $text, string $needle, PositionConverter $converter, int|false|null $offset = null): array
-    {
-        $offset = null === $offset ? strpos($text, $needle) : $offset;
-        self::assertIsInt($offset);
-        $position = $converter->toPosition($text, $offset + intdiv(\strlen($needle), 2));
-
-        return [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ];
-    }
 }

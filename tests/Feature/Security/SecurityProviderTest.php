@@ -8,7 +8,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\Security\SecurityCompletionProvider;
@@ -37,6 +36,7 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class SecurityProviderTest extends TestCase
 {
@@ -397,18 +397,18 @@ PHP;
         $diagnosticProvider = new SecurityDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes);
 
         $completionPosition = $converter->toPosition($completion, strpos($completion, "ROLE_A')") + \strlen('ROLE_A'));
-        self::assertSame(['ROLE_ADMIN'], array_column($completionProvider->complete($this->params($completionUri, $completionPosition)) ?? [], 'label'));
+        self::assertSame(['ROLE_ADMIN'], array_column($completionProvider->complete(LspRequests::position($completionUri, $completionPosition)) ?? [], 'label'));
         $rolePosition = $converter->toPosition($php, (int) strpos($php, 'ROLE_ADMIN') + 2);
-        $hover = $relationshipProvider->hover($this->params($phpUri, $rolePosition));
+        $hover = $relationshipProvider->hover(LspRequests::position($phpUri, $rolePosition));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
         self::assertStringContainsString('App\\Security\\PostVoter', $hover['contents']['value']);
         $providerPosition = $converter->toPosition($yaml, (int) strpos($yaml, 'provider: users') + \strlen('provider: us'));
-        self::assertSame([$yamlUri], array_column($relationshipProvider->definition($this->params($yamlUri, $providerPosition)) ?? [], 'uri'));
-        self::assertContains($twigUri, array_column($relationshipProvider->references($this->params($phpUri, $rolePosition)) ?? [], 'uri'));
-        self::assertSame(['security.unknown_provider'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $yamlUri]]) ?? [], 'code'));
-        self::assertSame(['security.unknown_firewall'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $twigUri]]) ?? [], 'code'));
+        self::assertSame([$yamlUri], array_column($relationshipProvider->definition(LspRequests::position($yamlUri, $providerPosition)) ?? [], 'uri'));
+        self::assertContains($twigUri, array_column($relationshipProvider->references(LspRequests::position($phpUri, $rolePosition)) ?? [], 'uri'));
+        self::assertSame(['security.unknown_provider'], array_column($diagnosticProvider->diagnostics(LspRequests::document($yamlUri)) ?? [], 'code'));
+        self::assertSame(['security.unknown_firewall'], array_column($diagnosticProvider->diagnostics(LspRequests::document($twigUri)) ?? [], 'code'));
     }
 
     public function testPreservesDashedProviderAndFirewallNames(): void
@@ -452,15 +452,15 @@ PHP;
         self::assertSame(['in-memory', 'main-area', 'in-memory'], array_map(static fn ($symbol): string => $symbol->name, $yamlFacts->symbols));
 
         $providerPosition = $converter->toPosition($yaml, (int) strpos($yaml, 'provider: in-memory') + \strlen('provider: in-me'));
-        self::assertSame([$yamlUri], array_column($relationshipProvider->definition($this->params($yamlUri, $providerPosition)) ?? [], 'uri'));
-        self::assertSame([$yamlUri, $yamlUri], array_column($relationshipProvider->references($this->params($yamlUri, $providerPosition)) ?? [], 'uri'));
+        self::assertSame([$yamlUri], array_column($relationshipProvider->definition(LspRequests::position($yamlUri, $providerPosition)) ?? [], 'uri'));
+        self::assertSame([$yamlUri, $yamlUri], array_column($relationshipProvider->references(LspRequests::position($yamlUri, $providerPosition)) ?? [], 'uri'));
 
         $firewallPosition = $converter->toPosition($twig, (int) strpos($twig, 'main-area') + 2);
-        self::assertSame([$yamlUri], array_column($relationshipProvider->definition($this->params($twigUri, $firewallPosition)) ?? [], 'uri'));
-        self::assertSame([$yamlUri, $twigUri], array_column($relationshipProvider->references($this->params($twigUri, $firewallPosition)) ?? [], 'uri'));
+        self::assertSame([$yamlUri], array_column($relationshipProvider->definition(LspRequests::position($twigUri, $firewallPosition)) ?? [], 'uri'));
+        self::assertSame([$yamlUri, $twigUri], array_column($relationshipProvider->references(LspRequests::position($twigUri, $firewallPosition)) ?? [], 'uri'));
 
-        self::assertSame([], $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $yamlUri]]));
-        self::assertSame([], $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $twigUri]]));
+        self::assertSame([], $diagnosticProvider->diagnostics(LspRequests::document($yamlUri)));
+        self::assertSame([], $diagnosticProvider->diagnostics(LspRequests::document($twigUri)));
     }
 
     public function testResolvesSymbolAtRangeEnd(): void
@@ -492,7 +492,7 @@ PHP;
         );
         $rangeEnd = $converter->toPosition($text, (int) strpos($text, 'provider: users') + \strlen('provider: users'));
 
-        self::assertSame([$uri], array_column($provider->definition($this->params($uri, $rangeEnd)) ?? [], 'uri'));
+        self::assertSame([$uri], array_column($provider->definition(LspRequests::position($uri, $rangeEnd)) ?? [], 'uri'));
     }
 
     private function extractor(?PositionConverter $converter = null): SecurityExtractor
@@ -510,11 +510,5 @@ PHP;
             new TwigCallArgumentResolver(new TwigArgumentParser()),
             $yamlParser,
         );
-    }
-
-    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
-    private function params(string $uri, Position $position): array
-    {
-        return ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
     }
 }

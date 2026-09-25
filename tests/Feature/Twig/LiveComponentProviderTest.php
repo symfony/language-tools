@@ -33,6 +33,7 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class LiveComponentProviderTest extends TestCase
@@ -96,10 +97,10 @@ final class LiveComponentProviderTest extends TestCase
         $completionProvider = new TwigComponentCompletionProvider($documentResolver, $converter, $protocol, $indexes, $componentResolver, $commentParser);
         $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
 
-        self::assertSame(['submit'], array_column($completionProvider->complete($this->params($converter, $completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
+        self::assertSame(['submit'], array_column($completionProvider->complete(LspRequests::offset($completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
         $nestedActionOffset = strpos($templateText, 'submit') + \strlen('sub');
-        self::assertSame(['submit'], array_column($completionProvider->complete($this->params($converter, $templateUri, $templateText, $nestedActionOffset)) ?? [], 'label'));
-        $actionParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, 'submit') + 2);
+        self::assertSame(['submit'], array_column($completionProvider->complete(LspRequests::offset($templateUri, $templateText, $nestedActionOffset)) ?? [], 'label'));
+        $actionParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, 'submit') + 2);
         self::assertSame([$classUri], array_column($relationshipProvider->definition($actionParams) ?? [], 'uri'));
         self::assertCount(4, $relationshipProvider->references($actionParams) ?? []);
         $actionHover = $relationshipProvider->hover($actionParams);
@@ -107,7 +108,7 @@ final class LiveComponentProviderTest extends TestCase
         self::assertIsArray($actionHover['contents'] ?? null);
         self::assertSame('Live action: `Search#submit`', $actionHover['contents']['value'] ?? null);
 
-        $componentParams = $this->params($converter, $usageUri, $usageText, strpos($usageText, 'Search') + 2);
+        $componentParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, 'Search') + 2);
         $componentHover = $relationshipProvider->hover($componentParams);
         self::assertIsArray($componentHover);
         self::assertIsArray($componentHover['contents'] ?? null);
@@ -120,13 +121,13 @@ final class LiveComponentProviderTest extends TestCase
             $documents->update($templateUri, $version + 2, $namedActionCompletionText);
             self::assertSame(
                 ['submit'],
-                array_column($completionProvider->complete($this->params($converter, $templateUri, $namedActionCompletionText, \strlen($namedActionCompletionText))) ?? [], 'label'),
+                array_column($completionProvider->complete(LspRequests::offset($templateUri, $namedActionCompletionText, \strlen($namedActionCompletionText))) ?? [], 'label'),
             );
         }
 
         $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
-        self::assertSame(['search:completed'], array_column($eventProvider->complete($this->params($converter, $classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co"))) ?? [], 'label'));
-        $eventParams = $this->params($converter, $classUri, $classText, strpos($classText, "emit('search:completed") + \strlen("emit('search:"));
+        self::assertSame(['search:completed'], array_column($eventProvider->complete(LspRequests::offset($classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co"))) ?? [], 'label'));
+        $eventParams = LspRequests::offset($classUri, $classText, strpos($classText, "emit('search:completed") + \strlen("emit('search:"));
         self::assertSame([$classUri], array_column($eventProvider->definition($eventParams) ?? [], 'uri'));
         self::assertCount(2, $eventProvider->references($eventParams) ?? []);
         $eventHover = $eventProvider->hover($eventParams);
@@ -192,7 +193,7 @@ final class LiveComponentProviderTest extends TestCase
         foreach ($cases as [$needle, $expected, $last]) {
             $offset = (int) ($last ? strrpos($text, $needle) : strpos($text, $needle)) + \strlen($needle);
 
-            self::assertSame($expected, array_column($provider->complete($this->params($converter, $uri, $text, $offset)) ?? [], 'label'));
+            self::assertSame($expected, array_column($provider->complete(LspRequests::offset($uri, $text, $offset)) ?? [], 'label'));
         }
     }
 
@@ -232,17 +233,6 @@ final class LiveComponentProviderTest extends TestCase
         );
     }
 
-    /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
-    private function params(PositionConverter $converter, string $uri, string $text, int $offset): array
-    {
-        $position = $converter->toPosition($text, $offset);
-
-        return [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ];
-    }
-
     public function testOffersNoEmitCompletionsInsidePhpComments(): void
     {
         $converter = new PositionConverter();
@@ -269,7 +259,7 @@ final class LiveComponentProviderTest extends TestCase
         $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
         $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
 
-        self::assertNull($provider->complete($this->params($converter, $uri, $text, strpos($text, 'search:c') + \strlen('search:c'))));
+        self::assertNull($provider->complete(LspRequests::offset($uri, $text, strpos($text, 'search:c') + \strlen('search:c'))));
     }
 
     public function testAttributesEmitCallsToTheirOwningLiveComponents(): void
