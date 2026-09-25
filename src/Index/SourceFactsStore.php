@@ -14,10 +14,6 @@ final class SourceFactsStore
     /** @var list<TFacts>|null */
     private ?array $effective = null;
 
-    public function __construct(private readonly SourceFactsOverlayOrder $overlayOrder = SourceFactsOverlayOrder::OverlaysLast)
-    {
-    }
-
     /** @param TFacts ...$facts */
     public function replaceSaved(SourceFactsInterface ...$facts): bool
     {
@@ -96,9 +92,7 @@ final class SourceFactsStore
     /** @return list<TFacts> */
     public function effective(): array
     {
-        return $this->effective ??= SourceFactsOverlayOrder::PreserveSavedPosition === $this->overlayOrder
-            ? array_values(array_replace($this->saved, $this->overlays))
-            : [...array_values(array_diff_key($this->saved, $this->overlays)), ...array_values($this->overlays)];
+        return $this->effective ??= array_values(array_replace($this->saved, $this->overlays));
     }
 
     /**

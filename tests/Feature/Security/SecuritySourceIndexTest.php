@@ -12,7 +12,7 @@ use Symfony\Lsp\Feature\Security\SecuritySymbolKind;
 
 final class SecuritySourceIndexTest extends TestCase
 {
-    public function testOverlaysShadowSavedFactsAfterUnshadowedSources(): void
+    public function testOverlaysKeepTheSavedSourcePosition(): void
     {
         $index = new SecuritySourceIndex();
         $index->replace(
@@ -21,7 +21,7 @@ final class SecuritySourceIndexTest extends TestCase
         );
         $index->overlay($this->facts('file:///first.php', 'ROLE_USER'));
 
-        self::assertSame(['file:///second.php', 'file:///first.php'], array_map(static fn (SecuritySourceSymbol $symbol): string => $symbol->uri, $index->symbols(SecuritySymbolKind::Role, 'ROLE_USER')));
+        self::assertSame(['file:///first.php', 'file:///second.php'], array_map(static fn (SecuritySourceSymbol $symbol): string => $symbol->uri, $index->symbols(SecuritySymbolKind::Role, 'ROLE_USER')));
 
         $index->removeOverlay('file:///first.php');
 

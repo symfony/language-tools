@@ -2,31 +2,21 @@
 
 namespace Symfony\Lsp\Tests\Index;
 
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Index\SourceFactsInterface;
-use Symfony\Lsp\Index\SourceFactsOverlayOrder;
 use Symfony\Lsp\Index\SourceFactsStore;
 
 final class SourceFactsStoreTest extends TestCase
 {
-    /** @param list<string> $expected */
-    #[DataProvider('overlayOrderProvider')]
-    public function testAppliesTheSelectedOverlayOrder(SourceFactsOverlayOrder $order, array $expected): void
+    public function testKeepsTheSavedPositionOfAnOverlaidDocument(): void
     {
         /** @var SourceFactsStore<StoreSourceFacts> $store */
-        $store = new SourceFactsStore($order);
+        $store = new SourceFactsStore();
         $store->replaceSaved(new StoreSourceFacts('first', 'saved-first'), new StoreSourceFacts('second', 'saved-second'));
         $store->replaceOverlay(new StoreSourceFacts('first', 'overlay-first'));
+        $store->replaceOverlay(new StoreSourceFacts('unsaved', 'overlay-unsaved'));
 
-        self::assertSame($expected, array_map(static fn (StoreSourceFacts $facts): string => $facts->value, $store->effective()));
-    }
-
-    /** @return iterable<string, array{SourceFactsOverlayOrder, list<string>}> */
-    public static function overlayOrderProvider(): iterable
-    {
-        yield 'saved position' => [SourceFactsOverlayOrder::PreserveSavedPosition, ['overlay-first', 'saved-second']];
-        yield 'overlays last' => [SourceFactsOverlayOrder::OverlaysLast, ['saved-second', 'overlay-first']];
+        self::assertSame(['overlay-first', 'saved-second', 'overlay-unsaved'], array_map(static fn (StoreSourceFacts $facts): string => $facts->value, $store->effective()));
     }
 
     public function testReturnsTheEffectiveFactsForAUri(): void
@@ -59,7 +49,7 @@ final class SourceFactsStoreTest extends TestCase
         self::assertSame(['saved-first', 'saved-second'], array_map(static fn (StoreSourceFacts $facts): string => $facts->value, $store->effective()));
 
         $store->replaceOverlay(new StoreSourceFacts('first', 'overlay-first'));
-        self::assertSame(['saved-second', 'overlay-first'], array_map(static fn (StoreSourceFacts $facts): string => $facts->value, $store->effective()));
+        self::assertSame(['overlay-first', 'saved-second'], array_map(static fn (StoreSourceFacts $facts): string => $facts->value, $store->effective()));
 
         $store->removeOverlay('first');
         $store->removeSaved('second');

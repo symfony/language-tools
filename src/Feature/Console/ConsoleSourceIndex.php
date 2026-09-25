@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Console;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
-use Symfony\Lsp\Index\SourceFactsOverlayOrder;
 
 /** @extends AbstractSourceFactsIndex<ConsoleSourceFacts> */
 final class ConsoleSourceIndex extends AbstractSourceFactsIndex
@@ -14,11 +13,6 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
 
     /** @var array<string, list<ConsoleCommandDeclaration>> */
     private array $declarations = [];
-
-    public function __construct()
-    {
-        parent::__construct(SourceFactsOverlayOrder::PreserveSavedPosition);
-    }
 
     public function definition(string $className): ConsoleEffectiveDefinition
     {

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep results stable when a file is opened, so opening one of two files that declare the same name no longer changes which declaration wins
 ## 0.22.0 (2026-09-25)
 
 - Check YAML configuration keys and values in every environment block

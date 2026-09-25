@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
-use Symfony\Lsp\Index\SourceFactsOverlayOrder;
 
 /** @extends AbstractSourceFactsIndex<MetadataSourceFacts> */
 final class MetadataSourceIndex extends AbstractSourceFactsIndex
@@ -21,11 +20,6 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
 
     /** @var array<string, string> */
     private array $formDataClasses = [];
-
-    public function __construct()
-    {
-        parent::__construct(SourceFactsOverlayOrder::PreserveSavedPosition);
-    }
 
     /** @return list<MetadataSourceSymbol> */
     public function symbols(MetadataSymbolKind $kind, ?string $name = null): array

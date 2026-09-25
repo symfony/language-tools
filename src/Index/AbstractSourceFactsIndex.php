@@ -12,9 +12,9 @@ abstract class AbstractSourceFactsIndex implements SourceFactsIndexInterface
     /** @var SourceFactsStore<TFacts> */
     private readonly SourceFactsStore $facts;
 
-    public function __construct(SourceFactsOverlayOrder $overlayOrder = SourceFactsOverlayOrder::OverlaysLast)
+    public function __construct()
     {
-        $this->facts = new SourceFactsStore($overlayOrder);
+        $this->facts = new SourceFactsStore();
     }
 
     /** @param TFacts ...$facts */

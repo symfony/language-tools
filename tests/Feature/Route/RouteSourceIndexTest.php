@@ -32,8 +32,8 @@ final class RouteSourceIndexTest extends TestCase
         $index->overlay($overlayFirst);
 
         self::assertSame($overlayFirst, $index->factsForUri($firstUri));
-        self::assertSame([2, 3], $this->declarationLines($index, 'shared'));
-        self::assertSame([2, 3], $this->referenceLines($index, 'shared'));
+        self::assertSame([3, 2], $this->declarationLines($index, 'shared'));
+        self::assertSame([3, 2], $this->referenceLines($index, 'shared'));
         self::assertSame([3], array_map(
             static fn (RouteReference $reference): int => $reference->range->start->line,
             $index->referencesForUri($firstUri),

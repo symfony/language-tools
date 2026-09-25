@@ -54,6 +54,18 @@ final class DoctrineIndexTest extends TestCase
         self::assertSame($second, $index->entity('App\\RuntimeSecond'));
     }
 
+    public function testOpeningADocumentDoesNotChangeWhichDuplicateEntityWins(): void
+    {
+        $index = new DoctrineIndex();
+        $first = new DoctrineSourceFacts('file:///src/First.php', [new DoctrineEntity('App\\Duplicate', 'file:///src/First.php', $this->range(), null, [])], [], []);
+        $second = new DoctrineSourceFacts('file:///src/Second.php', [new DoctrineEntity('App\\Duplicate', 'file:///src/Second.php', $this->range(), null, [])], [], []);
+        $index->replace($first, $second);
+
+        $index->overlay($first);
+
+        self::assertSame('file:///src/First.php', $index->entity('App\\Duplicate')?->uri);
+    }
+
     /** @return array{DoctrineSourceFacts, DoctrineEntity, DoctrineRepository, DoctrineSourceSymbol} */
     private function facts(string $name): array
     {

@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
-use Symfony\Lsp\Index\SourceFactsOverlayOrder;
 
 /** @extends AbstractSourceFactsIndex<AssetSourceFacts> */
 final class AssetSourceIndex extends AbstractSourceFactsIndex
@@ -18,11 +17,6 @@ final class AssetSourceIndex extends AbstractSourceFactsIndex
 
     /** @var array<string, list<string>> */
     private array $declarationNames = [];
-
-    public function __construct()
-    {
-        parent::__construct(SourceFactsOverlayOrder::PreserveSavedPosition);
-    }
 
     /** @return list<AssetSourceSymbol> */
     public function symbols(AssetSymbolKind $kind, ?string $name = null): array
