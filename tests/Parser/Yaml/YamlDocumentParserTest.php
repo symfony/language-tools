@@ -16,6 +16,7 @@ use Symfony\Lsp\Parser\Yaml\YamlScalar;
 use Symfony\Lsp\Parser\Yaml\YamlScalarDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlScalarStyle;
 use Symfony\Lsp\Parser\Yaml\YamlSequenceItem;
+use Symfony\Lsp\Tests\Support\RecordingTreeSitterParser;
 
 final class YamlDocumentParserTest extends TestCase
 {
@@ -79,6 +80,108 @@ final class YamlDocumentParserTest extends TestCase
 
         self::assertSame(['framework', 'messenger', 'routing'], $parser->parentPath($source, (int) strpos($source, 'App\Message')));
         self::assertSame(['framework', 'messenger'], $parser->parentPath($source, (int) strpos($source, 'routing:')));
+    }
+
+    /** @param list<string> $expected */
+    #[DataProvider('incompleteInputProvider')]
+    public function testResolvesTheParentPathOnIncompleteTrailingInput(string $yaml, array $expected): void
+    {
+        $cursor = strpos($yaml, '|');
+        self::assertIsInt($cursor);
+        $source = str_replace('|', '', $yaml);
+        $parser = new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
+
+        self::assertSame($expected, $parser->parentPath($source, $cursor));
+    }
+
+    /** @return iterable<string, array{string, list<string>}> */
+    public static function incompleteInputProvider(): iterable
+    {
+        yield 'unfinished key' => [<<<'YAML'
+            framework:
+                messenger:
+                    default_bus: command.bus
+                    rou|
+            YAML, ['framework', 'messenger']];
+        yield 'after a colon' => [<<<'YAML'
+            framework:
+                cache:
+                    app: |
+            YAML, ['framework', 'cache', 'app']];
+        yield 'unfinished value' => [<<<'YAML'
+            framework:
+                cache:
+                    app: cache.ada|
+            YAML, ['framework', 'cache']];
+        yield 'indented blank line' => [<<<'YAML'
+            framework:
+                messenger:
+                    transports:
+            |
+            YAML, ['framework', 'messenger', 'transports']];
+        yield 'unfinished sequence item' => [<<<'YAML'
+            security:
+                role_hierarchy:
+                    ROLE_ADMIN:
+                        - ROLE_US|
+            YAML, ['security', 'role_hierarchy', 'ROLE_ADMIN']];
+        yield 'unterminated flow sequence' => [<<<'YAML'
+            framework:
+                messenger:
+                    routing:
+                        App\Message\Report: [as|
+            YAML, ['framework', 'messenger', 'routing']];
+        yield 'unterminated flow mapping' => [<<<'YAML'
+            services:
+                App\Foo:
+                    tags:
+            |            - { name: 
+            YAML, ['services', 'App\Foo', 'tags']];
+        yield 'environment section' => [<<<'YAML'
+            when@test:
+                framework:
+                    router:
+            |
+            YAML, ['framework', 'router']];
+    }
+
+    public function testReusesTheParsedDocumentAcrossAlternatingCalls(): void
+    {
+        $source = <<<'YAML'
+            framework:
+                messenger:
+                    default_bus: command.bus
+                    routing:
+                        App\Message\Report: [as
+            YAML;
+        $inner = new RecordingTreeSitterParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
+        $parser = new YamlDocumentParser($inner);
+
+        $parser->parentPath($source, (int) strpos($source, 'App\Message'));
+        $parser->parse($source);
+        $parser->parentPath($source, (int) strpos($source, 'routing:'));
+        $parser->parse($source);
+        $parser->parentPath($source."\n", 0);
+
+        self::assertSame([['yaml', $source], ['yaml', $source."\n"]], $inner->calls);
+    }
+
+    public function testParsesAgainOnlyWhenTheReusedDocumentLacksScalars(): void
+    {
+        $source = <<<'YAML'
+            framework:
+                router:
+                    utf8: true
+            YAML;
+        $inner = new RecordingTreeSitterParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
+        $parser = new YamlDocumentParser($inner);
+
+        $parser->parse($source);
+        $document = $parser->parseDocument($source);
+
+        self::assertSame($document, $parser->parseDocument($source));
+        self::assertSame($document->mappings, $parser->parse($source));
+        self::assertSame([['yaml', $source], ['yaml', $source]], $inner->calls);
     }
 
     public function testKeepsEnvironmentScopeOutsideTheConfigurationPath(): void

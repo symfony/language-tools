@@ -8,6 +8,10 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
 
 final class YamlDocumentParser
 {
+    private ?string $source = null;
+    private bool $collectedScalars = false;
+    private ?YamlDocument $document = null;
+
     public function __construct(
         private readonly TreeSitterParserInterface $parser,
         private readonly YamlScalarDecoder $scalarDecoder = new YamlScalarDecoder(),
@@ -28,6 +32,9 @@ final class YamlDocumentParser
 
     private function parseSource(string $source, bool $collectScalars): YamlDocument
     {
+        if ($source === $this->source && null !== $this->document && ($this->collectedScalars || !$collectScalars)) {
+            return $this->document;
+        }
         $mappings = [];
         $scalars = [];
         $tree = $this->parser->parse('yaml', $source);
@@ -40,19 +47,26 @@ final class YamlDocumentParser
             }
         }
 
-        return new YamlDocument($mappings, $scalars);
+        $this->source = $source;
+        $this->collectedScalars = $collectScalars;
+
+        return $this->document = new YamlDocument($mappings, $scalars);
     }
 
     /** @return list<string> */
     public function parentPath(string $source, int $offset): array
     {
-        $mappings = $this->parse(substr($source, 0, $offset));
-        if ([] === $mappings) {
+        $mapping = null;
+        foreach ($this->parse($source) as $candidate) {
+            if ($candidate->keyEndByte < $offset) {
+                $mapping = $candidate;
+            }
+        }
+        if (null === $mapping) {
             return [];
         }
-        $mapping = $mappings[array_key_last($mappings)];
 
-        return '' === $mapping->value ? $mapping->path : \array_slice($mapping->path, 0, -1);
+        return '' === $mapping->value || $mapping->valueStartByte >= $offset ? $mapping->path : \array_slice($mapping->path, 0, -1);
     }
 
     /**
