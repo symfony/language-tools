@@ -196,6 +196,50 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertContains('--error-details=1', $processRunner->command);
     }
 
+    public function testLogsSectionWarningsInVerboseModeOnly(): void
+    {
+        $source = $this->temporaryDirectory.'/source.php';
+        file_put_contents($source, '<?php');
+        $payload = json_encode([
+            'schemaVersion' => 1,
+            'sections' => [
+                'twig' => ['complete' => false, 'paths' => [], 'warnings' => ['The debug:twig command is unavailable.', 42]],
+                'assets' => ['assetsComplete' => false, 'warnings' => [\sprintf('Asset path not found: %s/assets', $this->temporaryDirectory)]],
+                'routes' => ['complete' => true, 'items' => [], 'warnings' => []],
+            ],
+        ], \JSON_THROW_ON_ERROR);
+        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $silent = new CapturingWritableStream();
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
+            new CapturingProcessRunner(new ProcessResult(0, $payload, '')),
+            self::snapshotLoaders(),
+            self::projects($project),
+            logger: new ServerLogger($silent, new SensitiveDataRedactor()),
+        );
+
+        $initializer->initialize($project);
+
+        self::assertSame('', $silent->contents());
+
+        $output = new CapturingWritableStream();
+        $logger = new ServerLogger($output, new SensitiveDataRedactor());
+        $logger->configure('verbose');
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
+            new CapturingProcessRunner(new ProcessResult(0, $payload, '')),
+            self::snapshotLoaders(),
+            self::projects($project),
+            logger: $logger,
+        );
+
+        $initializer->initialize($project);
+
+        self::assertSame(
+            '[debug] The "twig" runtime metadata section reported: The debug:twig command is unavailable.'."\n"
+            .'[debug] The "assets" runtime metadata section reported: Asset path not found: ./assets'."\n",
+            $output->contents(),
+        );
+    }
+
     public function testNeverLoadsMetadataForAProjectRemovedWhileTheBridgeRan(): void
     {
         $source = $this->temporaryDirectory.'/source.php';

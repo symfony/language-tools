@@ -105,6 +105,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             if (null !== $timings) {
                 $this->statuses->runtimeTimings($project, $timings);
             }
+            $this->logSectionWarnings($project, $snapshot);
             $this->configurationValidation->load($project, $snapshot);
 
             $errors = $snapshot['errors'] ?? null;
@@ -157,6 +158,37 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             $this->restoreSnapshot($project, $bridge, $loadedSections);
 
             throw $error;
+        }
+    }
+
+    /**
+     * A section reports what it could not describe as a warning, which explains
+     * why its metadata is incomplete without failing the refresh.
+     *
+     * @param array<array-key, mixed> $snapshot
+     */
+    private function logSectionWarnings(Project $project, array $snapshot): void
+    {
+        if (!$this->logger->isVerbose()) {
+            return;
+        }
+
+        $sections = $snapshot['sections'] ?? null;
+        foreach (\is_array($sections) ? $sections : [] as $name => $section) {
+            if (!\is_string($name) || !\is_array($section)) {
+                continue;
+            }
+            $warnings = $section['warnings'] ?? null;
+            foreach (\is_array($warnings) ? $warnings : [] as $warning) {
+                if (!\is_string($warning) || '' === $warning) {
+                    continue;
+                }
+                $this->logger->verbose(\sprintf(
+                    'The "%s" runtime metadata section reported: %s',
+                    $name,
+                    $this->truncator->truncate($warning, 500),
+                ), [$project->rootPath]);
+            }
         }
     }
 
