@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Tool;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Tests\Support\ExecutableRunner;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
@@ -137,7 +138,7 @@ final class SmokeTestServerExecutableTest extends TestCase
     }
 
     /** @param list<string> $arguments */
-    private function runSmoke(array $arguments): \Symfony\Lsp\Tests\Support\ProcessResult
+    private function runSmoke(array $arguments): ProcessResult
     {
         $root = \dirname(__DIR__, 2);
 

@@ -3,8 +3,8 @@
 namespace Symfony\Lsp\Tests\Tool\Dogfood;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Tests\Support\ExecutableRunner;
-use Symfony\Lsp\Tests\Support\ProcessResult;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\CoverageAggregator;
 use Symfony\Lsp\Tools\Dogfood\SourceIdentity;

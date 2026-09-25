@@ -5,8 +5,8 @@ namespace Symfony\Lsp\Tests\Tool\Dogfood;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Tests\Support\ExecutableRunner;
-use Symfony\Lsp\Tests\Support\ProcessResult;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class DiscoverExecutableTest extends TestCase

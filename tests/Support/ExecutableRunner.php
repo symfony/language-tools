@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Support;
 
 use Amp\ByteStream\ClosedException;
 use Amp\Process\Process;
+use Symfony\Lsp\Runtime\ProcessResult;
 
 use function Amp\async;
 use function Amp\ByteStream\buffer;

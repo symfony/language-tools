@@ -4,8 +4,8 @@ namespace Symfony\Lsp\Tests\Tool;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Tests\Support\ExecutableRunner;
-use Symfony\Lsp\Tests\Support\ProcessResult;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class PublishVscodeTest extends TestCase
