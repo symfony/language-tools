@@ -3,25 +3,20 @@
 namespace Symfony\Lsp\Feature\Security;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\SourceSymbolTable;
 
 /** @extends AbstractSourceFactsIndex<SecuritySourceFacts> */
 final class SecuritySourceIndex extends AbstractSourceFactsIndex
 {
-    /** @var array<string, array<string, list<SecuritySourceSymbol>>> */
-    private array $symbols = [];
-
-    /** @var array<string, list<string>> */
-    private array $names = [];
-
-    /** @var array<string, list<string>> */
-    private array $declarationNames = [];
+    /** @var SourceSymbolTable<SecuritySourceSymbol> */
+    private SourceSymbolTable $symbols;
 
     /** @return list<SecuritySourceSymbol> */
     public function symbols(SecuritySymbolKind $kind, string $name): array
     {
         $this->derived();
 
-        return $this->symbols[$kind->value][$name] ?? [];
+        return $this->symbols->symbols($kind->value, $name);
     }
 
     /** @return list<string> */
@@ -29,7 +24,7 @@ final class SecuritySourceIndex extends AbstractSourceFactsIndex
     {
         $this->derived();
 
-        return $this->declarationNames[$kind->value] ?? [];
+        return $this->symbols->declarationNames($kind->value);
     }
 
     /** @return list<string> */
@@ -37,35 +32,16 @@ final class SecuritySourceIndex extends AbstractSourceFactsIndex
     {
         $this->derived();
 
-        return $declarationsOnly ? $this->declarationNames[$kind->value] ?? [] : $this->names[$kind->value] ?? [];
+        return $declarationsOnly ? $this->symbols->declarationNames($kind->value) : $this->symbols->names($kind->value);
     }
 
     protected function build(): void
     {
-        $this->symbols = [];
-        $names = [];
-        $declarationNames = [];
-        foreach ($this->facts() as $source) {
-            foreach ($source->symbols as $symbol) {
-                $kind = $symbol->kind->value;
-                $name = $symbol->name;
-                $this->symbols[$kind][$name][] = $symbol;
-                $names[$kind][$name] = true;
-                if ($symbol->declaration) {
-                    $declarationNames[$kind][$name] = true;
-                }
+        $this->symbols = new SourceSymbolTable();
+        foreach ($this->facts() as $facts) {
+            foreach ($facts->symbols as $symbol) {
+                $this->symbols->add($symbol->kind->value, $symbol);
             }
-        }
-
-        $this->names = [];
-        foreach ($names as $kind => $kindNames) {
-            $this->names[$kind] = array_keys($kindNames);
-            sort($this->names[$kind]);
-        }
-        $this->declarationNames = [];
-        foreach ($declarationNames as $kind => $kindNames) {
-            $this->declarationNames[$kind] = array_keys($kindNames);
-            sort($this->declarationNames[$kind]);
         }
     }
 }

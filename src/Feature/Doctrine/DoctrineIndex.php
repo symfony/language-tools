@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\SourceSymbolTable;
 
 /** @extends AbstractSourceFactsIndex<DoctrineSourceFacts> */
 final class DoctrineIndex extends AbstractSourceFactsIndex
@@ -22,8 +23,8 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     /** @var array<string, DoctrineRepository> */
     private array $repositoriesByClass = [];
 
-    /** @var array<string, array<string, list<DoctrineSourceSymbol>>> */
-    private array $symbols = [];
+    /** @var SourceSymbolTable<DoctrineSourceSymbol> */
+    private SourceSymbolTable $symbols;
 
     public function replaceRuntime(DoctrineEntity ...$entities): void
     {
@@ -65,7 +66,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     public function relatedSymbols(DoctrineSourceSymbol $selected): array
     {
         $this->derived();
-        $symbols = $this->symbols[$selected->kind->value][$selected->name] ?? [];
+        $symbols = $this->symbols->symbols($selected->kind->value, $selected->name);
         if (DoctrineSymbolKind::Field !== $selected->kind) {
             return $symbols;
         }
@@ -86,7 +87,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
 
         $firstSourceEntities = [];
         $this->repositoriesByClass = [];
-        $this->symbols = [];
+        $this->symbols = new SourceSymbolTable();
         foreach ($this->facts() as $facts) {
             foreach ($facts->entities as $entity) {
                 $firstSourceEntities[$entity->className] ??= $entity;
@@ -96,7 +97,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
                 $this->repositoriesByClass[$repository->className] ??= $repository;
             }
             foreach ($facts->symbols as $symbol) {
-                $this->symbols[$symbol->kind->value][$symbol->name][] = $symbol;
+                $this->symbols->add($symbol->kind->value, $symbol);
             }
         }
 

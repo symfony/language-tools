@@ -3,18 +3,13 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\SourceSymbolTable;
 
 /** @extends AbstractSourceFactsIndex<MetadataSourceFacts> */
 final class MetadataSourceIndex extends AbstractSourceFactsIndex
 {
-    /** @var array<string, list<MetadataSourceSymbol>> */
-    private array $symbols = [];
-
-    /** @var array<string, array<string, list<MetadataSourceSymbol>>> */
-    private array $symbolsByName = [];
-
-    /** @var array<string, list<string>> */
-    private array $names = [];
+    /** @var SourceSymbolTable<MetadataSourceSymbol> */
+    private SourceSymbolTable $symbols;
 
     /** @var array<string, string> */
     private array $formDataClasses = [];
@@ -24,7 +19,7 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
     {
         $this->derived();
 
-        return null === $name ? $this->symbols[$kind->value] ?? [] : $this->symbolsByName[$kind->value][$name] ?? [];
+        return $this->symbols->symbols($kind->value, $name);
     }
 
     /** @return list<string> */
@@ -32,7 +27,7 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
     {
         $this->derived();
 
-        return $this->names[$kind->value] ?? [];
+        return $this->symbols->names($kind->value);
     }
 
     public function formDataClass(string $formClass): ?string
@@ -44,27 +39,15 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
 
     protected function build(): void
     {
-        $this->symbols = [];
-        $this->symbolsByName = [];
+        $this->symbols = new SourceSymbolTable();
         $this->formDataClasses = [];
-        $names = [];
         foreach ($this->facts() as $facts) {
             foreach ($facts->formDataClasses as $formDataClass) {
                 $this->formDataClasses[strtolower(ltrim($formDataClass->formClass, '\\'))] = $formDataClass->dataClass;
             }
             foreach ($facts->symbols as $symbol) {
-                $kind = $symbol->kind->value;
-                $name = $symbol->name;
-                $this->symbols[$kind][] = $symbol;
-                $this->symbolsByName[$kind][$name][] = $symbol;
-                $names[$kind]['s'.$name] = $name;
+                $this->symbols->add($symbol->kind->value, $symbol);
             }
-        }
-
-        $this->names = [];
-        foreach ($names as $kind => $kindNames) {
-            $this->names[$kind] = array_values($kindNames);
-            sort($this->names[$kind]);
         }
     }
 }

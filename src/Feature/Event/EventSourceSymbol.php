@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\NamedSourceSymbolInterface;
 
-final class EventSourceSymbol
+final class EventSourceSymbol implements NamedSourceSymbolInterface
 {
     public function __construct(
         public readonly string $name,
