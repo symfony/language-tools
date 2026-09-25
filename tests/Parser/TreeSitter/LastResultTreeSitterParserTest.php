@@ -4,8 +4,7 @@ namespace Symfony\Lsp\Tests\Parser\TreeSitter;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
+use Symfony\Lsp\Tests\Support\RecordingTreeSitterParser;
 
 final class LastResultTreeSitterParserTest extends TestCase
 {
@@ -25,18 +24,5 @@ final class LastResultTreeSitterParserTest extends TestCase
             ['twig', 'same source'],
             ['yaml', 'same source'],
         ], $inner->calls);
-    }
-}
-
-final class RecordingTreeSitterParser implements TreeSitterParserInterface
-{
-    /** @var list<array{string, string}> */
-    public array $calls = [];
-
-    public function parse(string $language, string $source): TreeSitterTree
-    {
-        $this->calls[] = [$language, $source];
-
-        return new TreeSitterTree(false, []);
     }
 }
