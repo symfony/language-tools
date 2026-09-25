@@ -120,6 +120,25 @@ final class PhpDocument
         return $creations;
     }
 
+    /**
+     * The innermost argument a cursor offset sits in, across method calls,
+     * object creations and attributes.
+     */
+    public function argumentCursorAt(int $offset): ?PhpArgumentCursor
+    {
+        $cursor = null;
+        foreach ([$this->methodCalls, $this->objectCreations, $this->attributes] as $calls) {
+            foreach ($calls as $call) {
+                $candidate = PhpArgumentCursor::at($call, $offset);
+                if (null !== $candidate && (null === $cursor || $this->isInnerArgument($candidate->argument, $cursor->argument))) {
+                    $cursor = $candidate;
+                }
+            }
+        }
+
+        return $cursor;
+    }
+
     public function receiverCall(PhpMethodCall $call): ?PhpMethodCall
     {
         $receiver = $call->receiverContext;
@@ -252,6 +271,12 @@ final class PhpDocument
         }
 
         return $attributes;
+    }
+
+    private function isInnerArgument(PhpArgument $argument, PhpArgument $outer): bool
+    {
+        return $argument->startOffset > $outer->startOffset
+            || $argument->startOffset === $outer->startOffset && $argument->endOffset < $outer->endOffset;
     }
 
     private function isVariableVisibleFromScope(string $name, int $declarationScopeStartOffset, int $scopeStartOffset): bool
