@@ -688,11 +688,11 @@ final class TemplateProviderTest extends TestCase
         $params = ['textDocument' => ['uri' => $usageUri]];
 
         $withoutRuntimeMetadata = $provider->diagnostics($params);
-        self::assertNull($withoutRuntimeMetadata);
+        self::assertSame([], $withoutRuntimeMetadata);
 
         $indexes->forProject($project)->replaceRuntime(true, true, ['ux:icon'], 'components', ['ux:icon']);
         $withoutTemplateMetadata = $provider->diagnostics($params);
-        self::assertNull($withoutTemplateMetadata);
+        self::assertSame([], $withoutTemplateMetadata);
 
         $range = new Range(new Position(0, 0), new Position(0, 0));
         $templateIndexes->forProject($project)->replaceRuntime(
@@ -713,7 +713,7 @@ final class TemplateProviderTest extends TestCase
 
         $indexes->forProject($project)->replaceRuntime(false, true, [], 'components');
         $withIncompleteRuntimeNames = $provider->diagnostics($params);
-        self::assertNull($withIncompleteRuntimeNames);
+        self::assertSame([], $withIncompleteRuntimeNames);
     }
 
     public function testDoesNotDiagnoseComponentsWithoutTheTwigComponentIntegration(): void
@@ -739,7 +739,7 @@ final class TemplateProviderTest extends TestCase
         $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
         $provider = new TwigComponentDiagnosticProvider($documentResolver, new LspProtocolMapper(), $indexes, $templateIndexes, $componentResolver);
 
-        self::assertNull($provider->diagnostics(['textDocument' => ['uri' => $usageUri]]));
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $usageUri]]));
     }
 
     public function testCompletesBundleProvidedAndAnonymousComponentNames(): void
@@ -1199,8 +1199,20 @@ final class TemplateProviderTest extends TestCase
         self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testReportsNoTemplateDiagnosticsWhileTheTemplateIndexIsIncomplete(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = "{% include 'missing.html.twig' %}";
+        [, $indexed] = $this->providers($uri, 'twig', $text);
+        self::assertSame(['template.not_found'], array_column($indexed->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+
+        [, $navigation] = $this->providers($uri, 'twig', $text, indexComplete: false);
+
+        self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     /** @return array{TemplateCompletionHandler, TemplateNavigationProvider, PositionConverter} */
-    private function providers(string $uri, string $languageId, string $text, bool $indexReferences = true): array
+    private function providers(string $uri, string $languageId, string $text, bool $indexReferences = true, bool $indexComplete = true): array
     {
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
@@ -1209,7 +1221,7 @@ final class TemplateProviderTest extends TestCase
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $indexes = $this->templateIndexes($classIndexes);
         $indexes->forProject($project)->replaceRuntime(
-            true,
+            $indexComplete,
             new TemplateDeclaration(
                 'article/show.html.twig',
                 'file:///workspace/templates/article/show.html.twig',

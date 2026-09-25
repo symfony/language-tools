@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Publish an empty diagnostic list while a runtime index is incomplete, so stale route, template, Twig component, service and parameter diagnostics no longer stay on screen
 - Keep results stable when a file is opened, so opening one of two files that declare the same name no longer changes which declaration wins
 - Treat `%%` in XML service files as an escaped percent sign, so a literal like `%%message%%` is no longer read as a parameter reference
 - Clear the Doctrine metadata index when a project no longer has Doctrine installed

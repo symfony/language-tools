@@ -73,6 +73,19 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
+    public function testReportsNoDiagnosticsWhileBothRuntimeIndexesAreIncomplete(): void
+    {
+        $uri = 'file:///workspace/config/services.yaml';
+        $text = <<<'YAML'
+            services:
+                app.consumer:
+                    arguments: ['@missing.service', '%missing.parameter%']
+            YAML;
+        $provider = $this->provider($uri, $text, indexesComplete: false);
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+    }
+
     /** @param list<string> $expectedCodes */
     #[DataProvider('environmentScopedFileProvider')]
     public function testScopesConventionalEnvironmentFiles(string $uri, string $environment, array $expectedCodes): void
@@ -106,17 +119,17 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
     }
 
     /** @param list<string> $parameters */
-    private function provider(string $uri, string $text, string $environment = 'dev', array $parameters = []): DependencyInjectionDiagnosticProvider
+    private function provider(string $uri, string $text, string $environment = 'dev', array $parameters = [], bool $indexesComplete = true): DependencyInjectionDiagnosticProvider
     {
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $serviceIndexes = new ServiceIndexRegistry();
-        $serviceIndexes->forProject($project)->replace(true);
+        $serviceIndexes->forProject($project)->replace($indexesComplete);
         $parameterIndexes = new ParameterIndexRegistry();
         $parameterIndexes->forProject($project)->replace(
-            true,
+            $indexesComplete,
             ...array_map(static fn (string $name): Parameter => new Parameter($name, null), $parameters),
         );
         $converter = new PositionConverter();

@@ -42,7 +42,7 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         }
         $routeIndex = $this->routeIndexes->forProject($request->project);
         if (!$routeIndex->isComplete()) {
-            return null;
+            return [];
         }
 
         $diagnostics = [];

@@ -30,10 +30,10 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
         }
         $index = $this->indexes->forProject($request->project);
         if (!$index->isComplete() || !$index->isRuntimeComplete() || !$index->isRuntimeEnabled()) {
-            return null;
+            return [];
         }
         if (!$this->templates->forProject($request->project)->isComplete()) {
-            return null;
+            return [];
         }
         $facts = $index->factsForUri($request->document->uri);
         $diagnostics = [];

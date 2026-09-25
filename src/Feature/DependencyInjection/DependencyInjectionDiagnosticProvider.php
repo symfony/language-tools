@@ -49,7 +49,7 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
         $serviceIndex = $this->serviceIndexes->forProject($request->project);
         $parameterIndex = $this->parameterIndexes->forProject($request->project);
         if (!$serviceIndex->isComplete() && !$parameterIndex->isComplete()) {
-            return null;
+            return [];
         }
 
         $diagnostics = [];

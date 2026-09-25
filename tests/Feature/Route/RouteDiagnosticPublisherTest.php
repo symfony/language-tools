@@ -365,7 +365,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
     }
 
-    public function testDoesNotDiagnoseBeforeCompleteRuntimeMetadataIsAvailable(): void
+    public function testPublishesEmptyDiagnosticsBeforeCompleteRuntimeMetadataIsAvailable(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
         $client = new DiagnosticClient();
@@ -406,7 +406,36 @@ final class RouteDiagnosticPublisherTest extends TestCase
 
         $publisher->publish(['textDocument' => ['uri' => $uri]]);
 
-        self::assertSame([], $client->notifications);
+        self::assertCount(1, $client->notifications);
+        self::assertSame([], $client->notifications[0]['params']['diagnostics']);
+    }
+
+    public function testClearsPublishedDiagnosticsWhenRuntimeMetadataIsDropped(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        [$publisher, $client, $project, $routeIndexes] = $this->publisher($uri, <<<'PHP'
+            <?php
+            class ArticleController extends AbstractController
+            {
+                public function show(): void
+                {
+                    $this->generateUrl('missing_route');
+                }
+            }
+            PHP);
+
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        $diagnostics = $client->notifications[0]['params']['diagnostics'];
+        self::assertIsArray($diagnostics);
+        self::assertIsArray($diagnostics[0] ?? null);
+        self::assertSame('route.not_found', $diagnostics[0]['code'] ?? null);
+
+        $routeIndexes->removeProject($project);
+        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+
+        self::assertCount(2, $client->notifications);
+        self::assertSame([], $client->notifications[1]['params']['diagnostics']);
     }
 
     public function testRepublishesOpenDocumentDiagnosticsAfterRuntimeRefresh(): void
@@ -493,7 +522,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
      * @param Route|list<Route>|null $route
      * @param list<string>           $contextParameters
      *
-     * @return array{DiagnosticProviderRegistry, DiagnosticClient, Project}
+     * @return array{DiagnosticProviderRegistry, DiagnosticClient, Project, RouteIndexRegistry}
      */
     private function publisher(
         string $uri,
@@ -546,6 +575,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             new DiagnosticProviderRegistry($client, $documents, $projects, $collector),
             $client,
             $project,
+            $routeIndexes,
         ];
     }
 }

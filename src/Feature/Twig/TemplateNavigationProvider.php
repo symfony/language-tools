@@ -93,7 +93,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         }
         $index = $this->indexes->forProject($request->project);
         if (!$index->isComplete()) {
-            return null;
+            return [];
         }
         if ('twig' === $request->document->languageId && !$index->isRuntimeTemplateUri($request->document->uri)) {
             return [];
