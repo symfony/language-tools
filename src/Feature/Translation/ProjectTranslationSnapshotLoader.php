@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\SnapshotSection;
 
 final class ProjectTranslationSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -16,17 +17,18 @@ final class ProjectTranslationSnapshotLoader implements RuntimeSnapshotLoaderInt
         return 'translations';
     }
 
-    public function load(Project $project, array $section): void
+    public function load(Project $project, SnapshotSection $section): void
     {
-        if (!\is_array($section['items'] ?? null)) {
-            return;
-        }
         $messages = [];
-        foreach ($section['items'] as $item) {
-            if (\is_array($item) && \is_string($item['key'] ?? null) && \is_string($item['domain'] ?? null) && \is_string($item['locale'] ?? null) && \is_string($item['message'] ?? null)) {
-                $messages[] = new TranslationMessage($item['key'], $item['domain'], $item['locale'], $item['message'], true === ($item['icu'] ?? false));
-            }
+        foreach ($section->items('items', 'key', 'domain', 'locale', 'message') as $item) {
+            $messages[] = new TranslationMessage(
+                $item->string('key'),
+                $item->string('domain'),
+                $item->string('locale'),
+                $item->string('message'),
+                $item->bool('icu'),
+            );
         }
-        $this->indexes->forProject($project)->replaceRuntime(true === ($section['complete'] ?? null), ...$messages);
+        $this->indexes->forProject($project)->replaceRuntime($section->complete(), ...$messages);
     }
 }

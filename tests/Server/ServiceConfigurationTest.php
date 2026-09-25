@@ -37,13 +37,14 @@ use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
+use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
 use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Runtime\RuntimeSnapshotState;
-use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
+use Symfony\Lsp\Runtime\SnapshotSection;
 use Symfony\Lsp\Server\ContainerFactory;
 
 final class ServiceConfigurationTest extends TestCase
@@ -92,7 +93,7 @@ final class ServiceConfigurationTest extends TestCase
             SourceFactsStore::class,
             PhpStringLiteralDecoder::class,
             TwigStringDecoder::class,
-            RuntimeSnapshotValues::class,
+            SnapshotSection::class,
         ] as $class) {
             self::assertFalse($container->hasDefinition($class), \sprintf('The manually constructed class "%s" is registered as a service.', $class));
         }
@@ -162,7 +163,7 @@ final class ServiceConfigurationTest extends TestCase
             self::assertInstanceOf(RuntimeSnapshotLoaderInterface::class, $loader);
             $loaders[] = $loader;
         }
-        $sections = (new RuntimeSnapshotLoaderRegistry($loaders))->sections();
+        $sections = (new RuntimeSnapshotLoaderRegistry($loaders, new ContainerPathMapper(new RuntimeConfiguration())))->sections();
         sort($sections);
         $bridgeSections = $this->bridgeSections();
         sort($bridgeSections);

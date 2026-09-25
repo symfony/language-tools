@@ -21,12 +21,14 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Runtime\BridgeExecutionException;
 use Symfony\Lsp\Runtime\BridgeInstaller;
+use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\PartialRuntimeMetadataException;
 use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Runtime\ProcessRunnerInterface;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
+use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 use Symfony\Lsp\Runtime\RuntimeSnapshotStore;
@@ -47,6 +49,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $registry->replace(array_values($projects));
 
         return $registry;
+    }
+
+    private static function snapshotLoaders(RuntimeSnapshotLoaderInterface ...$loaders): RuntimeSnapshotLoaderRegistry
+    {
+        return new RuntimeSnapshotLoaderRegistry($loaders, new ContainerPathMapper(new RuntimeConfiguration()));
     }
 
     protected function setUp(): void
@@ -104,10 +111,10 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $statuses = new ProjectIndexStatusRegistry();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry([
+            self::snapshotLoaders(
                 new ProjectRouteSnapshotLoader($indexes),
                 new ProjectServiceSnapshotLoader($serviceIndexes, $parameterIndexes),
-            ]),
+            ),
             self::projects($project),
             configuration: $configuration,
             statuses: $statuses,
@@ -153,7 +160,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $configuration->configure(['releaseMetadata' => false]);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             configuration: $configuration,
             releaseMetadataUrl: 'https://symfony.com/releases.json',
@@ -180,7 +187,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $logger->configure('verbose');
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             logger: $logger,
         );
@@ -211,7 +218,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $configuration = new RuntimeConfiguration();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
+            self::snapshotLoaders(new ProjectRouteSnapshotLoader($indexes)),
             $registry,
             configuration: $configuration,
         );
@@ -241,7 +248,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         ]);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             configuration: $configuration,
             releaseMetadataUrl: 'https://symfony.com/releases.json',
@@ -273,7 +280,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $configuration->configure(['kernel' => 'Api\Kernel']);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             configuration: $configuration,
         );
@@ -300,7 +307,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, '', '')),
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             configuration: $configuration,
         );
@@ -322,7 +329,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 'project' => ['symfonyBranch' => '5.4'],
                 'unsupportedSymfonyVersion' => true,
             ], \JSON_THROW_ON_ERROR), '')),
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
         );
@@ -345,7 +352,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
         );
@@ -365,7 +372,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
         );
@@ -402,7 +409,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $statuses = new ProjectIndexStatusRegistry();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
             statuses: $statuses,
@@ -455,10 +462,10 @@ final class ProjectRuntimeInitializerTest extends TestCase
                     ], 'parameters' => []],
                 ],
             ], \JSON_THROW_ON_ERROR), '')),
-            new RuntimeSnapshotLoaderRegistry([
+            self::snapshotLoaders(
                 new ProjectRouteSnapshotLoader($routeIndexes),
                 new ProjectServiceSnapshotLoader($serviceIndexes, new ParameterIndexRegistry()),
-            ]),
+            ),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
         );
@@ -518,10 +525,10 @@ final class ProjectRuntimeInitializerTest extends TestCase
                     ],
                 ],
             ], \JSON_THROW_ON_ERROR), '')),
-            new RuntimeSnapshotLoaderRegistry([
+            self::snapshotLoaders(
                 new ProjectRouteSnapshotLoader($routeIndexes),
                 new ProjectServiceSnapshotLoader($serviceIndexes, new ParameterIndexRegistry()),
-            ]),
+            ),
             $projects,
             configuration: $configuration,
             snapshotStore: $store,
@@ -577,7 +584,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         ], \JSON_THROW_ON_ERROR), ''));
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source, $bridgeInstaller))->build(
             $processRunner,
-            new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($routeIndexes)]),
+            self::snapshotLoaders(new ProjectRouteSnapshotLoader($routeIndexes)),
             $projects,
             configuration: $configuration,
             configurationValidationLoader: new ProjectConfigurationValidationSnapshotLoader($validations),
@@ -616,7 +623,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 'sections' => [],
                 'errors' => [['section' => 'runtime', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
             ], \JSON_THROW_ON_ERROR), '')),
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
             configurationValidationLoader: new ProjectConfigurationValidationSnapshotLoader($validations),
@@ -649,7 +656,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                         'routes' => ['complete' => true, 'items' => [['name' => 'homepage', 'path' => '/']]],
                     ],
                 ], \JSON_THROW_ON_ERROR), '')),
-                new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($firstIndexes)]),
+                self::snapshotLoaders(new ProjectRouteSnapshotLoader($firstIndexes)),
                 $projects,
                 configuration: $configuration,
                 snapshotStore: new RuntimeSnapshotStore($configuration, new Filesystem()),
@@ -667,7 +674,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $restored = new StatusRuntimeInitializer(
             (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
                 new CapturingProcessRunner(new ProcessResult(1, '', '')),
-                new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($restoredIndexes)]),
+                self::snapshotLoaders(new ProjectRouteSnapshotLoader($restoredIndexes)),
                 $projects,
                 configuration: $configuration,
                 snapshotStore: new RuntimeSnapshotStore($configuration, new Filesystem()),
@@ -712,7 +719,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $state->markReady($project);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source, $bridgeInstaller))->build(
             new CapturingProcessRunner(new ProcessResult(1, '', '')),
-            new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
+            self::snapshotLoaders(new ProjectRouteSnapshotLoader($indexes)),
             $projects,
             configuration: $configuration,
             snapshotStore: $store,
@@ -761,7 +768,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                     'sections' => [],
                     'errors' => [['section' => 'runtime', 'message' => 'CANARY_RUNTIME_SECTION_ERROR']],
                 ], \JSON_THROW_ON_ERROR), '')),
-                new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
+                self::snapshotLoaders(new ProjectRouteSnapshotLoader($indexes)),
                 $projects,
                 configuration: $configuration,
                 configurationValidationLoader: new ProjectConfigurationValidationSnapshotLoader($validations),
@@ -806,7 +813,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 $payload."\nCANARY_SHUTDOWN_OUTPUT\n",
                 "CANARY_SECRET_RUNTIME_OUTPUT\n",
             )),
-            new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
+            self::snapshotLoaders(new ProjectRouteSnapshotLoader($indexes)),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
             logger: $logger,
@@ -825,9 +832,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(1, '', "CANARY_SECRET_RUNTIME_OUTPUT\n")),
-            new RuntimeSnapshotLoaderRegistry([
+            self::snapshotLoaders(
                 new ProjectRouteSnapshotLoader(new RouteIndexRegistry()),
-            ]),
+            ),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
         );
@@ -858,7 +865,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 "Deprecated: something is deprecated in vendor/lib.php on line 1\n".$payload."\nstray shutdown output\n",
                 '',
             )),
-            new RuntimeSnapshotLoaderRegistry([new ProjectRouteSnapshotLoader($indexes)]),
+            self::snapshotLoaders(new ProjectRouteSnapshotLoader($indexes)),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
         );
@@ -879,7 +886,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 "Deprecated: something is deprecated in vendor/lib.php on line 1\n",
                 "CANARY_SECRET_RUNTIME_OUTPUT\n",
             )),
-            new RuntimeSnapshotLoaderRegistry([]),
+            self::snapshotLoaders(),
             self::projects($project),
             configuration: new RuntimeConfiguration(),
         );

@@ -6,8 +6,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\ProjectAssetSnapshotLoader;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ProjectAssetSnapshotLoaderTest extends TestCase
 {
@@ -15,7 +15,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace');
         $indexes = new AssetIndexRegistry();
-        (new ProjectAssetSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
+        (new ProjectAssetSnapshotLoader($indexes))->load($project, SnapshotSections::of($project, [
             'assetsComplete' => true,
             'importMapComplete' => true,
             'assets' => [[
@@ -29,7 +29,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
                 'entrypoint' => true,
                 'version' => null,
             ]],
-        ]);
+        ]));
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->assetsComplete());
@@ -44,7 +44,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['containerProjectRoot' => '/app']);
         $indexes = new AssetIndexRegistry();
-        (new ProjectAssetSnapshotLoader($indexes, new ContainerPathMapper($configuration)))->load($project, [
+        (new ProjectAssetSnapshotLoader($indexes))->load($project, SnapshotSections::of($project, [
             'assetsComplete' => true,
             'importMapComplete' => true,
             'assets' => [[
@@ -58,7 +58,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
                 'entrypoint' => true,
                 'version' => null,
             ]],
-        ]);
+        ], $configuration));
 
         $index = $indexes->forProject($project);
         self::assertSame('/workspace/assets/app.js', $index->asset('app.js')?->sourcePath);

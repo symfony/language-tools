@@ -2,7 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
+use Symfony\Lsp\Runtime\SnapshotSection;
 
 final class RouteSnapshotImporter
 {
@@ -11,59 +11,34 @@ final class RouteSnapshotImporter
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $section
-     */
-    public function load(array $section): void
+    public function load(SnapshotSection $section): void
     {
-        $items = $section['items'] ?? null;
-        if (!\is_array($items) || true !== ($section['complete'] ?? null)) {
+        // the index reports every replaced route set as complete, so an
+        // incomplete one would turn unknown route names into diagnostics
+        if (!$section->complete()) {
             return;
         }
 
         $routes = [];
-        foreach ($items as $item) {
-            if (!\is_array($item) || !\is_string($item['name'] ?? null)) {
-                continue;
-            }
-
+        foreach ($section->items('items', 'name') as $item) {
             $routes[] = new Route(
-                $item['name'],
-                \is_string($item['path'] ?? null) ? $item['path'] : null,
-                RuntimeSnapshotValues::stringList($item['methods'] ?? null),
-                RuntimeSnapshotValues::stringList($item['schemes'] ?? null),
-                \is_string($item['host'] ?? null) ? $item['host'] : null,
-                \is_string($item['controller'] ?? null) ? $item['controller'] : null,
-                RuntimeSnapshotValues::stringList($item['defaults'] ?? null),
-                $this->stringMap($item['requirements'] ?? null),
-                \is_string($item['alias'] ?? null) ? $item['alias'] : null,
-                \is_string($item['canonical'] ?? null) ? $item['canonical'] : null,
+                $item->string('name'),
+                $item->optionalString('path'),
+                $item->strings('methods'),
+                $item->strings('schemes'),
+                $item->optionalString('host'),
+                $item->optionalString('controller'),
+                $item->strings('defaults'),
+                $item->stringMap('requirements'),
+                $item->optionalString('alias'),
+                $item->optionalString('canonical'),
             );
         }
 
         $this->routeIndex->replaceRuntime(
-            RuntimeSnapshotValues::stringList($section['resources'] ?? null),
-            RuntimeSnapshotValues::stringList($section['contextParameters'] ?? null),
+            $section->strings('resources'),
+            $section->strings('contextParameters'),
             ...$routes,
         );
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function stringMap(mixed $values): array
-    {
-        if (!\is_array($values)) {
-            return [];
-        }
-
-        $result = [];
-        foreach ($values as $key => $value) {
-            if (\is_string($key) && \is_string($value)) {
-                $result[$key] = $value;
-            }
-        }
-
-        return $result;
     }
 }

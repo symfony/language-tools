@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Metadata\MetadataIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\ProjectMetadataSnapshotLoader;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ProjectMetadataSnapshotLoaderTest extends TestCase
 {
@@ -13,7 +14,7 @@ final class ProjectMetadataSnapshotLoaderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace');
         $indexes = new MetadataIndexRegistry();
-        (new ProjectMetadataSnapshotLoader($indexes))->load($project, [
+        (new ProjectMetadataSnapshotLoader($indexes))->load($project, SnapshotSections::of($project, [
             'formsComplete' => true,
             'constraintsComplete' => true,
             'forms' => [[
@@ -27,7 +28,7 @@ final class ProjectMetadataSnapshotLoaderTest extends TestCase
                 'class' => 'Symfony\\Component\\Validator\\Constraints\\Length',
                 'options' => ['max', 'min'],
             ]],
-        ]);
+        ]));
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->formsComplete());

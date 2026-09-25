@@ -7,8 +7,7 @@ use Symfony\Lsp\Feature\Twig\ProjectTwigComponentSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
-use Symfony\Lsp\Runtime\ContainerPathMapper;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
 {
@@ -16,9 +15,9 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     {
         $indexes = new TwigComponentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
-        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
+        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new UriToPathConverter());
 
-        $loader->load($project, [
+        $loader->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'enabled' => true,
             'names' => ['ux:icon', 'Alert', 42, ['nested']],
@@ -34,7 +33,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
                 ],
                 ['name' => 'broken', 'class' => 'App\Broken', 'file' => null],
             ],
-        ]);
+        ]));
 
         $index = $indexes->forProject($project);
         // UX Icons registers UX:Icon with a case-insensitive renderer alias
@@ -60,15 +59,15 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     {
         $indexes = new TwigComponentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
-        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
+        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new UriToPathConverter());
         $indexes->forProject($project)->replaceRuntime(true, true, ['stale_component'], 'ui', ['stale_component']);
 
-        $loader->load($project, [
+        $loader->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'enabled' => false,
             'names' => [],
             'anonymousTemplateDirectory' => 'components',
-        ]);
+        ]));
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isRuntimeComplete());
@@ -82,13 +81,13 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
     {
         $indexes = new TwigComponentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
-        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
+        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new UriToPathConverter());
 
-        $loader->load($project, [
+        $loader->load($project, SnapshotSections::of($project, [
             'complete' => false,
             'names' => ['ux:icon'],
             'anonymousTemplateDirectory' => '',
-        ]);
+        ]));
 
         $index = $indexes->forProject($project);
         self::assertFalse($index->isRuntimeComplete());
@@ -96,14 +95,16 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         self::assertSame('components', $index->anonymousTemplateDirectory());
     }
 
-    public function testIgnoresMalformedNames(): void
+    public function testDropsMalformedNames(): void
     {
         $indexes = new TwigComponentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
-        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
+        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new UriToPathConverter());
+        $indexes->forProject($project)->replaceRuntime(true, true, ['stale_component'], 'ui');
 
-        $loader->load($project, ['names' => 'invalid']);
+        $loader->load($project, SnapshotSections::of($project, ['names' => 'invalid']));
 
         self::assertFalse($indexes->forProject($project)->isRuntimeComplete());
+        self::assertSame([], $indexes->forProject($project)->runtimeNames());
     }
 }

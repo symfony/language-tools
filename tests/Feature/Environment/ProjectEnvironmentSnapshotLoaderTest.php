@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\ProjectEnvironmentSnapshotLoader;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ProjectEnvironmentSnapshotLoaderTest extends TestCase
 {
@@ -13,10 +14,10 @@ final class ProjectEnvironmentSnapshotLoaderTest extends TestCase
     {
         $indexes = new EnvironmentIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
-        (new ProjectEnvironmentSnapshotLoader($indexes))->load($project, ['complete' => true, 'processors' => [
+        (new ProjectEnvironmentSnapshotLoader($indexes))->load($project, SnapshotSections::of($project, ['complete' => true, 'processors' => [
             ['name' => 'json', 'type' => 'array'],
             ['name' => 'int', 'type' => 'int'],
-        ]]);
+        ]]));
 
         self::assertSame(['int' => 'int', 'json' => 'array'], $indexes->forProject($project)->processors());
         self::assertTrue($indexes->forProject($project)->processorsComplete());

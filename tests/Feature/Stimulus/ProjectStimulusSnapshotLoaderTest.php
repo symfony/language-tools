@@ -11,8 +11,8 @@ use Symfony\Lsp\Feature\Stimulus\StimulusControllerSourceLoader;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class ProjectStimulusSnapshotLoaderTest extends TestCase
@@ -48,10 +48,10 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
         $indexes = new StimulusIndexRegistry();
         $project = new Project($this->workspace->path(), 'file://'.$this->workspace->path());
 
-        $this->loader($indexes)->load($project, [
+        $this->loader($indexes)->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'controllers' => [['name' => 'search', 'sourcePath' => $sourcePath, 'lazy' => null, 'vendor' => false]],
-        ]);
+        ]));
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());
@@ -72,10 +72,10 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
         $indexes = new StimulusIndexRegistry();
         $project = new Project($this->workspace->path(), 'file://'.$this->workspace->path());
 
-        $this->loader($indexes)->load($project, [
+        $this->loader($indexes)->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'controllers' => [['name' => 'widget', 'sourcePath' => $sourcePath, 'lazy' => false, 'vendor' => true]],
-        ]);
+        ]));
 
         self::assertFalse($indexes->forProject($project)->controller('widget')?->lazy);
     }
@@ -86,10 +86,10 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
         $indexes = new StimulusIndexRegistry();
         $project = new Project($this->workspace->path(), 'file://'.$this->workspace->path());
 
-        $this->loader($indexes)->load($project, [
+        $this->loader($indexes)->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'controllers' => [['name' => 'widget', 'sourcePath' => $sourcePath, 'lazy' => null, 'vendor' => false]],
-        ]);
+        ]));
 
         self::assertTrue($indexes->forProject($project)->controller('widget')?->lazy);
     }
@@ -99,10 +99,10 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
         $indexes = new StimulusIndexRegistry();
         $project = new Project($this->workspace->path(), 'file://'.$this->workspace->path());
 
-        $this->loader($indexes)->load($project, [
+        $this->loader($indexes)->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'controllers' => [['name' => 'missing', 'sourcePath' => $this->workspace->path('assets/controllers/missing_controller.js'), 'lazy' => null, 'vendor' => false]],
-        ]);
+        ]));
 
         $controller = $indexes->forProject($project)->controller('missing');
         self::assertInstanceOf(StimulusController::class, $controller);
@@ -117,10 +117,10 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
         $indexes = new StimulusIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
 
-        $this->loader($indexes, $configuration)->load($project, [
+        $this->loader($indexes)->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'controllers' => [['name' => 'search', 'sourcePath' => '/app/assets/controllers/search_controller.js', 'lazy' => false, 'vendor' => false]],
-        ]);
+        ], $configuration));
 
         self::assertSame(
             '/workspace/assets/controllers/search_controller.js',
@@ -128,11 +128,10 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
         );
     }
 
-    private function loader(StimulusIndexRegistry $indexes, ?RuntimeConfiguration $configuration = null): ProjectStimulusSnapshotLoader
+    private function loader(StimulusIndexRegistry $indexes): ProjectStimulusSnapshotLoader
     {
         return new ProjectStimulusSnapshotLoader(
             $indexes,
-            new ContainerPathMapper($configuration ?? new RuntimeConfiguration()),
             new StimulusControllerSourceLoader(new JavaScriptTokenizer(), new StimulusControllerSourceAnalyzer(new PositionConverter())),
         );
     }

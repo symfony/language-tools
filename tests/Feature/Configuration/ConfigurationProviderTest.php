@@ -41,6 +41,7 @@ use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ConfigurationProviderTest extends TestCase
 {
@@ -1613,7 +1614,7 @@ final class ConfigurationProviderTest extends TestCase
         }
         $runtimeConfiguration = new RuntimeConfiguration();
         $runtimeConfiguration->configure(['environment' => $environment]);
-        (new ProjectConfigurationSnapshotLoader($indexes))->load($project, ['bundles' => [
+        (new ProjectConfigurationSnapshotLoader($indexes))->load($project, SnapshotSections::of($project, ['bundles' => [
             [
                 'alias' => 'framework',
                 'tree' => $this->node('framework', 'array', children: [
@@ -1741,7 +1742,7 @@ final class ConfigurationProviderTest extends TestCase
                 'alias' => 'services',
                 'tree' => $this->node('services', 'array'),
             ],
-        ]]);
+        ]]));
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $phpComments = new PhpCommentParser();

@@ -3,16 +3,13 @@
 namespace Symfony\Lsp\Feature\Console;
 
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
+use Symfony\Lsp\Runtime\SnapshotSection;
 
 final class ProjectConsoleSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
-    public function __construct(
-        private readonly ConsoleIndexRegistry $indexes,
-        private readonly ContainerPathMapper $pathMapper,
-    ) {
+    public function __construct(private readonly ConsoleIndexRegistry $indexes)
+    {
     }
 
     public function section(): string
@@ -20,22 +17,18 @@ final class ProjectConsoleSnapshotLoader implements RuntimeSnapshotLoaderInterfa
         return 'console';
     }
 
-    public function load(Project $project, array $section): void
+    public function load(Project $project, SnapshotSection $section): void
     {
         $commands = [];
-        foreach (\is_array($section['commands'] ?? null) ? $section['commands'] : [] as $item) {
-            if (!\is_array($item) || !\is_string($item['class'] ?? null)) {
-                continue;
-            }
-            $file = \is_string($item['file'] ?? null) ? $this->pathMapper->toHost($project, $item['file']) : null;
+        foreach ($section->items('commands', 'class') as $item) {
             $commands[] = new ConsoleCommandMetadata(
-                $item['class'],
-                $file,
-                RuntimeSnapshotValues::stringList($item['arguments'] ?? null),
-                RuntimeSnapshotValues::stringList($item['options'] ?? null),
-                true === ($item['complete'] ?? false),
+                $item->string('class'),
+                $item->optionalPath('file'),
+                $item->strings('arguments'),
+                $item->strings('options'),
+                $item->complete(),
             );
         }
-        $this->indexes->forProject($project)->replace($commands, true === ($section['complete'] ?? false));
+        $this->indexes->forProject($project)->replace($commands, $section->complete());
     }
 }

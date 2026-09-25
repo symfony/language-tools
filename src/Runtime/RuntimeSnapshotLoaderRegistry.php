@@ -7,8 +7,10 @@ use Symfony\Lsp\Project\Project;
 final class RuntimeSnapshotLoaderRegistry
 {
     /** @param iterable<RuntimeSnapshotLoaderInterface> $loaders */
-    public function __construct(private readonly iterable $loaders)
-    {
+    public function __construct(
+        private readonly iterable $loaders,
+        private readonly ContainerPathMapper $pathMapper,
+    ) {
     }
 
     /**
@@ -39,7 +41,7 @@ final class RuntimeSnapshotLoaderRegistry
             if (!\is_array($section)) {
                 continue;
             }
-            $loader->load($project, $section);
+            $loader->load($project, new SnapshotSection($project, $this->pathMapper, $section));
         }
     }
 }

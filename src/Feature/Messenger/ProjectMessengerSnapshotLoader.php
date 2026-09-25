@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Feature\Messenger;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
+use Symfony\Lsp\Runtime\SnapshotSection;
 
 final class ProjectMessengerSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -17,34 +17,32 @@ final class ProjectMessengerSnapshotLoader implements RuntimeSnapshotLoaderInter
         return 'messenger';
     }
 
-    public function load(Project $project, array $section): void
+    public function load(Project $project, SnapshotSection $section): void
     {
         $buses = [];
-        foreach (\is_array($section['buses'] ?? null) ? $section['buses'] : [] as $item) {
-            if (\is_array($item) && \is_string($item['name'] ?? null)) {
-                $buses[] = new MessengerBus($item['name'], true === ($item['default'] ?? false));
-            }
+        foreach ($section->items('buses', 'name') as $item) {
+            $buses[] = new MessengerBus($item->string('name'), $item->bool('default'));
         }
         $transports = [];
-        foreach (\is_array($section['transports'] ?? null) ? $section['transports'] : [] as $item) {
-            if (\is_array($item) && \is_string($item['name'] ?? null)) {
-                $transports[] = new MessengerTransport($item['name'], true === ($item['failure'] ?? false));
-            }
+        foreach ($section->items('transports', 'name') as $item) {
+            $transports[] = new MessengerTransport($item->string('name'), $item->bool('failure'));
         }
         $messages = [];
-        foreach (\is_array($section['messages'] ?? null) ? $section['messages'] : [] as $item) {
-            if (!\is_array($item) || !\is_string($item['class'] ?? null)) {
-                continue;
-            }
-            $messages[] = new MessengerMessage($item['class'], RuntimeSnapshotValues::stringList($item['transports'] ?? null));
+        foreach ($section->items('messages', 'class') as $item) {
+            $messages[] = new MessengerMessage($item->string('class'), $item->strings('transports'));
         }
         $handlers = [];
-        foreach (\is_array($section['handlers'] ?? null) ? $section['handlers'] : [] as $item) {
-            if (!\is_array($item) || !\is_string($item['message'] ?? null) || !\is_string($item['bus'] ?? null) || !\is_string($item['service'] ?? null) || !\is_string($item['class'] ?? null) || !\is_string($item['method'] ?? null)) {
-                continue;
-            }
-            $handlers[] = new MessengerHandlerDeclaration($item['message'], $item['bus'], $item['service'], $item['class'], $item['method'], \is_int($item['priority'] ?? null) ? $item['priority'] : 0, \is_string($item['fromTransport'] ?? null) ? $item['fromTransport'] : null);
+        foreach ($section->items('handlers', 'message', 'bus', 'service', 'class', 'method') as $item) {
+            $handlers[] = new MessengerHandlerDeclaration(
+                $item->string('message'),
+                $item->string('bus'),
+                $item->string('service'),
+                $item->string('class'),
+                $item->string('method'),
+                $item->int('priority'),
+                $item->optionalString('fromTransport'),
+            );
         }
-        $this->indexes->forProject($project)->replace($buses, $transports, $messages, $handlers, true === ($section['complete'] ?? false));
+        $this->indexes->forProject($project)->replace($buses, $transports, $messages, $handlers, $section->complete());
     }
 }

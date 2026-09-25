@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
+use Symfony\Lsp\Runtime\SnapshotSection;
 
 final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -17,71 +17,46 @@ final class ProjectConfigurationSnapshotLoader implements RuntimeSnapshotLoaderI
         return 'configuration';
     }
 
-    public function load(Project $project, array $section): void
+    public function load(Project $project, SnapshotSection $section): void
     {
-        if (!\is_array($section['bundles'] ?? null)) {
-            return;
-        }
         $roots = [];
-        foreach ($section['bundles'] as $bundle) {
-            if (!\is_array($bundle) || !\is_string($bundle['alias'] ?? null) || !\is_array($bundle['tree'] ?? null)) {
-                continue;
+        foreach ($section->items('bundles', 'alias') as $bundle) {
+            $tree = $bundle->section('tree');
+            if (null !== $tree) {
+                $roots[$bundle->string('alias')] = $this->node($tree);
             }
-            $roots[$bundle['alias']] = $this->node($bundle['tree']);
         }
         $this->indexes->forProject($project)->replace($roots);
     }
 
-    /** @param array<array-key, mixed> $data */
-    private function node(array $data, ?string $entryKeyAttribute = null): ConfigurationNode
+    private function node(SnapshotSection $data, ?string $entryKeyAttribute = null): ConfigurationNode
     {
         $children = [];
-        foreach (\is_array($data['children'] ?? null) ? $data['children'] : [] as $child) {
-            if (\is_array($child)) {
-                $children[] = $this->node($child);
-            }
+        foreach ($data->items('children') as $child) {
+            $children[] = $this->node($child);
         }
-        $keyAttribute = \is_string($data['keyAttribute'] ?? null) ? $data['keyAttribute'] : null;
-        $prototype = \is_array($data['prototype'] ?? null) ? $this->node($data['prototype'], $keyAttribute) : null;
-        $allowed = [];
-        foreach (\is_array($data['allowedValues'] ?? null) ? $data['allowedValues'] : [] as $value) {
-            if (null === $value || \is_scalar($value)) {
-                $allowed[] = $value;
-            }
-        }
-        $allowedEnumCases = RuntimeSnapshotValues::stringList($data['allowedEnumCases'] ?? null);
-        $accepts = [];
-        foreach (\is_array($data['accepts'] ?? null) ? $data['accepts'] : [] as $kind => $accepted) {
-            if (\is_string($kind) && \is_bool($accepted)) {
-                $accepts[$kind] = $accepted;
-            }
-        }
-        $aliases = [];
-        foreach (\is_array($data['aliases'] ?? null) ? $data['aliases'] : [] as $alias => $name) {
-            if (\is_string($alias) && \is_string($name)) {
-                $aliases[$alias] = $name;
-            }
-        }
+        $keyAttribute = $data->optionalString('keyAttribute');
+        $prototype = $data->section('prototype');
 
         return new ConfigurationNode(
-            \is_string($data['name'] ?? null) ? $data['name'] : '',
-            \is_string($data['type'] ?? null) ? $data['type'] : 'variable',
-            true === ($data['required'] ?? false),
-            true === ($data['hasDefault'] ?? false),
-            \is_string($data['defaultSummary'] ?? null) ? $data['defaultSummary'] : null,
-            \is_string($data['info'] ?? null) ? $data['info'] : null,
-            $data['example'] ?? null,
-            true === ($data['deprecated'] ?? false),
-            $allowed,
-            $allowedEnumCases,
+            $data->string('name'),
+            $data->optionalString('type') ?? 'variable',
+            $data->bool('required'),
+            $data->bool('hasDefault'),
+            $data->optionalString('defaultSummary'),
+            $data->optionalString('info'),
+            $data->value('example'),
+            $data->bool('deprecated'),
+            $data->scalars('allowedValues'),
+            $data->strings('allowedEnumCases'),
             $children,
-            $prototype,
-            $accepts,
-            $aliases,
+            null === $prototype ? null : $this->node($prototype, $keyAttribute),
+            $data->boolMap('accepts'),
+            $data->stringMap('aliases'),
             $keyAttribute,
             $entryKeyAttribute,
-            false !== ($data['normalizeKeys'] ?? true),
-            true === ($data['allowedValuesTruncated'] ?? false),
+            $data->bool('normalizeKeys', true),
+            $data->bool('allowedValuesTruncated'),
         );
     }
 }

@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Security\ProjectSecuritySnapshotLoader;
 use Symfony\Lsp\Feature\Security\SecurityIndexRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ProjectSecuritySnapshotLoaderTest extends TestCase
 {
@@ -13,13 +14,13 @@ final class ProjectSecuritySnapshotLoaderTest extends TestCase
     {
         $indexes = new SecurityIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
-        (new ProjectSecuritySnapshotLoader($indexes))->load($project, [
+        (new ProjectSecuritySnapshotLoader($indexes))->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'firewalls' => [['name' => 'main', 'provider' => 'users', 'enabled' => true, 'stateless' => false, 'lazy' => true, 'authenticators' => ['App\\Security\\Authenticator']]],
             'providers' => [['name' => 'users', 'type' => 'entity']],
             'roles' => [['name' => 'ROLE_ADMIN', 'inheritedRoles' => ['ROLE_USER']]],
             'voters' => [['class' => 'App\\Security\\PostVoter']],
-        ]);
+        ]));
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());

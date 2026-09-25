@@ -7,8 +7,8 @@ use Symfony\Lsp\Feature\Console\ConsoleCommandMetadata;
 use Symfony\Lsp\Feature\Console\ConsoleIndexRegistry;
 use Symfony\Lsp\Feature\Console\ProjectConsoleSnapshotLoader;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ProjectConsoleSnapshotLoaderTest extends TestCase
 {
@@ -18,8 +18,8 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
         $configuration = new RuntimeConfiguration();
         $configuration->configureProject($project, ['containerProjectRoot' => '/app']);
         $indexes = new ConsoleIndexRegistry();
-        $loader = new ProjectConsoleSnapshotLoader($indexes, new ContainerPathMapper($configuration));
-        $loader->load($project, [
+        $loader = new ProjectConsoleSnapshotLoader($indexes);
+        $loader->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'commands' => [
                 [
@@ -32,7 +32,7 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
                 ['class' => 42, 'arguments' => ['invalid']],
                 'malformed',
             ],
-        ]);
+        ], $configuration));
 
         $index = $indexes->forProject($project);
         $command = $index->command('App\Command\ReportCommand');
@@ -48,8 +48,8 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace');
         $indexes = new ConsoleIndexRegistry();
-        $loader = new ProjectConsoleSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()));
-        $loader->load($project, ['commands' => 'invalid']);
+        $loader = new ProjectConsoleSnapshotLoader($indexes);
+        $loader->load($project, SnapshotSections::of($project, ['commands' => 'invalid']));
 
         self::assertNull($indexes->forProject($project)->command('invalid'));
         self::assertFalse($indexes->forProject($project)->isComplete());

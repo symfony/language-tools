@@ -8,16 +8,14 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
-use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
-use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
+use Symfony\Lsp\Runtime\SnapshotSection;
 
 final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
     public function __construct(
         private readonly TemplateIndexRegistry $indexes,
         private readonly UriToPathConverter $uriToPathConverter,
-        private readonly ContainerPathMapper $pathMapper,
     ) {
     }
 
@@ -26,28 +24,21 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
         return 'twig';
     }
 
-    public function load(Project $project, array $section): void
+    public function load(Project $project, SnapshotSection $section): void
     {
-        if (!\is_array($section['paths'] ?? null)) {
-            return;
-        }
-        $globals = RuntimeSnapshotValues::stringList($section['globals'] ?? null);
-        $this->indexes->forProject($project)->replaceGlobals($globals);
+        $this->indexes->forProject($project)->replaceGlobals($section->strings('globals'));
         $templates = [];
-        foreach ($section['paths'] as $loaderPath) {
-            if (!\is_array($loaderPath) || !\is_string($loaderPath['namespace'] ?? null) || !\is_string($loaderPath['path'] ?? null)) {
-                continue;
-            }
-            $path = $this->pathMapper->toHost($project, $loaderPath['path']);
+        foreach ($section->items('paths', 'namespace', 'path') as $loaderPath) {
+            $path = $loaderPath->path('path');
             $path = Path::isAbsolute($path)
                 ? Path::canonicalize($path)
                 : Path::join($project->rootPath, $path);
             if (!is_dir($path)) {
                 continue;
             }
+            $namespace = $loaderPath->string('namespace');
             foreach ($this->files($path) as $file) {
                 $relative = Path::makeRelative($file, $path);
-                $namespace = $loaderPath['namespace'];
                 $name = '(None)' === $namespace ? $relative : $namespace.'/'.$relative;
                 $templates[] = new TemplateDeclaration(
                     $name,
@@ -56,10 +47,7 @@ final class ProjectTemplateSnapshotLoader implements RuntimeSnapshotLoaderInterf
                 );
             }
         }
-        $this->indexes->forProject($project)->replaceRuntime(
-            true === ($section['complete'] ?? null),
-            ...$templates,
-        );
+        $this->indexes->forProject($project)->replaceRuntime($section->complete(), ...$templates);
     }
 
     /** @return \Generator<int, string> */

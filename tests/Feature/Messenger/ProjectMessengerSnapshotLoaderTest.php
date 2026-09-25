@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Messenger\MessengerIndexRegistry;
 use Symfony\Lsp\Feature\Messenger\ProjectMessengerSnapshotLoader;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ProjectMessengerSnapshotLoaderTest extends TestCase
 {
@@ -13,7 +14,7 @@ final class ProjectMessengerSnapshotLoaderTest extends TestCase
     {
         $indexes = new MessengerIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
-        (new ProjectMessengerSnapshotLoader($indexes))->load($project, [
+        (new ProjectMessengerSnapshotLoader($indexes))->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'buses' => [['name' => 'command.bus', 'default' => true]],
             'transports' => [['name' => 'async', 'failure' => false]],
@@ -27,7 +28,7 @@ final class ProjectMessengerSnapshotLoaderTest extends TestCase
                 'priority' => 10,
                 'fromTransport' => 'async',
             ]],
-        ]);
+        ]));
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());

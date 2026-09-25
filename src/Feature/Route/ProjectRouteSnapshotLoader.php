@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\SnapshotSection;
 
 final class ProjectRouteSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -17,7 +18,7 @@ final class ProjectRouteSnapshotLoader implements RuntimeSnapshotLoaderInterface
         return 'routes';
     }
 
-    public function load(Project $project, array $section): void
+    public function load(Project $project, SnapshotSection $section): void
     {
         (new RouteSnapshotImporter($this->indexes->forProject($project)))->load($section);
     }

@@ -3,14 +3,13 @@
 namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\SnapshotSection;
 
 final class ProjectStimulusSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
     public function __construct(
         private readonly StimulusIndexRegistry $indexes,
-        private readonly ContainerPathMapper $pathMapper,
         private readonly StimulusControllerSourceLoader $sources,
     ) {
     }
@@ -20,21 +19,17 @@ final class ProjectStimulusSnapshotLoader implements RuntimeSnapshotLoaderInterf
         return 'stimulus';
     }
 
-    public function load(Project $project, array $section): void
+    public function load(Project $project, SnapshotSection $section): void
     {
         $controllers = [];
-        foreach (\is_array($section['controllers'] ?? null) ? $section['controllers'] : [] as $item) {
-            if (!\is_array($item) || !\is_string($item['name'] ?? null) || !\is_string($item['sourcePath'] ?? null)) {
-                continue;
-            }
-            $sourcePath = $this->pathMapper->toHost($project, $item['sourcePath']);
+        foreach ($section->items('controllers', 'name', 'sourcePath') as $item) {
+            $sourcePath = $item->path('sourcePath');
             $source = $this->sources->load($sourcePath);
-            $lazy = $item['lazy'] ?? null;
             $controllers[] = new StimulusController(
-                $item['name'],
+                $item->string('name'),
                 $sourcePath,
-                \is_bool($lazy) ? $lazy : (bool) $source?->lazy,
-                true === ($item['vendor'] ?? false),
+                $item->optionalBool('lazy') ?? (bool) $source?->lazy,
+                $item->bool('vendor'),
                 $source?->memberNames(StimulusMemberKind::Action) ?? [],
                 $source?->memberNames(StimulusMemberKind::Target) ?? [],
                 $source?->memberNames(StimulusMemberKind::Value) ?? [],
@@ -42,6 +37,6 @@ final class ProjectStimulusSnapshotLoader implements RuntimeSnapshotLoaderInterf
                 $source?->memberNames(StimulusMemberKind::ClassName) ?? [],
             );
         }
-        $this->indexes->forProject($project)->replace(true === ($section['complete'] ?? false), ...$controllers);
+        $this->indexes->forProject($project)->replace($section->complete(), ...$controllers);
     }
 }

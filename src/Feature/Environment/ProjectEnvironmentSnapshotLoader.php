@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\SnapshotSection;
 
 final class ProjectEnvironmentSnapshotLoader implements RuntimeSnapshotLoaderInterface
 {
@@ -16,17 +17,12 @@ final class ProjectEnvironmentSnapshotLoader implements RuntimeSnapshotLoaderInt
         return 'environment';
     }
 
-    public function load(Project $project, array $section): void
+    public function load(Project $project, SnapshotSection $section): void
     {
-        if (!\is_array($section['processors'] ?? null)) {
-            return;
-        }
         $processors = [];
-        foreach ($section['processors'] as $processor) {
-            if (\is_array($processor) && \is_string($processor['name'] ?? null) && \is_string($processor['type'] ?? null)) {
-                $processors[$processor['name']] = $processor['type'];
-            }
+        foreach ($section->items('processors', 'name', 'type') as $processor) {
+            $processors[$processor->string('name')] = $processor->string('type');
         }
-        $this->indexes->forProject($project)->replaceProcessors($processors, true === ($section['complete'] ?? false));
+        $this->indexes->forProject($project)->replaceProcessors($processors, $section->complete());
     }
 }

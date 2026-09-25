@@ -7,8 +7,7 @@ use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
 use Symfony\Lsp\Feature\Doctrine\ProjectDoctrineSnapshotLoader;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
-use Symfony\Lsp\Runtime\ContainerPathMapper;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ProjectDoctrineSnapshotLoaderTest extends TestCase
 {
@@ -16,8 +15,8 @@ final class ProjectDoctrineSnapshotLoaderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace');
         $indexes = new DoctrineIndexRegistry();
-        $loader = new ProjectDoctrineSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
-        $loader->load($project, [
+        $loader = new ProjectDoctrineSnapshotLoader($indexes, new UriToPathConverter());
+        $loader->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'entities' => [
                 [
@@ -31,7 +30,7 @@ final class ProjectDoctrineSnapshotLoaderTest extends TestCase
                 ],
                 ['className' => 'App\Entity\Broken', 'file' => null, 'fields' => []],
             ],
-        ]);
+        ]));
 
         $index = $indexes->forProject($project);
         $entity = $index->entity('App\Entity\Book');
@@ -51,17 +50,17 @@ final class ProjectDoctrineSnapshotLoaderTest extends TestCase
     {
         $project = new Project('/workspace', 'file:///workspace');
         $indexes = new DoctrineIndexRegistry();
-        $loader = new ProjectDoctrineSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
-        $loader->load($project, [
+        $loader = new ProjectDoctrineSnapshotLoader($indexes, new UriToPathConverter());
+        $loader->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'enabled' => true,
             'entities' => [
                 ['className' => 'App\Entity\Book', 'file' => '/workspace/src/Entity/Book.php', 'fields' => []],
             ],
-        ]);
+        ]));
         self::assertNotNull($indexes->forProject($project)->entity('App\Entity\Book'));
 
-        $loader->load($project, ['complete' => true, 'enabled' => false, 'entities' => []]);
+        $loader->load($project, SnapshotSections::of($project, ['complete' => true, 'enabled' => false, 'entities' => []]));
 
         $index = $indexes->forProject($project);
         self::assertNull($index->entity('App\Entity\Book'));

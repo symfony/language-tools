@@ -61,9 +61,9 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class TemplateProviderTest extends TestCase
@@ -819,10 +819,10 @@ final class TemplateProviderTest extends TestCase
         $indexes = $this->templateIndexes();
 
         try {
-            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter()))->load($project, SnapshotSections::of($project, [
                 'complete' => true,
                 'paths' => [['namespace' => '(None)', 'path' => $root.'/templates']],
-            ]);
+            ]));
 
             self::assertSame('file://'.$root.'/templates/index.html', $indexes->forProject($project)->get('index.html')?->uri);
         } finally {
@@ -841,13 +841,13 @@ final class TemplateProviderTest extends TestCase
         $indexes = $this->templateIndexes();
 
         try {
-            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter()))->load($project, SnapshotSections::of($project, [
                 'complete' => true,
                 'paths' => [
                     ['namespace' => '@Shop', 'path' => $workspace->path('templates/bundles/ShopBundle')],
                     ['namespace' => '@Shop', 'path' => $workspace->path('vendor/shop/templates')],
                 ],
-            ]);
+            ]));
 
             self::assertSame('file://'.$override, $indexes->forProject($project)->get('@Shop/index.html.twig')?->uri);
         } finally {
@@ -866,10 +866,10 @@ final class TemplateProviderTest extends TestCase
         $indexes = $this->templateIndexes();
 
         try {
-            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper($configuration)))->load($project, [
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter()))->load($project, SnapshotSections::of($project, [
                 'complete' => true,
                 'paths' => [['namespace' => '(None)', 'path' => '/app/templates']],
-            ]);
+            ], $configuration));
 
             self::assertSame('file://'.$root.'/templates/index.html.twig', $indexes->forProject($project)->get('index.html.twig')?->uri);
         } finally {
@@ -893,10 +893,10 @@ final class TemplateProviderTest extends TestCase
         $indexes = $this->templateIndexes();
 
         try {
-            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter(), new ContainerPathMapper(new RuntimeConfiguration())))->load($project, [
+            (new ProjectTemplateSnapshotLoader($indexes, new UriToPathConverter()))->load($project, SnapshotSections::of($project, [
                 'complete' => true,
                 'paths' => [['namespace' => '(None)', 'path' => $root.'/templates']],
-            ]);
+            ]));
 
             self::assertSame('file://'.$root.'/templates/index.html.twig', $indexes->forProject($project)->get('index.html.twig')?->uri);
         } finally {

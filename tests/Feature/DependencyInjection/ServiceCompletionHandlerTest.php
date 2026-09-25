@@ -30,6 +30,7 @@ use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ServiceCompletionHandlerTest extends TestCase
 {
@@ -48,8 +49,8 @@ final class ServiceCompletionHandlerTest extends TestCase
         $indexes = new ServiceIndexRegistry();
         $parameterIndexes = new ParameterIndexRegistry();
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
-        (new ProjectServiceSnapshotLoader($indexes, $parameterIndexes))->load($project, [
-            'complete' => true,
+        (new ProjectServiceSnapshotLoader($indexes, $parameterIndexes))->load($project, SnapshotSections::of($project, [
+            'parametersComplete' => true,
             'items' => [
                 [
                     'id' => 'app.mailer',
@@ -64,7 +65,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             'parameters' => [
                 ['name' => 'app.api_key', 'value' => 'CANARY_SECRET_VALUE'],
             ],
-        ]);
+        ]));
         self::assertFalse($indexes->forProject($project)->isComplete());
         self::assertTrue($parameterIndexes->forProject($project)->isComplete());
         $converter = new PositionConverter();

@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Event\EventIndexRegistry;
 use Symfony\Lsp\Feature\Event\ProjectEventSnapshotLoader;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ProjectEventSnapshotLoaderTest extends TestCase
 {
@@ -13,7 +14,7 @@ final class ProjectEventSnapshotLoaderTest extends TestCase
     {
         $indexes = new EventIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
-        (new ProjectEventSnapshotLoader($indexes))->load($project, [
+        (new ProjectEventSnapshotLoader($indexes))->load($project, SnapshotSections::of($project, [
             'complete' => true,
             'events' => [['name' => 'App\\Event\\OrderPlaced', 'class' => 'App\\Event\\OrderPlaced']],
             'listeners' => [[
@@ -22,7 +23,7 @@ final class ProjectEventSnapshotLoaderTest extends TestCase
                 'method' => 'onOrderPlaced',
                 'priority' => 10,
             ]],
-        ]);
+        ]));
 
         $index = $indexes->forProject($project);
         self::assertTrue($index->isComplete());
