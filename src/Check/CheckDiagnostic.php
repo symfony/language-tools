@@ -22,6 +22,7 @@ final class CheckDiagnostic
         public readonly string $fingerprint,
         public readonly string $baselineState = 'active',
         public readonly ?string $provider = null,
+        public readonly int $occurrence = 1,
     ) {
     }
 
@@ -94,6 +95,16 @@ final class CheckDiagnostic
 
     public function withBaselineState(string $state): self
     {
+        return $this->with(baselineState: $state);
+    }
+
+    public function withOccurrence(int $occurrence): self
+    {
+        return $this->with(occurrence: $occurrence);
+    }
+
+    private function with(?string $baselineState = null, ?int $occurrence = null): self
+    {
         return new self(
             $this->project,
             $this->path,
@@ -107,8 +118,9 @@ final class CheckDiagnostic
             $this->source,
             $this->message,
             $this->fingerprint,
-            $state,
+            $baselineState ?? $this->baselineState,
             $this->provider,
+            $occurrence ?? $this->occurrence,
         );
     }
 

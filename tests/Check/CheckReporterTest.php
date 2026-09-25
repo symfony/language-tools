@@ -6,7 +6,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Check\BaselineEntry;
 use Symfony\Lsp\Check\CheckDiagnostic;
-use Symfony\Lsp\Check\CheckDiagnosticOccurrenceNumberer;
 use Symfony\Lsp\Check\CheckErrorCauseRenderer;
 use Symfony\Lsp\Check\CheckProjectResult;
 use Symfony\Lsp\Check\CheckReporter;
@@ -294,7 +293,7 @@ final class CheckReporterTest extends TestCase
 
     private function reporter(): CheckReporter
     {
-        return new CheckReporter(new CheckReportViewBuilder(new CheckDiagnosticOccurrenceNumberer()), [
+        return new CheckReporter(new CheckReportViewBuilder(), [
             new HumanCheckReportFormat(new CheckErrorCauseRenderer()),
             new JsonCheckReportFormat(),
             new GitHubCheckReportFormat(),
@@ -361,6 +360,7 @@ final class CheckReporterTest extends TestCase
                     'Duplicate missing service.',
                     $fingerprint,
                     provider: 'dependency-injection',
+                    occurrence: 2,
                 ),
             ],
             [

@@ -9,7 +9,6 @@ use Symfony\Lsp\Check\BaselineManager;
 use Symfony\Lsp\Check\BaselineMatcher;
 use Symfony\Lsp\Check\BaselineRepository;
 use Symfony\Lsp\Check\CheckDiagnostic;
-use Symfony\Lsp\Check\CheckDiagnosticOccurrenceNumberer;
 use Symfony\Lsp\Check\CheckFile;
 use Symfony\Lsp\Check\CheckOptions;
 use Symfony\Lsp\Document\PositionConverter;
@@ -37,7 +36,7 @@ final class BaselineManagerTest extends TestCase
     public function testGeneratedBaselineMatchesGoldenFile(): void
     {
         $diagnostic = $this->diagnostic('same-fingerprint');
-        $this->manager->apply($this->directory, $this->options('create'), [$diagnostic, $diagnostic]);
+        $this->manager->apply($this->directory, $this->options('create'), [$diagnostic, $diagnostic->withOccurrence(2)]);
 
         self::assertFileEquals(__DIR__.'/Fixtures/baseline-v1.json', $this->directory.'/baseline.json');
     }
@@ -179,7 +178,7 @@ final class BaselineManagerTest extends TestCase
     {
         return new BaselineManager(
             new BaselineRepository($filesystem, new BaselineCodec(new DiagnosticCodeRegistry())),
-            new BaselineMatcher(new CheckDiagnosticOccurrenceNumberer()),
+            new BaselineMatcher(),
         );
     }
 

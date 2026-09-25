@@ -204,7 +204,7 @@ return static function (ContainerConfigurator $container): void {
         );
     }
 
-    $services->load('Symfony\\Lsp\\Check\\', '../src/Check/*{Manager,Registry,Parser,Selector,Runner,Reporter,Renderer,Profiler,Command,Client,Factory,Analyzer,Executor,Builder,Codec,Repository,Matcher,Numberer,Format}.php');
+    $services->load('Symfony\\Lsp\\Check\\', '../src/Check/*{Manager,Registry,Parser,Selector,Runner,Reporter,Renderer,Profiler,Command,Client,Factory,Analyzer,Executor,Builder,Codec,Repository,Matcher,Format}.php');
     $services->load('Symfony\\Lsp\\Client\\', '../src/Client/*Client.php');
     $services->load('Symfony\\Lsp\\Document\\', '../src/Document/*{Resolver,Store,Synchronizer,Converter,Reader}.php');
     $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Registry,Codec,Hasher,Enumerator,Pipeline,Processor,Manager,Resolver}.php');

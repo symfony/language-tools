@@ -259,6 +259,42 @@ final class CheckExecutableTest extends TestCase
         self::assertSame(1, $report['summary']['blocking']);
     }
 
+    public function testNumbersRepeatedIdenticalDiagnosticsOnceForBaselinesAndReports(): void
+    {
+        file_put_contents(
+            $this->directory.'/config/services.yaml',
+            "parameters:\n    first: '%env(APP_SECRET%'\n    second: '%env(APP_SECRET%'\n",
+        );
+
+        $gitLab = $this->execute([
+            'check',
+            '--source-only',
+            '--format=gitlab',
+            '--workspace='.$this->directory,
+            'config/services.yaml',
+        ]);
+        /** @var list<GitLabIssue> $issues */
+        $issues = json_decode($gitLab['stdout'], true, flags: \JSON_THROW_ON_ERROR);
+
+        $generated = $this->execute([
+            'check',
+            '--source-only',
+            '--format=json',
+            '--workspace='.$this->directory,
+            '--baseline=baseline.json',
+            '--generate-baseline',
+            'config/services.yaml',
+        ]);
+        /** @var array{diagnostics: list<array{fingerprint: string, occurrence: int}>} $baseline */
+        $baseline = json_decode((string) file_get_contents($this->directory.'/baseline.json'), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertSame(CheckCommand::EXIT_SUCCESS, $generated['exitCode'], $generated['stderr']);
+        self::assertSame([1, 2], array_column($baseline['diagnostics'], 'occurrence'));
+        self::assertCount(1, array_unique(array_column($baseline['diagnostics'], 'fingerprint')));
+        self::assertCount(2, $issues);
+        self::assertNotSame($issues[0]['fingerprint'], $issues[1]['fingerprint']);
+    }
+
     public function testProfilesCheckerPhasesProjectsProvidersAndFiles(): void
     {
         $result = $this->execute([

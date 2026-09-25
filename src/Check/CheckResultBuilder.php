@@ -67,6 +67,7 @@ final class CheckResultBuilder
             $right->code,
             $right->message,
         ]);
+        $diagnostics = $this->numbered($diagnostics);
 
         if ($cancellation->expired() && [] === $errors) {
             $errors[] = $this->errors->timeout($options->timeout, $plan->workspace);
@@ -132,6 +133,26 @@ final class CheckResultBuilder
             $status['runtime'],
             $complete,
         );
+    }
+
+    /**
+     * Numbering identical diagnostics once keeps baseline entries and report
+     * occurrence fingerprints consistent.
+     *
+     * @param list<CheckDiagnostic> $diagnostics
+     *
+     * @return list<CheckDiagnostic>
+     */
+    private function numbered(array $diagnostics): array
+    {
+        $counts = [];
+        $numbered = [];
+        foreach ($diagnostics as $diagnostic) {
+            $counts[$diagnostic->fingerprint] = ($counts[$diagnostic->fingerprint] ?? 0) + 1;
+            $numbered[] = $diagnostic->withOccurrence($counts[$diagnostic->fingerprint]);
+        }
+
+        return $numbered;
     }
 
     /**
