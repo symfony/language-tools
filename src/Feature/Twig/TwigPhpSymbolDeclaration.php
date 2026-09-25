@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 
-final class TwigPhpSymbolDeclaration
+final class TwigPhpSymbolDeclaration implements LocatedSourceSymbolInterface
 {
     public function __construct(
         public readonly TwigPhpSymbolKind $kind,

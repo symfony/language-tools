@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 
-final class TwigCallableDeclaration
+final class TwigCallableDeclaration implements LocatedSourceSymbolInterface
 {
     public function __construct(
         public readonly TwigCallableKind $kind,

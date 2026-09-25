@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\SourceSymbolOrder;
 
 /** @extends AbstractSourceFactsIndex<TwigPhpSymbolSourceFacts> */
 final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
@@ -88,16 +89,11 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     public function declarationAt(string $uri, Position $position): ?TwigPhpSymbolDeclaration
     {
         $this->derived();
-        foreach ($this->declarationsByUri[$uri] ?? [] as $declaration) {
-            $start = $declaration->range->start;
-            $end = $declaration->range->end;
-            if (($position->line > $start->line || ($position->line === $start->line && $position->character >= $start->character))
-                && ($position->line < $end->line || ($position->line === $end->line && $position->character <= $end->character))) {
-                return $declaration;
-            }
-        }
 
-        return null;
+        return array_find(
+            $this->declarationsByUri[$uri] ?? [],
+            static fn (TwigPhpSymbolDeclaration $declaration): bool => $declaration->range->containsPosition($position),
+        );
     }
 
     protected function build(): void
@@ -138,24 +134,24 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
         sort($this->enumNames);
         $this->constantTypeNames = array_keys($constantTypeNames);
         sort($this->constantTypeNames);
-        $byDeclarationLocation = static fn (TwigPhpSymbolDeclaration $left, TwigPhpSymbolDeclaration $right): int => [$left->uri, $left->range->start->line, $left->range->start->character] <=> [$right->uri, $right->range->start->line, $right->range->start->character];
+        $byLocation = SourceSymbolOrder::byLocation(...);
         foreach ($this->types as &$declarations) {
-            usort($declarations, $byDeclarationLocation);
+            usort($declarations, $byLocation);
         }
         unset($declarations);
         foreach ($this->members as &$classMembers) {
             foreach ($classMembers as &$declarations) {
-                usort($declarations, $byDeclarationLocation);
+                usort($declarations, $byLocation);
             }
             unset($declarations);
         }
         unset($classMembers);
         foreach ($this->declarationsByUri as &$declarations) {
-            usort($declarations, $byDeclarationLocation);
+            usort($declarations, $byLocation);
         }
         unset($declarations);
         foreach ($this->references as &$references) {
-            usort($references, static fn (TwigPhpSymbolReference $left, TwigPhpSymbolReference $right): int => [$left->uri, $left->range->start->line, $left->range->start->character] <=> [$right->uri, $right->range->start->line, $right->range->start->character]);
+            usort($references, $byLocation);
         }
         unset($references);
     }

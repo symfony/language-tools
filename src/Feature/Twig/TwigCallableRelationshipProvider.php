@@ -8,6 +8,7 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Index\SourceSymbolOrder;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -163,7 +164,7 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
             array_push($usages, ...$index->usages($kind, $name));
         }
         if (1 < \count($pairs)) {
-            usort($usages, static fn (TwigCallableUsage $left, TwigCallableUsage $right): int => [$left->uri, $left->range->start->line, $left->range->start->character] <=> [$right->uri, $right->range->start->line, $right->range->start->character]);
+            usort($usages, SourceSymbolOrder::byLocation(...));
         }
 
         return array_map(

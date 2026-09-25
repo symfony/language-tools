@@ -9,4 +9,14 @@ final class Range
         public readonly Position $end,
     ) {
     }
+
+    public function containsPosition(Position $position): bool
+    {
+        $atOrAfterStart = $position->line > $this->start->line
+            || ($position->line === $this->start->line && $position->character >= $this->start->character);
+        $atOrBeforeEnd = $position->line < $this->end->line
+            || ($position->line === $this->end->line && $position->character <= $this->end->character);
+
+        return $atOrAfterStart && $atOrBeforeEnd;
+    }
 }
