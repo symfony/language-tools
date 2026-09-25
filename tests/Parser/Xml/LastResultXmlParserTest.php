@@ -4,8 +4,7 @@ namespace Symfony\Lsp\Tests\Parser\Xml;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\Xml\LastResultXmlParser;
-use Symfony\Lsp\Parser\Xml\XmlDocument;
-use Symfony\Lsp\Parser\Xml\XmlParserInterface;
+use Symfony\Lsp\Tests\Support\RecordingXmlParser;
 
 final class LastResultXmlParserTest extends TestCase
 {
@@ -20,18 +19,5 @@ final class LastResultXmlParserTest extends TestCase
         self::assertNotSame($first, $second);
         self::assertNotSame($first, $parser->parse('<first/>'));
         self::assertSame(['<first/>', '<second/>', '<first/>'], $inner->sources);
-    }
-}
-
-final class RecordingXmlParser implements XmlParserInterface
-{
-    /** @var list<string> */
-    public array $sources = [];
-
-    public function parse(string $source): XmlDocument
-    {
-        $this->sources[] = $source;
-
-        return new XmlDocument([]);
     }
 }

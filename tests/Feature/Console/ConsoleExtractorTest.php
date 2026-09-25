@@ -13,9 +13,8 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Tests\Support\RecordingPhpParser;
 
 final class ConsoleExtractorTest extends TestCase
 {
@@ -442,7 +441,7 @@ final class ConsoleExtractorTest extends TestCase
                 }
             }
             PHP;
-        $inner = new CountingConsolePhpParser(new TolerantPhpParser(new Parser()));
+        $inner = new RecordingPhpParser(new TolerantPhpParser(new Parser()));
         $parser = new LastResultPhpParser($inner);
         $delimiters = new BalancedDelimiterMatcher();
         $extractor = new ConsoleExtractor(
@@ -570,22 +569,5 @@ final class ConsoleExtractorTest extends TestCase
             new ConsoleDefinitionExtractor(),
             new ConsoleInvokableParameterExtractor(),
         );
-    }
-}
-
-final class CountingConsolePhpParser implements PhpParserInterface
-{
-    /** @var list<string> */
-    public array $sources = [];
-
-    public function __construct(private readonly PhpParserInterface $parser)
-    {
-    }
-
-    public function parse(string $source): PhpDocument
-    {
-        $this->sources[] = $source;
-
-        return $this->parser->parse($source);
     }
 }

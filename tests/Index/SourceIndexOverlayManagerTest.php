@@ -19,8 +19,6 @@ use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Index\SourceParseHealth;
-use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
@@ -28,6 +26,7 @@ use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\RecordingPhpParser;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class SourceIndexOverlayManagerTest extends TestCase
@@ -89,7 +88,7 @@ final class SourceIndexOverlayManagerTest extends TestCase
             $scope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
             $files = ProjectPaths::enumerator($scope);
             $health = new SourceOverlayHealthRegistry();
-            $parser = new CountingPhpParser(new TolerantPhpParser(new Parser()));
+            $parser = new RecordingPhpParser(new TolerantPhpParser(new Parser()));
             $manager = new SourceIndexOverlayManager(
                 $projects,
                 $documents,
@@ -102,27 +101,27 @@ final class SourceIndexOverlayManagerTest extends TestCase
             );
 
             $manager->updateUri($uri);
-            self::assertSame(1, $parser->calls);
+            self::assertSame(1, \count($parser->sources));
             self::assertSame([SourceParseHealth::Partial], $provider->healths);
             self::assertTrue($health->isDegraded($uri));
 
             $manager->updateUri($uri, trackParseHealth: false);
-            self::assertSame(1, $parser->calls);
+            self::assertSame(1, \count($parser->sources));
             self::assertSame([SourceParseHealth::Partial, SourceParseHealth::Healthy], $provider->healths);
             self::assertFalse($health->isDegraded($uri));
 
             $manager->updateUri($uri);
-            self::assertSame(2, $parser->calls);
+            self::assertSame(2, \count($parser->sources));
             self::assertTrue($health->isDegraded($uri));
 
             $scope->configure($project, ['src/**']);
             $manager->updateUri($uri);
-            self::assertSame(2, $parser->calls);
+            self::assertSame(2, \count($parser->sources));
             self::assertFalse($health->isDegraded($uri));
 
             $scope->configure($project, []);
             $manager->updateUri($uri);
-            self::assertSame(3, $parser->calls);
+            self::assertSame(3, \count($parser->sources));
             self::assertTrue($health->isDegraded($uri));
 
             $manager->removeUri($uri);
@@ -250,22 +249,6 @@ final class OverlayRecordingProvider implements SourceIndexProviderInterface
     public function removeOverlay(Project $project, string $uri): void
     {
         $this->removals[] = $uri;
-    }
-}
-
-final class CountingPhpParser implements PhpParserInterface
-{
-    public int $calls = 0;
-
-    public function __construct(private readonly PhpParserInterface $parser)
-    {
-    }
-
-    public function parse(string $source): PhpDocument
-    {
-        ++$this->calls;
-
-        return $this->parser->parse($source);
     }
 }
 

@@ -22,10 +22,9 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Xml\LastResultXmlParser;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
-use Symfony\Lsp\Parser\Xml\XmlDocument;
-use Symfony\Lsp\Parser\Xml\XmlParserInterface;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
+use Symfony\Lsp\Tests\Support\RecordingXmlParser;
 
 final class ConfigurationAnalyzerTest extends TestCase
 {
@@ -287,7 +286,7 @@ final class ConfigurationAnalyzerTest extends TestCase
 
     public function testXmlCompletionParsesTheCompleteSourceOnce(): void
     {
-        $inner = new RecordingXmlParser();
+        $inner = new RecordingXmlParser(new TolerantXmlParser());
         $parser = new LastResultXmlParser($inner);
         $analyzer = new XmlConfigurationAnalyzer($parser, new XmlCommentParser($parser));
         $source = '<container><framework:config><framework:router ut';
@@ -363,18 +362,5 @@ final class ConfigurationAnalyzerTest extends TestCase
     private function node(string $name, array $children = []): ConfigurationNode
     {
         return new ConfigurationNode($name, [] === $children ? 'boolean' : 'array', false, false, null, null, null, false, [], [], $children, null);
-    }
-}
-
-final class RecordingXmlParser implements XmlParserInterface
-{
-    /** @var list<string> */
-    public array $sources = [];
-
-    public function parse(string $source): XmlDocument
-    {
-        $this->sources[] = $source;
-
-        return (new TolerantXmlParser())->parse($source);
     }
 }

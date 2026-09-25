@@ -7,8 +7,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolKind;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
-use Symfony\Lsp\Parser\Xml\XmlDocument;
-use Symfony\Lsp\Parser\Xml\XmlParserInterface;
+use Symfony\Lsp\Tests\Support\RecordingXmlParser;
 
 final class XmlDependencyInjectionExtractorTest extends TestCase
 {
@@ -155,11 +154,11 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
 
     public function testDoesNotParseXmlWithoutTheServicesSchemaMarker(): void
     {
-        $parser = new CountingXmlParser();
+        $parser = new RecordingXmlParser();
         $extractor = new XmlDependencyInjectionExtractor(new PositionConverter(), $parser);
 
         self::assertNull($extractor->extract('file:///workspace/phpunit.xml', '<phpunit colors="true"/>'));
-        self::assertSame(0, $parser->calls);
+        self::assertSame(0, \count($parser->sources));
     }
 
     public function testRejectsSchemaMarkersOutsideTheDocumentElementNamespace(): void
@@ -193,17 +192,5 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
     private function extractor(): XmlDependencyInjectionExtractor
     {
         return new XmlDependencyInjectionExtractor(new PositionConverter(), new TolerantXmlParser());
-    }
-}
-
-final class CountingXmlParser implements XmlParserInterface
-{
-    public int $calls = 0;
-
-    public function parse(string $source): XmlDocument
-    {
-        ++$this->calls;
-
-        return new XmlDocument([]);
     }
 }
