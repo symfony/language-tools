@@ -43,6 +43,7 @@ use Symfony\Lsp\Runtime\DebouncedRuntimeRefreshScheduler;
 use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
+use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
 
@@ -147,6 +148,38 @@ final class ServiceConfigurationTest extends TestCase
         foreach ($tagged as $id) {
             self::assertTrue(is_subclass_of($id, ProjectStateInterface::class), \sprintf('The tagged service "%s" does not implement the project state contract.', $id));
         }
+    }
+
+    public function testLoadsEverySectionTheBridgeProduces(): void
+    {
+        $container = $this->container();
+        $container->compile();
+        $loaders = [];
+        foreach (array_keys($container->findTaggedServiceIds('lsp.runtime_snapshot_loader')) as $id) {
+            if (!class_exists($id)) {
+                continue;
+            }
+            $loader = (new \ReflectionClass($id))->newInstanceWithoutConstructor();
+            self::assertInstanceOf(RuntimeSnapshotLoaderInterface::class, $loader);
+            $loaders[] = $loader;
+        }
+        $sections = (new RuntimeSnapshotLoaderRegistry($loaders))->sections();
+        sort($sections);
+        $bridgeSections = $this->bridgeSections();
+        sort($bridgeSections);
+
+        self::assertSame($bridgeSections, $sections);
+    }
+
+    /** @return list<string> */
+    private function bridgeSections(): array
+    {
+        $source = file_get_contents(\dirname(__DIR__, 2).'/resources/bridge.php');
+        self::assertIsString($source);
+        preg_match_all('/\'([a-z_]+)\' => symfonyLspBridge\w+Section\(\$context\)/', $source, $matches);
+        self::assertNotEmpty($matches[1], 'The bridge section dispatch table was not found.');
+
+        return $matches[1];
     }
 
     private function container(): ContainerBuilder
