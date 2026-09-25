@@ -18,7 +18,7 @@ final class TemplateSourceIndexer extends AbstractSourceIndexer
         private readonly TemplateReferenceExtractor $extractor,
         private readonly TemplateNameResolver $nameResolver,
     ) {
-        parent::__construct($indexes, 'templates', TemplateSourceFacts::class);
+        parent::__construct($indexes, 'template', TemplateSourceFacts::class);
     }
 
     protected function payloadElementClasses(): array

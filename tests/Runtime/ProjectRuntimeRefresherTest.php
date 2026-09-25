@@ -41,16 +41,16 @@ final class ProjectRuntimeRefresherTest extends TestCase
     /** @return iterable<string, array{string, list<string>, RuntimeRefreshMode, list<string>|null, bool}> */
     public static function resourceProvider(): iterable
     {
-        yield 'route attribute' => ['file:///workspace/src/Controller.php', ['routes'], RuntimeRefreshMode::Reuse, ['routes'], true];
-        yield 'route YAML' => ['file:///workspace/config/routes.yaml', ['routes'], RuntimeRefreshMode::Reuse, ['routes'], true];
-        yield 'asset and Stimulus' => ['file:///workspace/assets/app.js', ['assets', 'stimulus'], RuntimeRefreshMode::Reuse, ['assets', 'stimulus'], true];
-        yield 'event' => ['file:///workspace/src/Listener.php', ['events'], RuntimeRefreshMode::Clear, ['events', 'container'], false];
-        yield 'translation' => ['file:///workspace/translations/messages.en.yaml', ['translations'], RuntimeRefreshMode::Reuse, ['translations'], true];
-        yield 'directory locale translation' => ['file:///workspace/app/Bundle/Translations/en_US/messages.ini', ['translations'], RuntimeRefreshMode::Reuse, ['translations'], true];
-        yield 'XML service' => ['file:///workspace/src/Resources/config/services.xml', ['dependencyInjection'], RuntimeRefreshMode::Clear, ['container'], false];
-        yield 'Twig callable' => ['file:///workspace/src/Twig/AppExtension.php', ['twig_callables'], RuntimeRefreshMode::Clear, ['twig'], false];
-        yield 'ambiguous configuration' => ['file:///workspace/config/packages/framework.yaml', ['dependencyInjection'], RuntimeRefreshMode::Clear, null, false];
-        yield 'unknown domain' => ['file:///workspace/src/Entity.php', ['doctrine_v1'], RuntimeRefreshMode::Clear, null, false];
+        yield 'route attribute' => ['file:///workspace/src/Controller.php', ['route'], RuntimeRefreshMode::Reuse, ['routes'], true];
+        yield 'route YAML' => ['file:///workspace/config/routes.yaml', ['route'], RuntimeRefreshMode::Reuse, ['routes'], true];
+        yield 'asset and Stimulus' => ['file:///workspace/assets/app.js', ['asset', 'stimulus'], RuntimeRefreshMode::Reuse, ['assets', 'stimulus'], true];
+        yield 'event' => ['file:///workspace/src/Listener.php', ['event'], RuntimeRefreshMode::Clear, ['events', 'container'], false];
+        yield 'translation' => ['file:///workspace/translations/messages.en.yaml', ['translation'], RuntimeRefreshMode::Reuse, ['translations'], true];
+        yield 'directory locale translation' => ['file:///workspace/app/Bundle/Translations/en_US/messages.ini', ['translation'], RuntimeRefreshMode::Reuse, ['translations'], true];
+        yield 'XML service' => ['file:///workspace/src/Resources/config/services.xml', ['dependency_injection'], RuntimeRefreshMode::Clear, ['container'], false];
+        yield 'Twig callable' => ['file:///workspace/src/Twig/AppExtension.php', ['twig_callable'], RuntimeRefreshMode::Clear, ['twig'], false];
+        yield 'ambiguous configuration' => ['file:///workspace/config/packages/framework.yaml', ['dependency_injection'], RuntimeRefreshMode::Clear, null, false];
+        yield 'domain without runtime sections' => ['file:///workspace/src/Entity.php', ['doctrine'], RuntimeRefreshMode::Clear, null, false];
     }
 
     public function testPlansCreatedAndDeletedIndependentResourcesFromTheirPaths(): void

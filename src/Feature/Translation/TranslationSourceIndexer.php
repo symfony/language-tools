@@ -12,7 +12,7 @@ final class TranslationSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(TranslationIndexRegistry $indexes, private readonly TranslationExtractor $extractor)
     {
-        parent::__construct($indexes, 'translations', TranslationSourceFacts::class);
+        parent::__construct($indexes, 'translation', TranslationSourceFacts::class);
     }
 
     protected function payloadElementClasses(): array

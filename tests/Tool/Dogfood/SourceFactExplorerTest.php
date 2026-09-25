@@ -27,13 +27,13 @@ final class SourceFactExplorerTest extends TestCase
     {
         $explorer = new SourceFactExplorer(positionsPerGroup: 2);
         foreach (['src/A.php', 'src/B.php', 'src/C.php'] as $file) {
-            $explorer->add('routes', $file, new RouteSourceFacts('file:///'.$file, [], [
+            $explorer->add('route', $file, new RouteSourceFacts('file:///'.$file, [], [
                 $this->routeReference('first', 1),
                 $this->routeReference('second', 2),
             ]));
         }
 
-        $group = $this->group($explorer->census(), 'routes', RouteReference::class);
+        $group = $this->group($explorer->census(), 'route', RouteReference::class);
 
         self::assertSame(6, $group['count']);
         self::assertSame(6, $group['withPosition']);
@@ -54,7 +54,7 @@ final class SourceFactExplorerTest extends TestCase
         self::assertSame($census, $reversed);
         self::assertSame(
             ['templates/a.twig', 'templates/b.twig'],
-            array_column($this->group($census, 'templates', TemplateReference::class)['positions'], 'file'),
+            array_column($this->group($census, 'template', TemplateReference::class)['positions'], 'file'),
         );
     }
 
@@ -63,10 +63,10 @@ final class SourceFactExplorerTest extends TestCase
         $bounded = $this->explore(['templates/a.twig', 'templates/b.twig'], 0);
         $sampled = $this->explore(['templates/a.twig', 'templates/b.twig'], 3);
 
-        $group = $this->group($bounded, 'templates', TemplateReference::class);
+        $group = $this->group($bounded, 'template', TemplateReference::class);
         self::assertSame([], $group['positions']);
         unset($group['positions']);
-        $expected = $this->group($sampled, 'templates', TemplateReference::class);
+        $expected = $this->group($sampled, 'template', TemplateReference::class);
         self::assertCount(2, $expected['positions']);
         unset($expected['positions']);
         self::assertSame($expected, $group);
@@ -82,7 +82,7 @@ final class SourceFactExplorerTest extends TestCase
     public function testReportsNeitherPayloadValuesNorSourceExcerpts(): void
     {
         $explorer = new SourceFactExplorer();
-        $explorer->add('routes', 'src/SecretController.php', new RouteSourceFacts(
+        $explorer->add('route', 'src/SecretController.php', new RouteSourceFacts(
             'file:///src/SecretController.php',
             [new RouteDeclaration('secret_route_name', 'file:///src/SecretController.php', $this->range(1))],
             [new RouteReference('secret_reference_name', 'file:///src/SecretController.php', $this->range(2), 'App\\Secret\\Controller')],
@@ -117,13 +117,13 @@ final class SourceFactExplorerTest extends TestCase
     public function testFindsPositionsOnPublicRangePropertiesOfPlainFacts(): void
     {
         $explorer = new SourceFactExplorer();
-        $explorer->add('templates', 'templates/a.twig', new TemplateSourceFacts(
+        $explorer->add('template', 'templates/a.twig', new TemplateSourceFacts(
             'file:///templates/a.twig',
             new TemplateDeclaration('a.twig', 'file:///templates/a.twig', $this->range(7)),
             [],
         ));
 
-        $group = $this->group($explorer->census(), 'templates', TemplateDeclaration::class);
+        $group = $this->group($explorer->census(), 'template', TemplateDeclaration::class);
 
         self::assertNull($group['kind']);
         self::assertSame([['file' => 'templates/a.twig', 'line' => 7, 'character' => 4, 'scenario' => null]], $group['positions']);
@@ -133,14 +133,14 @@ final class SourceFactExplorerTest extends TestCase
     {
         $shared = $this->routeReference('shared', 3);
         $explorer = new SourceFactExplorer();
-        $explorer->add('routes', 'src/A.php', new RouteSourceFacts('file:///src/A.php', [], [
+        $explorer->add('route', 'src/A.php', new RouteSourceFacts('file:///src/A.php', [], [
             $this->routeReference('twice', 1),
             $this->routeReference('twice', 1),
             $shared,
             $shared,
         ]));
 
-        $group = $this->group($explorer->census(), 'routes', RouteReference::class);
+        $group = $this->group($explorer->census(), 'route', RouteReference::class);
 
         self::assertSame(3, $group['count']);
         self::assertSame(2, $group['distinctPositions']);
@@ -152,11 +152,11 @@ final class SourceFactExplorerTest extends TestCase
         $facts = new RouteSourceFacts('file:///src/A.php', [], [$this->routeReference('deep', 1)]);
 
         $explorer = new SourceFactExplorer(maximumDepth: 2);
-        $explorer->add('routes', 'src/A.php', $facts);
+        $explorer->add('route', 'src/A.php', $facts);
         $shallow = $explorer->census();
 
         $explorer = new SourceFactExplorer(maximumDepth: 1);
-        $explorer->add('routes', 'src/A.php', $facts);
+        $explorer->add('route', 'src/A.php', $facts);
         $truncated = $explorer->census();
 
         self::assertFalse($shallow['depthLimitReached']);
@@ -172,13 +172,13 @@ final class SourceFactExplorerTest extends TestCase
             ['id' => 'route.elsewhere', 'file' => 'src/B.php', 'position' => new Position(9, 0)],
         ]);
         $explorer = new SourceFactExplorer(positionsPerGroup: 1, scenarios: $scenarios);
-        $explorer->add('routes', 'src/A.php', new RouteSourceFacts('file:///src/A.php', [], [
+        $explorer->add('route', 'src/A.php', new RouteSourceFacts('file:///src/A.php', [], [
             $this->routeReference('covered', 2),
             $this->routeReference('uncovered', 5),
         ]));
 
         $census = $explorer->census();
-        $group = $this->group($census, 'routes', RouteReference::class);
+        $group = $this->group($census, 'route', RouteReference::class);
 
         self::assertSame(1, $group['withScenario']);
         self::assertSame(['route.reference'], $group['scenarios']);
@@ -189,7 +189,7 @@ final class SourceFactExplorerTest extends TestCase
     public function testReportsNoScenarioCoverageWithoutAManifest(): void
     {
         $explorer = new SourceFactExplorer();
-        $explorer->add('routes', 'src/A.php', new RouteSourceFacts('file:///src/A.php', [], [$this->routeReference('any', 1)]));
+        $explorer->add('route', 'src/A.php', new RouteSourceFacts('file:///src/A.php', [], [$this->routeReference('any', 1)]));
 
         self::assertNull($explorer->census()['scenarios']);
     }
@@ -203,7 +203,7 @@ final class SourceFactExplorerTest extends TestCase
     {
         $explorer = new SourceFactExplorer(positionsPerGroup: $positionsPerGroup);
         foreach ($files as $file) {
-            $explorer->add('templates', $file, new TemplateSourceFacts('file:///'.$file, null, [
+            $explorer->add('template', $file, new TemplateSourceFacts('file:///'.$file, null, [
                 new TemplateReference('base.html.twig', 'file:///'.$file, $this->range(4)),
             ]));
         }

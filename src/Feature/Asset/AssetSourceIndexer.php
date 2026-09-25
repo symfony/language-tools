@@ -12,7 +12,7 @@ final class AssetSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(AssetSourceIndexRegistry $indexes, private readonly AssetExtractor $extractor)
     {
-        parent::__construct($indexes, 'assets', AssetSourceFacts::class);
+        parent::__construct($indexes, 'asset', AssetSourceFacts::class);
     }
 
     protected function payloadElementClasses(): array

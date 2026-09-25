@@ -11,7 +11,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 
 /** @extends AbstractSourceIndexer<RouteSourceFacts> */
-final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
+final class RouteSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(
         RouteSourceIndexRegistry $sourceIndexes,
@@ -21,7 +21,7 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
         private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
         private readonly ProjectPathResolver $pathResolver,
     ) {
-        parent::__construct($sourceIndexes, 'routes', RouteSourceFacts::class);
+        parent::__construct($sourceIndexes, 'route', RouteSourceFacts::class);
     }
 
     protected function payloadElementClasses(): array

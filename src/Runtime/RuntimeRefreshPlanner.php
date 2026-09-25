@@ -6,20 +6,21 @@ use Symfony\Lsp\Index\SourceFileChange;
 
 final class RuntimeRefreshPlanner
 {
-    private const DOMAIN_SECTIONS = [
-        'assets' => ['assets'],
+    /** Maps source index provider names to the runtime metadata sections their facts feed. */
+    public const DOMAIN_SECTIONS = [
+        'asset' => ['assets'],
         'console' => ['console'],
-        'dependencyInjection' => ['container'],
+        'dependency_injection' => ['container'],
         'environment' => ['environment'],
-        'events' => ['events', 'container'],
+        'event' => ['events', 'container'],
         'messenger' => ['messenger', 'container'],
         'metadata' => ['metadata', 'container'],
-        'routes' => ['routes'],
+        'route' => ['routes'],
         'security' => ['security', 'container'],
         'stimulus' => ['stimulus'],
-        'translations' => ['translations'],
-        'twig_callables' => ['twig'],
-        'twig_components_v2' => ['twig', 'twig_components', 'container'],
+        'translation' => ['translations'],
+        'twig_callable' => ['twig'],
+        'twig_component' => ['twig', 'twig_components', 'container'],
     ];
 
     public function plan(string $path, SourceFileChange $change): ?RuntimeRefreshPlan
@@ -45,7 +46,7 @@ final class RuntimeRefreshPlanner
         }
         $sections = array_values(array_unique($sections));
 
-        $preserveContainer = [] === array_diff($domains, ['assets', 'routes', 'stimulus', 'translations']);
+        $preserveContainer = [] === array_diff($domains, ['asset', 'route', 'stimulus', 'translation']);
 
         return new RuntimeRefreshPlan(
             $preserveContainer ? RuntimeRefreshMode::Reuse : RuntimeRefreshMode::Clear,
@@ -58,13 +59,13 @@ final class RuntimeRefreshPlanner
     private function domainsFromPath(string $path): array
     {
         if (str_starts_with($path, 'assets/')) {
-            return ['assets', 'stimulus'];
+            return ['asset', 'stimulus'];
         }
         if (str_contains('/'.$path, '/translations/')) {
-            return ['translations'];
+            return ['translation'];
         }
         if (str_starts_with($path, 'config/routes.') || str_starts_with($path, 'config/routes/')) {
-            return ['routes'];
+            return ['route'];
         }
 
         return [];

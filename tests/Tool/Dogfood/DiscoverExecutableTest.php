@@ -90,7 +90,7 @@ final class DiscoverExecutableTest extends TestCase
         self::assertStringContainsString('never that the server answers there', $report['note']);
         self::assertFalse($report['depthLimitReached']);
         self::assertArrayNotHasKey('scenarios', $report);
-        $group = $this->group($report, 'routes', self::ROUTE_REFERENCE);
+        $group = $this->group($report, 'route', self::ROUTE_REFERENCE);
         self::assertSame(2, $group['count']);
         self::assertSame(2, $group['files']);
         self::assertSame(
@@ -131,7 +131,7 @@ final class DiscoverExecutableTest extends TestCase
             }
             /** @var array{path: string, providers: array<string, string>} $record */
             $record = json_decode($line, true, flags: \JSON_THROW_ON_ERROR);
-            $record['providers']['routes'] = base64_encode(serialize(new RouteSourceFacts($uris->toUri($this->workspace->path($record['path'])), [], [])));
+            $record['providers']['route'] = base64_encode(serialize(new RouteSourceFacts($uris->toUri($this->workspace->path($record['path'])), [], [])));
             $lines[$number] = json_encode($record, \JSON_THROW_ON_ERROR);
         }
         file_put_contents($index, implode("\n", $lines)."\n");
@@ -185,7 +185,7 @@ final class DiscoverExecutableTest extends TestCase
         self::assertIsArray($scenarios);
         self::assertSame(['route.twig'], $scenarios['covered']);
         self::assertSame(['without.candidate'], $scenarios['uncovered']);
-        $group = $this->group($report, 'routes', self::ROUTE_REFERENCE);
+        $group = $this->group($report, 'route', self::ROUTE_REFERENCE);
         self::assertSame(2, $group['count']);
         self::assertSame(1, $group['withScenario']);
         self::assertSame(['route.twig'], $group['scenarios']);

@@ -17,9 +17,9 @@ use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationEx
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
-use Symfony\Lsp\Feature\Route\ProjectRouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
 use Symfony\Lsp\Feature\Route\RouteReference;
+use Symfony\Lsp\Feature\Route\RouteSourceIndexer;
 use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
 use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
@@ -52,7 +52,7 @@ use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 
-final class ProjectRouteSourceIndexerTest extends TestCase
+final class RouteSourceIndexerTest extends TestCase
 {
     private string $temporaryDirectory;
 
@@ -118,7 +118,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
             $projects,
             new DocumentStore(),
             [
-                new ProjectRouteSourceIndexer(
+                new RouteSourceIndexer(
                     $indexes,
                     new PhpRouteDeclarationExtractor($positionConverter, $parser),
                     new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
@@ -188,7 +188,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         $indexes = new RouteSourceIndexRegistry(new DependencyInjectionSourceIndexRegistry(), new RouteControllerClassifier());
         $positionConverter = new PositionConverter();
         $documents = new DocumentStore();
-        $indexer = new ProjectRouteSourceIndexer(
+        $indexer = new RouteSourceIndexer(
             $indexes,
             new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
             new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
@@ -249,7 +249,7 @@ final class ProjectRouteSourceIndexerTest extends TestCase
         $indexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
         $positionConverter = new PositionConverter();
         $parser = new TolerantPhpParser(new Parser());
-        $indexer = new ProjectRouteSourceIndexer(
+        $indexer = new RouteSourceIndexer(
             $indexes,
             new PhpRouteDeclarationExtractor($positionConverter, $parser),
             new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),

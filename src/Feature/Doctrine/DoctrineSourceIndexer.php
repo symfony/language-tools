@@ -12,7 +12,7 @@ final class DoctrineSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(DoctrineIndexRegistry $indexes, private readonly DoctrineExtractor $extractor)
     {
-        parent::__construct($indexes, 'doctrine_v1', DoctrineSourceFacts::class);
+        parent::__construct($indexes, 'doctrine', DoctrineSourceFacts::class);
     }
 
     protected function payloadElementClasses(): array

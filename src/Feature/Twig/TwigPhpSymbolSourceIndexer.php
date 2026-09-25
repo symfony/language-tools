@@ -14,7 +14,7 @@ final class TwigPhpSymbolSourceIndexer extends AbstractSourceIndexer
         TwigPhpSymbolSourceIndexRegistry $indexes,
         private readonly TwigPhpSymbolExtractor $extractor,
     ) {
-        parent::__construct($indexes, 'twig_php_symbols', TwigPhpSymbolSourceFacts::class);
+        parent::__construct($indexes, 'twig_php_symbol', TwigPhpSymbolSourceFacts::class);
     }
 
     protected function payloadElementClasses(): array

@@ -7,6 +7,7 @@ use Symfony\Lsp\Project\Project;
 
 interface SourceIndexProviderInterface
 {
+    /** Stable snake_case domain name used as the persisted payload key and as the runtime refresh domain. */
     public function name(): string;
 
     /** @return list<string> */

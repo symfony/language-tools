@@ -19,7 +19,7 @@ final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
         PhpAutowireReferenceExtractor $autowireExtractor,
         PhpClassDeclarationExtractor $classExtractor,
     ) {
-        parent::__construct($indexes, 'dependencyInjection', DependencyInjectionSourceFacts::class);
+        parent::__construct($indexes, 'dependency_injection', DependencyInjectionSourceFacts::class);
 
         $this->extractor = new DependencyInjectionDocumentExtractor(
             $yamlExtractor,

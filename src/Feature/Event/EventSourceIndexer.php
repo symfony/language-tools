@@ -12,7 +12,7 @@ final class EventSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(EventSourceIndexRegistry $indexes, private readonly EventExtractor $extractor)
     {
-        parent::__construct($indexes, 'events', EventSourceFacts::class);
+        parent::__construct($indexes, 'event', EventSourceFacts::class);
     }
 
     protected function payloadElementClasses(): array

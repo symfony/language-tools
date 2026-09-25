@@ -15,7 +15,7 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
         private readonly TwigCallableDeclarationExtractor $extractor,
         private readonly TwigCallableReferenceExtractor $references,
     ) {
-        parent::__construct($indexes, 'twig_callables', TwigCallableSourceFacts::class);
+        parent::__construct($indexes, 'twig_callable', TwigCallableSourceFacts::class);
     }
 
     protected function payloadElementClasses(): array

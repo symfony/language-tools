@@ -12,7 +12,7 @@ final class TwigComponentSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(TwigComponentIndexRegistry $indexes, private readonly TwigComponentExtractor $extractor)
     {
-        parent::__construct($indexes, 'twig_components_v2', TwigComponentSourceFacts::class);
+        parent::__construct($indexes, 'twig_component', TwigComponentSourceFacts::class);
     }
 
     protected function payloadElementClasses(): array
