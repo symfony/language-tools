@@ -8,7 +8,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 
 final class ProjectRegistryTest extends TestCase
 {
-    public function testReportsAddedAndRemovedProjectsByRootPath(): void
+    public function testReportsRemovedProjectsByRootPath(): void
     {
         $registry = new ProjectRegistry();
         $first = new Project('/first', 'file:///first');
@@ -16,22 +16,16 @@ final class ProjectRegistryTest extends TestCase
         $registry->replace([$first, $second]);
 
         $third = new Project('/third', 'file:///third');
-        $change = $registry->replace([$second, $third]);
-
-        self::assertSame([$third], $change->added);
-        self::assertSame([$first], $change->removed);
+        self::assertSame([$first], $registry->replace([$second, $third]));
     }
 
-    public function testRediscoveredRootsAreNeitherAddedNorRemoved(): void
+    public function testRediscoveredRootsAreNotRemoved(): void
     {
         $registry = new ProjectRegistry();
         $registry->replace([new Project('/workspace', 'file:///workspace')]);
 
         $rediscovered = new Project('/workspace', 'file:///workspace');
-        $change = $registry->replace([$rediscovered]);
-
-        self::assertSame([], $change->added);
-        self::assertSame([], $change->removed);
+        self::assertSame([], $registry->replace([$rediscovered]));
         self::assertSame([$rediscovered], $registry->all());
     }
 

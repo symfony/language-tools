@@ -137,8 +137,7 @@ final class WorkspaceConfiguration
         }
         $this->projectConfiguration->validateProjects($projects);
 
-        $change = $this->projectRegistry->replace($projects);
-        foreach ($change->removed as $project) {
+        foreach ($this->projectRegistry->replace($projects) as $project) {
             $this->projectStateCleaner->remove($project);
         }
         $this->projectSettings->applyFileSettings();

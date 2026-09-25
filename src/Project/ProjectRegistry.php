@@ -12,8 +12,10 @@ final class ProjectRegistry
 
     /**
      * @param list<Project> $projects
+     *
+     * @return list<Project> the projects that are no longer registered
      */
-    public function replace(array $projects): ProjectCollectionChange
+    public function replace(array $projects): array
     {
         $previous = [];
         foreach ($this->projects as $project) {
@@ -30,10 +32,7 @@ final class ProjectRegistry
             static fn (Project $left, Project $right): int => \strlen($right->rootUri) <=> \strlen($left->rootUri),
         );
 
-        return new ProjectCollectionChange(
-            array_values(array_diff_key($current, $previous)),
-            array_values(array_diff_key($previous, $current)),
-        );
+        return array_values(array_diff_key($previous, $current));
     }
 
     public function contains(Project $project): bool
