@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Runtime;
 use Amp\ByteStream\WritableBuffer;
 use Amp\Cancellation;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\PartialRuntimeMetadataException;
@@ -15,12 +14,13 @@ use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
+use Symfony\Lsp\Tests\Support\RecordingClient;
 
 final class ReportingRuntimeInitializerTest extends TestCase
 {
     public function testReportsRefreshFailuresWithoutDiscardingTheServerSession(): void
     {
-        $client = new ReportingClient();
+        $client = new RecordingClient();
         $statuses = new ProjectIndexStatusRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeReady($project);
@@ -40,7 +40,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
 
     public function testReportsPartialRuntimeMetadataWithoutHidingAvailableFeatures(): void
     {
-        $client = new ReportingClient();
+        $client = new RecordingClient();
         $statuses = new ProjectIndexStatusRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project);
@@ -61,7 +61,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
 
     public function testLogsSanitizedSectionCausesWithTheFailureItself(): void
     {
-        $client = new ReportingClient();
+        $client = new RecordingClient();
         $statuses = new ProjectIndexStatusRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project);
@@ -101,7 +101,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
 
     public function testReportsInitialFailureAsStaticOnly(): void
     {
-        $client = new ReportingClient();
+        $client = new RecordingClient();
         $statuses = new ProjectIndexStatusRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project);
@@ -117,7 +117,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
 
     public function testReportsUnsupportedSymfonyVersionAsStaticOnly(): void
     {
-        $client = new ReportingClient();
+        $client = new RecordingClient();
         $statuses = new ProjectIndexStatusRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project);
@@ -138,7 +138,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
 
     public function testReportsConfigurationFailuresWithoutRawDetails(): void
     {
-        $client = new ReportingClient();
+        $client = new RecordingClient();
         $statuses = new ProjectIndexStatusRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project, 'configuration');
@@ -154,7 +154,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
 
     public function testReportsConfigurationFailuresWithRestoredMetadata(): void
     {
-        $client = new ReportingClient();
+        $client = new RecordingClient();
         $statuses = new ProjectIndexStatusRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeReady($project);
@@ -171,7 +171,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
 
     public function testLogsTheUnderlyingErrorWithRedaction(): void
     {
-        $client = new ReportingClient();
+        $client = new RecordingClient();
         $statuses = new ProjectIndexStatusRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $statuses->runtimeFailed($project);
@@ -197,21 +197,5 @@ final class ReportingRuntimeInitializerTest extends TestCase
                 throw $this->error;
             }
         };
-    }
-}
-
-final class ReportingClient implements ClientInterface
-{
-    /** @var list<array{method: string, params: array<array-key, mixed>}> */
-    public array $notifications = [];
-
-    public function request(string $method, array $params): mixed
-    {
-        return null;
-    }
-
-    public function notify(string $method, array $params): void
-    {
-        $this->notifications[] = ['method' => $method, 'params' => $params];
     }
 }

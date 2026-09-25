@@ -14,12 +14,13 @@ use Symfony\Lsp\Project\WorkspaceTrustManager;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
+use Symfony\Lsp\Tests\Support\RecordingClient;
 
 final class WorkspaceTrustManagerTest extends TestCase
 {
     public function testUsesClientProvidedTrustWithoutPrompting(): void
     {
-        $client = new CapturingClient(null);
+        $client = new RecordingClient(null);
         $trust = new WorkspaceTrust();
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
@@ -38,7 +39,7 @@ final class WorkspaceTrustManagerTest extends TestCase
 
     public function testPromptsForUnknownTrustAndEnablesRuntimeIndexing(): void
     {
-        $client = new CapturingClient(['title' => 'Trust and enable runtime indexing']);
+        $client = new RecordingClient(['title' => 'Trust and enable runtime indexing']);
         $trust = new WorkspaceTrust();
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
@@ -62,7 +63,7 @@ final class WorkspaceTrustManagerTest extends TestCase
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
         $registry = $this->registry($project = new Project('/workspace', 'file:///workspace'));
-        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
+        $manager = new WorkspaceTrustManager(new RecordingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
         $manager->requestUnknownDecisions($registry->all());
 
@@ -78,7 +79,7 @@ final class WorkspaceTrustManagerTest extends TestCase
         $trust->set($project, TrustStatus::Trusted);
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses, [false, true]);
-        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
+        $manager = new WorkspaceTrustManager(new RecordingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $registry);
 
         $manager->requestUnknownDecisions($registry->all());
         $manager->requestUnknownDecisions($registry->all());
@@ -106,7 +107,7 @@ final class WorkspaceTrustManagerTest extends TestCase
                 $this->statuses->runtimePartial($project);
             }
         };
-        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $this->registry($project));
+        $manager = new WorkspaceTrustManager(new RecordingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $this->registry($project));
 
         $manager->requestUnknownDecisions([$project]);
         $manager->requestUnknownDecisions([$project]);
@@ -121,7 +122,7 @@ final class WorkspaceTrustManagerTest extends TestCase
         $trust->set($project, TrustStatus::Trusted);
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
-        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $this->registry($project));
+        $manager = new WorkspaceTrustManager(new RecordingClient(null), $trust, $runtimeInitializer, $statuses, new RuntimeConfiguration(), $this->registry($project));
 
         $manager->requestUnknownDecisions([$project]);
         $statuses->runtimeStale($project);
@@ -138,7 +139,7 @@ final class WorkspaceTrustManagerTest extends TestCase
         $statuses = new ProjectIndexStatusRegistry();
         $configuration = new RuntimeConfiguration();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
-        $manager = new WorkspaceTrustManager(new CapturingClient(null), $trust, $runtimeInitializer, $statuses, $configuration, $this->registry($project));
+        $manager = new WorkspaceTrustManager(new RecordingClient(null), $trust, $runtimeInitializer, $statuses, $configuration, $this->registry($project));
 
         $manager->requestUnknownDecisions([$project]);
         $manager->requestUnknownDecisions([$project]);
@@ -169,7 +170,7 @@ final class WorkspaceTrustManagerTest extends TestCase
 
     public function testRemovalResetsTrustSoReAddingPromptsAgain(): void
     {
-        $client = new CapturingClient(['title' => 'Trust and enable runtime indexing']);
+        $client = new RecordingClient(['title' => 'Trust and enable runtime indexing']);
         $trust = new WorkspaceTrust();
         $statuses = new ProjectIndexStatusRegistry();
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
@@ -228,28 +229,6 @@ final class RemovingClient implements ClientInterface
     public function request(string $method, array $params): mixed
     {
         $this->registry->replace([]);
-
-        return $this->response;
-    }
-
-    public function notify(string $method, array $params): void
-    {
-    }
-}
-
-final class CapturingClient implements ClientInterface
-{
-    /** @var list<array{method: string, params: array<array-key, mixed>}> */
-    public array $requests = [];
-
-    public function __construct(
-        private readonly mixed $response,
-    ) {
-    }
-
-    public function request(string $method, array $params): mixed
-    {
-        $this->requests[] = ['method' => $method, 'params' => $params];
 
         return $this->response;
     }

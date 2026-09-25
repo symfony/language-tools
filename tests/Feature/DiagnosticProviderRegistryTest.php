@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Feature;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
@@ -31,6 +30,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\RecordingClient;
 
 final class DiagnosticProviderRegistryTest extends TestCase
 {
@@ -212,13 +212,13 @@ final class DiagnosticProviderRegistryTest extends TestCase
         }
     }
 
-    /** @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector} */
+    /** @return array{DiagnosticProviderRegistry, RecordingClient, DiagnosticCollector} */
     private function registry(string $uri): array
     {
         return $this->registryWithProviders($uri, new StubDiagnosticProvider([$this->diagnostic('stub')]));
     }
 
-    /** @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector} */
+    /** @return array{DiagnosticProviderRegistry, RecordingClient, DiagnosticCollector} */
     private function registryWithProviders(string $uri, DiagnosticProviderInterface ...$providers): array
     {
         return $this->registryWithScope($uri, [], ...$providers);
@@ -227,7 +227,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
     /**
      * @param list<string> $excludePaths
      *
-     * @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector}
+     * @return array{DiagnosticProviderRegistry, RecordingClient, DiagnosticCollector}
      */
     private function registryWithScope(string $uri, array $excludePaths, DiagnosticProviderInterface ...$providers): array
     {
@@ -237,7 +237,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
     /**
      * @param list<string> $excludePaths
      *
-     * @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector}
+     * @return array{DiagnosticProviderRegistry, RecordingClient, DiagnosticCollector}
      */
     private function registryForDocument(string $uri, string $languageId, string $text, array $excludePaths, DiagnosticProviderInterface ...$providers): array
     {
@@ -247,11 +247,11 @@ final class DiagnosticProviderRegistryTest extends TestCase
     /**
      * @param list<string> $excludePaths
      *
-     * @return array{DiagnosticProviderRegistry, CollectingClient, DiagnosticCollector}
+     * @return array{DiagnosticProviderRegistry, RecordingClient, DiagnosticCollector}
      */
     private function registryForProjectDocument(string $rootPath, string $uri, string $languageId, string $text, array $excludePaths, DiagnosticProviderInterface ...$providers): array
     {
-        $client = new CollectingClient();
+        $client = new RecordingClient();
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
@@ -349,21 +349,5 @@ final class MalformedDiagnosticProvider implements DiagnosticProviderInterface
         $diagnostics = (array) json_decode('[42]', true, flags: \JSON_THROW_ON_ERROR);
 
         return $diagnostics;
-    }
-}
-
-final class CollectingClient implements ClientInterface
-{
-    /** @var list<array{method: string, params: array<array-key, mixed>}> */
-    public array $notifications = [];
-
-    public function request(string $method, array $params): mixed
-    {
-        return null;
-    }
-
-    public function notify(string $method, array $params): void
-    {
-        $this->notifications[] = ['method' => $method, 'params' => $params];
     }
 }

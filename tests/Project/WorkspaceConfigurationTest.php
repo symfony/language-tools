@@ -27,6 +27,7 @@ use Symfony\Lsp\Project\WorkspaceTrustManager;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
+use Symfony\Lsp\Tests\Support\RecordingClient;
 
 final class WorkspaceConfigurationTest extends TestCase
 {
@@ -169,16 +170,7 @@ final class WorkspaceConfigurationTest extends TestCase
 
     private function client(): ClientInterface
     {
-        return new class implements ClientInterface {
-            public function request(string $method, array $params): mixed
-            {
-                return null;
-            }
-
-            public function notify(string $method, array $params): void
-            {
-            }
-        };
+        return new RecordingClient();
     }
 
     private function runtimeInitializer(): RuntimeInitializerInterface

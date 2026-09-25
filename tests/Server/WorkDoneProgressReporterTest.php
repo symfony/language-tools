@@ -3,14 +3,14 @@
 namespace Symfony\Lsp\Tests\Server;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Server\WorkDoneProgressReporter;
+use Symfony\Lsp\Tests\Support\RecordingClient;
 
 final class WorkDoneProgressReporterTest extends TestCase
 {
     public function testCreatesAndCompletesSupportedProgress(): void
     {
-        $client = new ProgressClient();
+        $client = new RecordingClient();
         $progress = new WorkDoneProgressReporter($client);
         $progress->initialize(['capabilities' => ['window' => ['workDoneProgress' => true]]]);
 
@@ -26,26 +26,5 @@ final class WorkDoneProgressReporterTest extends TestCase
 
             return \is_array($value) ? ($value['kind'] ?? null) : null;
         }, $client->notifications));
-    }
-}
-
-final class ProgressClient implements ClientInterface
-{
-    /** @var list<array{method: string, params: array<array-key, mixed>}> */
-    public array $requests = [];
-
-    /** @var list<array{method: string, params: array<array-key, mixed>}> */
-    public array $notifications = [];
-
-    public function request(string $method, array $params): mixed
-    {
-        $this->requests[] = ['method' => $method, 'params' => $params];
-
-        return null;
-    }
-
-    public function notify(string $method, array $params): void
-    {
-        $this->notifications[] = ['method' => $method, 'params' => $params];
     }
 }

@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\GlobPatternCompiler;
@@ -15,6 +14,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectSettings;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\RecordingClient;
 
 final class ProjectSettingsTest extends TestCase
 {
@@ -23,7 +23,7 @@ final class ProjectSettingsTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $configuration = new TranslationConfigurationRegistry();
-        $client = new ProjectSettingsClient();
+        $client = new RecordingClient([['translationDiagnostics' => true, 'environment' => 'test', 'bridgeTimeout' => 120, 'excludePaths' => ['tests/Fixtures/**']]]);
         $runtime = new RuntimeConfiguration();
         $analysisSettings = new AnalysisSettings();
         $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
@@ -49,7 +49,7 @@ final class ProjectSettingsTest extends TestCase
                 'scopeUri' => 'file:///workspace',
                 'section' => 'symfonyLsp',
             ]],
-        ], $client->params);
+        ], $client->requests[0]['params'] ?? null);
     }
 
     public function testPhpCommandSettingsOverrideTheSymfonyCliDefault(): void
@@ -68,7 +68,7 @@ final class ProjectSettingsTest extends TestCase
             $projectConfiguration = new ProjectConfiguration(new UriToPathConverter(), $analysisSettings);
             $projectConfiguration->load([['uri' => 'file://'.$directory]]);
             $settings = new ProjectSettings(
-                new ProjectSettingsClient([]),
+                new RecordingClient([]),
                 $projects,
                 new TranslationConfigurationRegistry(),
                 $runtime,
@@ -114,7 +114,7 @@ final class ProjectSettingsTest extends TestCase
             $projectConfiguration->load([['uri' => 'file://'.$directory]]);
             $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
             $settings = new ProjectSettings(
-                new ProjectSettingsClient([['environment' => 'resource', 'translationDiagnostics' => false, 'excludePaths' => ['fixtures/**']]]),
+                new RecordingClient([['environment' => 'resource', 'translationDiagnostics' => false, 'excludePaths' => ['fixtures/**']]]),
                 $projects,
                 $translation,
                 $runtime,
@@ -133,27 +133,5 @@ final class ProjectSettingsTest extends TestCase
         } finally {
             (new Filesystem())->remove($directory);
         }
-    }
-}
-
-final class ProjectSettingsClient implements ClientInterface
-{
-    /** @var array<array-key, mixed> */
-    public array $params = [];
-
-    /** @param array<array-key, mixed> $response */
-    public function __construct(private readonly array $response = [['translationDiagnostics' => true, 'environment' => 'test', 'bridgeTimeout' => 120, 'excludePaths' => ['tests/Fixtures/**']]])
-    {
-    }
-
-    public function request(string $method, array $params): mixed
-    {
-        $this->params = $params;
-
-        return $this->response;
-    }
-
-    public function notify(string $method, array $params): void
-    {
     }
 }
