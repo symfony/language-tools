@@ -58,6 +58,7 @@
         "diagnostics:benchmark": "./tools/php-with-tree-sitter tools/benchmark-diagnostics.php",
         "autoload-check": "@composer dump-autoload --optimize --strict-psr",
         "test": "./tools/php-with-tree-sitter vendor/bin/phpunit --no-progress",
+        "test:unit": "./tools/php-with-tree-sitter vendor/bin/phpunit --no-progress --testsuite=unit",
         "phpstan": "phpstan analyze --no-progress",
         "cs-check": "php-cs-fixer fix --show-progress=none --dry-run --diff",
         "cs-fix": "php-cs-fixer fix --show-progress=none"

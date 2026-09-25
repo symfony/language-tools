@@ -5,9 +5,15 @@
          colors="true"
          cacheDirectory=".phpunit.cache">
     <testsuites>
-        <testsuite name="Symfony Language Tools Test Suite">
+        <testsuite name="unit">
             <directory>tests</directory>
             <exclude>tests/Fixtures</exclude>
+            <exclude>tests/Tool</exclude>
+            <exclude>tests/Compatibility</exclude>
+        </testsuite>
+        <testsuite name="tools">
+            <directory>tests/Tool</directory>
+            <directory>tests/Compatibility</directory>
         </testsuite>
     </testsuites>
 </phpunit>
