@@ -2,26 +2,19 @@
 
 namespace Symfony\Lsp\Runtime;
 
-use Amp\Cancellation;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathPolicy;
 
-final class BridgeInstaller implements RuntimeInitializerInterface
+final class BridgeInstaller
 {
     public function __construct(
         private readonly string $bridgeSource,
         private readonly string $serverVersion,
         private readonly Filesystem $filesystem,
     ) {
-    }
-
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
-    {
-        $cancellation?->throwIfRequested();
-        $this->install($project);
     }
 
     public function install(Project $project): string
