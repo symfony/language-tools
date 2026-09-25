@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\ClassNameKey;
 
 /** @extends AbstractSourceFactsIndex<DependencyInjectionSourceFacts> */
 final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
@@ -60,25 +61,23 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
     {
         $this->derive();
 
-        return $this->classDeclarations[strtolower(ltrim($className, '\\'))] ?? [];
+        return $this->classDeclarations[ClassNameKey::from($className)] ?? [];
     }
 
     public function isSubclassOf(string $className, string $parentClassName): bool
     {
         $this->derive();
-        $className = ltrim($className, '\\');
-        $parentClassName = ltrim($parentClassName, '\\');
-        $parentKey = strtolower($parentClassName);
+        $parentKey = ClassNameKey::from($parentClassName);
         $visited = [];
 
         while (true) {
-            $classKey = strtolower($className);
+            $classKey = ClassNameKey::from($className);
             $cacheKey = $classKey.'|'.$parentKey;
             if (isset($this->subclasses[$cacheKey])) {
                 $result = $this->subclasses[$cacheKey];
                 break;
             }
-            if (0 === strcasecmp($className, $parentClassName)) {
+            if ($classKey === $parentKey) {
                 $result = true;
                 break;
             }
@@ -92,7 +91,6 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
                 $result = false;
                 break;
             }
-            $className = ltrim($className, '\\');
         }
 
         foreach (array_keys($visited) as $classKey) {
@@ -148,7 +146,7 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
                 $this->references[$reference->kind->value][$reference->name][] = $reference;
             }
             foreach ($source->classes as $declaration) {
-                $this->classDeclarations[strtolower(ltrim($declaration->className, '\\'))][] = $declaration;
+                $this->classDeclarations[ClassNameKey::from($declaration->className)][] = $declaration;
             }
         }
 

@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Parser\Php\PhpConstantKind;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpTypeKind;
@@ -18,24 +19,24 @@ final class TwigPhpSymbolDeclarationExtractor
     {
         $typeKinds = [];
         foreach ($document->typeDeclarations as $type) {
-            $typeKinds[strtolower(ltrim($type->name, '\\'))] = $type->kind;
+            $typeKinds[ClassNameKey::from($type->name)] = $type->kind;
         }
 
         $constants = [];
         foreach ($document->constantDeclarations as $constant) {
-            if (PhpTypeKind::Trait_ !== ($typeKinds[strtolower(ltrim($constant->className, '\\'))] ?? null)) {
+            if (PhpTypeKind::Trait_ !== ($typeKinds[ClassNameKey::from($constant->className)] ?? null)) {
                 $constants[] = $constant;
             }
         }
 
         $constantOwners = [];
         foreach ($constants as $constant) {
-            $constantOwners[strtolower(ltrim($constant->className, '\\'))] = true;
+            $constantOwners[ClassNameKey::from($constant->className)] = true;
         }
 
         $declarations = [];
         foreach ($document->typeDeclarations as $type) {
-            if (!$type->isEnum() && !isset($constantOwners[strtolower(ltrim($type->name, '\\'))])) {
+            if (!$type->isEnum() && !isset($constantOwners[ClassNameKey::from($type->name)])) {
                 continue;
             }
             $kind = match ($type->kind) {

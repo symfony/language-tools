@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Messenger;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Index\SourceSymbolTable;
 
 /** @extends AbstractSourceFactsIndex<MessengerSourceFacts> */
@@ -27,17 +28,18 @@ final class MessengerSourceIndex extends AbstractSourceFactsIndex
     {
         $this->derive();
         $ancestors = [];
-        $pending = $this->parents[ltrim($className, '\\')] ?? [];
+        $pending = $this->parents[ClassNameKey::from($className)] ?? [];
         while ([] !== $pending) {
             $parent = array_shift($pending);
-            if (isset($ancestors[$parent])) {
+            $key = ClassNameKey::from($parent);
+            if (isset($ancestors[$key])) {
                 continue;
             }
-            $ancestors[$parent] = true;
-            array_push($pending, ...($this->parents[$parent] ?? []));
+            $ancestors[$key] = $parent;
+            array_push($pending, ...($this->parents[$key] ?? []));
         }
 
-        return array_keys($ancestors);
+        return array_values($ancestors);
     }
 
     protected function build(): void
@@ -49,7 +51,7 @@ final class MessengerSourceIndex extends AbstractSourceFactsIndex
                 $this->symbols->add($symbol->kind->name, $symbol);
             }
             foreach ($source->parents as $class => $parents) {
-                $this->parents[$class] = $parents;
+                $this->parents[ClassNameKey::from($class)] = $parents;
             }
         }
     }

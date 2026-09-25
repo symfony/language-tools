@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Console;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\ClassNameKey;
 
 /** @extends AbstractSourceFactsIndex<ConsoleSourceFacts> */
 final class ConsoleSourceIndex extends AbstractSourceFactsIndex
@@ -16,7 +17,7 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
     {
         $this->derive();
 
-        return $this->resolve(ltrim($className, '\\'), []);
+        return $this->resolve($className, []);
     }
 
     /** @return list<ConsoleCommandDeclaration> */
@@ -24,7 +25,7 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
     {
         $this->derive();
 
-        return $this->declarations[strtolower(ltrim($className, '\\'))] ?? [];
+        return $this->declarations[ClassNameKey::from($className)] ?? [];
     }
 
     protected function build(): void
@@ -32,7 +33,7 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
         $this->declarations = [];
         foreach ($this->facts() as $facts) {
             foreach ($facts->declarations as $declaration) {
-                $this->declarations[strtolower(ltrim($declaration->className, '\\'))][] = $declaration;
+                $this->declarations[ClassNameKey::from($declaration->className)][] = $declaration;
             }
         }
     }
@@ -40,10 +41,10 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
     /** @param array<string, true> $visited */
     private function resolve(string $className, array $visited): ConsoleEffectiveDefinition
     {
-        if (0 === strcasecmp(self::COMMAND, $className)) {
+        $key = ClassNameKey::from($className);
+        if (ClassNameKey::from(self::COMMAND) === $key) {
             return new ConsoleEffectiveDefinition([], [], true, true);
         }
-        $key = strtolower($className);
         if (isset($visited[$key])) {
             return new ConsoleEffectiveDefinition([], [], false, false);
         }
@@ -59,14 +60,14 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
         $complete = $declaration->complete;
 
         if (null !== $parent = $declaration->parentClassName) {
-            $parentDefinition = $this->resolve(ltrim($parent, '\\'), $visited);
+            $parentDefinition = $this->resolve($parent, $visited);
             $arguments = [...$arguments, ...$parentDefinition->arguments];
             $options = [...$options, ...$parentDefinition->options];
             $command = $command || $parentDefinition->command;
             $complete = $complete && $parentDefinition->complete;
         }
         foreach ($declaration->traits as $trait) {
-            $traitDefinition = $this->resolve(ltrim($trait, '\\'), $visited);
+            $traitDefinition = $this->resolve($trait, $visited);
             $arguments = [...$arguments, ...$traitDefinition->arguments];
             $options = [...$options, ...$traitDefinition->options];
             $complete = $complete && $traitDefinition->complete;

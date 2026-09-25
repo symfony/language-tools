@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Index\SourceSymbolTable;
 
 /** @extends AbstractSourceFactsIndex<DoctrineSourceFacts> */
@@ -36,7 +37,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     {
         $this->derive();
 
-        return $this->entitiesByClass[$className] ?? null;
+        return $this->entitiesByClass[ClassNameKey::from($className)] ?? null;
     }
 
     /** @return list<DoctrineEntity> */
@@ -51,15 +52,16 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     {
         $this->derive();
 
-        return $this->repositoriesByClass[$className] ?? null;
+        return $this->repositoriesByClass[ClassNameKey::from($className)] ?? null;
     }
 
     public function entityForRepository(string $repositoryClass): ?DoctrineEntity
     {
         $this->derive();
-        $repository = $this->repositoriesByClass[$repositoryClass] ?? null;
+        $key = ClassNameKey::from($repositoryClass);
+        $repository = $this->repositoriesByClass[$key] ?? null;
 
-        return null !== $repository ? $this->entitiesByClass[$repository->entityClass] ?? null : $this->entitiesByRepository[$repositoryClass] ?? null;
+        return null !== $repository ? $this->entitiesByClass[ClassNameKey::from($repository->entityClass)] ?? null : $this->entitiesByRepository[$key] ?? null;
     }
 
     /** @return list<DoctrineSourceSymbol> */
@@ -71,9 +73,9 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
             return $symbols;
         }
 
-        $selectedOwner = $this->entityClass($selected->owner);
+        $selectedOwner = $this->entityKey($selected->owner);
 
-        return array_values(array_filter($symbols, fn (DoctrineSourceSymbol $symbol): bool => $selectedOwner === $this->entityClass($symbol->owner)));
+        return array_values(array_filter($symbols, fn (DoctrineSourceSymbol $symbol): bool => $selectedOwner === $this->entityKey($symbol->owner)));
     }
 
     protected function build(): void
@@ -81,8 +83,9 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
         $firstRuntimeEntities = [];
         $mergedEntities = [];
         foreach ($this->runtime as $entity) {
-            $firstRuntimeEntities[$entity->className] ??= $entity;
-            $mergedEntities[$entity->className] = $entity;
+            $key = ClassNameKey::from($entity->className);
+            $firstRuntimeEntities[$key] ??= $entity;
+            $mergedEntities[$key] = $entity;
         }
 
         $firstSourceEntities = [];
@@ -90,11 +93,12 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
         $this->symbols = new SourceSymbolTable();
         foreach ($this->facts() as $facts) {
             foreach ($facts->entities as $entity) {
-                $firstSourceEntities[$entity->className] ??= $entity;
-                $mergedEntities[$entity->className] = $entity;
+                $key = ClassNameKey::from($entity->className);
+                $firstSourceEntities[$key] ??= $entity;
+                $mergedEntities[$key] = $entity;
             }
             foreach ($facts->repositories as $repository) {
-                $this->repositoriesByClass[$repository->className] ??= $repository;
+                $this->repositoriesByClass[ClassNameKey::from($repository->className)] ??= $repository;
             }
             foreach ($facts->symbols as $symbol) {
                 $this->symbols->add($symbol->kind->value, $symbol);
@@ -102,22 +106,26 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
         }
 
         $this->entitiesByClass = array_replace($firstRuntimeEntities, $firstSourceEntities);
-        ksort($mergedEntities);
         $this->entities = array_values($mergedEntities);
+        usort($this->entities, static fn (DoctrineEntity $left, DoctrineEntity $right): int => $left->className <=> $right->className);
         $this->entitiesByRepository = [];
         foreach ($this->entities as $entity) {
             if (null !== $repositoryClass = $entity->repositoryClass) {
-                $this->entitiesByRepository[$repositoryClass] ??= $entity;
+                $this->entitiesByRepository[ClassNameKey::from($repositoryClass)] ??= $entity;
             }
         }
     }
 
-    private function entityClass(?string $owner): ?string
+    private function entityKey(?string $owner): ?string
     {
         if (null === $owner) {
             return null;
         }
+        if (null !== $this->entity($owner)) {
+            return ClassNameKey::from($owner);
+        }
+        $entity = $this->entityForRepository($owner);
 
-        return null !== $this->entity($owner) ? $owner : $this->entityForRepository($owner)?->className;
+        return null === $entity ? null : ClassNameKey::from($entity->className);
     }
 }

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Index\SourceSymbolOrder;
 
 /** @extends AbstractSourceFactsIndex<TwigPhpSymbolSourceFacts> */
@@ -32,7 +33,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     {
         $this->derive();
 
-        return $this->types[$this->classKey($className)] ?? [];
+        return $this->types[ClassNameKey::from($className)] ?? [];
     }
 
     /** @return list<TwigPhpSymbolDeclaration> */
@@ -40,7 +41,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     {
         $this->derive();
 
-        return $this->members[$this->classKey($className)][$memberName] ?? [];
+        return $this->members[ClassNameKey::from($className)][$memberName] ?? [];
     }
 
     /** @return list<TwigPhpSymbolReference> */
@@ -72,7 +73,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     {
         $this->derive();
         $members = [];
-        foreach ($this->members[$this->classKey($className)] ?? [] as $name => $declarations) {
+        foreach ($this->members[ClassNameKey::from($className)] ?? [] as $name => $declarations) {
             foreach ($declarations as $declaration) {
                 if (!$declaration->public || ($enumCasesOnly && TwigPhpSymbolKind::EnumCase !== $declaration->kind)) {
                     continue;
@@ -106,7 +107,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
         $constantTypeNames = [];
         foreach ($this->facts() as $facts) {
             foreach ($facts->declarations as $declaration) {
-                $classKey = $this->classKey($declaration->className);
+                $classKey = ClassNameKey::from($declaration->className);
                 $this->declarationsByUri[$declaration->uri][] = $declaration;
                 if ($declaration->kind->isType()) {
                     $this->types[$classKey][] = $declaration;
@@ -156,13 +157,8 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
         unset($references);
     }
 
-    private function classKey(string $className): string
-    {
-        return strtolower(ltrim($className, '\\'));
-    }
-
     private function referenceKey(string $className, ?string $memberName): string
     {
-        return $this->classKey($className)."\0".$memberName;
+        return ClassNameKey::from($className)."\0".$memberName;
     }
 }

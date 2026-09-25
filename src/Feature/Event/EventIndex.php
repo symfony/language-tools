@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Event;
 
+use Symfony\Lsp\Index\ClassNameKey;
+
 final class EventIndex
 {
     /** @var array<string, Event> */
@@ -45,7 +47,9 @@ final class EventIndex
     /** @return list<EventListener> */
     public function listenersByClass(string $className): array
     {
-        return array_values(array_filter($this->listeners, static fn (EventListener $listener): bool => $listener->className === ltrim($className, '\\')));
+        $key = ClassNameKey::from($className);
+
+        return array_values(array_filter($this->listeners, static fn (EventListener $listener): bool => ClassNameKey::from($listener->className) === $key));
     }
 
     public function isComplete(): bool

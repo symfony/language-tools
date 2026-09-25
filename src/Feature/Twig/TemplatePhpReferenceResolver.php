@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
+use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
@@ -37,7 +38,7 @@ final class TemplatePhpReferenceResolver
             if (1 !== \count($variable->types)) {
                 return null;
             }
-            $types[strtolower(ltrim($variable->types[0], '\\'))] = $variable->types[0];
+            $types[ClassNameKey::from($variable->types[0])] = $variable->types[0];
         }
         if (1 !== \count($types)) {
             return null;
@@ -100,7 +101,7 @@ final class TemplatePhpReferenceResolver
     {
         $types = [];
         foreach (null === $document ? [] : $document->typeDeclarations as $type) {
-            $types[strtolower(ltrim($type->name, '\\'))] = $type;
+            $types[ClassNameKey::from($type->name)] = $type;
         }
         $visited = [];
         while (true) {

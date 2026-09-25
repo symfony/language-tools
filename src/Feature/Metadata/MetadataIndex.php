@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Metadata;
 
+use Symfony\Lsp\Index\ClassNameKey;
+
 final class MetadataIndex
 {
     /** @var array<string, FormType> */
@@ -21,14 +23,14 @@ final class MetadataIndex
     {
         $this->formTypes = [];
         foreach ($formTypes as $formType) {
-            $this->formTypes[$formType->className] = $formType;
+            $this->formTypes[ClassNameKey::from($formType->className)] = $formType;
         }
-        ksort($this->formTypes);
+        uasort($this->formTypes, static fn (FormType $left, FormType $right): int => $left->className <=> $right->className);
         $this->constraints = [];
         $this->constraintsByClass = [];
         foreach ($constraints as $constraint) {
             $this->constraints[$constraint->name] = $constraint;
-            $this->constraintsByClass[$constraint->className] = $constraint;
+            $this->constraintsByClass[ClassNameKey::from($constraint->className)] = $constraint;
         }
         ksort($this->constraints);
         $this->formsComplete = $formsComplete;
@@ -43,7 +45,7 @@ final class MetadataIndex
 
     public function formType(string $className): ?FormType
     {
-        return $this->formTypes[ltrim($className, '\\')] ?? null;
+        return $this->formTypes[ClassNameKey::from($className)] ?? null;
     }
 
     /** @return list<ValidationConstraint> */
@@ -54,7 +56,7 @@ final class MetadataIndex
 
     public function constraint(string $name): ?ValidationConstraint
     {
-        return $this->constraints[$name] ?? $this->constraintsByClass[ltrim($name, '\\')] ?? null;
+        return $this->constraints[$name] ?? $this->constraintsByClass[ClassNameKey::from($name)] ?? null;
     }
 
     public function formsComplete(): bool

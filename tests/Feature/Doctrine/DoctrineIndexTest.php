@@ -66,6 +66,28 @@ final class DoctrineIndexTest extends TestCase
         self::assertSame('file:///src/First.php', $index->entity('App\\Duplicate')?->uri);
     }
 
+    public function testLooksClassesUpRegardlessOfCaseAndLeadingBackslash(): void
+    {
+        $index = new DoctrineIndex();
+        [$facts, $entity, $repository] = $this->facts('First');
+        $index->replace($facts);
+
+        self::assertSame($entity, $index->entity('\\app\\FIRST'));
+        self::assertSame($repository, $index->repository('\\app\\firstREPOSITORY'));
+        self::assertSame($entity, $index->entityForRepository('\\APP\\FirstRepository'));
+    }
+
+    public function testRelatesFieldsOfOneEntityWrittenWithDifferentOwnerSpellings(): void
+    {
+        $index = new DoctrineIndex();
+        $entity = new DoctrineEntity('App\\Article', 'file:///src/Article.php', $this->range(), null, []);
+        $declaration = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, 'title', 'App\\Article', 'file:///src/Article.php', $this->range(), true);
+        $reference = new DoctrineSourceSymbol(DoctrineSymbolKind::Field, 'title', '\\app\\article', 'file:///src/ArticleRepository.php', $this->range(), false);
+        $index->replace(new DoctrineSourceFacts('file:///src/Article.php', [$entity], [], [$declaration, $reference]));
+
+        self::assertSame([$declaration, $reference], $index->relatedSymbols($declaration));
+    }
+
     /** @return array{DoctrineSourceFacts, DoctrineEntity, DoctrineRepository, DoctrineSourceSymbol} */
     private function facts(string $name): array
     {

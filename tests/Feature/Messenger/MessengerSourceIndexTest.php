@@ -32,6 +32,17 @@ final class MessengerSourceIndexTest extends TestCase
         self::assertSame(['App\\IntermediateMessage', 'App\\RootMessage'], $index->ancestors('App\\SecondMessage'));
     }
 
+    public function testWalksAncestorsRegardlessOfCaseAndLeadingBackslash(): void
+    {
+        $index = new MessengerSourceIndex();
+        $index->replace(
+            $this->facts('FirstMessage', ['\\App\\ParentMessage']),
+            $this->facts('ParentMessage', ['app\\RootMessage']),
+        );
+
+        self::assertSame(['\\App\\ParentMessage', 'app\\RootMessage'], $index->ancestors('APP\\firstmessage'));
+    }
+
     /** @param list<string> $parents */
     private function facts(string $name, array $parents): MessengerSourceFacts
     {

@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Console;
 
+use Symfony\Lsp\Index\ClassNameKey;
+
 final class ConsoleIndex
 {
     /** @var array<string, ConsoleCommandMetadata> */
@@ -13,14 +15,14 @@ final class ConsoleIndex
     {
         $this->commands = [];
         foreach ($commands as $command) {
-            $this->commands[strtolower(ltrim($command->className, '\\'))] = $command;
+            $this->commands[ClassNameKey::from($command->className)] = $command;
         }
         $this->complete = $complete;
     }
 
     public function command(string $className): ?ConsoleCommandMetadata
     {
-        return $this->commands[strtolower(ltrim($className, '\\'))] ?? null;
+        return $this->commands[ClassNameKey::from($className)] ?? null;
     }
 
     public function isComplete(): bool

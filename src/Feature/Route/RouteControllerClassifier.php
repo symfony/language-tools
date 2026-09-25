@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
+use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 
 final class RouteControllerClassifier
@@ -23,15 +24,15 @@ final class RouteControllerClassifier
 
         $types = [];
         foreach ($document->typeDeclarations as $type) {
-            $types[strtolower(ltrim($type->name, '\\'))] = $type;
+            $types[ClassNameKey::from($type->name)] = $type;
         }
         $visited = [];
-        while (!isset($visited[strtolower($className)])) {
+        while (!isset($visited[ClassNameKey::from($className)])) {
             $className = ltrim($className, '\\');
             if (0 === strcasecmp(self::ABSTRACT_CONTROLLER, $className)) {
                 return true;
             }
-            $classKey = strtolower($className);
+            $classKey = ClassNameKey::from($className);
             $type = $types[$classKey] ?? null;
             if (null === $type) {
                 return 0 === strcasecmp('AbstractController', $className);

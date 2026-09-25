@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -76,7 +77,7 @@ final class FormMetadataExtractor
                 $dataClass = $this->staticClassName($source, $dataClassExpression, $php);
             }
             if (null !== $dataClass) {
-                $classes[strtolower(ltrim($method->className, '\\'))] = new FormDataClass($method->className, $dataClass);
+                $classes[ClassNameKey::from($method->className)] = new FormDataClass($method->className, $dataClass);
             }
         }
 
@@ -93,10 +94,10 @@ final class FormMetadataExtractor
         $symbols = [];
         $dataClasses = [];
         foreach ($formDataClasses as $formDataClass) {
-            $dataClasses[strtolower(ltrim($formDataClass->formClass, '\\'))] = $formDataClass->dataClass;
+            $dataClasses[ClassNameKey::from($formDataClass->formClass)] = $formDataClass->dataClass;
         }
         foreach ($php->methodDeclarations as $method) {
-            $dataClass = $dataClasses[strtolower(ltrim($method->className, '\\'))] ?? null;
+            $dataClass = $dataClasses[ClassNameKey::from($method->className)] ?? null;
             if (null === $dataClass
                 || 'buildForm' !== $method->name
                 || null === ($builder = $this->typedMethodParameter($php, $method, 'Symfony\\Component\\Form\\FormBuilderInterface'))
@@ -354,7 +355,7 @@ final class FormMetadataExtractor
         }
         $reference = $references[0];
         $rawName = substr($source, $reference->startOffset, $reference->endOffset - $reference->startOffset);
-        if (\in_array(strtolower(ltrim($rawName, '\\')), ['self', 'static', 'parent'], true)) {
+        if (\in_array(ClassNameKey::from($rawName), ['self', 'static', 'parent'], true)) {
             return null;
         }
         $before = trim(substr($source, $expression['offset'], $reference->startOffset - $expression['offset']));

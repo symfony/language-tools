@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Index\SourceSymbolTable;
 
 /** @extends AbstractSourceFactsIndex<MetadataSourceFacts> */
@@ -34,7 +35,7 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
     {
         $this->derive();
 
-        return $this->formDataClasses[strtolower(ltrim($formClass, '\\'))] ?? null;
+        return $this->formDataClasses[ClassNameKey::from($formClass)] ?? null;
     }
 
     protected function build(): void
@@ -43,7 +44,7 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
         $this->formDataClasses = [];
         foreach ($this->facts() as $facts) {
             foreach ($facts->formDataClasses as $formDataClass) {
-                $this->formDataClasses[strtolower(ltrim($formDataClass->formClass, '\\'))] = $formDataClass->dataClass;
+                $this->formDataClasses[ClassNameKey::from($formDataClass->formClass)] = $formDataClass->dataClass;
             }
             foreach ($facts->symbols as $symbol) {
                 $this->symbols->add($symbol->kind->value, $symbol);

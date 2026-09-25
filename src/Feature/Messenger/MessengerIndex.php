@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Feature\Messenger;
 
+use Symfony\Lsp\Index\ClassNameKey;
+
 final class MessengerIndex
 {
     /** @var array<string, MessengerBus> */
@@ -36,14 +38,14 @@ final class MessengerIndex
         ksort($this->transports);
         $this->messages = [];
         foreach ($messages as $message) {
-            $this->messages[$message->className] = $message;
+            $this->messages[ClassNameKey::from($message->className)] = $message;
         }
-        ksort($this->messages);
+        uasort($this->messages, static fn (MessengerMessage $left, MessengerMessage $right): int => $left->className <=> $right->className);
         $this->handlersByMessage = [];
         $this->handlersByClass = [];
         foreach ($handlers as $handler) {
-            $this->handlersByMessage[$handler->message][] = $handler;
-            $this->handlersByClass[$handler->className][] = $handler;
+            $this->handlersByMessage[ClassNameKey::from($handler->message)][] = $handler;
+            $this->handlersByClass[ClassNameKey::from($handler->className)][] = $handler;
         }
         $this->complete = $complete;
     }
@@ -78,19 +80,19 @@ final class MessengerIndex
 
     public function message(string $className): ?MessengerMessage
     {
-        return $this->messages[ltrim($className, '\\')] ?? null;
+        return $this->messages[ClassNameKey::from($className)] ?? null;
     }
 
     /** @return list<MessengerHandlerDeclaration> */
     public function handlersForMessage(string $className): array
     {
-        return $this->handlersByMessage[ltrim($className, '\\')] ?? [];
+        return $this->handlersByMessage[ClassNameKey::from($className)] ?? [];
     }
 
     /** @return list<MessengerHandlerDeclaration> */
     public function handlersByClass(string $className): array
     {
-        return $this->handlersByClass[ltrim($className, '\\')] ?? [];
+        return $this->handlersByClass[ClassNameKey::from($className)] ?? [];
     }
 
     public function isComplete(): bool
