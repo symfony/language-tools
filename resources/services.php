@@ -7,6 +7,7 @@ use Microsoft\PhpParser\Parser;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Check\CheckCommand;
+use Symfony\Lsp\Check\CheckProjectAnalyzer;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Client\JsonRpcClient;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
@@ -254,6 +255,11 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$initializer', service(ObservedRuntimeInitializer::class))
         ->arg('$mutex', service(LocalKeyedMutex::class));
     $services->alias(RuntimeInitializerInterface::class, SerializedRuntimeInitializer::class);
+    $services->set('lsp.check.runtime_initializer', SerializedRuntimeInitializer::class)
+        ->arg('$initializer', service(StatusRuntimeInitializer::class))
+        ->arg('$mutex', service(LocalKeyedMutex::class));
+    $services->get(CheckProjectAnalyzer::class)
+        ->arg('$runtimeInitializer', service('lsp.check.runtime_initializer'));
 
     $registries = [
         CompletionProviderRegistry::class => 'lsp.provider.completion',

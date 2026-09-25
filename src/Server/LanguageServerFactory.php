@@ -11,15 +11,12 @@ use Fabpot\JsonRpc\JsonRpcValueDecoding;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
-use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Check\CheckClient;
 use Symfony\Lsp\Check\CheckCommand;
 use Symfony\Lsp\Check\CheckProgressReporter;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Progress\ProgressReporterInterface;
-use Symfony\Lsp\Runtime\SerializedRuntimeInitializer;
-use Symfony\Lsp\Runtime\StatusRuntimeInitializer;
 
 final class LanguageServerFactory
 {
@@ -68,8 +65,6 @@ final class LanguageServerFactory
         $container = $this->container();
         $container->setAlias(ClientInterface::class, CheckClient::class);
         $container->setAlias(ProgressReporterInterface::class, CheckProgressReporter::class);
-        $container->getDefinition(SerializedRuntimeInitializer::class)
-            ->setArgument('$initializer', new Reference(StatusRuntimeInitializer::class));
         $container->compile();
         $container->set(ServerLogger::class, new ServerLogger($errorOutput, new SensitiveDataRedactor(new Utf8StringTruncator())));
 
