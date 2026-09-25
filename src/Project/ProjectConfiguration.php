@@ -41,7 +41,12 @@ final class ProjectConfiguration
         $this->workspaces = $workspaces;
     }
 
-    /** @return list<string>|null */
+    /**
+     * The roots as written in the configuration file; they are resolved and
+     * validated with every other configured project root.
+     *
+     * @return list<string>|null
+     */
     public function projectRoots(string $workspaceRoot): ?array
     {
         $workspaceRoot = Path::canonicalize($workspaceRoot);
@@ -76,11 +81,6 @@ final class ProjectConfiguration
             $discovered[Path::canonicalize($project->rootPath)] = true;
         }
         foreach ($this->workspaces as $workspace) {
-            foreach ($workspace['projectRoots'] ?? [] as $projectRoot) {
-                if (!isset($discovered[$projectRoot])) {
-                    throw new InvalidConfigurationException(\sprintf('The configured project root "%s" was not discovered as a Symfony project.', $workspace['root'] === $projectRoot ? '.' : Path::makeRelative($projectRoot, $workspace['root'])));
-                }
-            }
             foreach (array_keys($workspace['projects']) as $projectRoot) {
                 if (!isset($discovered[$projectRoot])) {
                     throw new InvalidConfigurationException(\sprintf('The configured project "%s" was not discovered as a Symfony project.', $workspace['root'] === $projectRoot ? '.' : Path::makeRelative($projectRoot, $workspace['root'])));
@@ -155,7 +155,7 @@ final class ProjectConfiguration
 
         $projectRoots = null;
         if (\array_key_exists('projectRoots', $configuration)) {
-            $projectRoots = $this->projectRootsValue($configuration['projectRoots'], $root, $path);
+            $projectRoots = $this->projectRootsValue($configuration['projectRoots'], $path);
         }
 
         $settings = $this->analysisSettings->normalizeProject(
@@ -185,7 +185,7 @@ final class ProjectConfiguration
     }
 
     /** @return list<string> */
-    private function projectRootsValue(mixed $value, string $root, string $path): array
+    private function projectRootsValue(mixed $value, string $path): array
     {
         if (!\is_array($value) || !array_is_list($value)) {
             throw new InvalidConfigurationException(\sprintf('The configuration option "projectRoots" in "%s" must be a list of paths.', $path));
@@ -196,11 +196,7 @@ final class ProjectConfiguration
             if (!\is_string($configuredRoot) || '' === $configuredRoot) {
                 throw new InvalidConfigurationException(\sprintf('The configuration option "projectRoots" in "%s" must contain non-empty paths.', $path));
             }
-            $projectRoot = $this->absolutePath($configuredRoot, $root);
-            if (!PathContainment::contains($root, $projectRoot) || !PathContainment::resolvesInside($root, $projectRoot)) {
-                throw new InvalidConfigurationException(\sprintf('The project root "%s" in "%s" is outside the workspace.', $configuredRoot, $path));
-            }
-            $roots[] = $projectRoot;
+            $roots[] = $configuredRoot;
         }
 
         return array_values(array_unique($roots));

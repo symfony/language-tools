@@ -15,7 +15,7 @@ final class ProjectDiscovery
 
     /**
      * @param list<array{uri: string, name?: string}> $workspaceFolders
-     * @param list<string>                            $projectRoots
+     * @param list<string>                            $projectRoots     absolute paths of the projects to analyze
      *
      * @return list<Project>
      */
@@ -24,11 +24,9 @@ final class ProjectDiscovery
         $roots = [];
         $explicitRoots = [];
         if ([] !== $projectRoots) {
-            foreach ($projectRoots as $configuredRoot) {
-                foreach ($this->configuredPaths($configuredRoot, $workspaceFolders) as $path) {
-                    $roots[$path] = $this->uriToPathConverter->toUri($path);
-                    $explicitRoots[$path] = true;
-                }
+            foreach ($projectRoots as $projectRoot) {
+                $roots[$projectRoot] = $this->uriToPathConverter->toUri($projectRoot);
+                $explicitRoots[$projectRoot] = true;
             }
         } else {
             foreach ($workspaceFolders as $workspaceFolder) {
@@ -71,33 +69,6 @@ final class ProjectDiscovery
         }
 
         return false;
-    }
-
-    /**
-     * @param list<array{uri: string, name?: string}> $workspaceFolders
-     *
-     * @return list<string>
-     */
-    private function configuredPaths(string $configuredRoot, array $workspaceFolders): array
-    {
-        if (str_starts_with($configuredRoot, 'file:')) {
-            $path = $this->uriToPathConverter->convert($configuredRoot);
-
-            return null === $path ? [] : [$path];
-        }
-        if (Path::isAbsolute($configuredRoot)) {
-            return [Path::canonicalize($configuredRoot)];
-        }
-
-        $paths = [];
-        foreach ($workspaceFolders as $workspaceFolder) {
-            $workspacePath = $this->uriToPathConverter->convert($workspaceFolder['uri']);
-            if (null !== $workspacePath) {
-                $paths[] = Path::join($workspacePath, $configuredRoot);
-            }
-        }
-
-        return array_values(array_unique($paths));
     }
 
     /** @return \Generator<int, string> */

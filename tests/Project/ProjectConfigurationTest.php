@@ -48,7 +48,7 @@ final class ProjectConfigurationTest extends TestCase
         $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
         $project = new Project($this->directory.'/apps/admin', 'file:///workspace/apps/admin');
 
-        self::assertSame([$this->directory, $this->directory.'/apps/admin'], $this->configuration->projectRoots($this->directory));
+        self::assertSame(['.', 'apps/admin'], $this->configuration->projectRoots($this->directory));
         self::assertSame([
             'environment' => 'admin',
             'bridgeTimeout' => 90.0,
@@ -81,28 +81,6 @@ final class ProjectConfigurationTest extends TestCase
             ['environment' => 'test'],
             $this->configuration->settings(new Project($this->directory, 'file:///workspace')),
         );
-    }
-
-    public function testRejectsProjectRootsThatResolveOutsideTheWorkspace(): void
-    {
-        $external = $this->directory.'-external';
-        mkdir($external);
-        try {
-            if (!@symlink($external, $this->directory.'/linked')) {
-                self::markTestSkipped('The platform cannot create directory symlinks.');
-            }
-            file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
-                'version' => 1,
-                'projectRoots' => ['linked'],
-            ], \JSON_THROW_ON_ERROR));
-
-            $this->expectException(InvalidConfigurationException::class);
-            $this->expectExceptionMessage('outside the workspace');
-
-            $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
-        } finally {
-            @rmdir($external);
-        }
     }
 
     public function testRejectsProjectOverridesThatDoNotMatchDiscoveredProjects(): void

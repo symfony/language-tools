@@ -180,6 +180,56 @@ final class CheckParityTest extends TestCase
         }
     }
 
+    public function testReportsTheSameProjectRootFailureInBothFrontends(): void
+    {
+        $this->workspace->write('library/composer.json', json_encode(['name' => 'acme/library'], \JSON_THROW_ON_ERROR));
+        $expected = 'The project root "library" was not discovered as a Symfony project.';
+
+        self::assertSame($expected, $this->headlessProjectRootFailure('library'));
+        self::assertSame($expected, $this->editorProjectRootFailure('library'));
+    }
+
+    private function headlessProjectRootFailure(string $root): string
+    {
+        $execution = (new LanguageServerFactory())->createCheck()->run([
+            '--source-only',
+            '--format=json',
+            '--workspace='.$this->workspace->rootPath,
+            '--project-root='.$root,
+        ]);
+        self::assertSame(CheckCommand::EXIT_INVOCATION, $execution->exitCode, $execution->stderr);
+        $report = json_decode($execution->stdout, true, flags: \JSON_THROW_ON_ERROR);
+        self::assertIsArray($report);
+        $errors = $report['errors'] ?? null;
+        self::assertIsArray($errors);
+        $error = $errors[0] ?? null;
+        self::assertIsArray($error);
+        $message = $error['message'] ?? null;
+        self::assertIsString($message);
+
+        return $message;
+    }
+
+    private function editorProjectRootFailure(string $root): string
+    {
+        $transcript = (new InProcessLanguageServerHarness())->run([
+            ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
+                'rootUri' => 'file://'.$this->workspace->rootPath,
+                'capabilities' => new \stdClass(),
+                'initializationOptions' => ['projectRoots' => [$root], 'runtimeIndexing' => false],
+            ]],
+            new ProtocolMessageExpectation('the initialize failure', static fn (array $message): bool => isset($message['error'])),
+            ['jsonrpc' => '2.0', 'method' => 'exit', 'params' => []],
+        ]);
+        $logged = array_values(array_filter(
+            explode("\n", $transcript->errorOutput),
+            static fn (string $line): bool => str_starts_with($line, '[error] '),
+        ));
+        self::assertNotSame([], $logged, $transcript->errorOutput);
+
+        return substr($logged[0], \strlen('[error] '));
+    }
+
     /**
      * @param array<array-key, mixed> $initializationOptions
      *

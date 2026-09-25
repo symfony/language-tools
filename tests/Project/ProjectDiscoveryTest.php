@@ -68,7 +68,7 @@ final class ProjectDiscoveryTest extends TestCase
         file_put_contents($this->temporaryDirectory.'/apps/admin/composer.json', json_encode([
             'require' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
-        $projects = $discovery->discover($workspace, ['apps/admin']);
+        $projects = $discovery->discover($workspace, [$this->temporaryDirectory.'/apps/admin']);
         self::assertCount(1, $projects);
         self::assertSame($this->temporaryDirectory.'/apps/admin', $projects[0]->rootPath);
     }
@@ -118,7 +118,7 @@ final class ProjectDiscoveryTest extends TestCase
             array_map(static fn (Project $project): string => $project->rootPath, $projects),
         );
 
-        $projects = $discovery->discover($workspace, ['ignored/app']);
+        $projects = $discovery->discover($workspace, [$this->temporaryDirectory.'/ignored/app']);
         self::assertCount(1, $projects);
         self::assertSame($this->temporaryDirectory.'/ignored/app', $projects[0]->rootPath);
     }

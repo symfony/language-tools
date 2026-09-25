@@ -4,23 +4,13 @@ namespace Symfony\Lsp\Check;
 
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Project\InvalidConfigurationException;
-use Symfony\Lsp\Project\PathContainment;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectConfiguration;
-use Symfony\Lsp\Project\ProjectDiscovery;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\ProjectSettings;
+use Symfony\Lsp\Project\ProjectWorkspace;
 use Symfony\Lsp\Project\UriToPathConverter;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class CheckPlanFactory
 {
     public function __construct(
-        private readonly ProjectConfiguration $projectConfiguration,
-        private readonly ProjectDiscovery $projectDiscovery,
-        private readonly ProjectRegistry $projects,
-        private readonly ProjectSettings $projectSettings,
-        private readonly RuntimeConfiguration $runtimeConfiguration,
+        private readonly ProjectWorkspace $projectWorkspace,
         private readonly CheckFileSelector $fileSelector,
         private readonly CheckProfiler $profiler,
         private readonly UriToPathConverter $uriToPathConverter,
@@ -30,15 +20,21 @@ final class CheckPlanFactory
     public function create(CheckOptions $options, float $deadline): CheckPlan
     {
         $workspace = $this->workspace($options->workspace);
-        $folder = ['uri' => $this->uriToPathConverter->toUri($workspace)];
-        $projectRoots = $this->profiler->phase(
-            'configuration',
-            fn () => $this->configure($options, $workspace, $folder, $deadline),
-        );
-        $this->profiler->phase(
-            'projectDiscovery',
-            fn () => $this->discoverProjects($options, $folder, $projectRoots, $deadline),
-        );
+        $this->profiler->phase('configuration', function () use ($options, $workspace, $deadline): void {
+            $this->projectWorkspace->configure(
+                [['uri' => $this->uriToPathConverter->toUri($workspace)]],
+                $options->overrides,
+                $options->projectRoots,
+                $options->configurationPath,
+            );
+            $this->assertBeforeDeadline($deadline, $options->timeout);
+        });
+        $this->profiler->phase('projectDiscovery', function () use ($options, $deadline): void {
+            if ([] === $this->projectWorkspace->discover()) {
+                throw new InvalidConfigurationException('No Symfony project was discovered in the workspace.');
+            }
+            $this->assertBeforeDeadline($deadline, $options->timeout);
+        });
         $files = $this->profiler->phase('fileSelection', function () use ($options, $workspace, $deadline) {
             $files = $this->fileSelector->select($workspace, $options->selectors);
             $this->assertBeforeDeadline($deadline, $options->timeout);
@@ -60,41 +56,6 @@ final class CheckPlanFactory
         return new CheckPlan($workspace, $files, $filesByProject, $selectedProjects);
     }
 
-    /**
-     * @param array{uri: string} $folder
-     *
-     * @return list<string>
-     */
-    private function configure(CheckOptions $options, string $workspace, array $folder, float $deadline): array
-    {
-        $this->projectConfiguration->load([$folder], $options->configurationPath);
-        $this->runtimeConfiguration->configure($options->overrides);
-        $this->assertBeforeDeadline($deadline, $options->timeout);
-
-        return [] !== $options->projectRoots
-            ? $this->projectRoots($workspace, $options->projectRoots)
-            : ($this->projectConfiguration->projectRoots($workspace) ?? []);
-    }
-
-    /**
-     * @param array{uri: string} $folder
-     * @param list<string>       $projectRoots
-     */
-    private function discoverProjects(CheckOptions $options, array $folder, array $projectRoots, float $deadline): void
-    {
-        $projects = $this->projectDiscovery->discover([$folder], $projectRoots);
-        if ([] !== $options->projectRoots) {
-            $this->validateProjectRoots($projectRoots, $projects);
-        }
-        $this->projectConfiguration->validateProjects($projects);
-        $this->projects->replace($projects);
-        if ([] === $projects) {
-            throw new InvalidConfigurationException('No Symfony project was discovered in the workspace.');
-        }
-        $this->projectSettings->applyFileSettings($options->overrides);
-        $this->assertBeforeDeadline($deadline, $options->timeout);
-    }
-
     private function workspace(string $workspace): string
     {
         $workspace = Path::canonicalize(Path::isAbsolute($workspace) ? $workspace : Path::join((string) getcwd(), $workspace));
@@ -106,42 +67,6 @@ final class CheckPlanFactory
         }
 
         return $workspace;
-    }
-
-    /**
-     * @param list<string>  $roots
-     * @param list<Project> $projects
-     */
-    private function validateProjectRoots(array $roots, array $projects): void
-    {
-        $discovered = [];
-        foreach ($projects as $project) {
-            $discovered[Path::canonicalize($project->rootPath)] = true;
-        }
-        foreach ($roots as $root) {
-            if (!isset($discovered[$root])) {
-                throw new InvalidConfigurationException(\sprintf('The project root "%s" was not discovered as a Symfony project.', $root));
-            }
-        }
-    }
-
-    /**
-     * @param list<string> $roots
-     *
-     * @return list<string>
-     */
-    private function projectRoots(string $workspace, array $roots): array
-    {
-        $resolved = [];
-        foreach ($roots as $root) {
-            $path = Path::canonicalize(Path::isAbsolute($root) ? $root : Path::join($workspace, $root));
-            if (!PathContainment::contains($workspace, $path) || !PathContainment::resolvesInside($workspace, $path)) {
-                throw new InvalidConfigurationException(\sprintf('The project root "%s" is outside the workspace.', $root));
-            }
-            $resolved[] = $path;
-        }
-
-        return array_values(array_unique($resolved));
     }
 
     private function assertBeforeDeadline(float $deadline, float $timeout): void

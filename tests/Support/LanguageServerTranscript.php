@@ -9,6 +9,7 @@ final class LanguageServerTranscript
         public readonly int $exitCode,
         public readonly string $raw,
         public readonly array $messages,
+        public readonly string $errorOutput = '',
     ) {
     }
 }

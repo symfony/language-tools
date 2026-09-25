@@ -62,9 +62,10 @@ final class InProcessLanguageServerHarness
             }
         })());
 
-        $exitCode = $this->factory->create($input, $output)->run();
+        $errorOutput = new CapturingWritableStream();
+        $exitCode = $this->factory->create($input, $output, $errorOutput)->run();
         $raw = $output->contents();
 
-        return new LanguageServerTranscript($exitCode, $raw, $this->codec->decode($raw));
+        return new LanguageServerTranscript($exitCode, $raw, $this->codec->decode($raw), $errorOutput->contents());
     }
 }

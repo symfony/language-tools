@@ -210,9 +210,14 @@ final class LanguageServer
     /** @param array<array-key, mixed> $params */
     private function changeWorkspaceFolders(array $params): void
     {
-        async(function () use ($params): void {
+        $event = $params['event'] ?? null;
+        if (!\is_array($event)) {
+            return;
+        }
+
+        async(function () use ($event): void {
             try {
-                $this->workspaceConfiguration->changeWorkspaceFolders($params);
+                $this->workspaceConfiguration->changeWorkspaceFolders($event);
                 $this->workspaceFileWatcher->refresh();
                 $this->workspaceConfiguration->refreshProjectSettings();
                 $this->sourceScanner->indexAll();

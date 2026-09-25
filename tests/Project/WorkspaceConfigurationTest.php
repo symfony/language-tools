@@ -20,6 +20,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectSettings;
 use Symfony\Lsp\Project\ProjectStateCleaner;
 use Symfony\Lsp\Project\ProjectStateInterface;
+use Symfony\Lsp\Project\ProjectWorkspace;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Project\WorkspaceTrust;
@@ -123,10 +124,10 @@ final class WorkspaceConfigurationTest extends TestCase
             'require' => ['symfony/framework-bundle' => '^8.1'],
         ], \JSON_THROW_ON_ERROR));
 
-        $configuration->changeWorkspaceFolders(['event' => [
+        $configuration->changeWorkspaceFolders([
             'removed' => [['uri' => $rootUri]],
             'added' => [['uri' => $rootUri.'/nested']],
-        ]]);
+        ]);
 
         self::assertCount(1, $registry->all());
         self::assertSame($this->temporaryDirectory.'/nested', $registry->all()[0]->rootPath);
@@ -154,17 +155,23 @@ final class WorkspaceConfigurationTest extends TestCase
         $uriToPathConverter = new UriToPathConverter();
         $analysisSettings = new AnalysisSettings();
         $projectConfiguration = new ProjectConfiguration($uriToPathConverter, $analysisSettings);
+        $projectSettings = new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration, $projectConfiguration, new ProjectFileScopeRegistry(new GlobPatternCompiler()), $analysisSettings);
 
         return new WorkspaceConfiguration(
-            new ProjectDiscovery($uriToPathConverter, new GitignoreMatcher()),
+            new ProjectWorkspace(
+                $projectConfiguration,
+                new ProjectDiscovery($uriToPathConverter, new GitignoreMatcher()),
+                $registry,
+                $projectSettings,
+                new ProjectStateCleaner(null === $state ? [] : [$state]),
+                $runtimeConfiguration,
+                $uriToPathConverter,
+            ),
             $registry,
             new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer(), new ProjectIndexStatusRegistry(), $runtimeConfiguration, $registry),
             $runtimeConfiguration,
-            new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration, $projectConfiguration, new ProjectFileScopeRegistry(new GlobPatternCompiler()), $analysisSettings),
-            $projectConfiguration,
+            $projectSettings,
             new PositionConverter(),
-            $uriToPathConverter,
-            new ProjectStateCleaner(null === $state ? [] : [$state]),
         );
     }
 

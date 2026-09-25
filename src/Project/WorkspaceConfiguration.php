@@ -2,25 +2,18 @@
 
 namespace Symfony\Lsp\Project;
 
-use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class WorkspaceConfiguration
 {
-    /** @var list<array{uri: string, name?: string}> */
-    private array $workspaceFolders = [];
-
     public function __construct(
-        private readonly ProjectDiscovery $projectDiscovery,
+        private readonly ProjectWorkspace $workspace,
         private readonly ProjectRegistry $projectRegistry,
         private readonly WorkspaceTrustManager $workspaceTrustManager,
         private readonly RuntimeConfiguration $runtimeConfiguration,
         private readonly ProjectSettings $projectSettings,
-        private readonly ProjectConfiguration $projectConfiguration,
         private readonly PositionConverter $positionConverter,
-        private readonly UriToPathConverter $uriToPathConverter,
-        private readonly ProjectStateCleaner $projectStateCleaner,
     ) {
     }
 
@@ -31,15 +24,17 @@ final class WorkspaceConfiguration
     {
         $this->negotiatePositionEncoding($params);
         $this->projectSettings->initialize($params);
-        $this->workspaceFolders = $this->workspaceFolders($params);
-        $this->projectConfiguration->load($this->workspaceFolders);
 
         $initializationOptions = $params['initializationOptions'] ?? null;
-        if (\is_array($initializationOptions)) {
-            $this->runtimeConfiguration->configure($initializationOptions);
-        }
+        $settings = \is_array($initializationOptions) ? $initializationOptions : [];
+        $this->workspace->configure(
+            $this->workspaceFolders($params),
+            $settings,
+            $this->projectRoots($settings),
+            containedProjectRoots: false,
+        );
+        $this->workspace->discover();
 
-        $this->rediscoverProjects();
         if (\is_array($initializationOptions)) {
             $this->workspaceTrustManager->applyInitializationOptions($params, $this->projectRegistry->all());
         }
@@ -57,8 +52,13 @@ final class WorkspaceConfiguration
 
     public function reloadProjectConfiguration(): void
     {
-        $this->projectConfiguration->load($this->workspaceFolders);
-        $this->rediscoverProjects();
+        $this->workspace->loadConfiguration();
+        $this->workspace->discover();
+    }
+
+    public function rediscoverProjects(): void
+    {
+        $this->workspace->discover();
     }
 
     /** @return list<string> */
@@ -76,107 +76,35 @@ final class WorkspaceConfiguration
         return $this->workspaceTrustManager->requestUnknownDecisions($runtimeProjects);
     }
 
-    /** @param array<array-key, mixed> $params */
-    public function changeWorkspaceFolders(array $params): void
+    /** @param array<array-key, mixed> $event */
+    public function changeWorkspaceFolders(array $event): void
     {
-        $event = $params['event'] ?? null;
-        if (!\is_array($event)) {
-            return;
-        }
-
         $removed = [];
         foreach (\is_array($event['removed'] ?? null) ? $event['removed'] : [] as $folder) {
             if (\is_array($folder) && \is_string($folder['uri'] ?? null)) {
                 $removed[rtrim($folder['uri'], '/')] = true;
             }
         }
-        $this->workspaceFolders = array_values(array_filter(
-            $this->workspaceFolders,
+        $folders = array_values(array_filter(
+            $this->workspace->folders(),
             static fn (array $folder): bool => !isset($removed[rtrim($folder['uri'], '/')]),
         ));
 
         $known = [];
-        foreach ($this->workspaceFolders as $folder) {
+        foreach ($folders as $folder) {
             $known[rtrim($folder['uri'], '/')] = true;
         }
         foreach (\is_array($event['added'] ?? null) ? $event['added'] : [] as $folder) {
             if (!\is_array($folder) || !\is_string($folder['uri'] ?? null) || isset($known[rtrim($folder['uri'], '/')])) {
                 continue;
             }
-            $this->workspaceFolders[] = \is_string($folder['name'] ?? null)
+            $folders[] = \is_string($folder['name'] ?? null)
                 ? ['uri' => $folder['uri'], 'name' => $folder['name']]
                 : ['uri' => $folder['uri']];
         }
 
-        $this->projectConfiguration->load($this->workspaceFolders);
-        $this->rediscoverProjects();
-    }
-
-    public function rediscoverProjects(): void
-    {
-        $projects = [];
-        $initializationRoots = $this->runtimeConfiguration->projectRoots();
-        if ([] !== $initializationRoots) {
-            $projects = $this->projectDiscovery->discover($this->workspaceFolders, $initializationRoots);
-        } else {
-            foreach ($this->workspaceFolders as $folder) {
-                $path = $this->workspaceFolderPath($folder);
-                $roots = null === $path ? null : $this->projectConfiguration->projectRoots($path);
-                array_push($projects, ...$this->projectDiscovery->discover([$folder], $roots ?? []));
-            }
-        }
-
-        $unique = [];
-        foreach ($projects as $project) {
-            $unique[$project->rootPath] = $project;
-        }
-        $projects = array_values($unique);
-        usort($projects, static fn (Project $left, Project $right): int => strcmp($left->rootPath, $right->rootPath));
-        if ([] !== $initializationRoots) {
-            $this->validateInitializationRoots($initializationRoots, $projects);
-        }
-        $this->projectConfiguration->validateProjects($projects);
-
-        foreach ($this->projectRegistry->replace($projects) as $project) {
-            $this->projectStateCleaner->remove($project);
-        }
-        $this->projectSettings->applyFileSettings();
-    }
-
-    /**
-     * @param list<string>  $roots
-     * @param list<Project> $projects
-     */
-    private function validateInitializationRoots(array $roots, array $projects): void
-    {
-        $discovered = [];
-        foreach ($projects as $project) {
-            $discovered[$project->rootPath] = true;
-        }
-        foreach ($roots as $root) {
-            $paths = [];
-            if (str_starts_with($root, 'file:')) {
-                $path = $this->uriToPathConverter->convert($root);
-                $paths = null === $path ? [] : [$path];
-            } elseif (Path::isAbsolute($root)) {
-                $paths = [Path::canonicalize($root)];
-            } else {
-                foreach ($this->workspaceFolders as $folder) {
-                    $workspace = $this->uriToPathConverter->convert($folder['uri']);
-                    if (null !== $workspace) {
-                        $paths[] = Path::join($workspace, $root);
-                    }
-                }
-            }
-            if ([] === $paths) {
-                throw new InvalidConfigurationException(\sprintf('The configured project root "%s" is invalid.', $root));
-            }
-            foreach ($paths as $path) {
-                if (!isset($discovered[$path])) {
-                    throw new InvalidConfigurationException(\sprintf('The configured project root "%s" was not discovered as a Symfony project.', $root));
-                }
-            }
-        }
+        $this->workspace->changeFolders($folders);
+        $this->workspace->discover();
     }
 
     /** @param array<array-key, mixed> $params */
@@ -216,9 +144,26 @@ final class WorkspaceConfiguration
         return $folders;
     }
 
-    /** @param array{uri: string, name?: string} $folder */
-    private function workspaceFolderPath(array $folder): ?string
+    /**
+     * @param array<array-key, mixed> $initializationOptions
+     *
+     * @return list<string>
+     */
+    private function projectRoots(array $initializationOptions): array
     {
-        return $this->uriToPathConverter->convert($folder['uri']);
+        $projectRoots = $initializationOptions['projectRoots'] ?? null;
+        if (!\is_array($projectRoots) || !array_is_list($projectRoots)) {
+            return [];
+        }
+
+        $roots = [];
+        foreach ($projectRoots as $root) {
+            if (!\is_string($root) || '' === $root) {
+                return [];
+            }
+            $roots[] = $root;
+        }
+
+        return $roots;
     }
 }
