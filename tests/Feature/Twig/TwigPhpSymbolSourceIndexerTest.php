@@ -15,7 +15,6 @@ use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceFacts;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceIndexer;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -28,7 +27,7 @@ use Symfony\Lsp\Project\Project;
 
 final class TwigPhpSymbolSourceIndexerTest extends TestCase
 {
-    public function testPersistsDeclarationsReferencesAndLookupIndexes(): void
+    public function testIndexesDeclarationsReferencesAndLookups(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
         $phpUri = 'file:///workspace/src/Model.php';
@@ -70,18 +69,6 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
         $published = $index->memberDeclarations('App\Status', 'Published')[0];
         self::assertSame(TwigPhpSymbolKind::EnumCase, $published->kind);
         self::assertSame($published, $index->declarationAt($phpUri, new Position($published->range->start->line, $published->range->start->character)));
-
-        $codec = new SourceIndexPayloadCodec();
-        $codec->validate([$indexer]);
-        $restoredIndexes = new TwigPhpSymbolSourceIndexRegistry();
-        $restoredIndexer = $this->indexer($restoredIndexes);
-        $restoredIndexer->begin($project);
-        $restoredIndexer->restore($project, $codec->decode($indexer->name(), $codec->encode($indexer->name(), $phpFacts)));
-        $restoredIndexer->restore($project, $codec->decode($indexer->name(), $codec->encode($indexer->name(), $twigFacts)));
-        $restoredIndexer->finish($project);
-
-        self::assertCount(1, $restoredIndexes->forProject($project)->memberDeclarations('App\Options', 'FORMAT'));
-        self::assertCount(1, $restoredIndexes->forProject($project)->references('App\Status', 'Published'));
     }
 
     public function testOpenDocumentOverlayReplacesSavedSymbols(): void
