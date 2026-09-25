@@ -15,8 +15,6 @@ final class CheckCommand
     public const EXIT_INVOCATION = 11;
     public const EXIT_OPERATIONAL = 12;
 
-    private const VERBOSE_OPTIONS = ['--verbose', '-v', '-vv', '-vvv'];
-
     public function __construct(
         private readonly CheckOptionsParser $optionsParser,
         private readonly CheckRunner $runner,
@@ -34,15 +32,15 @@ final class CheckCommand
     public function run(array $arguments, int|float|null $processStartedAt = null): CheckExecution
     {
         $format = 'human';
-        $verbose = [] !== array_intersect(self::VERBOSE_OPTIONS, $arguments);
+        $verbose = false;
         try {
-            $parsed = $this->optionsParser->parse($arguments);
-            $format = $parsed->format;
-            if ($parsed->value instanceof InvalidConfigurationException) {
-                throw $parsed->value;
+            $options = $this->optionsParser->parse($arguments);
+            $format = $options->format;
+            $verbose = $options->verbose;
+            if (null !== $options->error) {
+                throw $options->error;
             }
-            $options = $parsed->value;
-            $this->logger->configure($options->verbose ? 'verbose' : 'off');
+            $this->logger->configure($verbose ? 'verbose' : 'off');
             if ($options->help) {
                 return new CheckExecution(self::EXIT_SUCCESS, $this->reporter->help());
             }
@@ -56,12 +54,12 @@ final class CheckCommand
                 ? self::EXIT_OPERATIONAL
                 : (0 === $result->blockingCount ? self::EXIT_SUCCESS : self::EXIT_DIAGNOSTICS);
             $stderr = implode('', array_map(
-                fn (array $error): string => $this->errorOutput($error, $options->verbose),
+                fn (array $error): string => $this->errorOutput($error, $verbose),
                 $result->errors,
             ));
             $stderr .= $this->profileReporter->render($result);
 
-            return new CheckExecution($exitCode, $this->reporter->render($result, $format, $options->verbose, $exitCode), $stderr);
+            return new CheckExecution($exitCode, $this->reporter->render($result, $format, $verbose, $exitCode), $stderr);
         } catch (InvalidConfigurationException $error) {
             $result = $this->errorResult('invocation', $error->getMessage());
 

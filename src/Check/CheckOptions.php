@@ -2,6 +2,8 @@
 
 namespace Symfony\Lsp\Check;
 
+use Symfony\Lsp\Project\InvalidConfigurationException;
+
 final class CheckOptions
 {
     /**
@@ -26,6 +28,7 @@ final class CheckOptions
         public readonly bool $profile,
         public readonly bool $listCodes,
         public readonly bool $help,
+        public readonly ?InvalidConfigurationException $error = null,
     ) {
     }
 }

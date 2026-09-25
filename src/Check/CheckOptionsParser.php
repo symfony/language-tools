@@ -8,6 +8,8 @@ use Symfony\Lsp\Project\InvalidConfigurationException;
 
 final class CheckOptionsParser
 {
+    private const DEFAULT_FORMAT = 'human';
+
     private const FORMATS = ['human', 'json', 'github', 'gitlab', 'sarif'];
 
     private const VALUE_OPTIONS = [
@@ -28,65 +30,63 @@ final class CheckOptionsParser
     public function __construct(
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
         private readonly AnalysisSettings $analysisSettings,
-        private readonly CheckArgumentsTokenizer $tokenizer,
     ) {
     }
 
-    /** @param list<string> $arguments */
-    public function parse(array $arguments): CheckOptionsParseResult
-    {
-        $tokenized = $this->tokenizer->tokenize($arguments);
-        try {
-            return new CheckOptionsParseResult($tokenized->format, $this->apply($tokenized));
-        } catch (InvalidConfigurationException $error) {
-            return new CheckOptionsParseResult($tokenized->format, $error);
-        }
-    }
-
-    private function apply(TokenizedCheckArguments $arguments): CheckOptions
+    /**
+     * Parsing never stops on the first failure so that the report format and
+     * the verbosity are always resolved from the complete argument list.
+     *
+     * @param list<string> $arguments
+     */
+    public function parse(array $arguments): CheckOptions
     {
         $workspace = getcwd();
+        $draft = new CheckOptionsDraft(false === $workspace ? '' : $workspace);
         if (false === $workspace) {
-            throw new InvalidConfigurationException('Unable to determine the current working directory.');
+            $draft->error = new InvalidConfigurationException('Unable to determine the current working directory.');
         }
 
-        $draft = new CheckOptionsDraft($workspace);
-        foreach ($arguments->tokens as $token) {
-            if ('separator' === $token->kind) {
-                continue;
-            }
-            if ('positional' === $token->kind) {
-                $draft->selectors[] = $token->raw;
+        $separated = false;
+        foreach ($arguments as $argument) {
+            if ($separated || !str_starts_with($argument, '-')) {
+                $draft->selectors[] = $argument;
 
                 continue;
             }
-            if ('flag' === $token->kind) {
-                $this->applyFlag($draft, $token->raw);
+            if ('--' === $argument) {
+                $separated = true;
 
                 continue;
             }
 
-            $name = $token->name;
-            $value = $token->value;
-            if (null === $name || null === $value) {
-                throw new \LogicException('A value option token must have a name and value.');
+            try {
+                if (1 === preg_match('/^--([a-z][a-z0-9-]*)=(.*)$/D', $argument, $match)) {
+                    $this->applyValue($draft, $match[1], $match[2], $argument);
+                } else {
+                    $this->applyFlag($draft, $argument);
+                }
+            } catch (InvalidConfigurationException $error) {
+                $draft->error ??= $error;
             }
-            if ('' === $value && !\in_array($name, ['fail-on', 'format'], true)) {
-                throw new InvalidConfigurationException(\sprintf('The check option "%s" requires a value.', $token->raw));
-            }
-            $this->applyValue($draft, $name, $value);
         }
 
-        $draft->overrides = $this->analysisSettings->normalizeProject($draft->overrides, context: 'command-line');
+        try {
+            $draft->overrides = $this->analysisSettings->normalizeProject($draft->overrides, context: 'command-line');
+        } catch (InvalidConfigurationException $error) {
+            $draft->error ??= $error;
+        }
         if ('none' !== $draft->baselineMode && null === $draft->baselinePath) {
             $draft->baselinePath = '.symfony-lsp-baseline.json';
         }
         if ($draft->strictBaseline && null === $draft->baselinePath) {
-            throw new InvalidConfigurationException('The --strict-baseline option requires --baseline.');
+            $draft->error ??= new InvalidConfigurationException('The --strict-baseline option requires --baseline.');
         }
 
+        $formats = array_keys($draft->formats);
+
         return new CheckOptions(
-            $draft->format,
+            1 === \count($formats) ? $formats[0] : self::DEFAULT_FORMAT,
             $draft->workspace,
             $draft->configurationPath,
             $draft->selectors,
@@ -101,6 +101,7 @@ final class CheckOptionsParser
             $draft->profile,
             $draft->listCodes,
             $draft->help,
+            $draft->error,
         );
     }
 
@@ -134,12 +135,15 @@ final class CheckOptionsParser
         return \sprintf('Unknown check option "%s".', $option);
     }
 
-    private function applyValue(CheckOptionsDraft $draft, string $name, string $value): void
+    private function applyValue(CheckOptionsDraft $draft, string $name, string $value, string $argument): void
     {
+        if ('' === $value && !\in_array($name, ['fail-on', 'format'], true)) {
+            throw new InvalidConfigurationException(\sprintf('The check option "%s" requires a value.', $argument));
+        }
+
         switch ($name) {
             case 'format':
-                $draft->selectedFormat = $this->format($draft->selectedFormat, $value);
-                $draft->format = $draft->selectedFormat;
+                $this->selectFormat($draft, $value);
                 break;
             case 'workspace':
                 $draft->workspace = $value;
@@ -217,16 +221,16 @@ final class CheckOptionsParser
         return (float) $value;
     }
 
-    private function format(?string $current, string $requested): string
+    private function selectFormat(CheckOptionsDraft $draft, string $requested): void
     {
         if (!\in_array($requested, self::FORMATS, true)) {
             throw new InvalidConfigurationException('The --format option must be human, json, github, gitlab or sarif.');
         }
-        if (null !== $current && $current !== $requested) {
+
+        $draft->formats[$requested] = true;
+        if (\count($draft->formats) > 1) {
             throw new InvalidConfigurationException('The --format option cannot select more than one format.');
         }
-
-        return $requested;
     }
 
     private function baselineMode(string $current, string $requested): string

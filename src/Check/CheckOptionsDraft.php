@@ -2,10 +2,12 @@
 
 namespace Symfony\Lsp\Check;
 
+use Symfony\Lsp\Project\InvalidConfigurationException;
+
 final class CheckOptionsDraft
 {
-    public string $format = 'human';
-    public ?string $selectedFormat = null;
+    /** @var array<string, true> */
+    public array $formats = [];
     public ?string $configurationPath = null;
     /** @var list<string> */
     public array $selectors = [];
@@ -23,6 +25,7 @@ final class CheckOptionsDraft
     public bool $profile = false;
     public bool $listCodes = false;
     public bool $help = false;
+    public ?InvalidConfigurationException $error = null;
 
     public function __construct(public string $workspace)
     {

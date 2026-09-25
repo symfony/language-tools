@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Check;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Check\CheckArgumentsTokenizer;
 use Symfony\Lsp\Check\CheckOptions;
 use Symfony\Lsp\Check\CheckOptionsParser;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
@@ -20,7 +19,6 @@ final class CheckOptionsParserTest extends TestCase
         $this->parser = new CheckOptionsParser(
             new DiagnosticCodeRegistry(),
             new AnalysisSettings(),
-            new CheckArgumentsTokenizer(),
         );
     }
 
@@ -116,13 +114,22 @@ final class CheckOptionsParserTest extends TestCase
 
     /** @param list<string> $arguments */
     #[DataProvider('invalidArguments')]
-    public function testReportsExactErrorsWithTheDetectedFormat(array $arguments, string $format, string $message): void
+    public function testReportsTheFirstErrorWithTheDetectedFormat(array $arguments, string $format, string $message): void
     {
-        $result = $this->parser->parse($arguments);
+        $options = $this->parser->parse($arguments);
 
-        self::assertSame($format, $result->format);
-        self::assertInstanceOf(InvalidConfigurationException::class, $result->value);
-        self::assertSame($message, $result->value->getMessage());
+        self::assertSame($format, $options->format);
+        self::assertInstanceOf(InvalidConfigurationException::class, $options->error);
+        self::assertSame($message, $options->error->getMessage());
+    }
+
+    public function testKeepsParsingTheRemainingArgumentsAfterAFailure(): void
+    {
+        $options = $this->parser->parse(['--unknown', '-v', '--timeout=0']);
+
+        self::assertTrue($options->verbose);
+        self::assertInstanceOf(InvalidConfigurationException::class, $options->error);
+        self::assertSame('Unknown check option "--unknown".', $options->error->getMessage());
     }
 
     /** @return iterable<string, array{string}> */
@@ -173,12 +180,12 @@ final class CheckOptionsParserTest extends TestCase
         ];
         yield 'invalid format' => [
             ['--format=xml'],
-            'xml',
+            'human',
             'The --format option must be human, json, github, gitlab or sarif.',
         ];
         yield 'empty format' => [
             ['--format='],
-            '',
+            'human',
             'The --format option must be human, json, github, gitlab or sarif.',
         ];
         yield 'conflicting formats' => [
@@ -240,11 +247,11 @@ final class CheckOptionsParserTest extends TestCase
     /** @param list<string> $arguments */
     private function options(array $arguments): CheckOptions
     {
-        $result = $this->parser->parse($arguments);
-        if ($result->value instanceof InvalidConfigurationException) {
-            throw $result->value;
+        $options = $this->parser->parse($arguments);
+        if (null !== $options->error) {
+            throw $options->error;
         }
 
-        return $result->value;
+        return $options;
     }
 }
