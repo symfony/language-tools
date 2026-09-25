@@ -87,7 +87,6 @@ function symfonyLspBridgeMetadataSection(SymfonyLspBridgeContext $context): ?arr
         'constraintsComplete' => $constraintsComplete,
         'forms' => array_values($forms),
         'constraints' => array_values($constraints),
-        'resources' => [],
         'warnings' => $warnings,
     ];
     return $section;

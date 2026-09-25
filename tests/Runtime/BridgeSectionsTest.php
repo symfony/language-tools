@@ -546,7 +546,6 @@ final class BridgeSectionsTest extends TestCase
             'complete' => false,
             'paths' => [],
             'globals' => [],
-            'resources' => [],
             'warnings' => ['The debug:twig command is unavailable.'],
         ], $result['sections']['twig'] ?? null);
     }

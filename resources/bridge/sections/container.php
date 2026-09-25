@@ -36,7 +36,6 @@ function symfonyLspBridgeContainerSection(SymfonyLspBridgeContext $context): ?ar
                 'parametersComplete' => true,
                 'items' => $items,
                 'parameters' => $parameterItems,
-                'resources' => [],
                 'warnings' => [],
             ];
         } catch (Throwable $error) {

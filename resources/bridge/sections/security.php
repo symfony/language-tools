@@ -111,7 +111,6 @@ function symfonyLspBridgeSecuritySection(SymfonyLspBridgeContext $context): ?arr
         'providers' => array_values($providers),
         'roles' => $roleItems,
         'voters' => array_values($voters),
-        'resources' => [],
         'warnings' => $warnings,
     ];
     return $section;

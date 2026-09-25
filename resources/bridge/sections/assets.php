@@ -115,7 +115,6 @@ function symfonyLspBridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
         'importMapComplete' => $importMapComplete,
         'assets' => array_values($assets),
         'importMap' => array_values($importMap),
-        'resources' => [],
         'warnings' => $warnings,
     ];
     return $section;

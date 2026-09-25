@@ -3,7 +3,6 @@
 function symfonyLspBridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
 {
     $controllers = [];
-    $resources = [];
     $warnings = [];
     $complete = false;
 
@@ -22,7 +21,6 @@ function symfonyLspBridgeStimulusSection(SymfonyLspBridgeContext $context): ?arr
                 $controllerPaths = array_values(array_filter(is_array($configuration['controller_paths'] ?? null) ? $configuration['controller_paths'] : [], 'is_string'));
                 $controllersJson = is_string($configuration['controllers_json'] ?? null) ? $configuration['controllers_json'] : null;
                 if (null !== $controllersJson && is_file($controllersJson)) {
-                    $resources[] = realpath($controllersJson) ?: $controllersJson;
                     foreach (symfonyLspBridgeStimulusUxControllers($context->project(), $controllersJson, $warnings) as $name => $controller) {
                         $controllers[$name] = $controller;
                     }
@@ -32,7 +30,6 @@ function symfonyLspBridgeStimulusSection(SymfonyLspBridgeContext $context): ?arr
                     $warnings[] = 'The configured controllers.json was not found.';
                 }
                 foreach (symfonyLspBridgeStimulusBundleRegistries($context, $kernel, $warnings) as $bundleControllersJson) {
-                    $resources[] = realpath($bundleControllersJson) ?: $bundleControllersJson;
                     foreach (symfonyLspBridgeStimulusUxControllers($context->project(), $bundleControllersJson, $warnings) as $name => $controller) {
                         $controllers[$name] ??= $controller;
                     }
@@ -50,12 +47,10 @@ function symfonyLspBridgeStimulusSection(SymfonyLspBridgeContext $context): ?arr
     }
 
     ksort($controllers);
-    sort($resources);
     sort($warnings);
     $section = [
         'complete' => $complete,
         'controllers' => array_values($controllers),
-        'resources' => $resources,
         'warnings' => $warnings,
     ];
     return $section;

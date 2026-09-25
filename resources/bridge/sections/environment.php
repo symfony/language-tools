@@ -43,7 +43,6 @@ function symfonyLspBridgeEnvironmentSection(SymfonyLspBridgeContext $context): ?
     $section = [
         'complete' => $complete,
         'processors' => $processorItems,
-        'resources' => [],
         'warnings' => [],
     ];
 

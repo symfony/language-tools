@@ -64,7 +64,6 @@ function symfonyLspBridgeEventsSection(SymfonyLspBridgeContext $context): ?array
         'complete' => $complete,
         'events' => $eventItems,
         'listeners' => $listeners,
-        'resources' => [],
         'warnings' => [],
     ];
     return $section;

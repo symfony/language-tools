@@ -54,7 +54,6 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
         'complete' => $complete,
         'paths' => $paths,
         'globals' => $globals,
-        'resources' => [],
         'warnings' => $warnings,
     ];
 

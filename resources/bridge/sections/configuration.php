@@ -2,7 +2,6 @@
 
 function symfonyLspBridgeConfigurationSection(SymfonyLspBridgeContext $context): ?array
 {
-    $project = $context->project();
     $bundles = [];
     $warnings = [];
     $complete = true;
@@ -32,24 +31,9 @@ function symfonyLspBridgeConfigurationSection(SymfonyLspBridgeContext $context):
     }
     usort($bundles, static fn (array $left, array $right): int => $left['alias'] <=> $right['alias']);
     sort($warnings);
-    $resources = [];
-    $configDir = Symfony\Component\Filesystem\Path::join($project, 'config');
-    if (is_dir($configDir)) {
-        $finder = (new Symfony\Component\Finder\Finder())
-            ->files()
-            ->in($configDir)
-            ->ignoreDotFiles(false)
-            ->ignoreVCS(false)
-            ->name('/\.(?:php|xml|yaml|yml)$/i');
-        foreach ($finder as $file) {
-            $resources[] = $file->getPathname();
-        }
-    }
-    sort($resources);
     $section = [
         'complete' => $complete,
         'bundles' => $bundles,
-        'resources' => $resources,
         'warnings' => $warnings,
     ];
 

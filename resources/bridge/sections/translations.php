@@ -53,7 +53,6 @@ function symfonyLspBridgeTranslationsSection(SymfonyLspBridgeContext $context): 
     $section = [
         'complete' => true,
         'items' => $items,
-        'resources' => [],
         'warnings' => [],
     ];
 

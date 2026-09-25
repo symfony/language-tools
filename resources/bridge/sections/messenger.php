@@ -50,7 +50,6 @@ function symfonyLspBridgeMessengerSection(SymfonyLspBridgeContext $context): ?ar
         'transports' => array_values($transports),
         'messages' => array_values($messages),
         'handlers' => symfonyLspBridgeMessengerSortHandlers($handlers),
-        'resources' => [],
         'warnings' => $warnings,
     ];
 }
