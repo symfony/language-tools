@@ -11,7 +11,7 @@ final class TwigCallableDiagnosticProvider implements DiagnosticProviderInterfac
     public function __construct(
         private readonly DocumentContextResolver $documents,
         private readonly LspProtocolMapper $protocol,
-        private readonly TwigCallableIndexRegistry $indexes,
+        private readonly TwigCallableSourceIndexRegistry $indexes,
         private readonly TwigCallableMethodResolver $methods,
     ) {
     }

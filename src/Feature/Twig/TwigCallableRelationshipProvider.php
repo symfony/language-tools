@@ -19,7 +19,7 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
         private readonly DocumentContextResolver $documents,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
-        private readonly TwigCallableIndexRegistry $indexes,
+        private readonly TwigCallableSourceIndexRegistry $indexes,
         private readonly TwigCallableReferenceExtractor $references,
         private readonly TwigCallableMethodResolver $methods,
         private readonly PhpParserInterface $phpParser,

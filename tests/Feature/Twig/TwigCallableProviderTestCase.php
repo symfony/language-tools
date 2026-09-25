@@ -16,10 +16,10 @@ use Symfony\Lsp\Feature\Twig\TwigCallableArgumentAnalyzer;
 use Symfony\Lsp\Feature\Twig\TwigCallableCompletionProvider;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableDiagnosticProvider;
-use Symfony\Lsp\Feature\Twig\TwigCallableIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableMethodResolver;
 use Symfony\Lsp\Feature\Twig\TwigCallableReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableRelationshipProvider;
+use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -76,7 +76,7 @@ class TwigCallableProviderTestCase extends TestCase
             $documents->open(new Document($uri, 'twig', 1, $text));
             $callableFacts[] = $referenceExtractor->extract(new SourceDocument($uri, 'twig', $text));
         }
-        $indexes = new TwigCallableIndexRegistry();
+        $indexes = new TwigCallableSourceIndexRegistry();
         $indexes->forProject($project)->replace(...$callableFacts);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $classIndexes->forProject($project)->replace(...$classFacts);

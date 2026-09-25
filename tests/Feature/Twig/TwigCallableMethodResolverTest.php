@@ -15,9 +15,9 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegist
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclaration;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
-use Symfony\Lsp\Feature\Twig\TwigCallableIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
 use Symfony\Lsp\Feature\Twig\TwigCallableMethodResolver;
+use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -103,7 +103,7 @@ final class TwigCallableMethodResolverTest extends TestCase
                 return $this->parser->parse($source);
             }
         };
-        $callableIndexes = new TwigCallableIndexRegistry();
+        $callableIndexes = new TwigCallableSourceIndexRegistry();
         $callableIndexes->forProject($project)->replace((new TwigCallableDeclarationExtractor(new PositionConverter(), $parser))->extract(new SourceDocument($uri, 'php', $source)));
         $resolver = new TwigCallableMethodResolver(
             $classIndexes,
@@ -221,7 +221,7 @@ final class TwigCallableMethodResolverTest extends TestCase
             $uri,
             classes: (new PhpClassDeclarationExtractor(new PositionConverter(), $parser))->extract($uri, $source),
         ));
-        $callableIndexes = new TwigCallableIndexRegistry();
+        $callableIndexes = new TwigCallableSourceIndexRegistry();
         $callableIndexes->forProject($project)->replace((new TwigCallableDeclarationExtractor(new PositionConverter(), $parser))->extract(new SourceDocument($uri, 'php', $source)));
         $resolver = new TwigCallableMethodResolver(
             $classIndexes,

@@ -12,10 +12,10 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolCompletionContextResolver;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolExtractor;
-use Symfony\Lsp\Feature\Twig\TwigPhpSymbolIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolProvider;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceFacts;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -76,7 +76,7 @@ final class TwigPhpSymbolProviderTest extends TestCase
         $twigFacts = $extractor->extract(new SourceDocument($twigUri, 'twig', $twig));
         self::assertInstanceOf(TwigPhpSymbolSourceFacts::class, $phpFacts);
         self::assertInstanceOf(TwigPhpSymbolSourceFacts::class, $twigFacts);
-        $indexes = new TwigPhpSymbolIndexRegistry();
+        $indexes = new TwigPhpSymbolSourceIndexRegistry();
         $indexes->forProject($project)->replace($phpFacts, $twigFacts);
         $provider = new TwigPhpSymbolProvider(
             new DocumentContextResolver($documents, $projects),

@@ -8,11 +8,11 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Twig\TwigCallableArgumentReference;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
-use Symfony\Lsp\Feature\Twig\TwigCallableIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
 use Symfony\Lsp\Feature\Twig\TwigCallableReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexer;
+use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableUsage;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
@@ -43,7 +43,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
             {{ final_call(value = 3) }}
             {{ missing_value(value=) }}
             TWIG;
-        $indexes = new TwigCallableIndexRegistry();
+        $indexes = new TwigCallableSourceIndexRegistry();
         $indexer = $this->indexer($indexes);
         $indexer->begin($project);
         $facts = $indexer->index($project, new SourceDocument($uri, 'twig', $text));
@@ -83,7 +83,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
     public function testPreservesRecoveredUsagesThatAreNotValidCalls(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $indexer = $this->indexer(new TwigCallableIndexRegistry());
+        $indexer = $this->indexer(new TwigCallableSourceIndexRegistry());
         $indexer->begin($project);
         $facts = $indexer->index($project, new SourceDocument(
             'file:///workspace/templates/malformed.html.twig',
@@ -105,7 +105,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
             {{ named(value: 'value') }}
             {{ item|filtered }}
             TWIG;
-        $indexes = new TwigCallableIndexRegistry();
+        $indexes = new TwigCallableSourceIndexRegistry();
         $indexer = $this->indexer($indexes);
         $indexer->begin($project);
         $facts = $indexer->index($project, new SourceDocument($uri, 'twig', $text));
@@ -158,7 +158,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
                 }
             }
             PHP);
-        $sourceIndexes = new TwigCallableIndexRegistry();
+        $sourceIndexes = new TwigCallableSourceIndexRegistry();
         $sourceIndexer = $this->indexer($sourceIndexes);
         $sourceIndexer->begin($project);
         $facts = $sourceIndexer->index($project, $document);
@@ -168,7 +168,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
         $codec = new SourceIndexPayloadCodec();
         $codec->validate([$sourceIndexer]);
         $payload = $codec->encode($sourceIndexer->name(), $facts);
-        $restoredIndexes = new TwigCallableIndexRegistry();
+        $restoredIndexes = new TwigCallableSourceIndexRegistry();
         $restoredIndexer = $this->indexer($restoredIndexes);
         $restoredIndexer->begin($project);
         $restoredIndexer->restore($project, $codec->decode($sourceIndexer->name(), $payload));
@@ -193,7 +193,7 @@ final class TwigCallableSourceIndexerTest extends TestCase
         self::assertTrue($attributes[0]->optionsKnown);
     }
 
-    private function indexer(TwigCallableIndexRegistry $indexes): TwigCallableSourceIndexer
+    private function indexer(TwigCallableSourceIndexRegistry $indexes): TwigCallableSourceIndexer
     {
         $converter = new PositionConverter();
 

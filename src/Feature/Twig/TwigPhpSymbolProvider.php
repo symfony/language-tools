@@ -16,7 +16,7 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
         private readonly DocumentContextResolver $documents,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
-        private readonly TwigPhpSymbolIndexRegistry $indexes,
+        private readonly TwigPhpSymbolSourceIndexRegistry $indexes,
         private readonly TwigPhpSymbolExtractor $extractor,
     ) {
     }
@@ -182,7 +182,7 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
     }
 
     /** @return list<TwigPhpSymbolDeclaration> */
-    private function declarations(TwigPhpSymbolIndex $index, string $className, ?string $memberName): array
+    private function declarations(TwigPhpSymbolSourceIndex $index, string $className, ?string $memberName): array
     {
         return null === $memberName ? $index->typeDeclarations($className) : $index->memberDeclarations($className, $memberName);
     }

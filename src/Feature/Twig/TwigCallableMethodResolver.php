@@ -14,7 +14,7 @@ final class TwigCallableMethodResolver
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly ProjectDocumentReader $reader,
         private readonly PhpParserInterface $phpParser,
-        private readonly TwigCallableIndexRegistry $callableIndexes,
+        private readonly TwigCallableSourceIndexRegistry $callableIndexes,
     ) {
     }
 

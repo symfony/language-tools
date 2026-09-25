@@ -7,7 +7,7 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 use Symfony\Lsp\Index\SourceSymbolOrder;
 
 /** @extends AbstractSourceFactsIndex<TwigCallableSourceFacts> */
-final class TwigCallableIndex extends AbstractSourceFactsIndex
+final class TwigCallableSourceIndex extends AbstractSourceFactsIndex
 {
     /** @var array<string, list<string>> */
     private array $names = [];

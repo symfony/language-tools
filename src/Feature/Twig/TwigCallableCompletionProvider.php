@@ -16,7 +16,7 @@ final class TwigCallableCompletionProvider implements CompletionProviderInterfac
         private readonly DocumentContextResolver $documents,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
-        private readonly TwigCallableIndexRegistry $indexes,
+        private readonly TwigCallableSourceIndexRegistry $indexes,
         private readonly TwigCallableMethodResolver $methods,
         private readonly TwigCallableArgumentAnalyzer $arguments,
         private readonly TwigCommentParser $comments,

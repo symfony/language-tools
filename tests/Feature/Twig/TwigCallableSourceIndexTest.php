@@ -9,18 +9,18 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclaration;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
-use Symfony\Lsp\Feature\Twig\TwigCallableIndex;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceFacts;
+use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndex;
 use Symfony\Lsp\Feature\Twig\TwigCallableUsage;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
-final class TwigCallableIndexTest extends TestCase
+final class TwigCallableSourceIndexTest extends TestCase
 {
     public function testInvalidatesCachedNamesDeclarationsAndUsages(): void
     {
-        $index = new TwigCallableIndex();
+        $index = new TwigCallableSourceIndex();
         [$firstFacts, $firstDeclaration, $firstUsage] = $this->facts('first');
         $index->replace($firstFacts);
 
@@ -53,7 +53,7 @@ final class TwigCallableIndexTest extends TestCase
         $earlierDeclaration = new TwigCallableDeclaration(TwigCallableKind::Filter, 'format', 'file:///a.php', $this->range(4, 5));
         $laterUsage = new TwigCallableUsage(TwigCallableKind::Filter, 'format', 'file:///template.html.twig', $this->range(8, 9));
         $earlierUsage = new TwigCallableUsage(TwigCallableKind::Filter, 'format', 'file:///template.html.twig', $this->range(1, 2));
-        $index = new TwigCallableIndex();
+        $index = new TwigCallableSourceIndex();
         $index->replace(new TwigCallableSourceFacts('file:///source', [$laterDeclaration, $earlierDeclaration], [$laterUsage, $earlierUsage]));
 
         self::assertSame([$earlierDeclaration, $laterDeclaration], $index->declarations(TwigCallableKind::Filter, 'format'));
@@ -63,7 +63,7 @@ final class TwigCallableIndexTest extends TestCase
     public function testKeepsUnsavedTwigCallableDeclarationsAuthoritative(): void
     {
         $extractor = new TwigCallableDeclarationExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()));
-        $index = new TwigCallableIndex();
+        $index = new TwigCallableSourceIndex();
         $uri = 'file:///workspace/src/Twig/AppExtension.php';
         $saved = "<?php class Extension { public function getFunctions(): array { return [new \\Twig\\TwigFunction('saved_name', null)]; } }";
         $unsaved = "<?php class Extension { public function getFunctions(): array { return [new \\Twig\\TwigFunction('unsaved_name', null)]; } }";

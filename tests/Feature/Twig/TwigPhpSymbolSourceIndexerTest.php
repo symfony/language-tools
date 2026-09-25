@@ -9,11 +9,11 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolCompletionContextResolver;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolExtractor;
-use Symfony\Lsp\Feature\Twig\TwigPhpSymbolIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolKind;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceFacts;
 use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceIndexer;
+use Symfony\Lsp\Feature\Twig\TwigPhpSymbolSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -52,7 +52,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
             {{ constant('App\\Options::FORMAT') }}
             {{ enum('App\\Status').Published }}
             TWIG;
-        $indexes = new TwigPhpSymbolIndexRegistry();
+        $indexes = new TwigPhpSymbolSourceIndexRegistry();
         $indexer = $this->indexer($indexes);
         $indexer->begin($project);
         $phpFacts = $indexer->index($project, new SourceDocument($phpUri, 'php', $php));
@@ -73,7 +73,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
 
         $codec = new SourceIndexPayloadCodec();
         $codec->validate([$indexer]);
-        $restoredIndexes = new TwigPhpSymbolIndexRegistry();
+        $restoredIndexes = new TwigPhpSymbolSourceIndexRegistry();
         $restoredIndexer = $this->indexer($restoredIndexes);
         $restoredIndexer->begin($project);
         $restoredIndexer->restore($project, $codec->decode($indexer->name(), $codec->encode($indexer->name(), $phpFacts)));
@@ -89,7 +89,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace');
         $uri = 'file:///workspace/src/Status.php';
         $extractor = $this->extractor(new PositionConverter());
-        $index = (new TwigPhpSymbolIndexRegistry())->forProject($project);
+        $index = (new TwigPhpSymbolSourceIndexRegistry())->forProject($project);
         $saved = $extractor->extract(new SourceDocument($uri, 'php', '<?php enum Status { case Saved; }'));
         $unsaved = $extractor->extract(new SourceDocument($uri, 'php', '<?php enum Status { case Unsaved; }'));
         self::assertInstanceOf(TwigPhpSymbolSourceFacts::class, $saved);
@@ -107,7 +107,7 @@ final class TwigPhpSymbolSourceIndexerTest extends TestCase
         self::assertSame([], $index->memberDeclarations('Status', 'Unsaved'));
     }
 
-    private function indexer(TwigPhpSymbolIndexRegistry $indexes): TwigPhpSymbolSourceIndexer
+    private function indexer(TwigPhpSymbolSourceIndexRegistry $indexes): TwigPhpSymbolSourceIndexer
     {
         return new TwigPhpSymbolSourceIndexer($indexes, $this->extractor(new PositionConverter()));
     }

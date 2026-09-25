@@ -8,7 +8,7 @@ use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Index\SourceSymbolOrder;
 
 /** @extends AbstractSourceFactsIndex<TwigPhpSymbolSourceFacts> */
-final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
+final class TwigPhpSymbolSourceIndex extends AbstractSourceFactsIndex
 {
     /** @var array<string, list<TwigPhpSymbolDeclaration>> */
     private array $types = [];

@@ -11,7 +11,7 @@ use Symfony\Lsp\Project\Project;
 final class TwigCallableSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(
-        private readonly TwigCallableIndexRegistry $indexes,
+        private readonly TwigCallableSourceIndexRegistry $indexes,
         private readonly TwigCallableDeclarationExtractor $extractor,
         private readonly TwigCallableReferenceExtractor $references,
     ) {
@@ -44,7 +44,7 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
         return TwigCallableSourceFacts::class;
     }
 
-    protected function sourceIndex(Project $project): TwigCallableIndex
+    protected function sourceIndex(Project $project): TwigCallableSourceIndex
     {
         return $this->indexes->forProject($project);
     }

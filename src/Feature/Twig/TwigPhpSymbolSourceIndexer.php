@@ -11,7 +11,7 @@ use Symfony\Lsp\Project\Project;
 final class TwigPhpSymbolSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(
-        private readonly TwigPhpSymbolIndexRegistry $indexes,
+        private readonly TwigPhpSymbolSourceIndexRegistry $indexes,
         private readonly TwigPhpSymbolExtractor $extractor,
     ) {
     }
@@ -41,7 +41,7 @@ final class TwigPhpSymbolSourceIndexer extends AbstractSourceIndexer
         return TwigPhpSymbolSourceFacts::class;
     }
 
-    protected function sourceIndex(Project $project): TwigPhpSymbolIndex
+    protected function sourceIndex(Project $project): TwigPhpSymbolSourceIndex
     {
         return $this->indexes->forProject($project);
     }
