@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.22.0 (2026-09-25)
 
 - Check YAML configuration keys and values in every environment block
