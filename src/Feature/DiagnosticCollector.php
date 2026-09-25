@@ -76,13 +76,12 @@ final class DiagnosticCollector
             return null;
         }
         if ($this->isExcluded($document->uri, $includeExcluded)) {
-            return new DetailedDiagnosticCollection(true, [], []);
+            return new DetailedDiagnosticCollection([], []);
         }
 
         $diagnostics = [];
         $failures = [];
         $providerNanoseconds = [];
-        $matched = false;
         foreach ($this->providers as $provider) {
             $providerName = $measureProviders ? $provider->name() : null;
             $providerStartedAt = $measureProviders ? (float) hrtime(true) : null;
@@ -110,7 +109,6 @@ final class DiagnosticCollector
                     continue;
                 }
 
-                $matched = true;
                 array_push($diagnostics, ...$provided);
             } finally {
                 if (null !== $providerStartedAt && null !== $providerName) {
@@ -122,7 +120,7 @@ final class DiagnosticCollector
         // Headless checks never track parse health, so partial-parse filtering does not apply here
         $diagnostics = $this->suppressor->suppressCollected($document, $diagnostics);
 
-        return new DetailedDiagnosticCollection($matched || [] !== $diagnostics, $diagnostics, $failures, $providerNanoseconds);
+        return new DetailedDiagnosticCollection($diagnostics, $failures, $providerNanoseconds);
     }
 
     private function collectedDiagnostic(string $provider, mixed $diagnostic): CollectedDiagnostic

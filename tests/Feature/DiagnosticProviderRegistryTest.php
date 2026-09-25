@@ -121,7 +121,6 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
         self::assertInstanceOf(DetailedDiagnosticCollection::class, $detailed);
         self::assertSame([], $detailed->diagnostics);
-        self::assertTrue($detailed->matched);
     }
 
     public function testMergesProviderDiagnosticsInOrder(): void
