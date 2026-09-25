@@ -7,7 +7,6 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<TwigComponentSourceFacts> */
 final class TwigComponentIndex extends AbstractSourceFactsIndex
 {
-    private bool $complete = false;
     private bool $runtimeComplete = false;
     private bool $runtimeEnabled = false;
     /** @var array<string, TwigComponent> */
@@ -19,7 +18,6 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @var array<string, true> */
     private array $caseInsensitiveRuntimeNames = [];
     private string $anonymousTemplateDirectory = 'components';
-    private bool $indexed = false;
 
     /** @var list<TwigComponent> */
     private array $components = [];
@@ -48,7 +46,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<TwigComponent> */
     public function components(): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->components;
     }
@@ -56,14 +54,14 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<TwigComponent> */
     public function declarations(string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->declarations[$name] ?? [];
     }
 
     public function get(string $name): ?TwigComponent
     {
-        $this->index();
+        $this->derived();
 
         // vendor components, such as ux:icon, only exist in runtime metadata
         return $this->componentsByName[$name]
@@ -74,7 +72,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<TwigComponentReference> */
     public function references(string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return isset($this->caseInsensitiveRuntimeNames[strtolower($name)]) ? $this->caseInsensitiveReferences[strtolower($name)] ?? [] : $this->references[$name] ?? [];
     }
@@ -82,7 +80,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<TwigComponentActionReference> */
     public function actionReferences(string $component, string $action): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->actionReferences[$component][$action] ?? [];
     }
@@ -90,7 +88,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<LiveComponentEvent> */
     public function events(string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->events[$name] ?? [];
     }
@@ -98,14 +96,9 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function eventNames(): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->eventNames;
-    }
-
-    public function isComplete(): bool
-    {
-        return $this->complete;
     }
 
     /**
@@ -156,22 +149,8 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
         return $this->anonymousTemplateDirectory;
     }
 
-    protected function factsReplaced(): void
+    protected function build(): void
     {
-        $this->complete = true;
-    }
-
-    protected function factsChanged(): void
-    {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->componentsByName = [];
         $this->declarations = [];
         $this->references = [];
@@ -204,7 +183,6 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
         $this->components = array_values($this->componentsByName);
         $this->eventNames = array_values($eventNames);
         sort($this->eventNames);
-        $this->indexed = true;
     }
 
     private function merge(?TwigComponent $current, TwigComponent $component): TwigComponent

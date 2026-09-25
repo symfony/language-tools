@@ -7,8 +7,6 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<AssetSourceFacts> */
 final class AssetSourceIndex extends AbstractSourceFactsIndex
 {
-    private bool $indexed = false;
-
     /** @var array<string, list<AssetSourceSymbol>> */
     private array $symbols = [];
 
@@ -21,7 +19,7 @@ final class AssetSourceIndex extends AbstractSourceFactsIndex
     /** @return list<AssetSourceSymbol> */
     public function symbols(AssetSymbolKind $kind, ?string $name = null): array
     {
-        $this->index();
+        $this->derived();
 
         return null === $name ? $this->symbols[$kind->value] ?? [] : $this->symbolsByName[$kind->value][$name] ?? [];
     }
@@ -29,22 +27,13 @@ final class AssetSourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function declarationNames(AssetSymbolKind $kind): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->declarationNames[$kind->value] ?? [];
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->symbols = [];
         $this->symbolsByName = [];
         $declarationNames = [];
@@ -65,6 +54,5 @@ final class AssetSourceIndex extends AbstractSourceFactsIndex
             $this->declarationNames[$kind] = array_keys($names);
             sort($this->declarationNames[$kind]);
         }
-        $this->indexed = true;
     }
 }

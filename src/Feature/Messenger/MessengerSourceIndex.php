@@ -7,8 +7,6 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<MessengerSourceFacts> */
 final class MessengerSourceIndex extends AbstractSourceFactsIndex
 {
-    private bool $indexed = false;
-
     /** @var array<string, array<string, list<MessengerSourceSymbol>>> */
     private array $symbols = [];
 
@@ -18,7 +16,7 @@ final class MessengerSourceIndex extends AbstractSourceFactsIndex
     /** @return list<MessengerSourceSymbol> */
     public function symbols(MessengerSymbolKind $kind, string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->symbols[$kind->name][$name] ?? [];
     }
@@ -26,7 +24,7 @@ final class MessengerSourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function ancestors(string $className): array
     {
-        $this->index();
+        $this->derived();
         $ancestors = [];
         $pending = $this->parents[ltrim($className, '\\')] ?? [];
         while ([] !== $pending) {
@@ -41,17 +39,8 @@ final class MessengerSourceIndex extends AbstractSourceFactsIndex
         return array_keys($ancestors);
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->symbols = [];
         $this->parents = [];
         foreach ($this->facts() as $source) {
@@ -62,6 +51,5 @@ final class MessengerSourceIndex extends AbstractSourceFactsIndex
                 $this->parents[$class] = $parents;
             }
         }
-        $this->indexed = true;
     }
 }

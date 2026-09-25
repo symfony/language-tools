@@ -7,8 +7,6 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<StimulusSourceFacts> */
 final class StimulusSourceIndex extends AbstractSourceFactsIndex
 {
-    private bool $indexed = false;
-
     /** @var list<StimulusControllerDeclaration> */
     private array $declarations = [];
 
@@ -21,7 +19,7 @@ final class StimulusSourceIndex extends AbstractSourceFactsIndex
     /** @return list<StimulusControllerDeclaration> */
     public function declarations(?string $name = null): array
     {
-        $this->index();
+        $this->derived();
 
         return null === $name ? $this->declarations : $this->declarationsByName[$name] ?? [];
     }
@@ -29,22 +27,13 @@ final class StimulusSourceIndex extends AbstractSourceFactsIndex
     /** @return list<StimulusReference> */
     public function references(string $controller, ?StimulusMemberKind $kind = null, ?string $member = null): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->references[$controller][$this->referenceKey($kind, $member)] ?? [];
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->declarations = [];
         $this->declarationsByName = [];
         $this->references = [];
@@ -57,7 +46,6 @@ final class StimulusSourceIndex extends AbstractSourceFactsIndex
                 $this->references[$reference->controller][$this->referenceKey($reference->kind, $reference->member)][] = $reference;
             }
         }
-        $this->indexed = true;
     }
 
     private function referenceKey(?StimulusMemberKind $kind, ?string $member): string

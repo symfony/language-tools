@@ -8,8 +8,6 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<RouteSourceFacts> */
 final class RouteSourceIndex extends AbstractSourceFactsIndex
 {
-    private bool $indexed = false;
-
     /** @var array<string, list<RouteDeclaration>> */
     private array $declarationsByName = [];
 
@@ -23,7 +21,7 @@ final class RouteSourceIndex extends AbstractSourceFactsIndex
     /** @return list<RouteDeclaration> */
     public function declarations(string $name): array
     {
-        $this->indexDeclarations();
+        $this->derived();
 
         return $this->declarationsByName[$name] ?? [];
     }
@@ -51,24 +49,14 @@ final class RouteSourceIndex extends AbstractSourceFactsIndex
         return null === $facts ? [] : array_values(array_filter($facts->references, $this->isSupported(...)));
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function indexDeclarations(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->declarationsByName = [];
         foreach ($this->facts() as $facts) {
             foreach ($facts->declarations as $declaration) {
                 $this->declarationsByName[$declaration->name][] = $declaration;
             }
         }
-        $this->indexed = true;
     }
 
     private function isSupported(RouteReference $reference): bool

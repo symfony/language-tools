@@ -7,8 +7,6 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<DependencyInjectionSourceFacts> */
 final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
 {
-    private bool $indexed = false;
-
     /** @var array<string, list<ServiceDeclaration>> */
     private array $serviceDeclarations = [];
 
@@ -36,7 +34,7 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
     /** @return list<ServiceDeclaration> */
     public function serviceDeclarations(string $id): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->serviceDeclarations[$id] ?? [];
     }
@@ -44,7 +42,7 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
     /** @return list<ParameterDeclaration> */
     public function parameterDeclarations(string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->parameterDeclarations[$name] ?? [];
     }
@@ -52,7 +50,7 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
     /** @return list<DependencyInjectionReference> */
     public function references(DependencyInjectionSymbolKind $kind, string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->references[$kind->value][$name] ?? [];
     }
@@ -60,13 +58,14 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
     /** @return list<PhpClassDeclaration> */
     public function classDeclarations(string $className): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->classDeclarations[strtolower(ltrim($className, '\\'))] ?? [];
     }
 
     public function isSubclassOf(string $className, string $parentClassName): bool
     {
+        $this->derived();
         $className = ltrim($className, '\\');
         $parentClassName = ltrim($parentClassName, '\\');
         $parentKey = strtolower($parentClassName);
@@ -106,7 +105,7 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function serviceIds(): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->serviceIds;
     }
@@ -114,7 +113,7 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function parameterNames(): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->parameterNames;
     }
@@ -122,23 +121,14 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
     /** @return list<ServiceDeclaration> */
     public function decoratorsOf(string $id): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->decorators[$id] ?? [];
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
         $this->subclasses = [];
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->serviceDeclarations = [];
         $this->parameterDeclarations = [];
         $this->references = [];
@@ -166,6 +156,5 @@ final class DependencyInjectionSourceIndex extends AbstractSourceFactsIndex
         sort($this->serviceIds);
         $this->parameterNames = array_keys($this->parameterDeclarations);
         sort($this->parameterNames);
-        $this->indexed = true;
     }
 }

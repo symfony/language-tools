@@ -58,6 +58,28 @@ final class SourceFactsLifecycleTest extends TestCase
         self::assertSame(1, $index->builds());
     }
 
+    public function testReportsWhetherSourcesWereScanned(): void
+    {
+        $index = new CountingSourceFactsIndex();
+
+        self::assertFalse($index->hasScannedSources());
+
+        $index->overlay(new LifecycleSourceFacts('file:///source.php', 'overlay'));
+        self::assertFalse($index->hasScannedSources());
+
+        $index->replace();
+        self::assertTrue($index->hasScannedSources());
+    }
+
+    public function testAnAccessorReenteredFromTheBuildDoesNotRebuild(): void
+    {
+        $index = new ReentrantSourceFactsIndex();
+        $index->replace(new LifecycleSourceFacts('file:///source.php', 'saved'));
+
+        self::assertSame(['saved'], $index->values());
+        self::assertSame(1, $index->builds());
+    }
+
     public function testExposesEffectiveFactsByUri(): void
     {
         $index = new CountingSourceFactsIndex();
@@ -162,17 +184,14 @@ final class SourceFactsLifecycleTest extends TestCase
 /** @extends AbstractSourceFactsIndex<LifecycleSourceFacts> */
 final class CountingSourceFactsIndex extends AbstractSourceFactsIndex
 {
-    /** @var list<string>|null */
-    private ?array $values = null;
+    /** @var list<string> */
+    private array $values = [];
     private int $builds = 0;
 
     /** @return list<string> */
     public function values(): array
     {
-        if (null === $this->values) {
-            ++$this->builds;
-            $this->values = array_map(static fn (LifecycleSourceFacts $facts): string => $facts->declaration, $this->facts());
-        }
+        $this->derived();
 
         return $this->values;
     }
@@ -188,9 +207,38 @@ final class CountingSourceFactsIndex extends AbstractSourceFactsIndex
         return $this->builds;
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->values = null;
+        ++$this->builds;
+        $this->values = array_map(static fn (LifecycleSourceFacts $facts): string => $facts->declaration, $this->facts());
+    }
+}
+
+/** @extends AbstractSourceFactsIndex<LifecycleSourceFacts> */
+final class ReentrantSourceFactsIndex extends AbstractSourceFactsIndex
+{
+    /** @var list<string> */
+    private array $values = [];
+    private int $builds = 0;
+
+    /** @return list<string> */
+    public function values(): array
+    {
+        $this->derived();
+
+        return $this->values;
+    }
+
+    public function builds(): int
+    {
+        return $this->builds;
+    }
+
+    protected function build(): void
+    {
+        ++$this->builds;
+        $this->values = array_map(static fn (LifecycleSourceFacts $facts): string => $facts->declaration, $this->facts());
+        $this->values();
     }
 }
 

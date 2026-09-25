@@ -9,7 +9,6 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
 {
     /** @var list<DoctrineEntity> */
     private array $runtime = [];
-    private bool $indexed = false;
 
     /** @var array<string, DoctrineEntity> */
     private array $entitiesByClass = [];
@@ -29,12 +28,12 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     public function replaceRuntime(DoctrineEntity ...$entities): void
     {
         $this->runtime = array_values($entities);
-        $this->indexed = false;
+        $this->invalidate();
     }
 
     public function entity(string $className): ?DoctrineEntity
     {
-        $this->index();
+        $this->derived();
 
         return $this->entitiesByClass[$className] ?? null;
     }
@@ -42,21 +41,21 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     /** @return list<DoctrineEntity> */
     public function entities(): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->entities;
     }
 
     public function repository(string $className): ?DoctrineRepository
     {
-        $this->index();
+        $this->derived();
 
         return $this->repositoriesByClass[$className] ?? null;
     }
 
     public function entityForRepository(string $repositoryClass): ?DoctrineEntity
     {
-        $this->index();
+        $this->derived();
         $repository = $this->repositoriesByClass[$repositoryClass] ?? null;
 
         return null !== $repository ? $this->entitiesByClass[$repository->entityClass] ?? null : $this->entitiesByRepository[$repositoryClass] ?? null;
@@ -65,7 +64,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     /** @return list<DoctrineSourceSymbol> */
     public function relatedSymbols(DoctrineSourceSymbol $selected): array
     {
-        $this->index();
+        $this->derived();
         $symbols = $this->symbols[$selected->kind->value][$selected->name] ?? [];
         if (DoctrineSymbolKind::Field !== $selected->kind) {
             return $symbols;
@@ -76,26 +75,8 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
         return array_values(array_filter($symbols, fn (DoctrineSourceSymbol $symbol): bool => $selectedOwner === $this->entityClass($symbol->owner)));
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function entityClass(?string $owner): ?string
-    {
-        if (null === $owner) {
-            return null;
-        }
-
-        return null !== $this->entity($owner) ? $owner : $this->entityForRepository($owner)?->className;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $firstRuntimeEntities = [];
         $mergedEntities = [];
         foreach ($this->runtime as $entity) {
@@ -128,6 +109,14 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
                 $this->entitiesByRepository[$repositoryClass] ??= $entity;
             }
         }
-        $this->indexed = true;
+    }
+
+    private function entityClass(?string $owner): ?string
+    {
+        if (null === $owner) {
+            return null;
+        }
+
+        return null !== $this->entity($owner) ? $owner : $this->entityForRepository($owner)?->className;
     }
 }

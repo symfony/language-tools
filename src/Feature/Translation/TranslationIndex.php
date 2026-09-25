@@ -10,7 +10,6 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @var list<TranslationMessage> */
     private array $runtime = [];
     private bool $complete = false;
-    private bool $indexed = false;
 
     /** @var array<string, array<string, list<TranslationMessage>>> */
     private array $messages = [];
@@ -38,7 +37,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     {
         $this->runtime = array_values($messages);
         $this->complete = $complete;
-        $this->indexed = false;
+        $this->invalidate();
     }
 
     public function replaceSources(TranslationSourceFacts ...$sources): void
@@ -49,7 +48,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<TranslationMessage> */
     public function messages(string $domain, string $key): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->messages[$domain][$key] ?? [];
     }
@@ -57,7 +56,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<TranslationDeclaration> */
     public function declarations(string $domain, string $key): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->declarations[$domain][$key] ?? [];
     }
@@ -65,7 +64,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<TranslationReference> */
     public function references(string $domain, string $key): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->references[$domain][$key] ?? [];
     }
@@ -73,7 +72,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function keys(string $domain, string $prefix): array
     {
-        $this->index();
+        $this->derived();
 
         return array_values(array_filter(
             $this->keys[$domain] ?? [],
@@ -84,7 +83,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function domains(): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->domains;
     }
@@ -92,7 +91,7 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function locales(): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->locales;
     }
@@ -105,22 +104,13 @@ final class TranslationIndex extends AbstractSourceFactsIndex
     /** @return list<string>|null */
     public function globalParameters(): ?array
     {
-        $this->index();
+        $this->derived();
 
         return $this->dynamicGlobalParameters ? null : $this->globalParameters;
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->messages = [];
         $this->declarations = [];
         $this->references = [];
@@ -167,6 +157,5 @@ final class TranslationIndex extends AbstractSourceFactsIndex
         $this->globalParameters = array_keys($globalParameters);
         sort($this->globalParameters);
         $this->dynamicGlobalParameters = $dynamicGlobalParameters;
-        $this->indexed = true;
     }
 }

@@ -7,8 +7,6 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<SecuritySourceFacts> */
 final class SecuritySourceIndex extends AbstractSourceFactsIndex
 {
-    private bool $indexed = false;
-
     /** @var array<string, array<string, list<SecuritySourceSymbol>>> */
     private array $symbols = [];
 
@@ -21,7 +19,7 @@ final class SecuritySourceIndex extends AbstractSourceFactsIndex
     /** @return list<SecuritySourceSymbol> */
     public function symbols(SecuritySymbolKind $kind, string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->symbols[$kind->value][$name] ?? [];
     }
@@ -29,7 +27,7 @@ final class SecuritySourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function declarationNames(SecuritySymbolKind $kind): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->declarationNames[$kind->value] ?? [];
     }
@@ -37,22 +35,13 @@ final class SecuritySourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function names(SecuritySymbolKind $kind, bool $declarationsOnly = false): array
     {
-        $this->index();
+        $this->derived();
 
         return $declarationsOnly ? $this->declarationNames[$kind->value] ?? [] : $this->names[$kind->value] ?? [];
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->symbols = [];
         $names = [];
         $declarationNames = [];
@@ -78,6 +67,5 @@ final class SecuritySourceIndex extends AbstractSourceFactsIndex
             $this->declarationNames[$kind] = array_keys($kindNames);
             sort($this->declarationNames[$kind]);
         }
-        $this->indexed = true;
     }
 }

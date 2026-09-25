@@ -10,7 +10,6 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
     /** @var array<string, string> */
     private array $processors = [];
     private bool $processorsComplete = false;
-    private bool $indexed = false;
 
     /** @var list<string> */
     private array $names = [];
@@ -48,7 +47,7 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function names(): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->names;
     }
@@ -56,7 +55,7 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
     /** @return list<EnvironmentDeclaration> */
     public function declarations(string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->declarations[$name] ?? [];
     }
@@ -64,22 +63,13 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
     /** @return list<EnvironmentReference> */
     public function references(string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->references[$name] ?? [];
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->declarations = [];
         $this->references = [];
         foreach ($this->facts() as $facts) {
@@ -93,6 +83,5 @@ final class EnvironmentIndex extends AbstractSourceFactsIndex
 
         $this->names = array_keys($this->declarations);
         sort($this->names);
-        $this->indexed = true;
     }
 }

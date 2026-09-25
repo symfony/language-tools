@@ -8,8 +8,6 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<TwigPhpSymbolSourceFacts> */
 final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
 {
-    private bool $indexed = false;
-
     /** @var array<string, list<TwigPhpSymbolDeclaration>> */
     private array $types = [];
 
@@ -31,7 +29,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<TwigPhpSymbolDeclaration> */
     public function typeDeclarations(string $className): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->types[$this->classKey($className)] ?? [];
     }
@@ -39,7 +37,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<TwigPhpSymbolDeclaration> */
     public function memberDeclarations(string $className, string $memberName): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->members[$this->classKey($className)][$memberName] ?? [];
     }
@@ -47,7 +45,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<TwigPhpSymbolReference> */
     public function references(string $className, ?string $memberName): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->references[$this->referenceKey($className, $memberName)] ?? [];
     }
@@ -55,7 +53,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function enumNames(): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->enumNames;
     }
@@ -63,7 +61,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function constantTypeNames(): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->constantTypeNames;
     }
@@ -71,7 +69,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
     /** @return list<TwigPhpSymbolDeclaration> */
     public function completableMembers(string $className, bool $enumCasesOnly): array
     {
-        $this->index();
+        $this->derived();
         $members = [];
         foreach ($this->members[$this->classKey($className)] ?? [] as $name => $declarations) {
             foreach ($declarations as $declaration) {
@@ -89,7 +87,7 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
 
     public function declarationAt(string $uri, Position $position): ?TwigPhpSymbolDeclaration
     {
-        $this->index();
+        $this->derived();
         foreach ($this->declarationsByUri[$uri] ?? [] as $declaration) {
             $start = $declaration->range->start;
             $end = $declaration->range->end;
@@ -102,17 +100,8 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
         return null;
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->types = [];
         $this->members = [];
         $this->references = [];
@@ -169,7 +158,6 @@ final class TwigPhpSymbolIndex extends AbstractSourceFactsIndex
             usort($references, static fn (TwigPhpSymbolReference $left, TwigPhpSymbolReference $right): int => [$left->uri, $left->range->start->line, $left->range->start->character] <=> [$right->uri, $right->range->start->line, $right->range->start->character]);
         }
         unset($references);
-        $this->indexed = true;
     }
 
     private function classKey(string $className): string

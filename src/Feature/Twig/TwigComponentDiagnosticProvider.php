@@ -29,7 +29,7 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        if (!$index->isComplete() || !$index->isRuntimeComplete() || !$index->isRuntimeEnabled()) {
+        if (!$index->hasScannedSources() || !$index->isRuntimeComplete() || !$index->isRuntimeEnabled()) {
             return [];
         }
         if (!$this->templates->forProject($request->project)->isComplete()) {

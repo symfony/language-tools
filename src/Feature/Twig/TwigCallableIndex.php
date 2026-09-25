@@ -8,8 +8,6 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<TwigCallableSourceFacts> */
 final class TwigCallableIndex extends AbstractSourceFactsIndex
 {
-    private bool $indexed = false;
-
     /** @var array<string, list<string>> */
     private array $names = [];
 
@@ -31,7 +29,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function names(TwigCallableKind $kind): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->names[$kind->value] ?? [];
     }
@@ -39,7 +37,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
     /** @return list<TwigCallableUsage> */
     public function usages(TwigCallableKind $kind, string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->usages[$kind->value][$name] ?? [];
     }
@@ -47,7 +45,7 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
     /** @return list<TwigCallableDeclaration> */
     public function declarations(TwigCallableKind $kind, string $name): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->declarations[$kind->value][$name] ?? [];
     }
@@ -55,28 +53,28 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
     /** @return list<TwigCallableDeclaration> */
     public function declarationsForCallable(string $className, string $method): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->declarationsByCallable[TwigCallableKey::from($className, $method)] ?? [];
     }
 
     public function hasCallableDeclarations(): bool
     {
-        $this->index();
+        $this->derived();
 
         return [] !== $this->declarationsByCallable;
     }
 
     public function method(string $className, string $method): ?TwigCallableSourceMethod
     {
-        $this->index();
+        $this->derived();
 
         return $this->methods[TwigCallableKey::from($className, $method)] ?? null;
     }
 
     public function declarationAt(string $uri, Position $position): ?TwigCallableDeclaration
     {
-        $this->index();
+        $this->derived();
 
         foreach ($this->declarationsByUri[$uri] ?? [] as $declaration) {
             $start = $declaration->range->start;
@@ -93,17 +91,8 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
         return null;
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $names = [];
         $this->usages = [];
         $this->declarations = [];
@@ -157,6 +146,5 @@ final class TwigCallableIndex extends AbstractSourceFactsIndex
             unset($usages);
         }
         unset($kindUsages);
-        $this->indexed = true;
     }
 }

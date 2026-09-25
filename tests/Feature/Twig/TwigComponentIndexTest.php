@@ -27,7 +27,7 @@ final class TwigComponentIndexTest extends TestCase
         self::assertSame([$firstActionReference], $index->actionReferences('First', 'save'));
         self::assertSame([$firstEvent], $index->events('first:changed'));
         self::assertSame(['first:changed'], $index->eventNames());
-        self::assertTrue($index->isComplete());
+        self::assertTrue($index->hasScannedSources());
 
         [$secondFacts, $secondComponent, $secondReference, $secondActionReference, $secondEvent] = $this->facts('Second');
         $index->replaceSource($secondFacts);

@@ -9,14 +9,12 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
 {
     private const COMMAND = 'Symfony\\Component\\Console\\Command\\Command';
 
-    private bool $indexed = false;
-
     /** @var array<string, list<ConsoleCommandDeclaration>> */
     private array $declarations = [];
 
     public function definition(string $className): ConsoleEffectiveDefinition
     {
-        $this->index();
+        $this->derived();
 
         return $this->resolve(ltrim($className, '\\'), []);
     }
@@ -24,29 +22,19 @@ final class ConsoleSourceIndex extends AbstractSourceFactsIndex
     /** @return list<ConsoleCommandDeclaration> */
     public function declarations(string $className): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->declarations[strtolower(ltrim($className, '\\'))] ?? [];
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->declarations = [];
         foreach ($this->facts() as $facts) {
             foreach ($facts->declarations as $declaration) {
                 $this->declarations[strtolower(ltrim($declaration->className, '\\'))][] = $declaration;
             }
         }
-        $this->indexed = true;
     }
 
     /** @param array<string, true> $visited */

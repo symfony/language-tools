@@ -7,8 +7,6 @@ use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 /** @extends AbstractSourceFactsIndex<MetadataSourceFacts> */
 final class MetadataSourceIndex extends AbstractSourceFactsIndex
 {
-    private bool $indexed = false;
-
     /** @var array<string, list<MetadataSourceSymbol>> */
     private array $symbols = [];
 
@@ -24,7 +22,7 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
     /** @return list<MetadataSourceSymbol> */
     public function symbols(MetadataSymbolKind $kind, ?string $name = null): array
     {
-        $this->index();
+        $this->derived();
 
         return null === $name ? $this->symbols[$kind->value] ?? [] : $this->symbolsByName[$kind->value][$name] ?? [];
     }
@@ -32,29 +30,20 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
     /** @return list<string> */
     public function names(MetadataSymbolKind $kind): array
     {
-        $this->index();
+        $this->derived();
 
         return $this->names[$kind->value] ?? [];
     }
 
     public function formDataClass(string $formClass): ?string
     {
-        $this->index();
+        $this->derived();
 
         return $this->formDataClasses[strtolower(ltrim($formClass, '\\'))] ?? null;
     }
 
-    protected function factsChanged(): void
+    protected function build(): void
     {
-        $this->indexed = false;
-    }
-
-    private function index(): void
-    {
-        if ($this->indexed) {
-            return;
-        }
-
         $this->symbols = [];
         $this->symbolsByName = [];
         $this->formDataClasses = [];
@@ -77,6 +66,5 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
             $this->names[$kind] = array_values($kindNames);
             sort($this->names[$kind]);
         }
-        $this->indexed = true;
     }
 }

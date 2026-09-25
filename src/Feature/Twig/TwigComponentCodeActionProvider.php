@@ -31,7 +31,7 @@ final class TwigComponentCodeActionProvider implements CodeActionProviderInterfa
             return null;
         }
         $index = $this->indexes->forProject($request->project);
-        if (!$index->isComplete() || !$index->isRuntimeComplete() || !$index->isRuntimeEnabled()
+        if (!$index->hasScannedSources() || !$index->isRuntimeComplete() || !$index->isRuntimeEnabled()
             || !$this->templates->forProject($request->project)->isComplete()
         ) {
             return [];
