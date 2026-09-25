@@ -75,7 +75,7 @@ final class CheckDiagnosticExecutor
                         $openDocuments[$file->uri] = true;
                     }
                     try {
-                        $collection = $this->diagnostics->collectDetailed(
+                        $collection = $this->diagnostics->collect(
                             ['textDocument' => ['uri' => $file->uri]],
                             $file->excluded,
                             $this->profiler->enabled(),

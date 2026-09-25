@@ -19,9 +19,9 @@ final class PartialParseDiagnosticFilter
     }
 
     /**
-     * @param list<array<array-key, mixed>> $diagnostics
+     * @param list<CollectedDiagnostic> $diagnostics
      *
-     * @return list<array<array-key, mixed>>
+     * @return list<CollectedDiagnostic>
      */
     public function filter(Document $document, array $diagnostics): array
     {
@@ -29,8 +29,8 @@ final class PartialParseDiagnosticFilter
             return $diagnostics;
         }
 
-        return array_values(array_filter($diagnostics, static function (array $diagnostic): bool {
-            $code = $diagnostic['code'] ?? null;
+        return array_values(array_filter($diagnostics, static function (CollectedDiagnostic $diagnostic): bool {
+            $code = $diagnostic->diagnostic['code'] ?? null;
 
             return !\is_string($code) || !isset(self::FILTERED_CODES[$code]);
         }));

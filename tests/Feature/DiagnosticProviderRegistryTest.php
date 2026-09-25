@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature;
 
+use Amp\ByteStream\WritableBuffer;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
@@ -29,20 +30,23 @@ use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
+use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\RecordingClient;
 
 final class DiagnosticProviderRegistryTest extends TestCase
 {
+    private ?WritableBuffer $log = null;
+
     public function testCollectsAndPublishesProviderDiagnosticsForProjectDocuments(): void
     {
         [$registry, $client, $collector] = $this->registry('file:///workspace/templates/page.html.twig');
         $params = ['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']];
 
-        $collected = $collector->collect($params);
+        $collected = $this->diagnostics($collector, $params);
         $registry->publish($params);
 
-        self::assertIsArray($collected);
         self::assertSame(['stub'], array_column($collected, 'code'));
         self::assertCount(1, $client->notifications);
         $diagnostics = $client->notifications[0]['params']['diagnostics'];
@@ -75,7 +79,26 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
     }
 
-    public function testDetailedCollectionKeepsSuccessfulProvidersAroundFailures(): void
+    public function testPublishesSuccessfulProvidersAroundFailuresAndLogsTheFailures(): void
+    {
+        $this->log = $log = new WritableBuffer();
+        [$registry, $client] = $this->registryWithProviders(
+            'file:///workspace/templates/page.html.twig',
+            new StubDiagnosticProvider([$this->diagnostic('first')], 'first-provider'),
+            new ThrowingDiagnosticProvider(),
+            new StubDiagnosticProvider([$this->diagnostic('third')], 'third-provider'),
+        );
+
+        $registry->publish(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+        $log->close();
+
+        $diagnostics = $client->notifications[0]['params']['diagnostics'] ?? null;
+        self::assertIsArray($diagnostics);
+        self::assertSame(['first', 'third'], array_column($diagnostics, 'code'));
+        self::assertStringContainsString('The "broken-provider" diagnostic provider failed: Provider failed.', $log->buffer());
+    }
+
+    public function testCollectionKeepsSuccessfulProvidersAroundFailures(): void
     {
         [, , $collector] = $this->registryWithProviders(
             'file:///workspace/templates/page.html.twig',
@@ -85,7 +108,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
             new StubDiagnosticProvider([$this->diagnostic('third')], 'third-provider'),
         );
 
-        $collection = $collector->collectDetailed(
+        $collection = $collector->collect(
             ['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']],
             measureProviders: true,
         );
@@ -102,7 +125,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertSame('A diagnostic provider returned a non-array diagnostic.', $collection->failures[1]->error->getMessage());
     }
 
-    public function testSuppressesDiagnosticsInSimpleAndDetailedCollection(): void
+    public function testSuppressesDiagnosticsInPublishedAndCollectedDiagnostics(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
         $source = "<?php\n// @symfony-lsp-ignore template.not_found\nrender('missing');\n";
@@ -116,7 +139,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
         $params = ['textDocument' => ['uri' => $uri]];
 
         $registry->publish($params);
-        $detailed = $collector->collectDetailed($params);
+        $detailed = $collector->collect($params);
 
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
         self::assertInstanceOf(DetailedDiagnosticCollection::class, $detailed);
@@ -152,7 +175,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
         $registry->publish($params);
 
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
-        self::assertSame(['stub'], array_column($collector->collect($params, true) ?? [], 'code'));
+        self::assertSame(['stub'], array_column($this->diagnostics($collector, $params, true), 'code'));
     }
 
     public function testSuppressesGitignoredDocumentsEvenWhenExcludedPathsAreIncluded(): void
@@ -174,9 +197,9 @@ final class DiagnosticProviderRegistryTest extends TestCase
             );
             $params = ['textDocument' => ['uri' => $uri]];
 
-            self::assertSame([], $collector->collect($params));
-            self::assertSame([], $collector->collect($params, true));
-            $detailed = $collector->collectDetailed($params);
+            self::assertSame([], $this->diagnostics($collector, $params));
+            self::assertSame([], $this->diagnostics($collector, $params, true));
+            $detailed = $collector->collect($params);
             self::assertInstanceOf(DetailedDiagnosticCollection::class, $detailed);
             self::assertSame([], $detailed->diagnostics);
         } finally {
@@ -287,7 +310,18 @@ final class DiagnosticProviderRegistryTest extends TestCase
             $documents,
             $projects,
             $collector,
+            new ServerLogger($this->log, new SensitiveDataRedactor()),
         ), $client, $collector];
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    private function diagnostics(DiagnosticCollector $collector, array $params, bool $includeExcluded = false): array
+    {
+        return array_map(static fn ($diagnostic): array => $diagnostic->diagnostic, $collector->collect($params, $includeExcluded)->diagnostics ?? []);
     }
 
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, severity: int, source: string, code: string, message: string} */

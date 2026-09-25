@@ -8,6 +8,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshObserverInterface;
+use Symfony\Lsp\Server\ServerLogger;
 
 final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterface, ProjectStateInterface
 {
@@ -16,6 +17,7 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
         private readonly DiagnosticCollector $collector,
+        private readonly ServerLogger $logger,
     ) {
     }
 
@@ -30,14 +32,17 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
         }
 
         $document = $this->documents->get($textDocument['uri']);
-        if (null === $document || null === $diagnostics = $this->collector->collect($params)) {
+        if (null === $document || null === $collection = $this->collector->collect($params)) {
             return;
+        }
+        foreach ($collection->failures as $failure) {
+            $this->logger->error($failure->error, \sprintf('The "%s" diagnostic provider failed', $failure->provider));
         }
 
         $this->client->notify('textDocument/publishDiagnostics', [
             'uri' => $document->uri,
             'version' => $document->version,
-            'diagnostics' => $diagnostics,
+            'diagnostics' => array_map(static fn (CollectedDiagnostic $diagnostic): array => $diagnostic->diagnostic, $collection->diagnostics),
         ]);
     }
 

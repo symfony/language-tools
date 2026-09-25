@@ -25,46 +25,8 @@ final class DiagnosticCollector
 
     /**
      * @param array<array-key, mixed> $params
-     *
-     * @return list<array<array-key, mixed>>|null
      */
-    public function collect(array $params, bool $includeExcluded = false): ?array
-    {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return null;
-        }
-
-        $document = $this->documents->get($textDocument['uri']);
-        if (null === $document) {
-            return null;
-        }
-        if ($this->isExcluded($document->uri, $includeExcluded)) {
-            return [];
-        }
-
-        $diagnostics = [];
-        $matched = false;
-        foreach ($this->providers as $provider) {
-            $providedDiagnostics = $provider->diagnostics($params);
-            if (null === $providedDiagnostics) {
-                continue;
-            }
-
-            $matched = true;
-            array_push($diagnostics, ...$providedDiagnostics);
-        }
-
-        $diagnostics = $this->partialParseFilter->filter($document, $diagnostics);
-        $diagnostics = $this->suppressor->suppress($document, $diagnostics);
-
-        return $matched || [] !== $diagnostics ? $diagnostics : null;
-    }
-
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    public function collectDetailed(array $params, bool $includeExcluded = false, bool $measureProviders = false): ?DetailedDiagnosticCollection
+    public function collect(array $params, bool $includeExcluded = false, bool $measureProviders = false): ?DetailedDiagnosticCollection
     {
         $textDocument = $params['textDocument'] ?? null;
         if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
@@ -82,6 +44,7 @@ final class DiagnosticCollector
         $diagnostics = [];
         $failures = [];
         $providerNanoseconds = [];
+        $matched = false;
         foreach ($this->providers as $provider) {
             $providerName = $measureProviders ? $provider->name() : null;
             $providerStartedAt = $measureProviders ? (float) hrtime(true) : null;
@@ -109,6 +72,7 @@ final class DiagnosticCollector
                     continue;
                 }
 
+                $matched = true;
                 array_push($diagnostics, ...$provided);
             } finally {
                 if (null !== $providerStartedAt && null !== $providerName) {
@@ -117,8 +81,10 @@ final class DiagnosticCollector
             }
         }
 
-        // Headless checks never track parse health, so partial-parse filtering does not apply here
-        $diagnostics = $this->suppressor->suppressCollected($document, $diagnostics);
+        $diagnostics = $this->suppressor->suppress($document, $this->partialParseFilter->filter($document, $diagnostics));
+        if (!$matched && [] === $diagnostics && [] === $failures) {
+            return null;
+        }
 
         return new DetailedDiagnosticCollection($diagnostics, $failures, $providerNanoseconds);
     }

@@ -48,6 +48,8 @@ use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Server\SensitiveDataRedactor;
+use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\RecordingClient;
 
@@ -402,7 +404,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
                 new TemplateIndexRegistry($classIndexes),
             )],
         );
-        $publisher = new DiagnosticProviderRegistry($client, $documents, $projects, $collector);
+        $publisher = new DiagnosticProviderRegistry($client, $documents, $projects, $collector, new ServerLogger(null, new SensitiveDataRedactor()));
 
         $publisher->publish(['textDocument' => ['uri' => $uri]]);
 
@@ -572,7 +574,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         );
 
         return [
-            new DiagnosticProviderRegistry($client, $documents, $projects, $collector),
+            new DiagnosticProviderRegistry($client, $documents, $projects, $collector, new ServerLogger(null, new SensitiveDataRedactor())),
             $client,
             $project,
             $routeIndexes,

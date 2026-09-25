@@ -24,7 +24,7 @@ final class DiagnosticSuppressorTest extends TestCase
     #[DataProvider('nativeCommentProvider')]
     public function testSuppressesDiagnosticsWithNativeComments(string $languageId, string $source, int $line): void
     {
-        $diagnostics = $this->suppressor()->suppress(
+        $diagnostics = $this->suppress(
             new Document('file:///workspace/source', $languageId, 1, $source),
             [$this->diagnostic('template.not_found', $line)],
         );
@@ -65,7 +65,7 @@ final class DiagnosticSuppressorTest extends TestCase
     #[DataProvider('nonCommentProvider')]
     public function testDoesNotRecognizeDirectivesOutsideComments(string $languageId, string $source, int $line): void
     {
-        $diagnostics = $this->suppressor()->suppress(
+        $diagnostics = $this->suppress(
             new Document('file:///workspace/source', $languageId, 1, $source),
             [$diagnostic = $this->diagnostic('template.not_found', $line)],
         );
@@ -110,7 +110,7 @@ final class DiagnosticSuppressorTest extends TestCase
 
         self::assertSame(
             [$diagnostic],
-            $this->suppressor()->suppress(new Document('file:///workspace/source.php', 'php', 1, $source), [$diagnostic]),
+            $this->suppress(new Document('file:///workspace/source.php', 'php', 1, $source), [$diagnostic]),
         );
     }
 
@@ -120,7 +120,7 @@ final class DiagnosticSuppressorTest extends TestCase
 
         self::assertSame(
             [],
-            $this->suppressor()->suppress(
+            $this->suppress(
                 new Document('file:///workspace/source.yaml', 'yaml', 1, $source),
                 [$this->diagnostic('template.not_found', 2)],
             ),
@@ -135,7 +135,7 @@ final class DiagnosticSuppressorTest extends TestCase
 
         self::assertSame(
             [$diagnostic],
-            $this->suppressor()->suppress(new Document('file:///workspace/source.yaml', 'yaml', 1, $source), [$diagnostic]),
+            $this->suppress(new Document('file:///workspace/source.yaml', 'yaml', 1, $source), [$diagnostic]),
         );
     }
 
@@ -154,11 +154,11 @@ final class DiagnosticSuppressorTest extends TestCase
             $second = $this->diagnostic('template.not_found', 2, 9),
         ];
 
-        self::assertSame([$second], $this->suppressor()->suppress(new Document('file:///workspace/source.php', 'php', 1, $source), $diagnostics));
+        self::assertSame([$second], $this->suppress(new Document('file:///workspace/source.php', 'php', 1, $source), $diagnostics));
 
         $source = "<?php\n// @symfony-lsp-ignore template.not_found, template.not_found\nfirst(); second();\n";
 
-        self::assertSame([], $this->suppressor()->suppress(new Document('file:///workspace/source.php', 'php', 1, $source), $diagnostics));
+        self::assertSame([], $this->suppress(new Document('file:///workspace/source.php', 'php', 1, $source), $diagnostics));
     }
 
     public function testReportsMalformedAndUnknownSuppressions(): void
@@ -170,7 +170,7 @@ final class DiagnosticSuppressorTest extends TestCase
             render('missing');
             PHP;
 
-        $diagnostics = $this->suppressor()->suppress(
+        $diagnostics = $this->suppress(
             new Document('file:///workspace/source.php', 'php', 1, $source),
             [$this->diagnostic('template.not_found', 3)],
         );
@@ -190,7 +190,7 @@ final class DiagnosticSuppressorTest extends TestCase
     {
         $source = "<?php\n// @symfony-lsp-ignore template.not_found, missing.code\nrender('missing');\n";
 
-        $diagnostics = $this->suppressor()->suppress(
+        $diagnostics = $this->suppress(
             new Document('file:///workspace/source.php', 'php', 1, $source),
             [$this->diagnostic('template.not_found', 2)],
         );
@@ -201,12 +201,25 @@ final class DiagnosticSuppressorTest extends TestCase
     public function testSuppressesDetailedDiagnostics(): void
     {
         $source = "<?php\n// @symfony-lsp-ignore template.not_found\nrender('missing');\n";
-        $diagnostics = $this->suppressor()->suppressCollected(
+        $diagnostics = $this->suppressor()->suppress(
             new Document('file:///workspace/source.php', 'php', 1, $source),
             [new CollectedDiagnostic('template', $this->diagnostic('template.not_found', 2))],
         );
 
         self::assertSame([], $diagnostics);
+    }
+
+    /**
+     * @param list<array<array-key, mixed>> $diagnostics
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    private function suppress(Document $document, array $diagnostics): array
+    {
+        return array_map(
+            static fn (CollectedDiagnostic $diagnostic): array => $diagnostic->diagnostic,
+            $this->suppressor()->suppress($document, array_map(static fn (array $diagnostic): CollectedDiagnostic => new CollectedDiagnostic('test', $diagnostic), $diagnostics)),
+        );
     }
 
     private function suppressor(): DiagnosticSuppressor

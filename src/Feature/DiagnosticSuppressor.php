@@ -23,30 +23,11 @@ final class DiagnosticSuppressor
     }
 
     /**
-     * @param list<array<array-key, mixed>> $diagnostics
-     *
-     * @return list<array<array-key, mixed>>
-     */
-    public function suppress(Document $document, array $diagnostics): array
-    {
-        [$suppressed, $warnings] = $this->resolve($document, $diagnostics);
-        $active = [];
-        foreach ($diagnostics as $index => $diagnostic) {
-            if (!isset($suppressed[$index])) {
-                $active[] = $diagnostic;
-            }
-        }
-        array_push($active, ...$warnings);
-
-        return $active;
-    }
-
-    /**
      * @param list<CollectedDiagnostic> $diagnostics
      *
      * @return list<CollectedDiagnostic>
      */
-    public function suppressCollected(Document $document, array $diagnostics): array
+    public function suppress(Document $document, array $diagnostics): array
     {
         $protocolDiagnostics = [];
         foreach ($diagnostics as $diagnostic) {
