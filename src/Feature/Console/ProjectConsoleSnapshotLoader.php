@@ -31,20 +31,11 @@ final class ProjectConsoleSnapshotLoader implements RuntimeSnapshotLoaderInterfa
             $commands[] = new ConsoleCommandMetadata(
                 $item['class'],
                 $file,
-                $this->strings($item['arguments'] ?? []),
-                $this->strings($item['options'] ?? []),
+                RuntimeSnapshotValues::stringList($item['arguments'] ?? null),
+                RuntimeSnapshotValues::stringList($item['options'] ?? null),
                 true === ($item['complete'] ?? false),
             );
         }
         $this->indexes->forProject($project)->replace($commands, true === ($section['complete'] ?? false));
-    }
-
-    /** @return list<string> */
-    private function strings(mixed $values): array
-    {
-        $values = array_values(array_unique(RuntimeSnapshotValues::stringList($values)));
-        sort($values);
-
-        return $values;
     }
 }

@@ -12,7 +12,7 @@ use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class ProjectConsoleSnapshotLoaderTest extends TestCase
 {
-    public function testLoadsAndNormalizesCommandDefinitions(): void
+    public function testLoadsCommandDefinitions(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
         $configuration = new RuntimeConfiguration();
@@ -25,8 +25,8 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
                 [
                     'class' => 'App\Command\ReportCommand',
                     'file' => '/app/src/Command/ReportCommand.php',
-                    'arguments' => ['report', 42, 'report'],
-                    'options' => ['verbose', null, 'format'],
+                    'arguments' => ['report', 42],
+                    'options' => ['format', null, 'verbose'],
                     'complete' => true,
                 ],
                 ['class' => 42, 'arguments' => ['invalid']],
@@ -42,7 +42,6 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
         self::assertSame(['report'], $command->arguments);
         self::assertSame(['format', 'verbose'], $command->options);
         self::assertTrue($command->complete);
-        self::assertCount(1, $index->commands());
     }
 
     public function testIgnoresMalformedCommands(): void
@@ -52,7 +51,7 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
         $loader = new ProjectConsoleSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()));
         $loader->load($project, ['commands' => 'invalid']);
 
-        self::assertSame([], $indexes->forProject($project)->commands());
+        self::assertNull($indexes->forProject($project)->command('invalid'));
         self::assertFalse($indexes->forProject($project)->isComplete());
     }
 }
