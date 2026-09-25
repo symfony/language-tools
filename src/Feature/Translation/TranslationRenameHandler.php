@@ -2,7 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Translation;
 
-use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\RenameEditBuilder;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -14,6 +14,7 @@ final class TranslationRenameHandler implements RenameProviderInterface
         private readonly LspProtocolMapper $protocol,
         private readonly TranslationIndexRegistry $indexes,
         private readonly ProjectPathResolver $pathResolver,
+        private readonly RenameEditBuilder $editBuilder,
     ) {
     }
 
@@ -63,25 +64,20 @@ final class TranslationRenameHandler implements RenameProviderInterface
             return null;
         }
 
-        $byUri = [];
+        $locations = [];
         foreach ($index->references($reference->domain, $reference->key) as $item) {
             if ($this->pathResolver->isApplicationOwned($project, $item->uri)) {
-                $byUri[$item->uri][] = $this->edit($item->range, $newName);
+                $locations[] = [$item->uri, $item->range, $newName];
             }
         }
         foreach ($declarations as $item) {
             if ($this->pathResolver->isApplicationOwned($project, $item->uri)) {
-                $byUri[$item->uri][] = $this->edit($item->range, $declarationText);
+                $locations[] = [$item->uri, $item->range, $declarationText];
             }
-        }
-        ksort($byUri);
-        $changes = [];
-        foreach ($byUri as $uri => $edits) {
-            $changes[] = ['textDocument' => ['uri' => $uri, 'version' => null], 'edits' => $edits];
         }
 
         return [
-            'documentChanges' => $changes,
+            'documentChanges' => $this->editBuilder->documentChanges($locations, 'translationRename'),
             'changeAnnotations' => ['translationRename' => [
                 'label' => \sprintf('Rename translation "%s" to "%s"', $reference->key, $newName),
                 'needsConfirmation' => true,
@@ -113,11 +109,5 @@ final class TranslationRenameHandler implements RenameProviderInterface
         }
 
         return substr($newName, $newSeparator + 1);
-    }
-
-    /** @return array<array-key, mixed> */
-    private function edit(Range $range, string $newText): array
-    {
-        return ['range' => $this->protocol->range($range), 'newText' => $newText, 'annotationId' => 'translationRename'];
     }
 }

@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
+use Symfony\Lsp\Feature\RenameEditBuilder;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
@@ -18,6 +19,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
         private readonly DependencyInjectionProjectLookup $lookup,
         private readonly ProjectPathResolver $pathResolver,
+        private readonly RenameEditBuilder $editBuilder,
     ) {
     }
 
@@ -59,37 +61,19 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         $locations = [];
         foreach ($index->references($symbol->kind, $symbol->name) as $reference) {
             if ($this->pathResolver->isApplicationOwned($project, $reference->uri)) {
-                $locations[] = [$reference->uri, $reference->range];
+                $locations[] = [$reference->uri, $reference->range, $newName];
             }
         }
         foreach ($this->lookup->declarations($project, $symbol->kind, $symbol->name) as $declaration) {
             if ($this->pathResolver->isApplicationOwned($project, $declaration->uri)) {
-                $locations[] = [$declaration->uri, $declaration->range];
+                $locations[] = [$declaration->uri, $declaration->range, $newName];
             }
-        }
-
-        $editsByUri = [];
-        foreach ($locations as [$uri, $range]) {
-            $key = $uri.'\0'.$range->start->line.'\0'.$range->start->character;
-            $editsByUri[$uri][$key] = [
-                'range' => $this->protocol->range($range),
-                'newText' => $newName,
-                'annotationId' => 'dependencyInjectionRename',
-            ];
-        }
-        ksort($editsByUri);
-        $documentChanges = [];
-        foreach ($editsByUri as $uri => $edits) {
-            $documentChanges[] = [
-                'textDocument' => ['uri' => $uri, 'version' => null],
-                'edits' => array_values($edits),
-            ];
         }
 
         $kind = DependencyInjectionSymbolKind::Service === $symbol->kind ? 'service' : 'parameter';
 
         return [
-            'documentChanges' => $documentChanges,
+            'documentChanges' => $this->editBuilder->documentChanges($locations, 'dependencyInjectionRename'),
             'changeAnnotations' => [
                 'dependencyInjectionRename' => [
                     'label' => \sprintf('Rename %s "%s" to "%s"', $kind, $symbol->name, $newName),

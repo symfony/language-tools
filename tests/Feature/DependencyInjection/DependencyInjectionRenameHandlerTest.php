@@ -24,6 +24,7 @@ use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
+use Symfony\Lsp\Feature\RenameEditBuilder;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -75,6 +76,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
                 $sourceIndexes,
             ),
             ProjectPaths::resolver(),
+            new RenameEditBuilder(new LspProtocolMapper()),
         );
         $position = $converter->toPosition($yaml, strpos($yaml, 'app.mailer') + 1);
         $params = [
@@ -142,6 +144,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
                 $sourceIndexes,
             ),
             ProjectPaths::resolver(),
+            new RenameEditBuilder(new LspProtocolMapper()),
         );
         $position = $converter->toPosition($text, strpos($text, 'app.storage_dir') + 1);
 
@@ -198,6 +201,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
             $sourceIndexes,
             new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
             ProjectPaths::resolver(),
+            new RenameEditBuilder(new LspProtocolMapper()),
         );
         $servicePosition = $converter->toPosition($text, strpos($text, 'current.service') + 1);
         $parameterPosition = $converter->toPosition($text, strpos($text, 'current.parameter') + 1);

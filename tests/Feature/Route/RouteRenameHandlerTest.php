@@ -11,6 +11,7 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\RenameEditBuilder;
 use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
@@ -121,23 +122,7 @@ final class RouteRenameHandlerTest extends TestCase
         );
         $routes = new RouteIndexRegistry();
         $routes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
-        $positionConverter = new PositionConverter();
-        $handler = new RouteRenameHandler(
-            new DocumentContextResolver($documents, $projects),
-            new LspProtocolMapper(),
-            new RouteSymbolResolver(
-                $positionConverter,
-                RouteReferenceExtractorFactory::create($positionConverter),
-                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
-                new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
-                new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-                new UriToPathConverter(),
-                $classIndexes,
-            ),
-            $sourceIndexes,
-            $routes,
-            ProjectPaths::resolver(),
-        );
+        $handler = $this->createHandler($documents, $projects, $classIndexes, $sourceIndexes, $routes);
 
         $edit = $handler->rename([
             'textDocument' => ['uri' => $uri],
@@ -170,6 +155,55 @@ final class RouteRenameHandlerTest extends TestCase
 
         self::assertNull($handler->prepare($params));
         self::assertNull($handler->rename([...$params, 'newName' => 'article_display']));
+    }
+
+    public function testEmitsOneEditWhenADeclarationAndAReferenceShareARange(): void
+    {
+        $uri = 'file:///workspace/src/ConsumerController.php';
+        $text = <<<'PHP'
+            <?php
+            class ConsumerController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->generateUrl('article_show');
+                }
+            }
+            PHP;
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $classIndexes = new DependencyInjectionSourceIndexRegistry();
+        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
+        $range = new Range(new Position(5, 28), new Position(5, 40));
+        $sourceIndexes->forProject($project)->replace(new RouteSourceFacts(
+            $uri,
+            [new RouteDeclaration('article_show', $uri, $range)],
+            [new RouteReference('article_show', $uri, $range)],
+        ));
+        $routes = new RouteIndexRegistry();
+        $routes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
+        $handler = $this->createHandler($documents, $projects, $classIndexes, $sourceIndexes, $routes);
+
+        $edit = $handler->rename([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => 5, 'character' => 31],
+            'newName' => 'article_display',
+        ]);
+
+        self::assertIsArray($edit);
+        self::assertSame([[
+            'textDocument' => ['uri' => $uri, 'version' => null],
+            'edits' => [[
+                'range' => [
+                    'start' => ['line' => 5, 'character' => 28],
+                    'end' => ['line' => 5, 'character' => 40],
+                ],
+                'newText' => 'article_display',
+                'annotationId' => 'routeRename',
+            ]],
+        ]], $edit['documentChanges']);
     }
 
     /**
@@ -217,10 +251,26 @@ final class RouteRenameHandlerTest extends TestCase
             new Route('article_show', '/article/{id}', [], [], null, null),
             new Route('homepage', '/', [], [], null, null),
         );
+
+        return [$this->createHandler($documents, $projects, $classIndexes, $sourceIndexes, $routes), [
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => 5, 'character' => 31],
+        ]];
+    }
+
+    private function createHandler(
+        DocumentStore $documents,
+        ProjectRegistry $projects,
+        DependencyInjectionSourceIndexRegistry $classIndexes,
+        RouteSourceIndexRegistry $sourceIndexes,
+        RouteIndexRegistry $routes,
+    ): RouteRenameHandler {
         $positionConverter = new PositionConverter();
-        $handler = new RouteRenameHandler(
+        $protocol = new LspProtocolMapper();
+
+        return new RouteRenameHandler(
             new DocumentContextResolver($documents, $projects),
-            new LspProtocolMapper(),
+            $protocol,
             new RouteSymbolResolver(
                 $positionConverter,
                 RouteReferenceExtractorFactory::create($positionConverter),
@@ -233,11 +283,7 @@ final class RouteRenameHandlerTest extends TestCase
             $sourceIndexes,
             $routes,
             ProjectPaths::resolver(),
+            new RenameEditBuilder($protocol),
         );
-
-        return [$handler, [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => 5, 'character' => 31],
-        ]];
     }
 }

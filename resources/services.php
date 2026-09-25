@@ -36,6 +36,7 @@ use Symfony\Lsp\Feature\Messenger\MessengerCodeLensProvider;
 use Symfony\Lsp\Feature\PartialParseDiagnosticFilter;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
+use Symfony\Lsp\Feature\RenameEditBuilder;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
@@ -145,6 +146,7 @@ return static function (ContainerConfigurator $container): void {
     $services->set(DiagnosticSuppressor::class);
     $services->set(PartialParseDiagnosticFilter::class);
     $services->set(UnknownNameCodeActionBuilder::class);
+    $services->set(RenameEditBuilder::class);
     $featureGroups = [
         'Route' => [],
         'DependencyInjection' => [],

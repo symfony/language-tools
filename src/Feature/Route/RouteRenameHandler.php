@@ -3,7 +3,7 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\RenameEditBuilder;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
@@ -19,6 +19,7 @@ final class RouteRenameHandler implements RenameProviderInterface
         private readonly RouteSourceIndexRegistry $sourceIndexes,
         private readonly RouteIndexRegistry $routeIndexes,
         private readonly ProjectPathResolver $pathResolver,
+        private readonly RenameEditBuilder $editBuilder,
     ) {
     }
 
@@ -73,28 +74,18 @@ final class RouteRenameHandler implements RenameProviderInterface
             return null;
         }
 
-        /** @var array<string, list<array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string, annotationId: string}>> $editsByUri */
-        $editsByUri = [];
+        $locations = [];
         foreach ($sourceIndex->references($symbol->name) as $reference) {
             if ($this->pathResolver->isApplicationOwned($project, $reference->uri)) {
-                $editsByUri[$reference->uri][] = $this->edit($reference->range, $newName);
+                $locations[] = [$reference->uri, $reference->range, $newName];
             }
         }
         foreach ($declarations as $declaration) {
-            $editsByUri[$declaration->uri][] = $this->edit($declaration->range, $newName);
-        }
-        ksort($editsByUri);
-
-        $documentChanges = [];
-        foreach ($editsByUri as $uri => $edits) {
-            $documentChanges[] = [
-                'textDocument' => ['uri' => $uri, 'version' => null],
-                'edits' => $edits,
-            ];
+            $locations[] = [$declaration->uri, $declaration->range, $newName];
         }
 
         return [
-            'documentChanges' => $documentChanges,
+            'documentChanges' => $this->editBuilder->documentChanges($locations, 'routeRename'),
             'changeAnnotations' => [
                 'routeRename' => [
                     'label' => \sprintf('Rename route "%s" to "%s"', $symbol->name, $newName),
@@ -132,17 +123,5 @@ final class RouteRenameHandler implements RenameProviderInterface
             $this->sourceIndexes->forProject($project)->declarations($name),
             fn (RouteDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri),
         ));
-    }
-
-    /**
-     * @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string, annotationId: string}
-     */
-    private function edit(Range $range, string $newName): array
-    {
-        return [
-            'range' => $this->protocol->range($range),
-            'newText' => $newName,
-            'annotationId' => 'routeRename',
-        ];
     }
 }
