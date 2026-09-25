@@ -19,6 +19,15 @@ final class CheckProjectResult
     ) {
     }
 
+    public function sourceOnlyDescription(): string
+    {
+        return match ($this->modeReason) {
+            'debug-disabled' => 'Symfony debug mode is disabled',
+            'runtime-indexing-disabled' => 'runtime indexing is disabled',
+            default => 'runtime analysis is unavailable',
+        };
+    }
+
     public function withComplete(bool $complete): self
     {
         return new self(

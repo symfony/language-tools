@@ -2,9 +2,14 @@
 
 namespace Symfony\Lsp\Check;
 
-final class GitLabCheckReporter
+final class GitLabCheckReportFormat implements CheckReportFormatInterface
 {
-    public function render(CheckReportView $view): string
+    public function name(): string
+    {
+        return 'gitlab';
+    }
+
+    public function render(CheckReportView $view, bool $verbose): string
     {
         $issues = [];
         foreach ($view->diagnostics as $diagnosticView) {
@@ -32,7 +37,7 @@ final class GitLabCheckReporter
         return json_encode($issues, \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE)."\n";
     }
 
-    public function codes(): string
+    public function codes(array $codes): string
     {
         return "[]\n";
     }

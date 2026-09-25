@@ -19,6 +19,7 @@ final class CheckCommand
         private readonly CheckOptionsParser $optionsParser,
         private readonly CheckRunner $runner,
         private readonly CheckReporter $reporter,
+        private readonly CheckErrorCauseRenderer $causes,
         private readonly CheckProfiler $profiler,
         private readonly CheckProfileReporter $profileReporter,
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
@@ -42,7 +43,7 @@ final class CheckCommand
             }
             $this->logger->configure($verbose ? 'verbose' : 'off');
             if ($options->help) {
-                return new CheckExecution(self::EXIT_SUCCESS, $this->reporter->help());
+                return new CheckExecution(self::EXIT_SUCCESS, $this->optionsParser->help());
             }
             if ($options->listCodes) {
                 return new CheckExecution(self::EXIT_SUCCESS, $this->reporter->codes($this->diagnosticCodes->all(), $format));
@@ -120,7 +121,7 @@ final class CheckCommand
         $output = (isset($error['project']) ? '['.$error['project'].'] ' : '').$error['message']."\n";
         if (isset($error['cause'])) {
             $output .= $verbose
-                ? implode("\n", $this->reporter->causeLines($error['cause']))."\n"
+                ? implode("\n", $this->causes->lines($error['cause']))."\n"
                 : "Add --verbose to show the cause.\n";
         }
 

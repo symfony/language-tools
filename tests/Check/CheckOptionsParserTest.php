@@ -4,8 +4,14 @@ namespace Symfony\Lsp\Tests\Check;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Check\CheckErrorCauseRenderer;
 use Symfony\Lsp\Check\CheckOptions;
 use Symfony\Lsp\Check\CheckOptionsParser;
+use Symfony\Lsp\Check\GitHubCheckReportFormat;
+use Symfony\Lsp\Check\GitLabCheckReportFormat;
+use Symfony\Lsp\Check\HumanCheckReportFormat;
+use Symfony\Lsp\Check\JsonCheckReportFormat;
+use Symfony\Lsp\Check\SarifCheckReportFormat;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\InvalidConfigurationException;
@@ -19,6 +25,13 @@ final class CheckOptionsParserTest extends TestCase
         $this->parser = new CheckOptionsParser(
             new DiagnosticCodeRegistry(),
             new AnalysisSettings(),
+            [
+                new HumanCheckReportFormat(new CheckErrorCauseRenderer()),
+                new JsonCheckReportFormat(),
+                new GitHubCheckReportFormat(),
+                new GitLabCheckReportFormat(),
+                new SarifCheckReportFormat(new DiagnosticCodeRegistry(), '1.2.3'),
+            ],
         );
     }
 

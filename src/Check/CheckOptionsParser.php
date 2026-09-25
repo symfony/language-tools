@@ -10,8 +10,6 @@ final class CheckOptionsParser
 {
     private const DEFAULT_FORMAT = 'human';
 
-    private const FORMATS = ['human', 'json', 'github', 'gitlab', 'sarif'];
-
     private const VALUE_OPTIONS = [
         '--workspace',
         '--config',
@@ -27,10 +25,57 @@ final class CheckOptionsParser
         '--format',
     ];
 
+    /** @var list<string> */
+    private readonly array $formats;
+
+    /** @param iterable<CheckReportFormatInterface> $formats */
     public function __construct(
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
         private readonly AnalysisSettings $analysisSettings,
+        iterable $formats,
     ) {
+        $names = [];
+        foreach ($formats as $format) {
+            $names[] = $format->name();
+        }
+        $this->formats = $names;
+    }
+
+    public function help(): string
+    {
+        return <<<HELP
+            Usage: symfony-lsp check [options] [files, directories or patterns]
+
+            Options:
+              --format={$this->formatList('|')} Select the report format
+              --workspace=PATH                 Set the workspace root
+              --config=PATH                    Load a configuration file instead of .symfony-lsp.json
+              --project-root=PATH              Select an explicit Symfony project root; repeatable
+              --source-only                    Disable runtime indexing and application execution
+              --php-command=JSON               Override the project PHP command argument list
+              --container-project-root=PATH    Override the container-side project root
+              --no-container-project-root      Run the project PHP command on the host
+              --environment=NAME               Override the Symfony environment
+              --kernel=CLASS|PATH              Select the kernel class or application entry point
+              --debug, --no-debug              Enable or disable Symfony debug mode
+              --runtime-indexing               Enable runtime indexing
+              --no-runtime-indexing            Disable runtime indexing
+              --bridge-timeout=SECONDS         Set each project bridge deadline
+              --timeout=SECONDS                Set the complete check deadline; defaults to 600
+              --verbose, -v, -vv, -vvv         Show sanitized operational failure causes
+              --profile                        Report phase and diagnostic timing details
+              --translation-diagnostics        Enable missing-translation diagnostics
+              --no-translation-diagnostics     Disable missing-translation diagnostics
+              --fail-on=CODE,...               Restrict blocking diagnostics to selected codes
+              --list-codes                     List supported diagnostic codes
+              --baseline=PATH                  Match an occurrence-specific baseline
+              --generate-baseline              Create a new baseline
+              --refresh-baseline               Replace an existing baseline
+              --strict-baseline                Fail when baseline entries become stale
+              --help, -h                       Display this help
+
+            Runtime analysis executes application code. Use --source-only for untrusted code.
+            HELP;
     }
 
     /**
@@ -223,14 +268,25 @@ final class CheckOptionsParser
 
     private function selectFormat(CheckOptionsDraft $draft, string $requested): void
     {
-        if (!\in_array($requested, self::FORMATS, true)) {
-            throw new InvalidConfigurationException('The --format option must be human, json, github, gitlab or sarif.');
+        if (!\in_array($requested, $this->formats, true)) {
+            throw new InvalidConfigurationException(\sprintf('The --format option must be %s.', $this->formatList(', ', ' or ')));
         }
 
         $draft->formats[$requested] = true;
         if (\count($draft->formats) > 1) {
             throw new InvalidConfigurationException('The --format option cannot select more than one format.');
         }
+    }
+
+    private function formatList(string $separator, ?string $lastSeparator = null): string
+    {
+        $names = $this->formats;
+        if (null === $lastSeparator || \count($names) < 2) {
+            return implode($separator, $names);
+        }
+        $last = array_pop($names);
+
+        return implode($separator, $names).$lastSeparator.$last;
     }
 
     private function baselineMode(string $current, string $requested): string

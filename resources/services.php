@@ -7,7 +7,14 @@ use Microsoft\PhpParser\Parser;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Check\CheckCommand;
+use Symfony\Lsp\Check\CheckOptionsParser;
 use Symfony\Lsp\Check\CheckProjectAnalyzer;
+use Symfony\Lsp\Check\CheckReporter;
+use Symfony\Lsp\Check\GitHubCheckReportFormat;
+use Symfony\Lsp\Check\GitLabCheckReportFormat;
+use Symfony\Lsp\Check\HumanCheckReportFormat;
+use Symfony\Lsp\Check\JsonCheckReportFormat;
+use Symfony\Lsp\Check\SarifCheckReportFormat;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Client\JsonRpcClient;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
@@ -197,7 +204,7 @@ return static function (ContainerConfigurator $container): void {
         );
     }
 
-    $services->load('Symfony\\Lsp\\Check\\', '../src/Check/*{Manager,Registry,Parser,Selector,Runner,Reporter,Profiler,Command,Client,Factory,Analyzer,Executor,Builder,Codec,Repository,Matcher,Numberer}.php');
+    $services->load('Symfony\\Lsp\\Check\\', '../src/Check/*{Manager,Registry,Parser,Selector,Runner,Reporter,Renderer,Profiler,Command,Client,Factory,Analyzer,Executor,Builder,Codec,Repository,Matcher,Numberer,Format}.php');
     $services->load('Symfony\\Lsp\\Client\\', '../src/Client/*Client.php');
     $services->load('Symfony\\Lsp\\Document\\', '../src/Document/*{Resolver,Store,Synchronizer,Converter,Reader}.php');
     $services->load('Symfony\\Lsp\\Index\\', '../src/Index/*{Scanner,Handler,Registry,Codec,Hasher,Enumerator,Pipeline,Processor,Manager,Resolver}.php');
@@ -264,6 +271,13 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$mutex', service(LocalKeyedMutex::class));
     $services->get(CheckProjectAnalyzer::class)
         ->arg('$runtimeInitializer', service('lsp.check.runtime_initializer'));
+
+    foreach ([HumanCheckReportFormat::class, JsonCheckReportFormat::class, GitHubCheckReportFormat::class, GitLabCheckReportFormat::class, SarifCheckReportFormat::class] as $priority => $format) {
+        $services->get($format)->tag('lsp.check.report_format', ['priority' => -$priority]);
+    }
+    foreach ([CheckOptionsParser::class, CheckReporter::class] as $service) {
+        $services->get($service)->arg('$formats', tagged_iterator('lsp.check.report_format'));
+    }
 
     $registries = [
         CompletionProviderRegistry::class => 'lsp.provider.completion',

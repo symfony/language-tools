@@ -9,7 +9,7 @@ use Symfony\Lsp\Runtime\RuntimeMetadataException;
  * @phpstan-import-type CheckError from CheckResult
  * @phpstan-import-type RuntimeMetadataCause from RuntimeMetadataException
  */
-final class SarifCheckReporter
+final class SarifCheckReportFormat implements CheckReportFormatInterface
 {
     private const SCHEMA = 'https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json';
 
@@ -19,7 +19,12 @@ final class SarifCheckReporter
     ) {
     }
 
-    public function render(CheckReportView $view): string
+    public function name(): string
+    {
+        return 'sarif';
+    }
+
+    public function render(CheckReportView $view, bool $verbose): string
     {
         $configurationNotifications = array_map(
             fn (CheckReportBaselineEntryView $entryView): array => $this->staleBaselineNotification($entryView, $view->strictBaseline),
@@ -64,7 +69,6 @@ final class SarifCheckReporter
         ]]);
     }
 
-    /** @param list<string> $codes */
     public function codes(array $codes): string
     {
         return $this->encode([[

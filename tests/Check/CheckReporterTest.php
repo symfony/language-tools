@@ -7,12 +7,16 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Check\BaselineEntry;
 use Symfony\Lsp\Check\CheckDiagnostic;
 use Symfony\Lsp\Check\CheckDiagnosticOccurrenceNumberer;
+use Symfony\Lsp\Check\CheckErrorCauseRenderer;
 use Symfony\Lsp\Check\CheckProjectResult;
 use Symfony\Lsp\Check\CheckReporter;
 use Symfony\Lsp\Check\CheckReportViewBuilder;
 use Symfony\Lsp\Check\CheckResult;
-use Symfony\Lsp\Check\GitLabCheckReporter;
-use Symfony\Lsp\Check\SarifCheckReporter;
+use Symfony\Lsp\Check\GitHubCheckReportFormat;
+use Symfony\Lsp\Check\GitLabCheckReportFormat;
+use Symfony\Lsp\Check\HumanCheckReportFormat;
+use Symfony\Lsp\Check\JsonCheckReportFormat;
+use Symfony\Lsp\Check\SarifCheckReportFormat;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Runtime\RuntimeMetadataException;
 
@@ -290,11 +294,13 @@ final class CheckReporterTest extends TestCase
 
     private function reporter(): CheckReporter
     {
-        return new CheckReporter(
-            new GitLabCheckReporter(),
-            new SarifCheckReporter(new DiagnosticCodeRegistry(), '1.2.3'),
-            new CheckReportViewBuilder(new CheckDiagnosticOccurrenceNumberer()),
-        );
+        return new CheckReporter(new CheckReportViewBuilder(new CheckDiagnosticOccurrenceNumberer()), [
+            new HumanCheckReportFormat(new CheckErrorCauseRenderer()),
+            new JsonCheckReportFormat(),
+            new GitHubCheckReportFormat(),
+            new GitLabCheckReportFormat(),
+            new SarifCheckReportFormat(new DiagnosticCodeRegistry(), '1.2.3'),
+        ]);
     }
 
     private function goldenResult(): CheckResult
