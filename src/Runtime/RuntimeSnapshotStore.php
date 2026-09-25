@@ -68,32 +68,10 @@ final class RuntimeSnapshotStore
      */
     public function save(Project $project, string $bridge, array $snapshot, array $requestedSections, bool $complete): void
     {
-        if (self::SNAPSHOT_SCHEMA_VERSION !== ($snapshot['schemaVersion'] ?? null)) {
-            return;
+        $previous = $complete ? null : $this->load($project, $bridge);
+        if ($complete || null !== $previous) {
+            $this->merge($project, $bridge, $snapshot, $requestedSections, $previous->snapshot ?? [], true);
         }
-
-        if ($complete) {
-            $previousSnapshot = [];
-        } else {
-            $previous = $this->load($project, $bridge);
-            if (null === $previous) {
-                return;
-            }
-            $previousSnapshot = $previous->snapshot;
-        }
-        $previousSections = $previousSnapshot['sections'] ?? null;
-        /** @var array<string, array<array-key, mixed>> $sections */
-        $sections = \is_array($previousSections) ? $previousSections : [];
-        $incomingSections = \is_array($snapshot['sections'] ?? null) ? $snapshot['sections'] : [];
-        foreach ($requestedSections as $section) {
-            if (\is_array($incomingSections[$section] ?? null)) {
-                $sections[$section] = $incomingSections[$section];
-            } else {
-                unset($sections[$section]);
-            }
-        }
-
-        $this->persist($project, $bridge, $sections, $previousSnapshot);
     }
 
     /**
@@ -102,19 +80,29 @@ final class RuntimeSnapshotStore
      */
     public function savePartial(Project $project, string $bridge, array $snapshot, array $availableSections): void
     {
+        $this->merge($project, $bridge, $snapshot, $availableSections, $this->load($project, $bridge)->snapshot ?? [], false);
+    }
+
+    /**
+     * @param array<array-key, mixed> $snapshot
+     * @param list<string>            $sectionNames
+     * @param array<array-key, mixed> $previousSnapshot
+     */
+    private function merge(Project $project, string $bridge, array $snapshot, array $sectionNames, array $previousSnapshot, bool $removeMissing): void
+    {
         if (self::SNAPSHOT_SCHEMA_VERSION !== ($snapshot['schemaVersion'] ?? null)) {
             return;
         }
 
-        $previous = $this->load($project, $bridge);
-        $previousSnapshot = $previous->snapshot ?? [];
         $previousSections = $previousSnapshot['sections'] ?? null;
         /** @var array<string, array<array-key, mixed>> $sections */
         $sections = \is_array($previousSections) ? $previousSections : [];
         $incomingSections = \is_array($snapshot['sections'] ?? null) ? $snapshot['sections'] : [];
-        foreach ($availableSections as $section) {
+        foreach ($sectionNames as $section) {
             if (\is_array($incomingSections[$section] ?? null)) {
                 $sections[$section] = $incomingSections[$section];
+            } elseif ($removeMissing) {
+                unset($sections[$section]);
             }
         }
 
