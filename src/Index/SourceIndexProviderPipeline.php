@@ -79,10 +79,13 @@ final class SourceIndexProviderPipeline
             } elseif (\is_string($previousPayload)) {
                 try {
                     $previousData = $this->codec->decode($name, $previousPayload);
-                    if (serialize($provider->runtimeRefreshProjection($data)) === serialize($provider->runtimeRefreshProjection($previousData))) {
-                        continue;
-                    }
                 } catch (\UnexpectedValueException) {
+                    $previousData = null;
+                }
+                if (null !== $previousData
+                    && serialize($provider->runtimeRefreshProjection($data)) === serialize($provider->runtimeRefreshProjection($previousData))
+                ) {
+                    continue;
                 }
             }
             $changedProviders[] = $name;

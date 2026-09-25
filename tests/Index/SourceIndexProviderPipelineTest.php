@@ -43,13 +43,49 @@ final class SourceIndexProviderPipelineTest extends TestCase
             new SecondPipelineProvider('second', [PipelineFacts::class]),
         ]);
     }
+
+    public function testTreatsAnUnreadableCachedPayloadAsAChangedDomain(): void
+    {
+        $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), [
+            new FirstPipelineProvider('first', [PipelineFacts::class], new PipelineFacts()),
+        ]);
+
+        $replacement = $pipeline->replace(
+            new Project('/workspace', 'file:///workspace'),
+            new SourceDocument('file:///source.php', 'php', ''),
+            ['first' => 'not a payload'],
+        );
+
+        self::assertTrue($replacement->factsChanged);
+        self::assertSame(['first'], $replacement->changedProviders);
+    }
+
+    public function testSurfacesProviderFailuresInsteadOfCountingThemAsChangedDomains(): void
+    {
+        $codec = new SourceIndexPayloadCodec();
+        $pipeline = new SourceIndexProviderPipeline($codec, [
+            new FailingPipelineProvider('first', [PipelineFacts::class], new PipelineFacts()),
+        ]);
+
+        $this->expectException(\UnexpectedValueException::class);
+        $this->expectExceptionMessage('The "first" provider cannot project its facts.');
+
+        $pipeline->replace(
+            new Project('/workspace', 'file:///workspace'),
+            new SourceDocument('file:///source.php', 'php', ''),
+            ['first' => $codec->encode('first', new PipelineFacts('file:///previous.php'))],
+        );
+    }
 }
 
 abstract class AbstractPipelineProvider implements SourceIndexProviderInterface
 {
     /** @param list<string> $classes */
-    public function __construct(private readonly string $providerName, private readonly array $classes)
-    {
+    public function __construct(
+        private readonly string $providerName,
+        private readonly array $classes,
+        private readonly ?SourceFactsInterface $facts = null,
+    ) {
     }
 
     public function name(): string
@@ -81,7 +117,7 @@ abstract class AbstractPipelineProvider implements SourceIndexProviderInterface
 
     public function replace(Project $project, SourceDocument $document): ?SourceFactsInterface
     {
-        return null;
+        return $this->facts;
     }
 
     public function runtimeRefreshProjection(mixed $data): array
@@ -108,6 +144,14 @@ final class FirstPipelineProvider extends AbstractPipelineProvider
 
 final class SecondPipelineProvider extends AbstractPipelineProvider
 {
+}
+
+final class FailingPipelineProvider extends AbstractPipelineProvider
+{
+    public function runtimeRefreshProjection(mixed $data): array
+    {
+        throw new \UnexpectedValueException(\sprintf('The "%s" provider cannot project its facts.', $this->name()));
+    }
 }
 
 final class PipelineFacts implements SourceFactsInterface
