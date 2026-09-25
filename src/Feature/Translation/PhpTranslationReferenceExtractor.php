@@ -4,7 +4,9 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpArgumentCursor;
 use Symfony\Lsp\Parser\Php\PhpArgumentList;
+use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpObjectCreation;
@@ -79,6 +81,39 @@ final class PhpTranslationReferenceExtractor
     }
 
     /**
+     * The translation key, placeholder, domain or locale being typed at the
+     * cursor, in a call the index reads references from.
+     */
+    public function completionContext(string $text, int $offset): ?TranslationCompletionContext
+    {
+        $document = $this->parser->parse($text);
+        $cursor = $this->completionCursor($text, $document, $offset);
+        if (null === $cursor || null === $cursor->quote) {
+            return null;
+        }
+        $call = $cursor->call;
+        $key = $this->keyArgument($call);
+        if ($cursor->isArrayItemLiteral() && $cursor->argument === $call->namedOrPositionalArgument('parameters', 1)) {
+            $message = $key?->stringLiteral?->value;
+
+            return null === $message ? null : $this->context('placeholder', $cursor, $text, $offset, $message);
+        }
+        if (!$cursor->isArgumentLiteral()) {
+            return null;
+        }
+        if ($cursor->argument === $key) {
+            return $this->context('key', $cursor, $text, $offset);
+        }
+        if ($cursor->argument === $call->namedOrPositionalArgument('domain', 2)) {
+            return $this->context('domain', $cursor, $text, $offset);
+        }
+
+        return $call instanceof PhpMethodCall && $cursor->argument === $call->namedOrPositionalArgument('locale', 3)
+            ? $this->context('locale', $cursor, $text, $offset)
+            : null;
+    }
+
+    /**
      * The domain scoping the key literal at $offset: the call's literal domain,
      * the default domain when the call sets none, or null when the call sets a
      * domain that isn't statically known.
@@ -95,6 +130,52 @@ final class PhpTranslationReferenceExtractor
         return 'messages';
     }
 
+    /**
+     * The innermost translation call argument the cursor sits in, across
+     * translator calls, translatable messages and translation helper calls.
+     */
+    private function completionCursor(string $text, PhpDocument $document, int $offset): ?PhpArgumentCursor
+    {
+        $cursor = $document->argumentCursorAt($offset);
+        $call = $cursor?->call;
+        if (null !== $cursor
+            && !($call instanceof PhpMethodCall && 'trans' === $call->method && !$this->hasUnrelatedReceiver($call, $document))
+            && !($call instanceof PhpObjectCreation && $this->isTranslatableMessage($call))
+        ) {
+            $cursor = null;
+        }
+        foreach ($this->helperArgumentLists($text, $document) as $arguments) {
+            $candidate = PhpArgumentCursor::at($arguments, $offset);
+            if (null !== $candidate && (null === $cursor || $candidate->argument->startOffset > $cursor->argument->startOffset)) {
+                $cursor = $candidate;
+            }
+        }
+
+        return $cursor;
+    }
+
+    private function keyArgument(PhpMethodCall|PhpObjectCreation|PhpAttribute|PhpArgumentList $call): ?PhpArgument
+    {
+        return $call instanceof PhpMethodCall
+            ? $call->argument('id') ?? $call->namedOrPositionalArgument('key', 0)
+            : $call->namedOrPositionalArgument('message', 0);
+    }
+
+    private function context(string $kind, PhpArgumentCursor $cursor, string $text, int $offset, ?string $key = null): TranslationCompletionContext
+    {
+        $placeholder = 'placeholder' === $kind && str_starts_with($cursor->prefix, '%');
+        $prefix = $placeholder ? substr($cursor->prefix, 1) : $cursor->prefix;
+        $start = $cursor->prefixStartOffset + ($placeholder ? 1 : 0);
+
+        return new TranslationCompletionContext(
+            $kind,
+            $prefix,
+            $this->converter->toRange($text, $start, $offset - $start),
+            'messages',
+            $key,
+        );
+    }
+
     /** @return list<array{key: PhpStringLiteral, domain: ?PhpArgument, parameters: ?PhpArgument}> */
     private function calls(string $text, PhpDocument $document): array
     {
@@ -103,7 +184,7 @@ final class PhpTranslationReferenceExtractor
             if ('trans' !== $call->method || $this->hasUnrelatedReceiver($call, $document)) {
                 continue;
             }
-            $key = ($call->argument('id') ?? $call->namedOrPositionalArgument('key', 0))?->stringLiteral;
+            $key = $this->keyArgument($call)?->stringLiteral;
             if (null !== $key) {
                 $calls[] = [
                     'key' => $key,
@@ -164,25 +245,10 @@ final class PhpTranslationReferenceExtractor
     /** @return list<array{key: PhpStringLiteral, domain: ?PhpArgument, parameters: ?PhpArgument}> */
     private function helperCalls(string $text, PhpDocument $document): array
     {
-        $tokens = array_values(\PhpToken::tokenize($text));
-        $helperNames = $this->importedHelperNames($tokens);
-        if (0 === strcasecmp('Symfony\\Component\\Translation', $document->namespace())) {
-            $helperNames['t'] = true;
-        }
-
         $calls = [];
-        foreach ($tokens as $index => $token) {
-            $fullyQualified = \T_NAME_FULLY_QUALIFIED === $token->id && 0 === strcasecmp(self::TRANSLATION_HELPER, ltrim($token->text, '\\'));
-            if (!$fullyQualified && (\T_STRING !== $token->id || !isset($helperNames[strtolower($token->text)]))) {
-                continue;
-            }
-            $previous = $this->previousSignificantToken($tokens, $index);
-            if (null !== $previous && $previous->is([\T_OBJECT_OPERATOR, \T_NULLSAFE_OBJECT_OPERATOR, \T_DOUBLE_COLON])) {
-                continue;
-            }
-            $arguments = $this->helperArguments($tokens, $index, $text);
-            $key = $arguments?->namedOrPositionalArgument('message', 0)?->stringLiteral;
-            if (null === $arguments || null === $key) {
+        foreach ($this->helperArgumentLists($text, $document) as $arguments) {
+            $key = $this->keyArgument($arguments)?->stringLiteral;
+            if (null === $key) {
                 continue;
             }
             $calls[] = [
@@ -193,6 +259,39 @@ final class PhpTranslationReferenceExtractor
         }
 
         return $calls;
+    }
+
+    /**
+     * The arguments of every call to Symfony's translation helper, which PHP
+     * syntax facts do not cover because they hold no plain function calls.
+     *
+     * @return list<PhpArgumentList>
+     */
+    private function helperArgumentLists(string $text, PhpDocument $document): array
+    {
+        $tokens = array_values(\PhpToken::tokenize($text));
+        $helperNames = $this->importedHelperNames($tokens);
+        if (0 === strcasecmp('Symfony\\Component\\Translation', $document->namespace())) {
+            $helperNames['t'] = true;
+        }
+
+        $lists = [];
+        foreach ($tokens as $index => $token) {
+            $fullyQualified = \T_NAME_FULLY_QUALIFIED === $token->id && 0 === strcasecmp(self::TRANSLATION_HELPER, ltrim($token->text, '\\'));
+            if (!$fullyQualified && (\T_STRING !== $token->id || !isset($helperNames[strtolower($token->text)]))) {
+                continue;
+            }
+            $previous = $this->previousSignificantToken($tokens, $index);
+            if (null !== $previous && $previous->is([\T_OBJECT_OPERATOR, \T_NULLSAFE_OBJECT_OPERATOR, \T_DOUBLE_COLON])) {
+                continue;
+            }
+            $arguments = $this->helperArguments($tokens, $index, $text);
+            if (null !== $arguments) {
+                $lists[] = $arguments;
+            }
+        }
+
+        return $lists;
     }
 
     /**
@@ -274,8 +373,11 @@ final class PhpTranslationReferenceExtractor
             }
             $current[] = $token;
         }
+        if ([] !== $current) {
+            $arguments[] = $this->helperArgument($current, $text);
+        }
 
-        return null;
+        return new PhpArgumentList($arguments);
     }
 
     /** @param non-empty-list<\PhpToken> $tokens */

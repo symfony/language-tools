@@ -29,40 +29,29 @@ final class TranslationCompletionContext
     ) {
     }
 
-    public static function create(string $languageId, string $text, Position $position, PositionConverter $converter, TwigDirectiveLocator $directives): ?self
+    public static function fromTwig(string $text, Position $position, PositionConverter $converter, TwigDirectiveLocator $directives): ?self
     {
         $cursor = $converter->toByteOffset($text, $position);
         $before = substr($text, 0, $cursor);
-        if ('php' === $languageId) {
-            if (preg_match('/(?:->trans\s*\(\s*(?:id\s*:\s*)?|(?:\bt|new\s+TranslatableMessage)\s*\(\s*(?:message\s*:\s*)?)([\'\"])([^\'\"]*)$/s', $before, $m, \PREG_OFFSET_CAPTURE)) {
-                return self::context('key', $m[2], $text, $position, $converter);
-            }
-            if (preg_match('/(?:->trans|\bt|new\s+TranslatableMessage)\s*\(\s*([\'\"])([^\'\"]+)\1\s*,\s*\[[^\]]*[\'\"](%?[^\'\"]*)$/s', $before, $m, \PREG_OFFSET_CAPTURE)) {
-                return self::context('placeholder', $m[3], $text, $position, $converter, 'messages', $m[2][0]);
-            }
-            if (preg_match('/(?:->trans|\bt|new\s+TranslatableMessage)\s*\(\s*([\'\"])([^\'\"]+)\1\s*,\s*\[[^\]]*\]\s*,\s*([\'\"])([^\'\"]*)$/s', $before, $m, \PREG_OFFSET_CAPTURE)) {
-                return self::context('domain', $m[4], $text, $position, $converter);
-            }
-            if (preg_match('/->trans\s*\(.*?,\s*\[[^\]]*\]\s*,\s*([\'\"])([^\'\"]+)\1\s*,\s*([\'\"])([^\'\"]*)$/s', $before, $m, \PREG_OFFSET_CAPTURE)) {
-                return self::context('locale', $m[4], $text, $position, $converter);
-            }
+        $directive = $directives->directiveStart($text, $cursor);
+        if (null === $directive || null === $string = self::twigOpenString($before, $directive)) {
+            return null;
         }
-        if ('twig' === $languageId) {
-            $directive = $directives->directiveStart($text, $cursor);
-            if (null === $directive || null === $string = self::twigOpenString($before, $directive)) {
-                return null;
-            }
-            [$quote, $start] = $string;
-            $content = substr($before, $start);
-            if (!preg_match(self::TWIG_STRING_CONTENT[$quote], $content)) {
-                return null;
-            }
-            if (
-                preg_match('/\b(?:trans|t)\s*\(\s*$/D', substr($before, 0, $start - 1))
-                || preg_match(self::TWIG_TRANS_FILTER[$quote], substr($text, $cursor))
-            ) {
-                return self::context('key', [$content, $start], $text, $position, $converter, quote: $quote);
-            }
+        [$quote, $start] = $string;
+        $content = substr($before, $start);
+        if (!preg_match(self::TWIG_STRING_CONTENT[$quote], $content)) {
+            return null;
+        }
+        if (
+            preg_match('/\b(?:trans|t)\s*\(\s*$/D', substr($before, 0, $start - 1))
+            || preg_match(self::TWIG_TRANS_FILTER[$quote], substr($text, $cursor))
+        ) {
+            return new self(
+                'key',
+                TwigStringDecoder::decode($content),
+                new Range($converter->toPosition($text, $start), $position),
+                quote: $quote,
+            );
         }
 
         return null;
@@ -100,17 +89,5 @@ final class TranslationCompletionContext
         }
 
         return null === $quote ? null : [$quote, $start];
-    }
-
-    /** @param array{0: string, 1: int} $match */
-    private static function context(string $kind, array $match, string $text, Position $position, PositionConverter $converter, string $domain = 'messages', ?string $key = null, ?string $quote = null): self
-    {
-        $prefix = ltrim($match[0], '%');
-        $offset = $match[1] + (str_starts_with($match[0], '%') ? 1 : 0);
-        if (null !== $quote) {
-            $prefix = TwigStringDecoder::decode($prefix);
-        }
-
-        return new self($kind, $prefix, new Range($converter->toPosition($text, $offset), $position), $domain, $key, $quote);
     }
 }

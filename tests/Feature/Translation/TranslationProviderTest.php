@@ -50,15 +50,28 @@ final class TranslationProviderTest extends TestCase
     }
 
     #[DataProvider('namedPhpTranslationCallProvider')]
-    public function testCompletesNamedPhpTranslationKeys(string $call): void
+    public function testCompletesNamedPhpTranslationKeys(string $text): void
     {
         $uri = 'file:///workspace/src/Controller.php';
-        $text = '<?php '.$call;
         [$provider, $converter] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
         self::assertSame(['article.title'], array_column($provider->complete($params) ?? [], 'label'));
+    }
+
+    #[DataProvider('unrelatedPhpTranslationCallProvider')]
+    public function testOffersNoPhpCompletionWhereIndexingReadsNoReference(string $text): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        [$provider, $converter] = $this->provider($uri, $text);
+        $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
+
+        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertNull($provider->complete([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ]));
     }
 
     public function testCompletesMessagePlaceholders(): void
@@ -678,9 +691,48 @@ final class TranslationProviderTest extends TestCase
     /** @return iterable<string, array{string}> */
     public static function namedPhpTranslationCallProvider(): iterable
     {
-        yield 'trans method' => ["\$translator->trans(id: 'article.ti"];
-        yield 't helper' => ["t(message: 'article.ti"];
-        yield 'translatable message' => ["new TranslatableMessage(message: 'article.ti"];
+        yield 'trans method' => ["<?php \$translator->trans(id: 'article.ti"];
+        yield 't helper' => [<<<'PHP'
+            <?php
+            use function Symfony\Component\Translation\t;
+
+            t(message: 'article.ti
+            PHP];
+        yield 'translatable message' => [<<<'PHP'
+            <?php
+            use Symfony\Component\Translation\TranslatableMessage;
+
+            new TranslatableMessage(message: 'article.ti
+            PHP];
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function unrelatedPhpTranslationCallProvider(): iterable
+    {
+        yield 'unrelated translator type' => [<<<'PHP'
+            <?php
+            use App\Mailer;
+
+            function notify(Mailer $mailer): void
+            {
+                $mailer->trans('article.ti
+            }
+            PHP];
+        yield 'local helper function' => [<<<'PHP'
+            <?php
+            function t(string $message): string
+            {
+                return $message;
+            }
+
+            t('article.ti
+            PHP];
+        yield 'unrelated translatable message' => [<<<'PHP'
+            <?php
+            use App\Message\TranslatableMessage;
+
+            new TranslatableMessage('article.ti
+            PHP];
     }
 
     /**

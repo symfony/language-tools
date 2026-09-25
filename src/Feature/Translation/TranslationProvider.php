@@ -38,13 +38,17 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             return null;
         }
 
-        $context = TranslationCompletionContext::create(
-            $request->document->languageId,
-            $this->comments->mask($request->document->languageId, $request->document->text),
-            $request->position,
-            $this->converter,
-            $this->directives,
-        );
+        $document = $request->document;
+        $context = match ($document->languageId) {
+            'php' => $this->extractor->phpCompletionContext($document->text, $this->converter->toByteOffset($document->text, $request->position)),
+            'twig' => TranslationCompletionContext::fromTwig(
+                $this->comments->mask('twig', $document->text),
+                $request->position,
+                $this->converter,
+                $this->directives,
+            ),
+            default => null,
+        };
         if (null === $context) {
             return null;
         }

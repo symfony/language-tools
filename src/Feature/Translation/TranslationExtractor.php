@@ -13,6 +13,12 @@ final class TranslationExtractor
     ) {
     }
 
+    /** The PHP translation slot being typed at $offset. */
+    public function phpCompletionContext(string $text, int $offset): ?TranslationCompletionContext
+    {
+        return $this->phpReferences->completionContext($text, $offset);
+    }
+
     /**
      * The domain scoping key completion at $offset, or null when the call at
      * the cursor sets a domain that isn't statically known.
