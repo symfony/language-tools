@@ -7,6 +7,7 @@
 - Suggest close route names as quick fixes for unknown PHP and Twig route references
 - Rewrite the public documentation for users, with separate guides for editor and command-line use
 - Correct the documented capabilities of every integration against the implementation
+- Read `.gitignore` files like Git for `#` characters inside patterns, trailing tabs and files with many patterns
 
 ## 0.21.0 (2026-09-19)
 
