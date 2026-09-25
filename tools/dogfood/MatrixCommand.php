@@ -56,7 +56,6 @@ final class MatrixCommand
         $startedAt = hrtime(true);
         $this->filesystem->mkdir($outputDirectory);
         $semaphore = new LocalSemaphore($jobs);
-        /** @var array<int, \Amp\Future<ProjectReport>> $futures */
         $futures = [];
         foreach ($configurations as $index => $configuration) {
             $futures[$index] = async(function () use ($configuration, $outputDirectory, $semaphore, $enforceBudgets): ProjectReport {
@@ -71,6 +70,7 @@ final class MatrixCommand
                 }
             });
         }
+        /** @var array<int, ProjectReport> $projectReports */
         $projectReports = await($futures);
         ksort($projectReports);
         $failed = false;
