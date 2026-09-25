@@ -270,46 +270,8 @@ final class ApplicationSourceScanner implements ProjectStateInterface
     private function scanSourceFiles(Project $project, ?SourceIndexReaderInterface $reader, SourceIndexWriterInterface $writer, Cancellation $cancellation, ?int $collectionThreshold): array
     {
         $entries = [];
-        if (null === $reader || !$reader->hasRecords()) {
-            foreach ($this->sourceFiles($project, $cancellation) as $relativePath => $source) {
-                $processed = $this->scanSourceFile($source['location'], $source['languageId'], null);
-                if (null === $processed) {
-                    continue;
-                }
-                $entries[$relativePath] = $processed->metadata;
-                $writer->add($relativePath, $processed->metadata, $processed->payloads);
-                $collectionThreshold = $this->collectCycles($processed->parsed, $collectionThreshold);
-            }
-
-            return $entries;
-        }
-
-        $sources = iterator_to_array($this->sourceFiles($project, $cancellation));
-        $processedCount = 0;
-        foreach ($reader->records() as $relativePath => $cached) {
-            if (0 === ++$processedCount % 64) {
-                delay(0, cancellation: $cancellation);
-            }
-            $cancellation->throwIfRequested();
-            $source = $sources[$relativePath] ?? null;
-            if (null === $source) {
-                continue;
-            }
-            unset($sources[$relativePath]);
+        foreach ($this->scanJobs($project, $reader, $cancellation) as $relativePath => [$source, $cached]) {
             $processed = $this->scanSourceFile($source['location'], $source['languageId'], $cached);
-            if (null === $processed) {
-                continue;
-            }
-            $entries[$relativePath] = $processed->metadata;
-            $writer->add($relativePath, $processed->metadata, $processed->payloads);
-            $collectionThreshold = $this->collectCycles($processed->parsed, $collectionThreshold);
-        }
-        foreach ($sources as $relativePath => $source) {
-            if (0 === ++$processedCount % 64) {
-                delay(0, cancellation: $cancellation);
-            }
-            $cancellation->throwIfRequested();
-            $processed = $this->scanSourceFile($source['location'], $source['languageId'], null);
             if (null === $processed) {
                 continue;
             }
@@ -319,6 +281,45 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         }
 
         return $entries;
+    }
+
+    /**
+     * Cached files come first in their stored order so the reader streams its records once.
+     *
+     * @return \Generator<string, array{array{location: SourceIndexFileLocation, languageId: string}, ?SourceIndexRecord}>
+     */
+    private function scanJobs(Project $project, ?SourceIndexReaderInterface $reader, Cancellation $cancellation): \Generator
+    {
+        if (null === $reader || !$reader->hasRecords()) {
+            foreach ($this->sourceFiles($project, $cancellation) as $relativePath => $source) {
+                yield $relativePath => [$source, null];
+            }
+
+            return;
+        }
+
+        $sources = iterator_to_array($this->sourceFiles($project, $cancellation));
+        $count = 0;
+        foreach ($reader->records() as $relativePath => $cached) {
+            $this->checkpoint(++$count, $cancellation);
+            $source = $sources[$relativePath] ?? null;
+            if (null !== $source) {
+                unset($sources[$relativePath]);
+                yield $relativePath => [$source, $cached];
+            }
+        }
+        foreach ($sources as $relativePath => $source) {
+            $this->checkpoint(++$count, $cancellation);
+            yield $relativePath => [$source, null];
+        }
+    }
+
+    private function checkpoint(int $count, Cancellation $cancellation): void
+    {
+        if (0 === $count % 64) {
+            delay(0, cancellation: $cancellation);
+        }
+        $cancellation->throwIfRequested();
     }
 
     /**
@@ -355,10 +356,7 @@ final class ApplicationSourceScanner implements ProjectStateInterface
     {
         $fileCount = 0;
         foreach ($this->files->files($project) as $path) {
-            if (0 === ++$fileCount % 64) {
-                delay(0, cancellation: $cancellation);
-            }
-            $cancellation->throwIfRequested();
+            $this->checkpoint(++$fileCount, $cancellation);
             $relativePath = $this->files->relativePath($project, $path);
             if (null === $relativePath) {
                 continue;
