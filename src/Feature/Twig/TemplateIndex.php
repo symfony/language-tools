@@ -3,23 +3,26 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
+use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 
-final class TemplateIndex
+/** @extends AbstractSourceFactsIndex<TemplateSourceFacts> */
+final class TemplateIndex extends AbstractSourceFactsIndex
 {
     /** @var array<string, TemplateDeclaration> */
     private array $runtime = [];
-    /** @var array<string, TemplateDeclaration> */
-    private array $sources = [];
-    /** @var array<string, list<TemplateReference>> */
-    private array $references = [];
-    /** @var array<string, array{declaration: ?TemplateDeclaration, references: list<TemplateReference>}> */
-    private array $overlays = [];
     private bool $complete = false;
     /** @var list<string> */
     private array $globals = [];
 
+    /** @var array<string, TemplateDeclaration> */
+    private array $declarations = [];
+
+    /** @var array<string, list<TemplateReference>> */
+    private array $references = [];
+
     public function __construct(private readonly DependencyInjectionSourceIndex $classes)
     {
+        parent::__construct();
     }
 
     /** @param list<string> $globals */
@@ -38,85 +41,24 @@ final class TemplateIndex
             $this->runtime[$template->name] ??= $template;
         }
         $this->complete = $complete;
-    }
-
-    public function replaceSources(TemplateDeclaration ...$templates): void
-    {
-        $this->sources = [];
-        foreach ($templates as $template) {
-            $this->sources[$template->uri] = $template;
-        }
-    }
-
-    public function replaceReferences(TemplateReference ...$references): void
-    {
-        $this->references = [];
-        foreach ($references as $reference) {
-            $this->references[$reference->uri][] = $reference;
-        }
-    }
-
-    /** @param list<TemplateReference> $references */
-    public function replaceSource(string $uri, ?TemplateDeclaration $declaration, array $references): void
-    {
-        if (null === $declaration) {
-            unset($this->sources[$uri]);
-        } else {
-            $this->sources[$uri] = $declaration;
-        }
-        $this->references[$uri] = $references;
-    }
-
-    public function removeSource(string $uri): void
-    {
-        unset($this->sources[$uri], $this->references[$uri]);
-    }
-
-    /** @param list<TemplateReference> $references */
-    public function overlay(string $uri, ?TemplateDeclaration $declaration, array $references): void
-    {
-        $this->overlays[$uri] = ['declaration' => $declaration, 'references' => $references];
-    }
-
-    public function removeOverlay(string $uri): void
-    {
-        unset($this->overlays[$uri]);
+        $this->invalidate();
     }
 
     public function get(string $name): ?TemplateDeclaration
     {
-        $name = $this->normalize($name);
-        foreach ($this->overlays as $overlay) {
-            if ($overlay['declaration']?->name === $name) {
-                return $overlay['declaration'];
-            }
-        }
-        foreach ($this->sourceDeclarations() as $declaration) {
-            if ($declaration->name === $name) {
-                return $declaration;
-            }
-        }
+        $this->derived();
 
-        return $this->runtime[$name] ?? null;
+        return $this->declarations[$this->normalize($name)] ?? null;
     }
 
     /** @return list<TemplateDeclaration> */
     public function matching(string $prefix): array
     {
+        $this->derived();
         $prefix = $this->normalize($prefix);
-        $templates = $this->runtime;
-        foreach ($this->sourceDeclarations() as $template) {
-            $templates[$template->name] = $template;
-        }
-        foreach ($this->overlays as $overlay) {
-            if (null !== $overlay['declaration']) {
-                $templates[$overlay['declaration']->name] = $overlay['declaration'];
-            }
-        }
-        ksort($templates);
 
         return array_values(array_filter(
-            $templates,
+            $this->declarations,
             static fn (TemplateDeclaration $template): bool => str_starts_with($template->name, $prefix),
         ));
     }
@@ -124,40 +66,17 @@ final class TemplateIndex
     /** @return list<TemplateReference> */
     public function references(string $name): array
     {
-        $name = $this->normalize($name);
-        $references = [];
-        foreach ($this->references as $uri => $indexed) {
-            if (isset($this->overlays[$uri])) {
-                continue;
-            }
-            foreach ($indexed as $reference) {
-                if ($this->normalize($reference->name) === $name && TemplatePhpReferenceResolver::supports($reference, $this->classes)) {
-                    $references[] = $reference;
-                }
-            }
-        }
-        foreach ($this->overlays as $overlay) {
-            foreach ($overlay['references'] as $reference) {
-                if ($this->normalize($reference->name) === $name && TemplatePhpReferenceResolver::supports($reference, $this->classes)) {
-                    $references[] = $reference;
-                }
-            }
-        }
+        $this->derived();
 
-        return $references;
+        return $this->supported($this->references[$this->normalize($name)] ?? []);
     }
 
     /** @return list<TemplateReference> */
     public function referencesForUri(string $uri): array
     {
-        $references = \array_key_exists($uri, $this->overlays)
-            ? $this->overlays[$uri]['references']
-            : $this->references[$uri] ?? [];
+        $facts = $this->factsForUri($uri);
 
-        return array_values(array_filter(
-            $references,
-            fn (TemplateReference $reference): bool => TemplatePhpReferenceResolver::supports($reference, $this->classes),
-        ));
+        return $this->supported(null === $facts ? [] : $facts->references);
     }
 
     public function isComplete(): bool
@@ -196,12 +115,33 @@ final class TemplateIndex
         return \in_array($name, $this->globals, true);
     }
 
-    /** @return list<TemplateDeclaration> */
-    private function sourceDeclarations(): array
+    protected function build(): void
+    {
+        $declarations = [];
+        $this->references = [];
+        foreach ($this->facts() as $facts) {
+            if (null !== $declaration = $facts->declaration) {
+                $declarations[$declaration->name] ??= $declaration;
+            }
+            foreach ($facts->references as $reference) {
+                $this->references[$this->normalize($reference->name)][] = $reference;
+            }
+        }
+
+        $this->declarations = array_replace($this->runtime, $declarations);
+        ksort($this->declarations);
+    }
+
+    /**
+     * @param list<TemplateReference> $references
+     *
+     * @return list<TemplateReference>
+     */
+    private function supported(array $references): array
     {
         return array_values(array_filter(
-            $this->sources,
-            fn (TemplateDeclaration $template): bool => !isset($this->overlays[$template->uri]),
+            $references,
+            fn (TemplateReference $reference): bool => TemplatePhpReferenceResolver::supports($reference, $this->classes),
         ));
     }
 

@@ -44,9 +44,9 @@ final class TemplateSourceIndexer extends AbstractSourceIndexer
         return TemplateSourceFacts::class;
     }
 
-    protected function sourceIndex(Project $project): TemplateSourceIndexAdapter
+    protected function sourceIndex(Project $project): TemplateIndex
     {
-        return new TemplateSourceIndexAdapter($this->indexes->forProject($project));
+        return $this->indexes->forProject($project);
     }
 
     protected function extract(Project $project, SourceDocument $document): TemplateSourceFacts

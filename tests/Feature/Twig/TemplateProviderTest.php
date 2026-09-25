@@ -27,6 +27,7 @@ use Symfony\Lsp\Feature\Twig\TemplateNavigationProvider;
 use Symfony\Lsp\Feature\Twig\TemplatePhpReferenceResolver;
 use Symfony\Lsp\Feature\Twig\TemplateReference;
 use Symfony\Lsp\Feature\Twig\TemplateReferenceExtractor;
+use Symfony\Lsp\Feature\Twig\TemplateSourceFacts;
 use Symfony\Lsp\Feature\Twig\TemplateSourceIndexer;
 use Symfony\Lsp\Feature\Twig\TwigComponent;
 use Symfony\Lsp\Feature\Twig\TwigComponentCodeLensProvider;
@@ -120,7 +121,7 @@ final class TemplateProviderTest extends TestCase
         );
     }
 
-    public function testPartialPhpOverlayUsesCurrentTemplateReferencesThroughTheAdapter(): void
+    public function testPartialPhpOverlayUsesCurrentTemplateReferences(): void
     {
         $converter = new PositionConverter();
         $parser = new TolerantPhpParser(new Parser());
@@ -413,7 +414,7 @@ final class TemplateProviderTest extends TestCase
                 PHP,
         );
         $references = $extractor->extractCandidates($document);
-        $indexes->forProject($project)->replaceReferences(...$references);
+        $indexes->forProject($project)->replace(new TemplateSourceFacts($document->uri, null, $references));
 
         self::assertCount(1, $extractor->extract($document, $classes));
         self::assertCount(1, $indexes->forProject($project)->references('article/show.html.twig'));
@@ -449,7 +450,7 @@ final class TemplateProviderTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = $this->templateIndexes();
-        $indexes->forProject($project)->replaceReferences($reference);
+        $indexes->forProject($project)->replace(new TemplateSourceFacts($reference->uri, null, [$reference]));
         $indexes->forProject($project)->replaceGlobals(['app']);
         $commentParser = new TwigCommentParser();
         $provider = new TwigVariableProvider(
@@ -925,7 +926,7 @@ final class TemplateProviderTest extends TestCase
             $uri,
             classes: (new PhpClassDeclarationExtractor($converter, $phpParser))->extract($uri, $text),
         ));
-        $indexes->forProject($project)->replaceReferences(...$extractor->extractCandidates(new SourceDocument($uri, 'php', $text)));
+        $indexes->forProject($project)->replace(new TemplateSourceFacts($uri, null, $extractor->extractCandidates(new SourceDocument($uri, 'php', $text))));
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
         $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
@@ -963,7 +964,7 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration('page.html.twig', $uri, $converter->toRange($text, 0, 0)),
             new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', $converter->toRange($text, 0, 0)),
         );
-        $indexes->forProject($project)->replaceReferences(...$extractor->extractCandidates(new SourceDocument($uri, 'twig', $text)));
+        $indexes->forProject($project)->replace(new TemplateSourceFacts($uri, null, $extractor->extractCandidates(new SourceDocument($uri, 'twig', $text))));
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $diagnostics = (new TemplateNavigationProvider($resolver, new PositionedSourceSymbolResolver($converter), $protocol, $extractor, $indexes, $classIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -1006,7 +1007,7 @@ final class TemplateProviderTest extends TestCase
             $uri,
             classes: (new PhpClassDeclarationExtractor($positionConverter, $phpParser))->extract($uri, $text),
         ));
-        $indexes->forProject($project)->replaceReferences(...$extractor->extractCandidates(new SourceDocument($uri, 'php', $text)));
+        $indexes->forProject($project)->replace(new TemplateSourceFacts($uri, null, $extractor->extractCandidates(new SourceDocument($uri, 'php', $text))));
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($positionConverter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
 
         try {
@@ -1254,7 +1255,7 @@ final class TemplateProviderTest extends TestCase
             ));
         }
         if ($indexReferences) {
-            $indexes->forProject($project)->replaceReferences(...$extractor->extractCandidates(new SourceDocument($uri, $languageId, $text)));
+            $indexes->forProject($project)->replace(new TemplateSourceFacts($uri, null, $extractor->extractCandidates(new SourceDocument($uri, $languageId, $text))));
         }
         $resolver = new DocumentContextResolver($documents, $projects);
 
@@ -1276,7 +1277,11 @@ final class TemplateProviderTest extends TestCase
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $indexes = $this->templateIndexes($classIndexes);
         $converter = new PositionConverter();
-        $indexes->forProject($project)->replaceSources(new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', new Range(new Position(0, 0), new Position(0, 0))));
+        $indexes->forProject($project)->replace(new TemplateSourceFacts(
+            'file:///workspace/templates/article/show.html.twig',
+            new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', new Range(new Position(0, 0), new Position(0, 0))),
+            [],
+        ));
         $handler = new TemplateCompletionHandler(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $this->templateReferenceExtractor($converter), $classIndexes, new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]));
         $position = $converter->toPosition($text, \strlen($text));
 
