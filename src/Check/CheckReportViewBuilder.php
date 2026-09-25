@@ -41,15 +41,9 @@ final class CheckReportViewBuilder
         );
 
         return new CheckReportView(
-            $result->version,
-            $result->complete,
-            $result->projects,
+            $result,
             $diagnostics,
             $staleBaseline,
-            $result->baselinePath,
-            $result->baselineMode,
-            $result->strictBaseline,
-            $result->errors,
             new CheckReportSummary(
                 \count($diagnostics),
                 $active,
@@ -58,7 +52,6 @@ final class CheckReportViewBuilder
                 $result->blockingCount,
             ),
             $exitCode,
-            $result->profile,
         );
     }
 }

@@ -27,11 +27,11 @@ final class SarifCheckReportFormat implements CheckReportFormatInterface
     public function render(CheckReportView $view, bool $verbose): string
     {
         $configurationNotifications = array_map(
-            fn (CheckReportBaselineEntryView $entryView): array => $this->staleBaselineNotification($entryView, $view->strictBaseline),
+            fn (CheckReportBaselineEntryView $entryView): array => $this->staleBaselineNotification($entryView, $view->result->strictBaseline),
             $view->staleBaseline,
         );
         $executionNotifications = [];
-        foreach ($view->errors as $error) {
+        foreach ($view->result->errors as $error) {
             $notification = $this->errorNotification($error);
             if ('invocation' === $error['category']) {
                 $configurationNotifications[] = $notification;
@@ -41,7 +41,7 @@ final class SarifCheckReportFormat implements CheckReportFormatInterface
         }
 
         $invocation = [
-            'executionSuccessful' => $view->complete,
+            'executionSuccessful' => $view->result->complete,
             'exitCode' => $view->exitCode,
         ];
         if ([] !== $configurationNotifications) {
@@ -57,12 +57,12 @@ final class SarifCheckReportFormat implements CheckReportFormatInterface
             'invocations' => [$invocation],
             'results' => $this->results($view->diagnostics),
             'properties' => [
-                'symfonyLsp.complete' => $view->complete,
-                'symfonyLsp.projects' => array_map($this->project(...), $view->projects),
+                'symfonyLsp.complete' => $view->result->complete,
+                'symfonyLsp.projects' => array_map($this->project(...), $view->result->projects),
                 'symfonyLsp.baseline' => [
-                    'path' => $view->baselinePath,
-                    'mode' => $view->baselineMode,
-                    'strict' => $view->strictBaseline,
+                    'path' => $view->result->baselinePath,
+                    'mode' => $view->result->baselineMode,
+                    'strict' => $view->result->strictBaseline,
                 ],
                 'symfonyLsp.summary' => $view->summary->toArray(),
             ],

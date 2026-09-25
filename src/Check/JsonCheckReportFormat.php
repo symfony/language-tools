@@ -15,9 +15,9 @@ final class JsonCheckReportFormat implements CheckReportFormatInterface
             'schemaVersion' => 1,
             'tool' => [
                 'name' => 'Symfony Language Tools',
-                'version' => $view->version,
+                'version' => $view->result->version,
             ],
-            'complete' => $view->complete,
+            'complete' => $view->result->complete,
             'coordinates' => [
                 'lineBase' => 0,
                 'characterBase' => 0,
@@ -34,8 +34,8 @@ final class JsonCheckReportFormat implements CheckReportFormatInterface
                 'source' => $project->source,
                 'runtime' => $project->runtime,
                 'complete' => $project->complete,
-            ], $view->projects),
-            ...(null === $view->profile ? [] : ['profile' => $view->profile->toArray()]),
+            ], $view->result->projects),
+            ...(null === $view->result->profile ? [] : ['profile' => $view->result->profile->toArray()]),
             'diagnostics' => array_map(static fn (CheckReportDiagnosticView $diagnosticView): array => [
                 'project' => $diagnosticView->diagnostic->project,
                 'path' => $diagnosticView->diagnostic->path,
@@ -57,13 +57,13 @@ final class JsonCheckReportFormat implements CheckReportFormatInterface
                 ],
             ], $view->diagnostics),
             'baseline' => [
-                'path' => $view->baselinePath,
-                'mode' => $view->baselineMode,
-                'strict' => $view->strictBaseline,
+                'path' => $view->result->baselinePath,
+                'mode' => $view->result->baselineMode,
+                'strict' => $view->result->strictBaseline,
                 'stale' => array_map(static fn (CheckReportBaselineEntryView $entryView): array => $entryView->entry->toArray(), $view->staleBaseline),
             ],
             'summary' => $view->summary->toArray(),
-            'errors' => $view->errors,
+            'errors' => $view->result->errors,
         ], \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE)."\n";
     }
 

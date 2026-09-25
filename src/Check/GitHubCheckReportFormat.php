@@ -12,7 +12,7 @@ final class GitHubCheckReportFormat implements CheckReportFormatInterface
     public function render(CheckReportView $view, bool $verbose): string
     {
         $lines = [];
-        foreach ($view->projects as $project) {
+        foreach ($view->result->projects as $project) {
             $message = !$project->complete
                 ? \sprintf('Project %s analysis is incomplete.', $project->id)
                 : ('runtime' === $project->mode
@@ -58,7 +58,7 @@ final class GitHubCheckReportFormat implements CheckReportFormatInterface
                 $this->escapeData(\sprintf('[%s] %s (occurrence %d)', $entryView->entry->code, $entryView->entry->message, $entryView->entry->occurrence)),
             );
         }
-        foreach ($view->errors as $error) {
+        foreach ($view->result->errors as $error) {
             $lines[] = '::error title=Symfony diagnostics check::'.$this->escapeData($error['message']);
         }
         $lines[] = \sprintf(

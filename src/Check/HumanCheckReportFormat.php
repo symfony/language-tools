@@ -16,7 +16,7 @@ final class HumanCheckReportFormat implements CheckReportFormatInterface
     public function render(CheckReportView $view, bool $verbose): string
     {
         $lines = [];
-        foreach ($view->projects as $project) {
+        foreach ($view->result->projects as $project) {
             $mode = 'runtime' === $project->mode
                 ? 'runtime metadata'
                 : 'source-only ('.$project->sourceOnlyDescription().')';
@@ -53,7 +53,7 @@ final class HumanCheckReportFormat implements CheckReportFormatInterface
                 $entry->occurrence,
             );
         }
-        foreach ($view->errors as $error) {
+        foreach ($view->result->errors as $error) {
             $lines[] = \sprintf(
                 'ERROR%s: %s',
                 isset($error['project']) ? ' ['.$error['project'].']' : '',
