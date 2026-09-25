@@ -106,10 +106,7 @@ final class IndexCommandHandler
     /** @param array<array-key, mixed> $params */
     private function environment(array $params): ?string
     {
-        $arguments = $params['arguments'] ?? null;
-        $environment = \is_array($arguments) ? ($arguments[1] ?? null) : null;
-
-        return \is_string($environment) && preg_match('/^[A-Za-z0-9_.-]+$/', $environment) ? $environment : null;
+        return $this->setting('environment', $this->argument($params));
     }
 
     /**
@@ -119,22 +116,31 @@ final class IndexCommandHandler
      */
     private function kernel(array $params): ?string
     {
+        $kernel = $this->argument($params);
+
+        return '' === $kernel ? '' : $this->setting('kernel', $kernel);
+    }
+
+    /** @param array<array-key, mixed> $params */
+    private function argument(array $params): mixed
+    {
         $arguments = $params['arguments'] ?? null;
-        $kernel = \is_array($arguments) ? ($arguments[1] ?? null) : null;
-        if (!\is_string($kernel)) {
+
+        return \is_array($arguments) ? ($arguments[1] ?? null) : null;
+    }
+
+    private function setting(string $name, mixed $value): ?string
+    {
+        if (!\is_string($value)) {
             return null;
         }
-        if ('' === $kernel) {
-            return '';
-        }
-
         try {
-            $normalized = $this->analysisSettings->normalizeProject(['kernel' => $kernel]);
+            $normalized = $this->analysisSettings->normalizeProject([$name => $value]);
         } catch (InvalidConfigurationException) {
             return null;
         }
 
-        return \is_string($normalized['kernel'] ?? null) ? $normalized['kernel'] : null;
+        return \is_string($normalized[$name] ?? null) ? $normalized[$name] : null;
     }
 
     /**

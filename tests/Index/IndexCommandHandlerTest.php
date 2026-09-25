@@ -103,6 +103,14 @@ final class IndexCommandHandlerTest extends TestCase
         self::assertSame('test', $switched[0]['environment'] ?? null);
         self::assertSame(RuntimeRefreshMode::Clear, $runtime->plans[1]->mode());
 
+        foreach (["prod\n", 'prod env', ''] as $invalid) {
+            self::assertNull($handler->execute([
+                'command' => IndexCommandHandler::SWITCH_ENVIRONMENT_COMMAND,
+                'arguments' => [$project->rootUri, $invalid],
+            ]));
+        }
+        self::assertSame('test', $runtimeConfiguration->environment($project));
+
         $workspaceTrust->set($project, TrustStatus::Untrusted);
         $untrusted = $handler->execute([
             'command' => IndexCommandHandler::STATUS_COMMAND,
