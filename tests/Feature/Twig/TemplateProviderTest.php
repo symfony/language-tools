@@ -45,6 +45,7 @@ use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\CommentParserRegistry;
+use Symfony\Lsp\Parser\Html\HtmlCommentParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -800,6 +801,7 @@ final class TemplateProviderTest extends TestCase
                 $names,
                 new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
                 new TwigCallArgumentResolver(new TwigArgumentParser()),
+                new HtmlCommentParser(),
             ),
         );
     }

@@ -25,6 +25,7 @@ use Symfony\Lsp\Feature\Stimulus\StimulusResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusSourceIndexRegistry;
 use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\Html\HtmlCommentParser;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -283,7 +284,7 @@ final class StimulusProviderTest extends TestCase
 
         return new StimulusExtractor(
             new StimulusControllerExtractor($converter, ProjectPaths::resolver(), $controllerNameNormalizer, new StimulusControllerSourceAnalyzer($converter)),
-            new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser()), new HtmlCommentParser()),
             new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
             $tokenizer,
         );
