@@ -30,19 +30,15 @@ final class CheckRunner
         $this->installSignalHandlers($cancellation->signal());
 
         try {
-            $analysisStartedAt = $this->profiler->measurement();
-            try {
-                $analysis = $this->projects->analyze($plan, $cancellation, $options->verbose);
-            } finally {
-                $this->profiler->recordPhase('projectAnalysis', $analysisStartedAt);
-            }
+            $analysis = $this->profiler->phase(
+                'projectAnalysis',
+                fn () => $this->projects->analyze($plan, $cancellation, $options->verbose),
+            );
             if (!$analysis->canceled) {
-                $diagnosticsStartedAt = $this->profiler->measurement();
-                try {
-                    $execution = $this->diagnostics->execute($plan, $analysis, $cancellation);
-                } finally {
-                    $this->profiler->recordPhase('diagnostics', $diagnosticsStartedAt);
-                }
+                $execution = $this->profiler->phase(
+                    'diagnostics',
+                    fn () => $this->diagnostics->execute($plan, $analysis, $cancellation),
+                );
             }
         } catch (\Throwable $error) {
             $execution = new CheckDiagnosticExecution(

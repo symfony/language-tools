@@ -7,21 +7,21 @@ use Symfony\Lsp\Project\ProjectConfiguration;
 
 final class CheckProfiler
 {
-    private const PHASES = [
-        'startup',
-        'configuration',
-        'projectDiscovery',
-        'fileSelection',
-        'projectAnalysis',
-        'diagnostics',
-        'resultProcessing',
+    public const PHASES = [
+        'startup' => 'Executable startup',
+        'configuration' => 'Configuration',
+        'projectDiscovery' => 'Project discovery',
+        'fileSelection' => 'File selection',
+        'projectAnalysis' => 'Project analysis',
+        'diagnostics' => 'Diagnostics',
+        'resultProcessing' => 'Result processing',
     ];
 
-    private const PROJECT_PHASES = [
-        'sourceIndex',
-        'filePreparation',
-        'runtimeIndex',
-        'diagnostics',
+    public const PROJECT_PHASES = [
+        'sourceIndex' => 'Source indexing',
+        'filePreparation' => 'File preparation',
+        'runtimeIndex' => 'Runtime indexing',
+        'diagnostics' => 'Diagnostics',
     ];
 
     private bool $enabled = false;
@@ -60,22 +60,68 @@ final class CheckProfiler
         return $this->enabled ? (float) hrtime(true) : null;
     }
 
-    public function recordPhase(string $phase, ?float $startedAt): void
+    /**
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
+     */
+    public function phase(string $phase, callable $work): mixed
     {
-        if (null === $startedAt) {
-            return;
-        }
-
-        $this->phases[$phase] = ($this->phases[$phase] ?? 0.0) + $this->elapsedNanoseconds($startedAt);
+        return $this->measure($work, function (float $elapsed) use ($phase): void {
+            $this->phases[$phase] = ($this->phases[$phase] ?? 0.0) + $elapsed;
+        });
     }
 
-    public function recordBaselineMatching(?float $startedAt): void
+    /**
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
+     */
+    public function projectPhase(Project $project, string $phase, callable $work): mixed
     {
-        if (null === $startedAt) {
-            return;
-        }
+        return $this->measure($work, function (float $elapsed) use ($project, $phase): void {
+            $profile = &$this->project($project);
+            $profile['phases'][$phase] = ($profile['phases'][$phase] ?? 0.0) + $elapsed;
+        });
+    }
 
-        $this->baselineMatching = ($this->baselineMatching ?? 0.0) + $this->elapsedNanoseconds($startedAt);
+    /**
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
+     */
+    public function baselineMatching(callable $work): mixed
+    {
+        return $this->measure($work, function (float $elapsed): void {
+            $this->baselineMatching = ($this->baselineMatching ?? 0.0) + $elapsed;
+        });
+    }
+
+    /**
+     * @template T
+     *
+     * @param callable(): T         $work
+     * @param callable(float): void $record
+     *
+     * @return T
+     */
+    private function measure(callable $work, callable $record): mixed
+    {
+        $startedAt = $this->measurement();
+
+        try {
+            return $work();
+        } finally {
+            if (null !== $startedAt) {
+                $record($this->elapsedNanoseconds($startedAt));
+            }
+        }
     }
 
     public function recordProjectFiles(Project $project, int $files): void
@@ -86,16 +132,6 @@ final class CheckProfiler
 
         $profile = &$this->project($project);
         $profile['files'] = $files;
-    }
-
-    public function recordProjectPhase(Project $project, string $phase, ?float $startedAt): void
-    {
-        if (null === $startedAt) {
-            return;
-        }
-
-        $profile = &$this->project($project);
-        $profile['phases'][$phase] = ($profile['phases'][$phase] ?? 0.0) + $this->elapsedNanoseconds($startedAt);
     }
 
     /** @param array<string, float> $providerNanoseconds */
@@ -141,7 +177,7 @@ final class CheckProfiler
             $projects[] = new CheckProfileProject(
                 $id,
                 $profile['files'],
-                $this->millisecondsByName($profile['phases'], self::PROJECT_PHASES),
+                $this->millisecondsByName($profile['phases'], array_keys(self::PROJECT_PHASES)),
                 $this->milliseconds($this->sorted($profile['diagnosticProviders'])),
                 $this->milliseconds($this->sorted($profile['slowestFiles'])),
             );
@@ -149,7 +185,7 @@ final class CheckProfiler
 
         return $this->finished = new CheckProfile(
             $this->millisecondsValue($this->elapsedNanoseconds($this->startedAt)),
-            $this->millisecondsByName($this->phases, self::PHASES),
+            $this->millisecondsByName($this->phases, array_keys(self::PHASES)),
             null === $this->baselineMatching ? null : $this->millisecondsValue($this->baselineMatching),
             $projects,
         );

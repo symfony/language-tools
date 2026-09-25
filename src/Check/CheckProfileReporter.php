@@ -19,15 +19,7 @@ final class CheckProfileReporter
         $lines = ['Timing profile:'];
         $lines[] = $this->line(1, 'Total', $profile->totalMilliseconds);
         $lines[] = '  Phases:';
-        foreach ([
-            'startup' => 'Executable startup',
-            'configuration' => 'Configuration',
-            'projectDiscovery' => 'Project discovery',
-            'fileSelection' => 'File selection',
-            'projectAnalysis' => 'Project analysis',
-            'diagnostics' => 'Diagnostics',
-            'resultProcessing' => 'Result processing',
-        ] as $name => $label) {
+        foreach (CheckProfiler::PHASES as $name => $label) {
             if (null !== $profile->phasesMilliseconds[$name]) {
                 $lines[] = $this->line(2, $label, $profile->phasesMilliseconds[$name]);
             }
@@ -49,12 +41,7 @@ final class CheckProfileReporter
                 $projectProfile->phasesMilliseconds,
                 static fn (?float $milliseconds): bool => null !== $milliseconds,
             )));
-            foreach ([
-                'sourceIndex' => 'Source indexing',
-                'filePreparation' => 'File preparation',
-                'runtimeIndex' => 'Runtime indexing',
-                'diagnostics' => 'Diagnostics',
-            ] as $name => $label) {
+            foreach (CheckProfiler::PROJECT_PHASES as $name => $label) {
                 if (null === $projectProfile->phasesMilliseconds[$name]) {
                     continue;
                 }

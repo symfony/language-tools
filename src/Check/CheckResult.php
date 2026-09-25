@@ -32,4 +32,21 @@ final class CheckResult
         public readonly ?CheckProfile $profile = null,
     ) {
     }
+
+    public function withProfile(?CheckProfile $profile): self
+    {
+        return new self(
+            $this->version,
+            $this->complete,
+            $this->projects,
+            $this->diagnostics,
+            $this->staleBaseline,
+            $this->baselinePath,
+            $this->baselineMode,
+            $this->strictBaseline,
+            $this->errors,
+            $this->blockingCount,
+            $profile,
+        );
+    }
 }

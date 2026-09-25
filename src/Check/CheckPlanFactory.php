@@ -29,45 +29,22 @@ final class CheckPlanFactory
 
     public function create(CheckOptions $options, float $deadline): CheckPlan
     {
-        $configurationStartedAt = $this->profiler->measurement();
-        try {
-            $workspace = $this->workspace($options->workspace);
-            $folder = ['uri' => $this->uriToPathConverter->toUri($workspace)];
-            $this->projectConfiguration->load([$folder], $options->configurationPath);
-            $this->runtimeConfiguration->configure($options->overrides);
-            $this->assertBeforeDeadline($deadline, $options->timeout);
-
-            $projectRoots = [] !== $options->projectRoots
-                ? $this->projectRoots($workspace, $options->projectRoots)
-                : ($this->projectConfiguration->projectRoots($workspace) ?? []);
-        } finally {
-            $this->profiler->recordPhase('configuration', $configurationStartedAt);
-        }
-
-        $discoveryStartedAt = $this->profiler->measurement();
-        try {
-            $projects = $this->projectDiscovery->discover([$folder], $projectRoots);
-            if ([] !== $options->projectRoots) {
-                $this->validateProjectRoots($projectRoots, $projects);
-            }
-            $this->projectConfiguration->validateProjects($projects);
-            $this->projects->replace($projects);
-            if ([] === $projects) {
-                throw new InvalidConfigurationException('No Symfony project was discovered in the workspace.');
-            }
-            $this->projectSettings->applyFileSettings($options->overrides);
-            $this->assertBeforeDeadline($deadline, $options->timeout);
-        } finally {
-            $this->profiler->recordPhase('projectDiscovery', $discoveryStartedAt);
-        }
-
-        $selectionStartedAt = $this->profiler->measurement();
-        try {
+        $workspace = $this->workspace($options->workspace);
+        $folder = ['uri' => $this->uriToPathConverter->toUri($workspace)];
+        $projectRoots = $this->profiler->phase(
+            'configuration',
+            fn () => $this->configure($options, $workspace, $folder, $deadline),
+        );
+        $this->profiler->phase(
+            'projectDiscovery',
+            fn () => $this->discoverProjects($options, $folder, $projectRoots, $deadline),
+        );
+        $files = $this->profiler->phase('fileSelection', function () use ($options, $workspace, $deadline) {
             $files = $this->fileSelector->select($workspace, $options->selectors);
             $this->assertBeforeDeadline($deadline, $options->timeout);
-        } finally {
-            $this->profiler->recordPhase('fileSelection', $selectionStartedAt);
-        }
+
+            return $files;
+        });
 
         $filesByProject = [];
         $selectedProjects = [];
@@ -81,6 +58,41 @@ final class CheckPlanFactory
         }
 
         return new CheckPlan($workspace, $files, $filesByProject, $selectedProjects);
+    }
+
+    /**
+     * @param array{uri: string} $folder
+     *
+     * @return list<string>
+     */
+    private function configure(CheckOptions $options, string $workspace, array $folder, float $deadline): array
+    {
+        $this->projectConfiguration->load([$folder], $options->configurationPath);
+        $this->runtimeConfiguration->configure($options->overrides);
+        $this->assertBeforeDeadline($deadline, $options->timeout);
+
+        return [] !== $options->projectRoots
+            ? $this->projectRoots($workspace, $options->projectRoots)
+            : ($this->projectConfiguration->projectRoots($workspace) ?? []);
+    }
+
+    /**
+     * @param array{uri: string} $folder
+     * @param list<string>       $projectRoots
+     */
+    private function discoverProjects(CheckOptions $options, array $folder, array $projectRoots, float $deadline): void
+    {
+        $projects = $this->projectDiscovery->discover([$folder], $projectRoots);
+        if ([] !== $options->projectRoots) {
+            $this->validateProjectRoots($projectRoots, $projects);
+        }
+        $this->projectConfiguration->validateProjects($projects);
+        $this->projects->replace($projects);
+        if ([] === $projects) {
+            throw new InvalidConfigurationException('No Symfony project was discovered in the workspace.');
+        }
+        $this->projectSettings->applyFileSettings($options->overrides);
+        $this->assertBeforeDeadline($deadline, $options->timeout);
     }
 
     private function workspace(string $workspace): string

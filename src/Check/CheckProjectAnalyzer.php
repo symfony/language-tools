@@ -36,12 +36,11 @@ final class CheckProjectAnalyzer
             foreach ($plan->projects as $project) {
                 $root = $project->rootPath;
                 $cancellation->checkpoint();
-                $sourceStartedAt = $this->profiler->measurement();
-                try {
-                    $this->sourceScanner->refreshProject($project, $cancellation->cancellation());
-                } finally {
-                    $this->profiler->recordProjectPhase($project, 'sourceIndex', $sourceStartedAt);
-                }
+                $this->profiler->projectPhase(
+                    $project,
+                    'sourceIndex',
+                    fn () => $this->sourceScanner->refreshProject($project, $cancellation->cancellation()),
+                );
                 $cancellation->checkpoint();
                 $status = $this->statuses->status($project);
                 $statuses[$root] = $status;
@@ -56,9 +55,7 @@ final class CheckProjectAnalyzer
                     continue;
                 }
 
-                $preparationStartedAt = $this->profiler->measurement();
-                try {
-                    $prepared = true;
+                $prepared = $this->profiler->projectPhase($project, 'filePreparation', function () use ($plan, $project, $root, $cancellation, &$errors, &$preparedHashes, &$preparedTexts): bool {
                     $preparedCount = 0;
                     foreach ($plan->filesByProject[$root] as $file) {
                         $cancellation->checkpoint();
@@ -66,9 +63,8 @@ final class CheckProjectAnalyzer
                         $text = file_get_contents($file->path);
                         if (false === $text) {
                             $errors[] = $this->errors->selectedFileUnreadable($file, $plan->workspace);
-                            $prepared = false;
 
-                            break;
+                            return false;
                         }
                         $hash = hash('sha256', $text);
                         if (!$file->excluded && $hash !== $this->sourceScanner->indexedHash($project, $file->path)) {
@@ -76,18 +72,17 @@ final class CheckProjectAnalyzer
                         }
                         if (!$file->excluded && $hash !== $this->sourceScanner->indexedHash($project, $file->path)) {
                             $errors[] = $this->errors->filePreparation($file, $plan->workspace);
-                            $prepared = false;
 
-                            break;
+                            return false;
                         }
                         $preparedHashes[$file->path] = $hash;
                         if ($file->excluded) {
                             $preparedTexts[$file->path] = $text;
                         }
                     }
-                } finally {
-                    $this->profiler->recordProjectPhase($project, 'filePreparation', $preparationStartedAt);
-                }
+
+                    return true;
+                });
                 if (!$prepared) {
                     $complete[$root] = false;
 
@@ -95,8 +90,7 @@ final class CheckProjectAnalyzer
                 }
 
                 if ($this->runtimeConfiguration->runtimeIndexing($project)) {
-                    $runtimeStartedAt = $this->profiler->measurement();
-                    try {
+                    $ready = $this->profiler->projectPhase($project, 'runtimeIndex', function () use ($plan, $project, $root, $cancellation, $verbose, &$errors, &$diagnosable, &$complete, &$statuses): bool {
                         $runtimeError = null;
                         try {
                             $this->runtimeInitializer->initialize($project, cancellation: $cancellation->cancellation());
@@ -108,23 +102,26 @@ final class CheckProjectAnalyzer
                         $cancellation->checkpoint();
                         $status = $this->statuses->status($project);
                         $statuses[$root] = $status;
-                        if ('ready' !== $status['runtime']['state']) {
-                            $errors[] = $this->errors->runtime(
-                                $project,
-                                $plan->workspace,
-                                $runtimeError,
-                                $status['runtime']['error'] ?? 'Runtime indexing did not complete.',
-                                $verbose,
-                            );
-                            $complete[$root] = false;
-                            if ($runtimeError instanceof ConfigurationValidationException || $runtimeError instanceof PartialRuntimeMetadataException) {
-                                $diagnosable[$root] = true;
-                            }
-
-                            continue;
+                        if ('ready' === $status['runtime']['state']) {
+                            return true;
                         }
-                    } finally {
-                        $this->profiler->recordProjectPhase($project, 'runtimeIndex', $runtimeStartedAt);
+
+                        $errors[] = $this->errors->runtime(
+                            $project,
+                            $plan->workspace,
+                            $runtimeError,
+                            $status['runtime']['error'] ?? 'Runtime indexing did not complete.',
+                            $verbose,
+                        );
+                        $complete[$root] = false;
+                        if ($runtimeError instanceof ConfigurationValidationException || $runtimeError instanceof PartialRuntimeMetadataException) {
+                            $diagnosable[$root] = true;
+                        }
+
+                        return false;
+                    });
+                    if (!$ready) {
+                        continue;
                     }
                 }
 
