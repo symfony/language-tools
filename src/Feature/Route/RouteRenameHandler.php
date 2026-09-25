@@ -34,7 +34,10 @@ final class RouteRenameHandler implements RenameProviderInterface
             return null;
         }
 
-        [, $symbol] = $resolved;
+        [$project, $symbol] = $resolved;
+        if ([] === $this->applicationDeclarations($project, $symbol->name)) {
+            return null;
+        }
 
         return [
             'range' => $this->protocol->range($symbol->range),
@@ -65,11 +68,8 @@ final class RouteRenameHandler implements RenameProviderInterface
         }
 
         $sourceIndex = $this->sourceIndexes->forProject($project);
-        $declarations = $sourceIndex->declarations($symbol->name);
-        if ([] === array_filter(
-            $declarations,
-            fn (RouteDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri),
-        )) {
+        $declarations = $this->applicationDeclarations($project, $symbol->name);
+        if ([] === $declarations) {
             return null;
         }
 
@@ -81,9 +81,7 @@ final class RouteRenameHandler implements RenameProviderInterface
             }
         }
         foreach ($declarations as $declaration) {
-            if ($this->pathResolver->isApplicationOwned($project, $declaration->uri)) {
-                $editsByUri[$declaration->uri][] = $this->edit($declaration->range, $newName);
-            }
+            $editsByUri[$declaration->uri][] = $this->edit($declaration->range, $newName);
         }
         ksort($editsByUri);
 
@@ -125,6 +123,15 @@ final class RouteRenameHandler implements RenameProviderInterface
         $symbol = $this->symbolResolver->resolve($request->project, SourceDocument::fromDocument($request->document), $request->position);
 
         return null === $symbol ? null : [$request->project, $symbol];
+    }
+
+    /** @return list<RouteDeclaration> */
+    private function applicationDeclarations(Project $project, string $name): array
+    {
+        return array_values(array_filter(
+            $this->sourceIndexes->forProject($project)->declarations($name),
+            fn (RouteDeclaration $declaration): bool => $this->pathResolver->isApplicationOwned($project, $declaration->uri),
+        ));
     }
 
     /**

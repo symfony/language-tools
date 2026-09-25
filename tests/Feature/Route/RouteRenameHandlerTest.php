@@ -164,10 +164,18 @@ final class RouteRenameHandlerTest extends TestCase
         self::assertNull($handler->rename([...$params, 'newName' => 'homepage']));
     }
 
+    public function testRefusesPreparingRouteDeclaredOutsideTheApplication(): void
+    {
+        [$handler, $params] = $this->handler('file:///workspace/vendor/acme/src/ArticleController.php');
+
+        self::assertNull($handler->prepare($params));
+        self::assertNull($handler->rename([...$params, 'newName' => 'article_display']));
+    }
+
     /**
      * @return array{RouteRenameHandler, array{textDocument: array{uri: string}, position: array{line: int, character: int}}}
      */
-    private function handler(): array
+    private function handler(string $declarationUri = 'file:///workspace/src/ArticleController.php'): array
     {
         $uri = 'file:///workspace/src/ConsumerController.php';
         $text = <<<'PHP'
@@ -186,7 +194,6 @@ final class RouteRenameHandlerTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
-        $declarationUri = 'file:///workspace/src/ArticleController.php';
         $vendorUri = 'file:///workspace/vendor/acme/Consumer.php';
         $sourceIndexes->forProject($project)->replace(
             new RouteSourceFacts($declarationUri, [new RouteDeclaration(
