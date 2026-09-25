@@ -257,17 +257,43 @@ final class YamlDocumentParser
     private function mergeMappings(array $parsed, array $recovered): array
     {
         $indexed = [];
-        foreach ($parsed as $mapping) {
-            $indexed[$mapping->keyStartByte] = true;
+        foreach ($parsed as $index => $mapping) {
+            $indexed[$mapping->keyStartByte] = $index;
         }
         foreach ($recovered as $mapping) {
-            if (!isset($indexed[$mapping->keyStartByte])) {
+            $index = $indexed[$mapping->keyStartByte] ?? null;
+            if (null === $index) {
                 $parsed[] = $mapping;
+                continue;
             }
+            $parsed[$index] = $this->withRecoveredAncestors($parsed[$index], $mapping);
         }
         usort($parsed, static fn (YamlMapping $left, YamlMapping $right): int => $left->keyStartByte <=> $right->keyStartByte);
 
         return $parsed;
+    }
+
+    /**
+     * An error node reparents pairs under the document root, so the tree keeps
+     * the key but loses the ancestors the recovered line indentation knows.
+     */
+    private function withRecoveredAncestors(YamlMapping $mapping, YamlMapping $recovered): YamlMapping
+    {
+        $depth = \count($recovered->path) - \count($mapping->path);
+        if ($depth <= 0 || [] !== $mapping->sequence || \array_slice($recovered->path, $depth) !== $mapping->path) {
+            return $mapping;
+        }
+
+        return new YamlMapping(
+            $recovered->path,
+            $mapping->value,
+            $mapping->keyStartByte,
+            $mapping->keyEndByte,
+            $mapping->valueStartByte,
+            $mapping->valueEndByte,
+            $recovered->sequence,
+            $recovered->scope,
+        );
     }
 
     /**

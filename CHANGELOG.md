@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep reading YAML keys at their real path when the file contains an unterminated flow collection
 - Keep publishing the diagnostics of the other integrations when one fails in the editor, and log the failure
 - Insert completed configuration values literally, so a value containing `$`, `}` or `\` such as `!php/enum App\Mode::FAST` is no longer mangled as a snippet
 - Publish an empty diagnostic list while a runtime index is incomplete, so stale route, template, Twig component, service and parameter diagnostics no longer stay on screen

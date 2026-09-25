@@ -39,6 +39,33 @@ final class YamlDocumentParserTest extends TestCase
         );
     }
 
+    public function testKeepsTheAncestorsOfMappingsBesideAnIncompleteFlowCollection(): void
+    {
+        $source = <<<'YAML'
+            framework:
+                messenger:
+                    default_bus: command.bus
+                    transports:
+                        async: '%env(MESSENGER_TRANSPORT_DSN)%'
+                    routing:
+                        App\Message\Report: [as
+            YAML;
+        $mappings = (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parse($source);
+
+        self::assertSame(
+            [
+                ['framework'],
+                ['framework', 'messenger'],
+                ['framework', 'messenger', 'default_bus'],
+                ['framework', 'messenger', 'transports'],
+                ['framework', 'messenger', 'transports', 'async'],
+                ['framework', 'messenger', 'routing'],
+                ['framework', 'messenger', 'routing', 'App\Message\Report'],
+            ],
+            array_map(static fn (YamlMapping $mapping): array => $mapping->path, $mappings),
+        );
+    }
+
     public function testResolvesTheParentPathAtAnIncompleteLine(): void
     {
         $source = <<<'YAML'
