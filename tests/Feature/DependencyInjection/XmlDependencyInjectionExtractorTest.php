@@ -72,6 +72,35 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
         );
     }
 
+    public function testTreatsDoubledPercentSignsAsEscapedLiterals(): void
+    {
+        $text = <<<'XML'
+            <container xmlns="http://symfony.com/schema/dic/services">
+                <services>
+                    <service id="app.formatter" class="App\Formatter" pattern="[%%datetime%%] %%message%%">
+                        <argument>%%escaped%%</argument>
+                        <argument>%kernel.environment%</argument>
+                        <argument>%%%wrapped%%%</argument>
+                        <argument>%root_dir%%document_folder%</argument>
+                    </service>
+                </services>
+            </container>
+            XML;
+        $facts = $this->extractor()->extract('file:///workspace/config/services.xml', $text);
+
+        self::assertNotNull($facts);
+        self::assertSame(
+            ['kernel.environment', 'wrapped', 'root_dir', 'document_folder'],
+            array_map(static fn ($reference): string => $reference->name, $facts->references),
+        );
+        $converter = new PositionConverter();
+        foreach ($facts->references as $reference) {
+            $start = $converter->toByteOffset($text, $reference->range->start);
+            $end = $converter->toByteOffset($text, $reference->range->end);
+            self::assertSame($reference->name, substr($text, $start, $end - $start));
+        }
+    }
+
     public function testUsesExactMarkupAndParentRelationships(): void
     {
         $text = <<<'XML'

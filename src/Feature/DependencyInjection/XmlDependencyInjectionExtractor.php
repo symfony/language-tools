@@ -159,9 +159,13 @@ final class XmlDependencyInjectionExtractor
     /** @return list<DependencyInjectionReference> */
     private function parameterReferences(string $uri, string $text, string $value, int $valueOffset): array
     {
-        preg_match_all('/%([^%\s"<>]+)%/', $value, $matches, \PREG_OFFSET_CAPTURE);
+        preg_match_all('/%%|%([^%\s"<>]+)%/', $value, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $references = [];
-        foreach ($matches[1] as [$name, $offset]) {
+        foreach ($matches as $match) {
+            if (!isset($match[1])) {
+                continue;
+            }
+            [$name, $offset] = $match[1];
             if (str_starts_with($name, 'env(')) {
                 continue;
             }
