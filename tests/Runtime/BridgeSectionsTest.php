@@ -307,6 +307,25 @@ final class BridgeSectionsTest extends TestCase
         ], $entity['fields'] ?? null);
     }
 
+    public function testReportsAnEmptyDoctrineSectionWhenDoctrineIsNotInstalled(): void
+    {
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('8.0.6');
+
+        $process = $this->bridge->run(['--sections=doctrine']);
+
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors'] ?? null, $snapshot);
+        self::assertIsArray($result['sections'] ?? null);
+        self::assertSame([
+            'complete' => true,
+            'enabled' => false,
+            'entities' => [],
+        ], $result['sections']['doctrine'] ?? null);
+    }
+
     public function testReportsUnavailableOptionalStimulusBundle(): void
     {
         (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('8.0.6');

@@ -46,4 +46,25 @@ final class ProjectDoctrineSnapshotLoaderTest extends TestCase
         self::assertNull($index->entity('App\Entity\Broken'));
         self::assertSame(['App\Entity\Book'], array_map(static fn ($item): string => $item->className, $index->entities()));
     }
+
+    public function testDropsRuntimeEntitiesWhenDoctrineIsNotInstalled(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $indexes = new DoctrineIndexRegistry();
+        $loader = new ProjectDoctrineSnapshotLoader($indexes, new ContainerPathMapper(new RuntimeConfiguration()), new UriToPathConverter());
+        $loader->load($project, [
+            'complete' => true,
+            'enabled' => true,
+            'entities' => [
+                ['className' => 'App\Entity\Book', 'file' => '/workspace/src/Entity/Book.php', 'fields' => []],
+            ],
+        ]);
+        self::assertNotNull($indexes->forProject($project)->entity('App\Entity\Book'));
+
+        $loader->load($project, ['complete' => true, 'enabled' => false, 'entities' => []]);
+
+        $index = $indexes->forProject($project);
+        self::assertNull($index->entity('App\Entity\Book'));
+        self::assertSame([], $index->entities());
+    }
 }
