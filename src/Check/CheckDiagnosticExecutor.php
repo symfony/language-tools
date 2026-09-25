@@ -9,7 +9,6 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
-use Symfony\Lsp\Project\ProjectConfiguration;
 
 final class CheckDiagnosticExecutor
 {
@@ -19,7 +18,6 @@ final class CheckDiagnosticExecutor
         private readonly DiagnosticCollector $diagnostics,
         private readonly DiagnosticCodeRegistry $diagnosticCodes,
         private readonly PositionConverter $positions,
-        private readonly ProjectConfiguration $projectConfiguration,
         private readonly CheckErrorFactory $errors,
         private readonly CheckProfiler $profiler,
     ) {
@@ -93,7 +91,6 @@ final class CheckDiagnosticExecutor
                                 try {
                                     $collected = CheckDiagnostic::fromProtocol(
                                         $file,
-                                        $this->projectConfiguration->projectId($file->project),
                                         $text,
                                         $diagnostic->diagnostic,
                                         $this->positions,

@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Check\CheckDiagnostic;
 use Symfony\Lsp\Check\CheckFile;
+use Symfony\Lsp\Check\CheckProject;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Project\Project;
 
@@ -17,9 +18,8 @@ final class CheckDiagnosticTest extends TestCase
     #[DataProvider('invalidRangeProvider')]
     public function testRejectsInvalidRanges(array $range): void
     {
-        $project = new Project('/workspace', 'file:///workspace');
         $file = new CheckFile(
-            $project,
+            new CheckProject(new Project('/workspace', 'file:///workspace'), '.'),
             '/workspace/config/services.yaml',
             'config/services.yaml',
             'config/services.yaml',
@@ -38,7 +38,7 @@ final class CheckDiagnosticTest extends TestCase
         $this->expectException(\UnexpectedValueException::class);
         $this->expectExceptionMessage('A diagnostic provider returned an invalid diagnostic.');
 
-        CheckDiagnostic::fromProtocol($file, '.', "services:\n", $diagnostic, new PositionConverter());
+        CheckDiagnostic::fromProtocol($file, "services:\n", $diagnostic, new PositionConverter());
     }
 
     /**

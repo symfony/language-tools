@@ -3,8 +3,6 @@
 namespace Symfony\Lsp\Check;
 
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationException;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeMetadataException;
 use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
@@ -19,17 +17,16 @@ use Symfony\Lsp\Server\SensitiveDataRedactor;
 final class CheckErrorFactory
 {
     public function __construct(
-        private readonly ProjectConfiguration $projectConfiguration,
         private readonly RuntimeConfiguration $runtimeConfiguration,
         private readonly SensitiveDataRedactor $redactor,
     ) {
     }
 
     /** @return CheckError */
-    public function sourceIndex(Project $project, string $workspace, string $message): array
+    public function sourceIndex(CheckProject $project, string $workspace, string $message): array
     {
         return $this->error('operational', $message, $workspace, [
-            'project' => $this->projectConfiguration->projectId($project),
+            'project' => $project->id,
         ]);
     }
 
@@ -64,7 +61,7 @@ final class CheckErrorFactory
     }
 
     /** @return CheckError */
-    public function runtime(Project $project, string $workspace, ?\Throwable $cause, string $fallback, bool $verbose): array
+    public function runtime(CheckProject $project, string $workspace, ?\Throwable $cause, string $fallback, bool $verbose): array
     {
         $configurationFailure = $cause instanceof ConfigurationValidationException;
         $error = $this->error(
@@ -72,8 +69,8 @@ final class CheckErrorFactory
             $this->runtimeMessage($cause, $fallback),
             $workspace,
             [
-                'project' => $this->projectConfiguration->projectId($project),
-                'environment' => $this->runtimeConfiguration->environment($project),
+                'project' => $project->id,
+                'environment' => $this->runtimeConfiguration->environment($project->project),
             ],
         );
         if (null !== $cause && !$configurationFailure) {
@@ -91,8 +88,8 @@ final class CheckErrorFactory
             \sprintf('Diagnostic provider "%s" failed for "%s".', $provider, $file->workspacePath),
             $workspace,
             [
-                'project' => $this->projectConfiguration->projectId($file->project),
-                'environment' => $this->runtimeConfiguration->environment($file->project),
+                'project' => $file->project->id,
+                'environment' => $this->runtimeConfiguration->environment($file->project->project),
                 'workspacePath' => $file->workspacePath,
                 'provider' => $provider,
             ],
@@ -110,8 +107,8 @@ final class CheckErrorFactory
             \sprintf('Diagnostic result processing failed for "%s".', $file->workspacePath),
             $workspace,
             [
-                'project' => $this->projectConfiguration->projectId($file->project),
-                'environment' => $this->runtimeConfiguration->environment($file->project),
+                'project' => $file->project->id,
+                'environment' => $this->runtimeConfiguration->environment($file->project->project),
                 'workspacePath' => $file->workspacePath,
             ],
         );
@@ -159,7 +156,7 @@ final class CheckErrorFactory
     private function fileError(CheckFile $file, string $workspace, string $message): array
     {
         return $this->error('operational', $message, $workspace, [
-            'project' => $this->projectConfiguration->projectId($file->project),
+            'project' => $file->project->id,
         ]);
     }
 

@@ -4,8 +4,6 @@ namespace Symfony\Lsp\Check;
 
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\InvalidConfigurationException;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 /** @phpstan-import-type ProjectIndexStatus from ProjectIndexStatusRegistry */
@@ -14,7 +12,6 @@ final class CheckResultBuilder
     public function __construct(
         private readonly BaselineManager $baseline,
         private readonly ProjectIndexStatusRegistry $statuses,
-        private readonly ProjectConfiguration $projectConfiguration,
         private readonly RuntimeConfiguration $runtimeConfiguration,
         private readonly CheckErrorFactory $errors,
         private readonly CheckProfiler $profiler,
@@ -55,7 +52,7 @@ final class CheckResultBuilder
                 && !isset($execution->incompleteProjects[$root]);
             $projects[] = $this->projectResult(
                 $project,
-                $analysis->statuses[$root] ?? $this->statuses->status($project),
+                $analysis->statuses[$root] ?? $this->statuses->status($project->project),
                 $complete,
             );
         }
@@ -125,16 +122,16 @@ final class CheckResultBuilder
     }
 
     /** @param ProjectIndexStatus $status */
-    private function projectResult(Project $project, array $status, bool $complete): CheckProjectResult
+    private function projectResult(CheckProject $project, array $status, bool $complete): CheckProjectResult
     {
-        $reason = $this->runtimeConfiguration->sourceOnlyReason($project);
+        $reason = $this->runtimeConfiguration->sourceOnlyReason($project->project);
         if (null !== $reason) {
             $status['runtime'] = ['state' => 'disabled', 'reason' => $reason];
         }
 
         return new CheckProjectResult(
-            $this->projectConfiguration->projectId($project),
-            $this->runtimeConfiguration->environment($project),
+            $project->id,
+            $this->runtimeConfiguration->environment($project->project),
             null === $reason ? 'runtime' : 'source-only',
             $reason,
             $status['source'],

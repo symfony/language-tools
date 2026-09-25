@@ -2,14 +2,12 @@
 
 namespace Symfony\Lsp\Check;
 
-use Symfony\Lsp\Project\Project;
-
 final class CheckPlan
 {
     /**
      * @param list<CheckFile>                $files
      * @param array<string, list<CheckFile>> $filesByProject
-     * @param array<string, Project>         $projects
+     * @param array<string, CheckProject>    $projects
      */
     public function __construct(
         public readonly string $workspace,

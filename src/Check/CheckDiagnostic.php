@@ -27,7 +27,7 @@ final class CheckDiagnostic
     }
 
     /** @param array<array-key, mixed> $diagnostic */
-    public static function fromProtocol(CheckFile $file, string $projectId, string $text, array $diagnostic, PositionConverter $positions, ?string $provider = null): self
+    public static function fromProtocol(CheckFile $file, string $text, array $diagnostic, PositionConverter $positions, ?string $provider = null): self
     {
         $range = $diagnostic['range'] ?? null;
         $start = \is_array($range) ? ($range['start'] ?? null) : null;
@@ -67,7 +67,7 @@ final class CheckDiagnostic
             $evidence = trim($lines[$start['line']] ?? '');
         }
         $fingerprint = hash('sha256', json_encode([
-            $projectId,
+            $file->project->id,
             $file->projectPath,
             $code,
             $severity,
@@ -77,7 +77,7 @@ final class CheckDiagnostic
         ], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE));
 
         return new self(
-            $projectId,
+            $file->project->id,
             $file->projectPath,
             $file->workspacePath,
             $start['line'],

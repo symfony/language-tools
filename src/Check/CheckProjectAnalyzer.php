@@ -39,10 +39,10 @@ final class CheckProjectAnalyzer
                 $this->profiler->projectPhase(
                     $project,
                     'sourceIndex',
-                    fn () => $this->sourceScanner->refreshProject($project, $cancellation->cancellation()),
+                    fn () => $this->sourceScanner->refreshProject($project->project, $cancellation->cancellation()),
                 );
                 $cancellation->checkpoint();
-                $status = $this->statuses->status($project);
+                $status = $this->statuses->status($project->project);
                 $statuses[$root] = $status;
                 if ('ready' !== $status['source']['state']) {
                     $errors[] = $this->errors->sourceIndex(
@@ -67,10 +67,10 @@ final class CheckProjectAnalyzer
                             return false;
                         }
                         $hash = hash('sha256', $text);
-                        if (!$file->excluded && $hash !== $this->sourceScanner->indexedHash($project, $file->path)) {
+                        if (!$file->excluded && $hash !== $this->sourceScanner->indexedHash($project->project, $file->path)) {
                             $this->sourceScanner->refreshUri($file->uri);
                         }
-                        if (!$file->excluded && $hash !== $this->sourceScanner->indexedHash($project, $file->path)) {
+                        if (!$file->excluded && $hash !== $this->sourceScanner->indexedHash($project->project, $file->path)) {
                             $errors[] = $this->errors->filePreparation($file, $plan->workspace);
 
                             return false;
@@ -89,18 +89,18 @@ final class CheckProjectAnalyzer
                     continue;
                 }
 
-                if ($this->runtimeConfiguration->runtimeIndexing($project)) {
+                if ($this->runtimeConfiguration->runtimeIndexing($project->project)) {
                     $ready = $this->profiler->projectPhase($project, 'runtimeIndex', function () use ($plan, $project, $root, $cancellation, $verbose, &$errors, &$diagnosable, &$complete, &$statuses): bool {
                         $runtimeError = null;
                         try {
-                            $this->runtimeInitializer->initialize($project, cancellation: $cancellation->cancellation());
+                            $this->runtimeInitializer->initialize($project->project, cancellation: $cancellation->cancellation());
                         } catch (CancelledException $error) {
                             throw $error;
                         } catch (\Throwable $error) {
                             $runtimeError = $error;
                         }
                         $cancellation->checkpoint();
-                        $status = $this->statuses->status($project);
+                        $status = $this->statuses->status($project->project);
                         $statuses[$root] = $status;
                         if ('ready' === $status['runtime']['state']) {
                             return true;

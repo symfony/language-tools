@@ -5,18 +5,16 @@ namespace Symfony\Lsp\Tests\Check;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Check\CheckProfile;
 use Symfony\Lsp\Check\CheckProfiler;
-use Symfony\Lsp\Project\AnalysisSettings;
+use Symfony\Lsp\Check\CheckProject;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectConfiguration;
-use Symfony\Lsp\Project\UriToPathConverter;
 
 final class CheckProfilerTest extends TestCase
 {
     public function testAggregatesProvidersAndKeepsTheTenSlowestFiles(): void
     {
-        $profiler = new CheckProfiler(new ProjectConfiguration(new UriToPathConverter(), new AnalysisSettings()));
+        $profiler = new CheckProfiler();
         $profiler->start(true);
-        $project = new Project('/workspace', 'file:///workspace');
+        $project = new CheckProject(new Project('/workspace', 'file:///workspace'), '.');
         $profiler->recordProjectFiles($project, 11);
         $profiler->recordDiagnosticProviders($project, ['route' => 1_000_000.0, 'template' => 3_000_000.0]);
         $profiler->recordDiagnosticProviders($project, ['route' => 4_000_000.0]);

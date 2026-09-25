@@ -41,6 +41,7 @@ final class CheckFileSelector
         $rejections = [];
 
         foreach ($this->projects->all() as $project) {
+            $checkProject = new CheckProject($project, $this->projectConfiguration->projectId($project));
             foreach ($this->files->entries($project, $includeExcluded) as $entry) {
                 if (isset($entry['directory'])) {
                     if (!$includeExcluded) {
@@ -79,7 +80,7 @@ final class CheckFileSelector
                 }
 
                 $file = new CheckFile(
-                    $project,
+                    $checkProject,
                     $path,
                     $projectPath,
                     $workspacePath,

@@ -11,6 +11,7 @@ use Symfony\Lsp\Check\BaselineRepository;
 use Symfony\Lsp\Check\CheckDiagnostic;
 use Symfony\Lsp\Check\CheckFile;
 use Symfony\Lsp\Check\CheckOptions;
+use Symfony\Lsp\Check\CheckProject;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\InvalidConfigurationException;
@@ -128,9 +129,8 @@ final class BaselineManagerTest extends TestCase
 
     public function testFingerprintSurvivesUnrelatedLineMovementButNotChangedEvidence(): void
     {
-        $project = new Project($this->directory, 'file://'.$this->directory);
         $file = new CheckFile(
-            $project,
+            new CheckProject(new Project($this->directory, 'file://'.$this->directory), '.'),
             $this->directory.'/config/services.yaml',
             'config/services.yaml',
             'config/services.yaml',
@@ -150,9 +150,9 @@ final class BaselineManagerTest extends TestCase
         ];
         $positions = new PositionConverter();
 
-        $original = CheckDiagnostic::fromProtocol($file, '.', 'prefix missing suffix', $protocol(0), $positions);
-        $moved = CheckDiagnostic::fromProtocol($file, '.', "first\nsecond\nprefix missing suffix", $protocol(2), $positions);
-        $changed = CheckDiagnostic::fromProtocol($file, '.', 'prefix changed suffix', $protocol(0), $positions);
+        $original = CheckDiagnostic::fromProtocol($file, 'prefix missing suffix', $protocol(0), $positions);
+        $moved = CheckDiagnostic::fromProtocol($file, "first\nsecond\nprefix missing suffix", $protocol(2), $positions);
+        $changed = CheckDiagnostic::fromProtocol($file, 'prefix changed suffix', $protocol(0), $positions);
 
         self::assertSame($original->fingerprint, $moved->fingerprint);
         self::assertNotSame($original->fingerprint, $changed->fingerprint);

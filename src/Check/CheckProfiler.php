@@ -2,9 +2,6 @@
 
 namespace Symfony\Lsp\Check;
 
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectConfiguration;
-
 final class CheckProfiler
 {
     public const PHASES = [
@@ -32,10 +29,6 @@ final class CheckProfiler
     /** @var array<string, array{files: int, phases: array<string, float>, diagnosticProviders: array<string, float>, slowestFiles: array<string, float>}> */
     private array $projects = [];
     private ?CheckProfile $finished = null;
-
-    public function __construct(private readonly ProjectConfiguration $projectConfiguration)
-    {
-    }
 
     public function start(bool $enabled, int|float|null $processStartedAt = null): void
     {
@@ -81,7 +74,7 @@ final class CheckProfiler
      *
      * @return T
      */
-    public function projectPhase(Project $project, string $phase, callable $work): mixed
+    public function projectPhase(CheckProject $project, string $phase, callable $work): mixed
     {
         return $this->measure($work, function (float $elapsed) use ($project, $phase): void {
             $profile = &$this->project($project);
@@ -124,7 +117,7 @@ final class CheckProfiler
         }
     }
 
-    public function recordProjectFiles(Project $project, int $files): void
+    public function recordProjectFiles(CheckProject $project, int $files): void
     {
         if (!$this->enabled) {
             return;
@@ -135,7 +128,7 @@ final class CheckProfiler
     }
 
     /** @param array<string, float> $providerNanoseconds */
-    public function recordDiagnosticProviders(Project $project, array $providerNanoseconds): void
+    public function recordDiagnosticProviders(CheckProject $project, array $providerNanoseconds): void
     {
         if (!$this->enabled) {
             return;
@@ -147,7 +140,7 @@ final class CheckProfiler
         }
     }
 
-    public function recordDiagnosticFile(Project $project, string $path, ?float $startedAt): void
+    public function recordDiagnosticFile(CheckProject $project, string $path, ?float $startedAt): void
     {
         if (null === $startedAt) {
             return;
@@ -192,9 +185,9 @@ final class CheckProfiler
     }
 
     /** @return array{files: int, phases: array<string, float>, diagnosticProviders: array<string, float>, slowestFiles: array<string, float>} */
-    private function &project(Project $project): array
+    private function &project(CheckProject $project): array
     {
-        $id = $this->projectConfiguration->projectId($project);
+        $id = $project->id;
         $this->projects[$id] ??= [
             'files' => 0,
             'phases' => [],
