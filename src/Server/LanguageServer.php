@@ -20,13 +20,8 @@ use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
-use Symfony\Lsp\Project\InvalidConfigurationException;
-use Symfony\Lsp\Project\ProjectConfiguration;
-use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
-
-use function Amp\async;
 
 /** @phpstan-import-type ProjectIndexCommandStatus from IndexCommandHandler */
 final class LanguageServer
@@ -36,6 +31,7 @@ final class LanguageServer
         private readonly JsonRpcDispatcher $dispatcher,
         private readonly ServerState $state,
         private readonly WorkspaceConfiguration $workspaceConfiguration,
+        private readonly WorkspaceSynchronizer $workspaceSynchronizer,
         private readonly WorkspaceFileWatcher $workspaceFileWatcher,
         private readonly DocumentSynchronizer $documentSynchronizer,
         private readonly CompletionProviderRegistry $completionProviders,
@@ -50,7 +46,6 @@ final class LanguageServer
         private readonly ProjectRuntimeRefresher $projectRuntimeRefresher,
         private readonly ApplicationSourceScanner $sourceScanner,
         private readonly IndexCommandHandler $indexCommandHandler,
-        private readonly UriToPathConverter $uriToPathConverter,
         private readonly ServerLogger $logger,
         private readonly WorkDoneProgressReporter $progress,
         private readonly string $version,
@@ -199,33 +194,16 @@ final class LanguageServer
      */
     private function changeConfiguration(array $params): void
     {
-        async(function (): void {
-            $this->workspaceConfiguration->refreshProjectSettings();
-            $this->sourceScanner->indexAll();
-            $this->workspaceConfiguration->requestWorkspaceTrust();
-            $this->diagnosticProviders->refreshAll();
-        })->ignore();
+        $this->workspaceSynchronizer->synchronize(settings: true);
     }
 
     /** @param array<array-key, mixed> $params */
     private function changeWorkspaceFolders(array $params): void
     {
         $event = $params['event'] ?? null;
-        if (!\is_array($event)) {
-            return;
+        if (\is_array($event)) {
+            $this->workspaceSynchronizer->synchronize(workspaceFolders: $event);
         }
-
-        async(function () use ($event): void {
-            try {
-                $this->workspaceConfiguration->changeWorkspaceFolders($event);
-                $this->workspaceFileWatcher->refresh();
-                $this->workspaceConfiguration->refreshProjectSettings();
-                $this->sourceScanner->indexAll();
-                $this->workspaceConfiguration->requestWorkspaceTrust();
-            } catch (InvalidConfigurationException $error) {
-                $this->logger->error($error);
-            }
-        })->ignore();
     }
 
     /** @param array<array-key, mixed> $params */
@@ -236,89 +214,14 @@ final class LanguageServer
             return;
         }
 
-        $rediscover = false;
-        $reloadConfiguration = false;
-        $refreshWatchers = false;
-        $rescanSources = false;
-        $watchedChanges = [];
+        $watchedFiles = [];
         foreach ($changes as $change) {
-            if (!\is_array($change) || !\is_string($change['uri'] ?? null) || !\is_int($change['type'] ?? null)) {
-                continue;
-            }
-            $uri = $change['uri'];
-            $basename = basename($this->uriToPathConverter->convert($uri) ?? '');
-            $composerChange = \in_array($basename, ['composer.json', 'composer.lock'], true);
-            $watchedChanges[] = [
-                'uri' => $uri,
-                'deleted' => 3 === $change['type'],
-                'composer' => $composerChange,
-            ];
-            if ($composerChange) {
-                $rediscover = true;
-            }
-            if (ProjectConfiguration::FILE_NAME === $basename) {
-                $reloadConfiguration = true;
-            }
-            if ('.gitignore' === $basename) {
-                $rescanSources = true;
-            }
-            if ($this->workspaceFileWatcher->requiresRefreshForChange($uri, $change['type'])) {
-                $refreshWatchers = true;
+            if (\is_array($change) && \is_string($change['uri'] ?? null) && \is_int($change['type'] ?? null)) {
+                $watchedFiles[] = ['uri' => $change['uri'], 'type' => $change['type']];
             }
         }
 
-        if (!$rediscover) {
-            foreach ($watchedChanges as $change) {
-                $sourceFileChange = $this->sourceScanner->refreshUri($change['uri'], $change['deleted']);
-                $this->projectRuntimeRefresher->refreshUri($change['uri'], $sourceFileChange);
-            }
-        }
-
-        if (!$rediscover && !$reloadConfiguration && !$refreshWatchers && !$rescanSources) {
-            return;
-        }
-
-        async(function () use ($rediscover, $reloadConfiguration, $refreshWatchers, $watchedChanges): void {
-            $configurationReady = true;
-            try {
-                if ($reloadConfiguration) {
-                    $this->workspaceConfiguration->reloadProjectConfiguration();
-                    $this->workspaceConfiguration->refreshProjectSettings();
-                } elseif ($rediscover) {
-                    $this->workspaceConfiguration->rediscoverProjects();
-                    $this->workspaceConfiguration->refreshProjectSettings();
-                }
-                if ($rediscover || $reloadConfiguration || $refreshWatchers) {
-                    $this->workspaceFileWatcher->refresh();
-                }
-            } catch (InvalidConfigurationException $error) {
-                $configurationReady = false;
-                $this->logger->error($error);
-            }
-
-            $rediscoveredChanges = [];
-            if ($rediscover) {
-                foreach ($watchedChanges as $change) {
-                    $rediscoveredChanges[] = [
-                        'uri' => $change['uri'],
-                        'composer' => $change['composer'],
-                        'source' => $this->sourceScanner->refreshUri($change['uri'], $change['deleted']),
-                    ];
-                }
-            }
-            $this->sourceScanner->indexAll();
-            $initializedProjects = $configurationReady && ($rediscover || $reloadConfiguration)
-                ? $this->workspaceConfiguration->requestWorkspaceTrust()
-                : [];
-            foreach ($rediscoveredChanges as $change) {
-                if ($change['composer']) {
-                    $this->projectRuntimeRefresher->refreshAfterRediscovery($change['uri'], $initializedProjects);
-                } else {
-                    $this->projectRuntimeRefresher->refreshUri($change['uri'], $change['source']);
-                }
-            }
-            $this->diagnosticProviders->refreshAll();
-        })->ignore();
+        $this->workspaceSynchronizer->synchronize(watchedFiles: $watchedFiles);
     }
 
     /** @param array<array-key, mixed> $params */
@@ -334,12 +237,7 @@ final class LanguageServer
      */
     private function initialized(array $params): void
     {
-        async(function (): void {
-            $this->workspaceFileWatcher->register();
-            $this->workspaceConfiguration->refreshProjectSettings();
-            $this->sourceScanner->indexAll();
-            $this->workspaceConfiguration->requestWorkspaceTrust();
-        })->ignore();
+        $this->workspaceSynchronizer->synchronize(initialization: true);
     }
 
     /**

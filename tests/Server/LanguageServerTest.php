@@ -326,6 +326,53 @@ final class LanguageServerTest extends TestCase
         }
     }
 
+    public function testAddedWorkspaceFoldersContributeTheirProjects(): void
+    {
+        $workspace = new TestWorkspace('symfony-lsp-folders-');
+        $workspace->write('apps/admin/composer.json', json_encode([
+            'type' => 'project',
+            'require' => ['symfony/framework-bundle' => '^8.0'],
+        ], \JSON_THROW_ON_ERROR));
+        $roots = null;
+
+        try {
+            $transcript = (new InProcessLanguageServerHarness())->run([
+                ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => [
+                    'workspaceFolders' => [['uri' => 'file://'.$workspace->path('src')]],
+                    'capabilities' => new \stdClass(),
+                    'initializationOptions' => ['runtimeIndexing' => false],
+                ]],
+                new ProtocolMessageExpectation('the initialize response', static fn (array $message): bool => 1 === ($message['id'] ?? null)),
+                ['jsonrpc' => '2.0', 'method' => 'initialized', 'params' => []],
+                ['jsonrpc' => '2.0', 'method' => 'workspace/didChangeWorkspaceFolders', 'params' => [
+                    'event' => ['added' => [['uri' => 'file://'.$workspace->path('apps/admin')]], 'removed' => []],
+                ]],
+                new LanguageServerTranscriptAction(static function (): void {
+                    delay(0.5);
+                }),
+                ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'workspace/executeCommand', 'params' => [
+                    'command' => 'symfony.indexStatus',
+                ]],
+                new ProtocolMessageExpectation('the index status', static function (array $message) use (&$roots): bool {
+                    if (2 !== ($message['id'] ?? null)) {
+                        return false;
+                    }
+                    $roots = array_column(\is_array($message['result'] ?? null) ? $message['result'] : [], 'root');
+
+                    return true;
+                }),
+                ['jsonrpc' => '2.0', 'id' => 3, 'method' => 'shutdown'],
+                new ProtocolMessageExpectation('the shutdown response', static fn (array $message): bool => 3 === ($message['id'] ?? null)),
+                ['jsonrpc' => '2.0', 'method' => 'exit'],
+            ]);
+
+            self::assertSame(0, $transcript->exitCode, $transcript->raw);
+            self::assertSame([$workspace->path('apps/admin')], $roots);
+        } finally {
+            $workspace->cleanup();
+        }
+    }
+
     #[DataProvider('composerFileProvider')]
     public function testWatchedComposerChangesCanCreateProgressWithoutDeadlockingListener(string $composerFile): void
     {

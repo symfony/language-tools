@@ -226,7 +226,7 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Symfony\\Lsp\\Project\\', '../src/Project/*{Discovery,Registry,Resolver,Settings,Converter,Configuration,Trust,Manager,Matcher,Compiler,Cleaner,Policy,Workspace}.php');
     $services->load('Symfony\\Lsp\\Protocol\\', '../src/Protocol/*Mapper.php');
     $services->load('Symfony\\Lsp\\Runtime\\', '../src/Runtime/*{Installer,Runner,Initializer,Refresher,Scheduler,Configuration,Registry,Planner,Mapper,Normalizer,Resolver,Store,State}.php');
-    $services->load('Symfony\\Lsp\\Server\\', '../src/Server/*{Server,Logger,State,Reporter,Watcher,Redactor,Truncator}.php');
+    $services->load('Symfony\\Lsp\\Server\\', '../src/Server/*{Server,Logger,State,Reporter,Watcher,Redactor,Truncator,Synchronizer}.php');
 
     $services->set(Parser::class);
     $services->set(Filesystem::class);
