@@ -3,26 +3,54 @@
 namespace Symfony\Lsp\Tests\Feature;
 
 use Fabpot\JsonRpc\Exception\JsonRpcException;
+use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Document\DocumentContextResolver;
+use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\CodeActionProviderRegistry;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
 use Symfony\Lsp\Feature\CodeLensProviderRegistry;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
+use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderRegistry;
+use Symfony\Lsp\Feature\Doctrine\DoctrineExtractor;
+use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
+use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipProvider;
+use Symfony\Lsp\Feature\Doctrine\DoctrineRepositoryReceiverResolver;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
+use Symfony\Lsp\Feature\Metadata\FormMetadataExtractor;
+use Symfony\Lsp\Feature\Metadata\MetadataExtractor;
+use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
+use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
+use Symfony\Lsp\Feature\Metadata\SerializerMetadataExtractor;
+use Symfony\Lsp\Feature\Metadata\ValidationMetadataExtractor;
+use Symfony\Lsp\Feature\Metadata\YamlMetadataExtractor;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
+use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Index\SourceParseHealth;
+use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\Php\PhpCommentParser;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
+use Symfony\Lsp\Parser\Php\TolerantPhpParser;
+use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
+use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
+use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class ProviderRegistryTest extends TestCase
 {
@@ -126,24 +154,84 @@ final class ProviderRegistryTest extends TestCase
         self::assertSame([], (new CodeLensProviderRegistry([new StubProvider(null)]))->codeLenses([]));
     }
 
-    public function testHoverProvidersReturnTheFirstMatchIncludingAnEmptyMatch(): void
+    public function testHoverProvidersMergeEveryMatchInOrder(): void
     {
+        $protocol = new LspProtocolMapper();
         $first = new StubProvider(null);
-        $second = new StubProvider([['contents' => 'second']]);
-        $third = new StubProvider([['contents' => 'third']]);
+        $second = new StubProvider([$protocol->markdownHover('second')]);
+        $third = new StubProvider([$protocol->markdownHover('third')]);
 
         self::assertSame(
-            ['contents' => 'second'],
-            (new HoverProviderRegistry([$first, $second, $third]))->hover([]),
+            $protocol->markdownHover("second\n\n---\n\nthird"),
+            (new HoverProviderRegistry($protocol, [$first, $second, $third]))->hover([]),
         );
         self::assertSame(['hover'], $first->calls);
         self::assertSame(['hover'], $second->calls);
-        self::assertSame([], $third->calls);
-        self::assertNull((new HoverProviderRegistry([new StubProvider(null)]))->hover([]));
+        self::assertSame(['hover'], $third->calls);
+        self::assertNull((new HoverProviderRegistry($protocol, [new StubProvider(null)]))->hover([]));
 
-        $afterEmpty = new StubProvider([['contents' => 'later']]);
-        self::assertSame([], (new HoverProviderRegistry([new StubProvider([[]]), $afterEmpty]))->hover([]));
-        self::assertSame([], $afterEmpty->calls);
+        $afterEmpty = new StubProvider([$protocol->markdownHover('later')]);
+        self::assertSame(
+            $protocol->markdownHover('later'),
+            (new HoverProviderRegistry($protocol, [new StubProvider([[]]), $afterEmpty]))->hover([]),
+        );
+        self::assertSame(['hover'], $afterEmpty->calls);
+    }
+
+    public function testHoverProvidersMergeTheDoctrineFieldAndThePhpPropertyOfTheSameProperty(): void
+    {
+        $uri = 'file:///workspace/src/Entity/Product.php';
+        $text = <<<'PHP'
+            <?php
+            namespace App\Entity;
+
+            use Doctrine\ORM\Mapping as ORM;
+
+            #[ORM\Entity]
+            class Product
+            {
+                #[ORM\ManyToOne(targetEntity: Category::class)]
+                private ?Category $category = null;
+            }
+            PHP;
+        $converter = new PositionConverter();
+        $project = new Project('/workspace', 'file:///workspace');
+        $projects = new ProjectRegistry();
+        $projects->replace([$project]);
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $source = new SourceDocument($uri, 'php', $text);
+        $resolver = new DocumentContextResolver($documents, $projects);
+        $protocol = new LspProtocolMapper();
+        $positionedSymbols = new PositionedSourceSymbolResolver($converter);
+        $phpParser = new TolerantPhpParser(new Parser());
+        $phpComments = new PhpCommentParser();
+        $doctrineExtractor = new DoctrineExtractor($converter, $phpParser, $phpComments, new DoctrineRepositoryReceiverResolver(), new PhpLiteralArrayKeyParser());
+        $doctrineIndexes = new DoctrineIndexRegistry();
+        $doctrineIndexes->forProject($project)->replace($doctrineExtractor->extract($source));
+        $metadataExtractor = new MetadataExtractor(
+            $converter,
+            $phpParser,
+            $phpComments,
+            new FormMetadataExtractor($converter, new BalancedDelimiterMatcher(), new PhpLiteralArrayKeyParser()),
+            new ValidationMetadataExtractor($converter),
+            new SerializerMetadataExtractor($converter),
+            new YamlMetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))),
+        );
+        $metadataIndexes = new MetadataSourceIndexRegistry();
+        $metadataIndexes->forProject($project)->replace($metadataExtractor->extract($source));
+        $registry = new HoverProviderRegistry($protocol, [
+            new MetadataRelationshipProvider($resolver, $positionedSymbols, $protocol, $metadataIndexes, $metadataExtractor),
+            new DoctrineRelationshipProvider($resolver, $positionedSymbols, $protocol, $doctrineIndexes, $doctrineExtractor),
+        ]);
+
+        $position = $converter->toPosition($text, (int) strpos($text, '$category = null') + 2);
+        $hover = $registry->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]);
+
+        self::assertSame(
+            $protocol->markdownHover("PHP property: `App\Entity\Product::\$category`\n\n```php\nprivate ?Category \$category\n```\n\n---\n\nDoctrine association: `App\Entity\Product::\$category`\n\nType: `App\Entity\Category`\n\nTarget entity: `App\Entity\Category`"),
+            $hover,
+        );
     }
 
     public function testRenamePreparationReturnsTheFirstMatchIncludingAnEmptyMatch(): void

@@ -5,6 +5,7 @@
 - Keep results stable when a file is opened, so opening one of two files that declare the same name no longer changes which declaration wins
 - Treat `%%` in XML service files as an escaped percent sign, so a literal like `%%message%%` is no longer read as a parameter reference
 - Clear the Doctrine metadata index when a project no longer has Doctrine installed
+- Show every matching hover for a symbol instead of only the first one, so a Doctrine field and its PHP property are both described
 
 ## 0.22.0 (2026-09-25)
 
