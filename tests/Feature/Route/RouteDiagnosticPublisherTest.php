@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Tests\Feature\Route;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
@@ -50,6 +49,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\RecordingClient;
 
 final class RouteDiagnosticPublisherTest extends TestCase
 {
@@ -368,7 +368,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
     public function testPublishesEmptyDiagnosticsBeforeCompleteRuntimeMetadataIsAvailable(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
-        $client = new DiagnosticClient();
+        $client = new RecordingClient();
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, <<<'PHP'
             <?php
@@ -522,7 +522,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
      * @param Route|list<Route>|null $route
      * @param list<string>           $contextParameters
      *
-     * @return array{DiagnosticProviderRegistry, DiagnosticClient, Project, RouteIndexRegistry}
+     * @return array{DiagnosticProviderRegistry, RecordingClient, Project, RouteIndexRegistry}
      */
     private function publisher(
         string $uri,
@@ -532,7 +532,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         bool $runtimeTemplate = true,
         array $contextParameters = [],
     ): array {
-        $client = new DiagnosticClient();
+        $client = new RecordingClient();
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
         $projects = new ProjectRegistry();
@@ -577,21 +577,5 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $project,
             $routeIndexes,
         ];
-    }
-}
-
-final class DiagnosticClient implements ClientInterface
-{
-    /** @var list<array{method: string, params: array<array-key, mixed>}> */
-    public array $notifications = [];
-
-    public function request(string $method, array $params): mixed
-    {
-        return null;
-    }
-
-    public function notify(string $method, array $params): void
-    {
-        $this->notifications[] = ['method' => $method, 'params' => $params];
     }
 }
