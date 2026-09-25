@@ -166,7 +166,7 @@ foreach ($requestedSections as $sectionName) {
             'doctrine' => symfonyLspBridgeDoctrineSection($context),
             'environment' => symfonyLspBridgeEnvironmentSection($context),
             'console' => symfonyLspBridgeConsoleSection($context),
-            default => null,
+            default => throw new InvalidArgumentException(sprintf('The "%s" runtime metadata section is unknown.', $sectionName)),
         };
         if (is_array($section)) {
             $sections[$sectionName] = $section;

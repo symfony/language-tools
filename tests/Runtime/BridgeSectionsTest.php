@@ -155,8 +155,8 @@ final class BridgeSectionsTest extends TestCase
         self::assertSame(['runtime', 'events', 'routes'], array_column($errors, 'section'));
         self::assertSame([true, false, false], array_map(static fn (array $error): bool => isset($error['cause']), $errors));
         self::assertSame('The application kernel could not be booted.', $errors[0]['message'] ?? null);
-        self::assertSame(\RuntimeException::class, $this->kernelBootCause($errors)['class']);
-        self::assertSame('CANARY_FRONT_CONTROLLER_FAILURE', $this->kernelBootCause($errors)['message']);
+        self::assertSame(\RuntimeException::class, $this->firstErrorCause($errors)['class']);
+        self::assertSame('CANARY_FRONT_CONTROLLER_FAILURE', $this->firstErrorCause($errors)['message']);
     }
 
     public function testReportsTheConventionalKernelFailureWithoutARuntimeFrontController(): void
@@ -170,8 +170,8 @@ final class BridgeSectionsTest extends TestCase
         self::assertIsArray($result);
         $errors = $this->errors($result);
         self::assertSame(['runtime', 'events'], array_column($errors, 'section'));
-        self::assertSame(\Error::class, $this->kernelBootCause($errors)['class']);
-        self::assertSame('Undefined constant "DISTRIBUTION_PROJECT_ROOT"', $this->kernelBootCause($errors)['message']);
+        self::assertSame(\Error::class, $this->firstErrorCause($errors)['class']);
+        self::assertSame('Undefined constant "DISTRIBUTION_PROJECT_ROOT"', $this->firstErrorCause($errors)['message']);
     }
 
     /**
@@ -197,7 +197,7 @@ final class BridgeSectionsTest extends TestCase
      *
      * @return array{class: mixed, message: mixed}
      */
-    private function kernelBootCause(array $errors): array
+    private function firstErrorCause(array $errors): array
     {
         $cause = $errors[0]['cause'] ?? null;
         self::assertIsArray($cause);
@@ -324,6 +324,22 @@ final class BridgeSectionsTest extends TestCase
             'enabled' => false,
             'entities' => [],
         ], $result['sections']['doctrine'] ?? null);
+    }
+
+    public function testReportsAnUnknownSectionAsAnError(): void
+    {
+        (new AutoloaderFixtureBuilder($this->workspace))->writeAutoloader('8.0.6');
+
+        $process = $this->bridge->run(['--sections=unknown', '--error-details=1']);
+
+        $snapshot = $process->stdout;
+        self::assertSame(0, $process->exitCode, $snapshot);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['sections'] ?? null, $snapshot);
+        $errors = $this->errors($result);
+        self::assertSame(['unknown'], array_column($errors, 'section'));
+        self::assertSame('The "unknown" runtime metadata section is unknown.', $this->firstErrorCause($errors)['message']);
     }
 
     public function testReportsUnavailableOptionalStimulusBundle(): void
