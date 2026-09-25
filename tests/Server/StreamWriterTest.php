@@ -1,44 +1,55 @@
 <?php
 
-namespace Symfony\Lsp\Tests\Check;
+namespace Symfony\Lsp\Tests\Server;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Check\CheckOutputWriter;
+use Symfony\Lsp\Server\StreamWriter;
 
-final class CheckOutputWriterTest extends TestCase
+final class StreamWriterTest extends TestCase
 {
     protected function setUp(): void
     {
         IntermittentWriteStream::$contents = '';
-        self::assertTrue(stream_wrapper_register('check-output', IntermittentWriteStream::class));
+        self::assertTrue(stream_wrapper_register('stream-writer', IntermittentWriteStream::class));
     }
 
     protected function tearDown(): void
     {
-        stream_wrapper_unregister('check-output');
+        stream_wrapper_unregister('stream-writer');
     }
 
     public function testRetriesTemporarilyUnavailableAndPartialWrites(): void
     {
-        $stream = fopen('check-output://report', 'w');
+        $stream = fopen('stream-writer://report', 'w');
         self::assertIsResource($stream);
         $contents = str_repeat('diagnostic output ', 1000);
 
-        self::assertTrue((new CheckOutputWriter())->write($stream, $contents));
+        self::assertTrue(StreamWriter::write($stream, $contents, retryEmptyWrites: true));
         fclose($stream);
 
         self::assertSame($contents, IntermittentWriteStream::$contents);
     }
 
+    public function testFailsOnEmptyWritesWhenRetriesAreDisabled(): void
+    {
+        $stream = fopen('stream-writer://report', 'w');
+        self::assertIsResource($stream);
+
+        self::assertFalse(StreamWriter::write($stream, 'diagnostic output'));
+        fclose($stream);
+
+        self::assertSame('', IntermittentWriteStream::$contents);
+    }
+
     public function testWritesLargeReportsWithoutCopyingTheRemainingContents(): void
     {
-        $stream = fopen('check-output://discard', 'w');
+        $stream = fopen('stream-writer://discard', 'w');
         self::assertIsResource($stream);
         $contents = str_repeat('x', 8 * 1024 * 1024);
         memory_reset_peak_usage();
         $memory = memory_get_usage();
 
-        $written = (new CheckOutputWriter())->write($stream, $contents);
+        $written = StreamWriter::write($stream, $contents);
         $additionalMemory = memory_get_peak_usage() - $memory;
         fclose($stream);
 

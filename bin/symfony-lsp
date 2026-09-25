@@ -3,12 +3,12 @@
 
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Check\CheckCommand;
-use Symfony\Lsp\Check\CheckOutputWriter;
 use Symfony\Lsp\Server\LanguageServerFactory;
 use Symfony\Lsp\Server\MemoryLimit;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Server\ServerVersion;
+use Symfony\Lsp\Server\StreamWriter;
 
 use Amp\ByteStream\ReadableResourceStream;
 use Amp\ByteStream\WritableResourceStream;
@@ -73,13 +73,12 @@ $factory = new LanguageServerFactory(
 );
 if ('check' === $command) {
     $execution = $factory->createCheck($errorOutput)->run(array_values(array_slice($argv, 2)), $processStartedAt);
-    $writer = new CheckOutputWriter();
-    if (!$writer->write(\STDOUT, $execution->stdout)) {
-        $writer->write(\STDERR, "Unable to write the diagnostics report to standard output.\n");
+    if (!StreamWriter::write(\STDOUT, $execution->stdout, retryEmptyWrites: true)) {
+        StreamWriter::write(\STDERR, "Unable to write the diagnostics report to standard output.\n", retryEmptyWrites: true);
         exit(CheckCommand::EXIT_OPERATIONAL);
     }
     if ('' !== $execution->stderr) {
-        $writer->write(\STDERR, $execution->stderr);
+        StreamWriter::write(\STDERR, $execution->stderr, retryEmptyWrites: true);
     }
     exit($execution->exitCode);
 }

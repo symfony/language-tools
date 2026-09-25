@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Index;
 
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Server\StreamWriter;
 
 final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
 {
@@ -78,15 +79,12 @@ final class PersistentSourceIndexWriter implements SourceIndexWriterInterface
 
             return false;
         }
-        while ('' !== $this->buffer) {
-            $written = @fwrite($this->handle, $this->buffer);
-            if (false === $written || 0 === $written) {
-                $this->discard();
+        if (!StreamWriter::write($this->handle, $this->buffer)) {
+            $this->discard();
 
-                return false;
-            }
-            $this->buffer = substr($this->buffer, $written);
+            return false;
         }
+        $this->buffer = '';
 
         return true;
     }

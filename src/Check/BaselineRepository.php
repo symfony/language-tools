@@ -7,6 +7,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\PathContainment;
+use Symfony\Lsp\Server\StreamWriter;
 
 final class BaselineRepository
 {
@@ -76,14 +77,8 @@ final class BaselineRepository
 
         $created = false;
         try {
-            $length = \strlen($contents);
-            $offset = 0;
-            while ($offset < $length) {
-                $written = @fwrite($stream, substr($contents, $offset, 8192));
-                if (false === $written || 0 === $written) {
-                    throw new IOException(\sprintf('Failed to write file "%s".', $file->path), 0, null, $file->path);
-                }
-                $offset += $written;
+            if (!StreamWriter::write($stream, $contents)) {
+                throw new IOException(\sprintf('Failed to write file "%s".', $file->path), 0, null, $file->path);
             }
             if (!@fclose($stream)) {
                 throw new IOException(\sprintf('Failed to close file "%s".', $file->path), 0, null, $file->path);

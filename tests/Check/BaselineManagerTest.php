@@ -6,7 +6,6 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Check\BaselineCodec;
 use Symfony\Lsp\Check\BaselineManager;
-use Symfony\Lsp\Check\BaselineMatcher;
 use Symfony\Lsp\Check\BaselineRepository;
 use Symfony\Lsp\Check\CheckDiagnostic;
 use Symfony\Lsp\Check\CheckFile;
@@ -178,7 +177,6 @@ final class BaselineManagerTest extends TestCase
     {
         return new BaselineManager(
             new BaselineRepository($filesystem, new BaselineCodec(new DiagnosticCodeRegistry())),
-            new BaselineMatcher(),
         );
     }
 
