@@ -32,6 +32,23 @@ final class GitignoreMatcherTest extends TestCase
         self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Controller.php'));
     }
 
+    public function testMatchesPathsBelowASymlinkedRoot(): void
+    {
+        if ('Windows' === \PHP_OS_FAMILY) {
+            self::markTestSkipped('Directory symlinks are not supported in this environment.');
+        }
+        mkdir($this->temporaryDirectory.'/project/var', 0777, true);
+        file_put_contents($this->temporaryDirectory.'/project/.gitignore', "var/\n");
+        if (!symlink($this->temporaryDirectory.'/project', $this->temporaryDirectory.'/link')) {
+            self::markTestSkipped('Unable to create a directory symlink in this environment.');
+        }
+        $root = $this->temporaryDirectory.'/link';
+        $matcher = new GitignoreMatcher();
+
+        self::assertTrue($matcher->isIgnored($root, $root.'/var/cache.php'));
+        self::assertFalse($matcher->isIgnored($root, $root.'/src/Controller.php'));
+    }
+
     public function testMatchesGitignoreFilesAboveTheProjectRoot(): void
     {
         mkdir($this->temporaryDirectory.'/.git');

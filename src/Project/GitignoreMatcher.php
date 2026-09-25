@@ -51,6 +51,8 @@ final class GitignoreRootMatcher
 {
     private readonly PendingPathIterator $pending;
 
+    private readonly string $resolvedRootPath;
+
     private ?VcsIgnoredFilterIterator $matcher = null;
 
     /** @var array<string, string> */
@@ -59,16 +61,35 @@ final class GitignoreRootMatcher
     public function __construct(private readonly string $rootPath)
     {
         $this->pending = new PendingPathIterator();
+        $realRootPath = realpath($rootPath);
+        $this->resolvedRootPath = false === $realRootPath ? $rootPath : Path::canonicalize($realRootPath);
     }
 
     public function isIgnored(string $path): bool
     {
+        $path = $this->resolve($path);
         $this->discardOutdatedRules($path);
-        $this->matcher ??= new VcsIgnoredFilterIterator($this->pending, $this->rootPath);
+        $this->matcher ??= new VcsIgnoredFilterIterator($this->pending, $this->resolvedRootPath);
         $this->pending->set(new LexicalPathFileInfo($path));
         $this->matcher->rewind();
 
         return !$this->matcher->valid();
+    }
+
+    /** Finder resolves its base directory, so paths below a symlinked root must follow it. */
+    private function resolve(string $path): string
+    {
+        if ($this->resolvedRootPath === $this->rootPath) {
+            return $path;
+        }
+        if ($path === $this->rootPath) {
+            return $this->resolvedRootPath;
+        }
+        if (str_starts_with($path, $this->rootPath.'/')) {
+            return $this->resolvedRootPath.substr($path, \strlen($this->rootPath));
+        }
+
+        return $path;
     }
 
     /** Only the .gitignore files above a path decide its result, so its chain detects every rule change that applies. */
