@@ -68,11 +68,12 @@ final class TwigComponentExtractorTest extends TestCase
                 {% set markup = "<twig:Coded data-live-action-param='coded' />" %}
                 {% verbatim %}<twig:Verbatim data-live-action-param="verbatim" />{% endverbatim %}
                 <twig:Dynamic data-live-action-param="{{ action }}" />
+                <!-- <twig:HtmlCommented /> -->
                 TWIG),
         );
 
         self::assertSame(
-            ['Alert', 'Dynamic'],
+            ['Alert', 'Dynamic', 'HtmlCommented'],
             array_map(static fn ($reference): string => $reference->name, $facts->references),
         );
         self::assertSame(
