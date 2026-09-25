@@ -14,39 +14,16 @@ use Symfony\Lsp\Project\Project;
 final class TemplateSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(
-        private readonly TemplateIndexRegistry $indexes,
+        TemplateIndexRegistry $indexes,
         private readonly TemplateReferenceExtractor $extractor,
         private readonly TemplateNameResolver $nameResolver,
     ) {
+        parent::__construct($indexes, 'templates', TemplateSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'templates';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [TemplateDeclaration::class, TemplateReference::class, TemplateSourceFacts::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof TemplateSourceFacts) {
-            throw new \UnexpectedValueException('The template source facts are invalid.');
-        }
-
-        return null === $data->declaration ? [] : [$data->declaration];
-    }
-
-    protected function factsClass(): string
-    {
-        return TemplateSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): TemplateIndex
-    {
-        return $this->indexes->forProject($project);
+        return [TemplateDeclaration::class, TemplateReference::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): TemplateSourceFacts
@@ -56,6 +33,11 @@ final class TemplateSourceIndexer extends AbstractSourceIndexer
             $this->declaration($project, $document->uri),
             $this->extractor->extractCandidates($document),
         );
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return null === $facts->declaration ? [] : [$facts->declaration];
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): TemplateSourceFacts

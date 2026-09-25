@@ -10,45 +10,27 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<MetadataSourceFacts> */
 final class MetadataSourceIndexer extends AbstractSourceIndexer
 {
-    public function __construct(private readonly MetadataSourceIndexRegistry $indexes, private readonly MetadataExtractor $extractor)
+    public function __construct(MetadataSourceIndexRegistry $indexes, private readonly MetadataExtractor $extractor)
     {
+        parent::__construct($indexes, 'metadata', MetadataSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'metadata';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [ConstraintOptionReference::class, FormDataClass::class, FormOptionReference::class, MetadataSourceFacts::class, MetadataSourceSymbol::class, MetadataSymbolKind::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof MetadataSourceFacts) {
-            throw new \UnexpectedValueException('The metadata source facts are invalid.');
-        }
-
-        return [
-            ...array_values(array_filter($data->symbols, static fn (MetadataSourceSymbol $symbol): bool => $symbol->declaration)),
-            ...$data->formDataClasses,
-        ];
-    }
-
-    protected function factsClass(): string
-    {
-        return MetadataSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): MetadataSourceIndex
-    {
-        return $this->indexes->forProject($project);
+        return [ConstraintOptionReference::class, FormDataClass::class, FormOptionReference::class, MetadataSourceSymbol::class, MetadataSymbolKind::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): MetadataSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return [
+            ...array_values(array_filter($facts->symbols, static fn (MetadataSourceSymbol $symbol): bool => $symbol->declaration)),
+            ...$facts->formDataClasses,
+        ];
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): MetadataSourceFacts

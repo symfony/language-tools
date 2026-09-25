@@ -10,42 +10,24 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<TranslationSourceFacts> */
 final class TranslationSourceIndexer extends AbstractSourceIndexer
 {
-    public function __construct(private readonly TranslationIndexRegistry $indexes, private readonly TranslationExtractor $extractor)
+    public function __construct(TranslationIndexRegistry $indexes, private readonly TranslationExtractor $extractor)
     {
+        parent::__construct($indexes, 'translations', TranslationSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'translations';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [TranslationDeclaration::class, TranslationReference::class, TranslationSourceFacts::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof TranslationSourceFacts) {
-            throw new \UnexpectedValueException('The translation source facts are invalid.');
-        }
-
-        return $data->declarations;
-    }
-
-    protected function factsClass(): string
-    {
-        return TranslationSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): TranslationIndex
-    {
-        return $this->indexes->forProject($project);
+        return [TranslationDeclaration::class, TranslationReference::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): TranslationSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return $facts->declarations;
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): TranslationSourceFacts

@@ -86,7 +86,7 @@ final class ProcessorRecordingProvider implements SourceIndexProviderInterface
         return $this->index($project, $document);
     }
 
-    public function runtimeDeclarations(mixed $data): array
+    public function runtimeRefreshProjection(mixed $data): array
     {
         return $data instanceof ProcessorFacts ? [$data->value] : [];
     }

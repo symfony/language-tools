@@ -7,8 +7,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Index\AbstractSourceFactsIndex;
 use Symfony\Lsp\Index\AbstractSourceIndexer;
+use Symfony\Lsp\Index\ProjectIndexRegistryInterface;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Index\SourceFactsIndexInterface;
 use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Project\Project;
@@ -242,36 +242,35 @@ final class ReentrantSourceFactsIndex extends AbstractSourceFactsIndex
     }
 }
 
-/** @extends AbstractSourceIndexer<LifecycleSourceFacts> */
-final class LifecycleSourceIndexer extends AbstractSourceIndexer
+/** @implements ProjectIndexRegistryInterface<CountingSourceFactsIndex> */
+final class LifecycleIndexRegistry implements ProjectIndexRegistryInterface
 {
     public function __construct(private readonly CountingSourceFactsIndex $index)
     {
     }
 
-    public function name(): string
+    public function forProject(Project $project): CountingSourceFactsIndex
     {
-        return 'lifecycle';
+        return $this->index;
+    }
+}
+
+/** @extends AbstractSourceIndexer<LifecycleSourceFacts> */
+final class LifecycleSourceIndexer extends AbstractSourceIndexer
+{
+    public function __construct(CountingSourceFactsIndex $index)
+    {
+        parent::__construct(new LifecycleIndexRegistry($index), 'lifecycle', LifecycleSourceFacts::class);
     }
 
-    public function payloadClasses(): array
-    {
-        return [LifecycleSourceFacts::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
+    protected function payloadElementClasses(): array
     {
         return [];
     }
 
-    protected function factsClass(): string
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
     {
-        return LifecycleSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): SourceFactsIndexInterface
-    {
-        return $this->index;
+        return [];
     }
 
     protected function extract(Project $project, SourceDocument $document): ?SourceFactsInterface

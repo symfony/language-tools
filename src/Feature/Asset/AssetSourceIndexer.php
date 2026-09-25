@@ -10,42 +10,24 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<AssetSourceFacts> */
 final class AssetSourceIndexer extends AbstractSourceIndexer
 {
-    public function __construct(private readonly AssetSourceIndexRegistry $indexes, private readonly AssetExtractor $extractor)
+    public function __construct(AssetSourceIndexRegistry $indexes, private readonly AssetExtractor $extractor)
     {
+        parent::__construct($indexes, 'assets', AssetSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'assets';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [AssetSourceFacts::class, AssetSourceSymbol::class, AssetSymbolKind::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof AssetSourceFacts) {
-            throw new \UnexpectedValueException('The asset source facts are invalid.');
-        }
-
-        return array_values(array_filter($data->symbols, static fn (AssetSourceSymbol $symbol): bool => $symbol->declaration));
-    }
-
-    protected function factsClass(): string
-    {
-        return AssetSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): AssetSourceIndex
-    {
-        return $this->indexes->forProject($project);
+        return [AssetSourceSymbol::class, AssetSymbolKind::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): AssetSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return array_values(array_filter($facts->symbols, static fn (AssetSourceSymbol $symbol): bool => $symbol->declaration));
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): AssetSourceFacts

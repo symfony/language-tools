@@ -10,45 +10,27 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<EventSourceFacts> */
 final class EventSourceIndexer extends AbstractSourceIndexer
 {
-    public function __construct(private readonly EventSourceIndexRegistry $indexes, private readonly EventExtractor $extractor)
+    public function __construct(EventSourceIndexRegistry $indexes, private readonly EventExtractor $extractor)
     {
+        parent::__construct($indexes, 'events', EventSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'events';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [EventSourceFacts::class, EventSourceSymbol::class, InvalidEventListenerMethod::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof EventSourceFacts) {
-            throw new \UnexpectedValueException('The event source facts are invalid.');
-        }
-
-        return [
-            ...array_filter($data->symbols, static fn (EventSourceSymbol $symbol): bool => $symbol->declaration),
-            ...$data->listeners,
-        ];
-    }
-
-    protected function factsClass(): string
-    {
-        return EventSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): EventSourceIndex
-    {
-        return $this->indexes->forProject($project);
+        return [EventSourceSymbol::class, InvalidEventListenerMethod::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): EventSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return [
+            ...array_filter($facts->symbols, static fn (EventSourceSymbol $symbol): bool => $symbol->declaration),
+            ...$facts->listeners,
+        ];
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): EventSourceFacts

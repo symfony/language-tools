@@ -14,42 +14,19 @@ use Symfony\Lsp\Project\ProjectPathResolver;
 final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(
-        private readonly RouteSourceIndexRegistry $sourceIndexes,
+        RouteSourceIndexRegistry $sourceIndexes,
         private readonly PhpRouteDeclarationExtractor $phpDeclarationExtractor,
         private readonly YamlRouteDeclarationExtractor $yamlDeclarationExtractor,
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
         private readonly TwigRouteReferenceExtractor $twigReferenceExtractor,
         private readonly ProjectPathResolver $pathResolver,
     ) {
+        parent::__construct($sourceIndexes, 'routes', RouteSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'routes';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [RouteDeclaration::class, RouteReference::class, RouteSourceFacts::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof RouteSourceFacts) {
-            throw new \UnexpectedValueException('The route source facts are invalid.');
-        }
-
-        return $data->declarations;
-    }
-
-    protected function factsClass(): string
-    {
-        return RouteSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): RouteSourceIndex
-    {
-        return $this->sourceIndexes->forProject($project);
+        return [RouteDeclaration::class, RouteReference::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): RouteSourceFacts
@@ -68,6 +45,11 @@ final class ProjectRouteSourceIndexer extends AbstractSourceIndexer
         }
 
         return new RouteSourceFacts($document->uri, $declarations, $references);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return $facts->declarations;
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): RouteSourceFacts

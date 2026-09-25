@@ -10,45 +10,27 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<EnvironmentSourceFacts> */
 final class EnvironmentSourceIndexer extends AbstractSourceIndexer
 {
-    public function __construct(private readonly EnvironmentIndexRegistry $indexes, private readonly EnvironmentExtractor $extractor)
+    public function __construct(EnvironmentIndexRegistry $indexes, private readonly EnvironmentExtractor $extractor)
     {
+        parent::__construct($indexes, 'environment', EnvironmentSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'environment';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [EnvironmentDeclaration::class, EnvironmentReference::class, EnvironmentSourceFacts::class, MalformedEnvironmentExpression::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof EnvironmentSourceFacts) {
-            throw new \UnexpectedValueException('The environment source facts are invalid.');
-        }
-
-        return [
-            ...$data->declarations,
-            ...$data->references,
-        ];
-    }
-
-    protected function factsClass(): string
-    {
-        return EnvironmentSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): EnvironmentIndex
-    {
-        return $this->indexes->forProject($project);
+        return [EnvironmentDeclaration::class, EnvironmentReference::class, MalformedEnvironmentExpression::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): EnvironmentSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return [
+            ...$facts->declarations,
+            ...$facts->references,
+        ];
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): EnvironmentSourceFacts

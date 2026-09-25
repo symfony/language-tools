@@ -10,49 +10,31 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<DoctrineSourceFacts> */
 final class DoctrineSourceIndexer extends AbstractSourceIndexer
 {
-    public function __construct(private readonly DoctrineIndexRegistry $indexes, private readonly DoctrineExtractor $extractor)
+    public function __construct(DoctrineIndexRegistry $indexes, private readonly DoctrineExtractor $extractor)
     {
+        parent::__construct($indexes, 'doctrine_v1', DoctrineSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'doctrine_v1';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [DoctrineEntity::class, DoctrineField::class, DoctrineRepository::class, DoctrineSourceFacts::class, DoctrineSourceSymbol::class, DoctrineSymbolKind::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof DoctrineSourceFacts) {
-            throw new \UnexpectedValueException('The Doctrine source facts are invalid.');
-        }
-
-        $declarations = [];
-        foreach ($data->symbols as $symbol) {
-            if ($symbol->declaration) {
-                $declarations[] = $symbol;
-            }
-        }
-
-        return [...$data->entities, ...$data->repositories, ...$declarations];
-    }
-
-    protected function factsClass(): string
-    {
-        return DoctrineSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): DoctrineIndex
-    {
-        return $this->indexes->forProject($project);
+        return [DoctrineEntity::class, DoctrineField::class, DoctrineRepository::class, DoctrineSourceSymbol::class, DoctrineSymbolKind::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): DoctrineSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        $declarations = [];
+        foreach ($facts->symbols as $symbol) {
+            if ($symbol->declaration) {
+                $declarations[] = $symbol;
+            }
+        }
+
+        return [...$facts->entities, ...$facts->repositories, ...$declarations];
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): DoctrineSourceFacts

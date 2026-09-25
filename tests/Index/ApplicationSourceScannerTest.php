@@ -929,7 +929,7 @@ final class ObjectFactsSourceIndexProvider implements SourceIndexProviderInterfa
         return $this->extract($project, $document);
     }
 
-    public function runtimeDeclarations(mixed $data): array
+    public function runtimeRefreshProjection(mixed $data): array
     {
         if (!$data instanceof RouteSourceFacts) {
             throw new \UnexpectedValueException();
@@ -998,7 +998,7 @@ final class FailingSourceIndexProvider implements SourceIndexProviderInterface
         throw new \RuntimeException('secret=value');
     }
 
-    public function runtimeDeclarations(mixed $data): array
+    public function runtimeRefreshProjection(mixed $data): array
     {
         return [];
     }
@@ -1080,7 +1080,7 @@ final class RecordingSourceIndexProvider implements SourceIndexProviderInterface
         return $this->record($document);
     }
 
-    public function runtimeDeclarations(mixed $data): array
+    public function runtimeRefreshProjection(mixed $data): array
     {
         if (!$data instanceof RouteSourceFacts) {
             throw new \UnexpectedValueException();
@@ -1168,7 +1168,7 @@ final class GenerationalSourceIndexProvider implements SourceIndexProviderInterf
         return $this->facts($document->uri, $hash);
     }
 
-    public function runtimeDeclarations(mixed $data): array
+    public function runtimeRefreshProjection(mixed $data): array
     {
         if (!$data instanceof RouteSourceFacts) {
             throw new \UnexpectedValueException();

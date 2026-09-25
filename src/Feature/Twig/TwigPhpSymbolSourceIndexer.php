@@ -11,44 +11,29 @@ use Symfony\Lsp\Project\Project;
 final class TwigPhpSymbolSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(
-        private readonly TwigPhpSymbolSourceIndexRegistry $indexes,
+        TwigPhpSymbolSourceIndexRegistry $indexes,
         private readonly TwigPhpSymbolExtractor $extractor,
     ) {
+        parent::__construct($indexes, 'twig_php_symbols', TwigPhpSymbolSourceFacts::class);
     }
 
-    public function name(): string
-    {
-        return 'twig_php_symbols';
-    }
-
-    public function payloadClasses(): array
+    protected function payloadElementClasses(): array
     {
         return [
             TwigPhpSymbolDeclaration::class,
             TwigPhpSymbolKind::class,
             TwigPhpSymbolReference::class,
-            TwigPhpSymbolSourceFacts::class,
         ];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        return [];
-    }
-
-    protected function factsClass(): string
-    {
-        return TwigPhpSymbolSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): TwigPhpSymbolSourceIndex
-    {
-        return $this->indexes->forProject($project);
     }
 
     protected function extract(Project $project, SourceDocument $document): ?TwigPhpSymbolSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return [];
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): TwigPhpSymbolSourceFacts

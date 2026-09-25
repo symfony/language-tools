@@ -15,6 +15,27 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
     /** @var array<string, array<string, TFacts>> */
     private array $lastHealthyFacts = [];
 
+    /**
+     * @param ProjectIndexRegistryInterface<SourceFactsIndexInterface<TFacts>> $indexes
+     * @param class-string<TFacts>                                             $factsClass
+     */
+    public function __construct(
+        private readonly ProjectIndexRegistryInterface $indexes,
+        private readonly string $name,
+        private readonly string $factsClass,
+    ) {
+    }
+
+    final public function name(): string
+    {
+        return $this->name;
+    }
+
+    final public function payloadClasses(): array
+    {
+        return [$this->factsClass, ...$this->payloadElementClasses()];
+    }
+
     final public function begin(Project $project): void
     {
         $this->facts[$project->rootPath] = [];
@@ -41,11 +62,7 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
         if (null === $data) {
             return;
         }
-        $class = $this->factsClass();
-        if (!$data instanceof $class) {
-            throw new \UnexpectedValueException(\sprintf('The cached source facts for provider "%s" are invalid.', $this->name()));
-        }
-        $this->facts[$project->rootPath][] = $data;
+        $this->facts[$project->rootPath][] = $this->assertFacts($data, \sprintf('The cached source facts for provider "%s" are invalid.', $this->name));
     }
 
     final public function finish(Project $project): void
@@ -66,6 +83,15 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
         }
 
         return $facts;
+    }
+
+    final public function runtimeRefreshProjection(mixed $data): array
+    {
+        if (null === $data) {
+            return [];
+        }
+
+        return $this->refreshRelevantFacts($this->assertFacts($data, \sprintf('The source facts of provider "%s" are invalid.', $this->name)));
     }
 
     final public function remove(Project $project, string $uri): void
@@ -102,14 +128,18 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
         $this->sourceIndex($project)->removeOverlay($uri);
     }
 
-    /** @return class-string<TFacts> */
-    abstract protected function factsClass(): string;
-
-    /** @return SourceFactsIndexInterface<TFacts> */
-    abstract protected function sourceIndex(Project $project): SourceFactsIndexInterface;
+    /** @return list<class-string> */
+    abstract protected function payloadElementClasses(): array;
 
     /** @return TFacts|null */
     abstract protected function extract(Project $project, SourceDocument $document): ?SourceFactsInterface;
+
+    /**
+     * @param TFacts $facts
+     *
+     * @return list<mixed>
+     */
+    abstract protected function refreshRelevantFacts(SourceFactsInterface $facts): array;
 
     /**
      * @param TFacts $healthy
@@ -122,5 +152,21 @@ abstract class AbstractSourceIndexer implements SourceIndexProviderInterface, Pr
     protected function supportsOverlay(Project $project, Document $document): bool
     {
         return true;
+    }
+
+    /** @return TFacts */
+    private function assertFacts(mixed $data, string $message): SourceFactsInterface
+    {
+        if (!$data instanceof $this->factsClass) {
+            throw new \UnexpectedValueException($message);
+        }
+
+        return $data;
+    }
+
+    /** @return SourceFactsIndexInterface<TFacts> */
+    private function sourceIndex(Project $project): SourceFactsIndexInterface
+    {
+        return $this->indexes->forProject($project);
     }
 }

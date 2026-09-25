@@ -5,8 +5,12 @@ namespace Symfony\Lsp\Index;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectStateInterface;
 
-/** @template TIndex of object */
-abstract class AbstractProjectIndexRegistry implements ProjectStateInterface
+/**
+ * @template TIndex of object
+ *
+ * @implements ProjectIndexRegistryInterface<TIndex>
+ */
+abstract class AbstractProjectIndexRegistry implements ProjectIndexRegistryInterface, ProjectStateInterface
 {
     /** @var array<string, TIndex> */
     private array $indexes = [];

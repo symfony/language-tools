@@ -10,46 +10,28 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<MessengerSourceFacts> */
 final class MessengerSourceIndexer extends AbstractSourceIndexer
 {
-    public function __construct(private readonly MessengerSourceIndexRegistry $indexes, private readonly MessengerExtractor $extractor)
+    public function __construct(MessengerSourceIndexRegistry $indexes, private readonly MessengerExtractor $extractor)
     {
+        parent::__construct($indexes, 'messenger', MessengerSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'messenger';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [MessengerSourceFacts::class, MessengerSourceSymbol::class, MessengerSymbolKind::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof MessengerSourceFacts) {
-            throw new \UnexpectedValueException('The Messenger source facts are invalid.');
-        }
-
-        return [
-            ...array_filter($data->symbols, static fn (MessengerSourceSymbol $symbol): bool => $symbol->declaration),
-            $data->parents,
-            $data->handlers,
-        ];
-    }
-
-    protected function factsClass(): string
-    {
-        return MessengerSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): MessengerSourceIndex
-    {
-        return $this->indexes->forProject($project);
+        return [MessengerSourceSymbol::class, MessengerSymbolKind::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): MessengerSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return [
+            ...array_filter($facts->symbols, static fn (MessengerSourceSymbol $symbol): bool => $symbol->declaration),
+            $facts->parents,
+            $facts->handlers,
+        ];
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): MessengerSourceFacts

@@ -11,42 +11,16 @@ use Symfony\Lsp\Project\Project;
 final class TwigCallableSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(
-        private readonly TwigCallableSourceIndexRegistry $indexes,
+        TwigCallableSourceIndexRegistry $indexes,
         private readonly TwigCallableDeclarationExtractor $extractor,
         private readonly TwigCallableReferenceExtractor $references,
     ) {
+        parent::__construct($indexes, 'twig_callables', TwigCallableSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'twig_callables';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [TwigCallableArgumentReference::class, TwigCallableCallReference::class, TwigCallableDeclaration::class, TwigCallableKind::class, TwigCallableMethodParameter::class, TwigCallableSourceFacts::class, TwigCallableSourceMethod::class, TwigCallableUsage::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (null === $data) {
-            return [];
-        }
-        if (!$data instanceof TwigCallableSourceFacts) {
-            throw new \UnexpectedValueException('The Twig callable source facts are invalid.');
-        }
-
-        return $data->declarations;
-    }
-
-    protected function factsClass(): string
-    {
-        return TwigCallableSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): TwigCallableSourceIndex
-    {
-        return $this->indexes->forProject($project);
+        return [TwigCallableArgumentReference::class, TwigCallableCallReference::class, TwigCallableDeclaration::class, TwigCallableKind::class, TwigCallableMethodParameter::class, TwigCallableSourceMethod::class, TwigCallableUsage::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): ?TwigCallableSourceFacts
@@ -59,6 +33,11 @@ final class TwigCallableSourceIndexer extends AbstractSourceIndexer
         }
 
         return null;
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return $facts->declarations;
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): TwigCallableSourceFacts

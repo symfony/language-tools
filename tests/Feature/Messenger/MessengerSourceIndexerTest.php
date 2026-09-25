@@ -119,7 +119,7 @@ final class MessengerSourceIndexerTest extends TestCase
         self::assertInstanceOf(MessengerSourceFacts::class, $facts);
         self::assertSame(['App\\Handler' => ['App\\BaseHandler']], $facts->parents);
         self::assertSame(['#[AsMessageHandler]'], $facts->handlers);
-        self::assertSame([$facts->parents, $facts->handlers], $indexer->runtimeDeclarations($facts));
+        self::assertSame([$facts->parents, $facts->handlers], $indexer->runtimeRefreshProjection($facts));
     }
 
     private function extractor(): MessengerExtractor

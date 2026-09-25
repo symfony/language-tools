@@ -228,7 +228,7 @@ final class OverlayRecordingProvider implements SourceIndexProviderInterface
         return null;
     }
 
-    public function runtimeDeclarations(mixed $data): array
+    public function runtimeRefreshProjection(mixed $data): array
     {
         return [];
     }

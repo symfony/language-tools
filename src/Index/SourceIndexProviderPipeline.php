@@ -73,13 +73,13 @@ final class SourceIndexProviderPipeline
             }
             $factsChanged = true;
             if ('' === $previousPayload) {
-                if ([] === $provider->runtimeDeclarations($data)) {
+                if ([] === $provider->runtimeRefreshProjection($data)) {
                     continue;
                 }
             } elseif (\is_string($previousPayload)) {
                 try {
                     $previousData = $this->codec->decode($name, $previousPayload);
-                    if (serialize($provider->runtimeDeclarations($data)) === serialize($provider->runtimeDeclarations($previousData))) {
+                    if (serialize($provider->runtimeRefreshProjection($data)) === serialize($provider->runtimeRefreshProjection($previousData))) {
                         continue;
                     }
                 } catch (\UnexpectedValueException) {

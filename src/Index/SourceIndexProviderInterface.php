@@ -22,8 +22,12 @@ interface SourceIndexProviderInterface
 
     public function replace(Project $project, SourceDocument $document): ?SourceFactsInterface;
 
-    /** @return list<mixed> */
-    public function runtimeDeclarations(mixed $data): array;
+    /**
+     * Returns the serializable part of the persisted facts that runtime metadata depends on.
+     *
+     * @return list<mixed>
+     */
+    public function runtimeRefreshProjection(mixed $data): array;
 
     public function remove(Project $project, string $uri): void;
 

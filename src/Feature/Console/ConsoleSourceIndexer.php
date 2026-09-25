@@ -11,43 +11,25 @@ use Symfony\Lsp\Project\Project;
 final class ConsoleSourceIndexer extends AbstractSourceIndexer
 {
     public function __construct(
-        private readonly ConsoleSourceIndexRegistry $indexes,
+        ConsoleSourceIndexRegistry $indexes,
         private readonly ConsoleExtractor $extractor,
     ) {
+        parent::__construct($indexes, 'console', ConsoleSourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'console';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [ConsoleSourceFacts::class, ConsoleCommandDeclaration::class, ConsoleInputReference::class, ConsoleInputKind::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof ConsoleSourceFacts) {
-            throw new \UnexpectedValueException('The Console source facts are invalid.');
-        }
-
-        return $data->declarations;
-    }
-
-    protected function factsClass(): string
-    {
-        return ConsoleSourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): ConsoleSourceIndex
-    {
-        return $this->indexes->forProject($project);
+        return [ConsoleCommandDeclaration::class, ConsoleInputReference::class, ConsoleInputKind::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): ConsoleSourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return $facts->declarations;
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): ConsoleSourceFacts

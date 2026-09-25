@@ -10,42 +10,24 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<SecuritySourceFacts> */
 final class SecuritySourceIndexer extends AbstractSourceIndexer
 {
-    public function __construct(private readonly SecuritySourceIndexRegistry $indexes, private readonly SecurityExtractor $extractor)
+    public function __construct(SecuritySourceIndexRegistry $indexes, private readonly SecurityExtractor $extractor)
     {
+        parent::__construct($indexes, 'security', SecuritySourceFacts::class);
     }
 
-    public function name(): string
+    protected function payloadElementClasses(): array
     {
-        return 'security';
-    }
-
-    public function payloadClasses(): array
-    {
-        return [SecuritySourceFacts::class, SecuritySourceSymbol::class, SecuritySymbolKind::class];
-    }
-
-    public function runtimeDeclarations(mixed $data): array
-    {
-        if (!$data instanceof SecuritySourceFacts) {
-            throw new \UnexpectedValueException('The security source facts are invalid.');
-        }
-
-        return array_values(array_filter($data->symbols, static fn (SecuritySourceSymbol $symbol): bool => $symbol->declaration));
-    }
-
-    protected function factsClass(): string
-    {
-        return SecuritySourceFacts::class;
-    }
-
-    protected function sourceIndex(Project $project): SecuritySourceIndex
-    {
-        return $this->indexes->forProject($project);
+        return [SecuritySourceSymbol::class, SecuritySymbolKind::class];
     }
 
     protected function extract(Project $project, SourceDocument $document): SecuritySourceFacts
     {
         return $this->extractor->extract($document);
+    }
+
+    protected function refreshRelevantFacts(SourceFactsInterface $facts): array
+    {
+        return array_values(array_filter($facts->symbols, static fn (SecuritySourceSymbol $symbol): bool => $symbol->declaration));
     }
 
     protected function preserveDeclarations(SourceFactsInterface $healthy, SourceFactsInterface $current): SecuritySourceFacts
