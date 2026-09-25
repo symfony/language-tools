@@ -12,13 +12,13 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Server\ContainerFactory;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationException;
 use Symfony\Lsp\Tools\Dogfood\ScenarioLocator;
 use Symfony\Lsp\Tools\Dogfood\ScenarioManifestLoader;
 use Symfony\Lsp\Tools\Dogfood\ScenarioPositionIndex;
 use Symfony\Lsp\Tools\Dogfood\SourceFactExplorer;
 
-use function Symfony\Lsp\Tools\createBenchmarkContainer;
 use function Symfony\Lsp\Tools\installBenchmarkSyntheticServices;
 
 require dirname(__DIR__).'/vendor/autoload.php';
@@ -97,7 +97,7 @@ if (null !== $manifestPath && !is_file($manifestPath)) {
     fail(sprintf('The scenario manifest "%s" does not exist.', $manifestPath));
 }
 
-$container = createBenchmarkContainer(VERSION);
+$container = (new ContainerFactory())->create(VERSION);
 foreach ([ApplicationSourceScanner::class, PersistentSourceIndexStore::class, ProjectDiscovery::class, ProjectIndexStatusRegistry::class, ProjectRegistry::class, SourceIndexPayloadCodec::class, SourceIndexProviderPipeline::class] as $service) {
     $container->getDefinition($service)->setPublic(true);
 }

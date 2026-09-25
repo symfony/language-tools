@@ -3,9 +3,7 @@
 namespace Symfony\Lsp\Tests\Server;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\Finder\Finder;
 use Symfony\Lsp\Feature\Asset\PublicAssetResolver;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
@@ -46,6 +44,7 @@ use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Runtime\RuntimeSnapshotState;
 use Symfony\Lsp\Runtime\RuntimeSnapshotValues;
+use Symfony\Lsp\Server\ContainerFactory;
 
 final class ServiceConfigurationTest extends TestCase
 {
@@ -184,12 +183,6 @@ final class ServiceConfigurationTest extends TestCase
 
     private function container(): ContainerBuilder
     {
-        $root = \dirname(__DIR__, 2);
-        $container = new ContainerBuilder();
-        $container->setParameter('server.version', 'test');
-        $container->setParameter('bridge.source', $root.'/resources/bridge.php');
-        (new PhpFileLoader($container, new FileLocator($root.'/resources')))->load('services.php');
-
-        return $container;
+        return (new ContainerFactory())->create('test');
     }
 }

@@ -19,10 +19,10 @@ use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Server\ContainerFactory;
 use Symfony\Lsp\Tools\CountingDiagnosticPhpParser;
 use Symfony\Lsp\Tools\DiagnosticParseCounter;
 
-use function Symfony\Lsp\Tools\createBenchmarkContainer;
 use function Symfony\Lsp\Tools\installBenchmarkSyntheticServices;
 
 require dirname(__DIR__).'/vendor/autoload.php';
@@ -81,7 +81,7 @@ foreach ($cases as $path => [$text]) {
     file_put_contents($projectRoot.'/'.$path, $text);
 }
 
-$container = createBenchmarkContainer('diagnostic-benchmark');
+$container = (new ContainerFactory())->create('diagnostic-benchmark');
 $container->register(DiagnosticParseCounter::class)->setSynthetic(true)->setPublic(true);
 $container->register(CountingDiagnosticPhpParser::class, CountingDiagnosticPhpParser::class)
     ->setDecoratedService(TolerantPhpParser::class)

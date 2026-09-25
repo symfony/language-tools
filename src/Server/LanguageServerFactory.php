@@ -8,10 +8,7 @@ use Fabpot\JsonRpc\ContentLengthJsonRpcTransport;
 use Fabpot\JsonRpc\JsonRpcDispatcher;
 use Fabpot\JsonRpc\JsonRpcPeer;
 use Fabpot\JsonRpc\JsonRpcValueDecoding;
-use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
-use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Check\CheckClient;
 use Symfony\Lsp\Check\CheckCommand;
 use Symfony\Lsp\Check\CheckProgressReporter;
@@ -76,12 +73,7 @@ final class LanguageServerFactory
 
     private function container(): ContainerBuilder
     {
-        $resources = Path::join(\dirname(__DIR__, 2), 'resources');
-        $container = new ContainerBuilder();
-        $container->setParameter('server.version', $this->serverVersion->value());
-        $container->setParameter('bridge.source', Path::join($resources, 'bridge.php'));
-        $loader = new PhpFileLoader($container, new FileLocator($resources));
-        $loader->load('services.php');
+        $container = (new ContainerFactory())->create($this->serverVersion->value());
         $container->setParameter('runtime.default_php_command', $this->defaultPhpCommand);
         $container->setParameter('runtime.release_metadata_url', $this->releaseMetadataUrl);
 
