@@ -7,7 +7,7 @@
  * database connection) in listener constructors.
  */
 
-function symfonyLspBridgeEventsSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeEventsSection(SymfonyLspBridgeContext $context): array
 {
     $eventItems = [];
     $listeners = [];
@@ -60,13 +60,13 @@ function symfonyLspBridgeEventsSection(SymfonyLspBridgeContext $context): ?array
     }
     usort($eventItems, static fn (array $left, array $right): int => $left['name'] <=> $right['name']);
     usort($listeners, static fn (array $left, array $right): int => [$left['event'], -$left['priority'], $left['class'], $left['method']] <=> [$right['event'], -$right['priority'], $right['class'], $right['method']]);
-    $section = [
+
+    return [
         'complete' => $complete,
         'events' => $eventItems,
         'listeners' => $listeners,
         'warnings' => [],
     ];
-    return $section;
 }
 
 function symfonyLspBridgeEventAliases(SymfonyLspBridgeContext $context): array

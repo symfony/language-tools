@@ -294,7 +294,7 @@ final class BridgeSectionsTest extends TestCase
         self::assertIsArray($result['sections'] ?? null);
         $doctrine = $result['sections']['doctrine'] ?? null;
         self::assertIsArray($doctrine);
-        self::assertTrue($doctrine['complete'] ?? null);
+        self::assertTrue($doctrine['enabled'] ?? null);
         self::assertIsArray($doctrine['entities'] ?? null);
         $entity = $doctrine['entities'][0] ?? null;
         self::assertIsArray($entity);
@@ -320,9 +320,9 @@ final class BridgeSectionsTest extends TestCase
         self::assertSame([], $result['errors'] ?? null, $snapshot);
         self::assertIsArray($result['sections'] ?? null);
         self::assertSame([
-            'complete' => true,
             'enabled' => false,
             'entities' => [],
+            'warnings' => [],
         ], $result['sections']['doctrine'] ?? null);
     }
 

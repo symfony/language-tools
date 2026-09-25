@@ -1,6 +1,6 @@
 <?php
 
-function symfonyLspBridgeStimulusSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeStimulusSection(SymfonyLspBridgeContext $context): array
 {
     $controllers = [];
     $warnings = [];
@@ -48,12 +48,12 @@ function symfonyLspBridgeStimulusSection(SymfonyLspBridgeContext $context): ?arr
 
     ksort($controllers);
     sort($warnings);
-    $section = [
+
+    return [
         'complete' => $complete,
         'controllers' => array_values($controllers),
         'warnings' => $warnings,
     ];
-    return $section;
 }
 
 function symfonyLspBridgeStimulusBundleRegistries(SymfonyLspBridgeContext $context, object $kernel, array &$warnings): array

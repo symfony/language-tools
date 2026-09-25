@@ -1,7 +1,10 @@
 <?php
 
-function symfonyLspBridgeContainerSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeContainerSection(SymfonyLspBridgeContext $context): array
 {
+    $items = [];
+    $parameterItems = [];
+    $parametersComplete = false;
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
     ) {
@@ -28,20 +31,20 @@ function symfonyLspBridgeContainerSection(SymfonyLspBridgeContext $context): ?ar
                 '--format' => 'json',
                 ...$commandOptions,
             ]));
+            $parametersComplete = true;
 
             $items = symfonyLspBridgeNormalizeServices($container, $types);
-            $section = [
-                'complete' => true,
-                'servicesComplete' => false,
-                'parametersComplete' => true,
-                'items' => $items,
-                'parameters' => $parameterItems,
-                'warnings' => [],
-            ];
         } catch (Throwable $error) {
             $context->addError('container', $error);
         }
     }
 
-    return $section ?? null;
+    // debug:container hides the services the compiler inlines or removes
+    return [
+        'servicesComplete' => false,
+        'parametersComplete' => $parametersComplete,
+        'items' => $items,
+        'parameters' => $parameterItems,
+        'warnings' => [],
+    ];
 }

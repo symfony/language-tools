@@ -1,6 +1,6 @@
 <?php
 
-function symfonyLspBridgeSecuritySection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeSecuritySection(SymfonyLspBridgeContext $context): array
 {
     $firewalls = [];
     $providers = [];
@@ -105,7 +105,8 @@ function symfonyLspBridgeSecuritySection(SymfonyLspBridgeContext $context): ?arr
     foreach (array_keys($roles) as $role) {
         $roleItems[] = ['name' => $role, 'inheritedRoles' => $roleHierarchy[$role] ?? []];
     }
-    $section = [
+
+    return [
         'complete' => $complete,
         'firewalls' => array_values($firewalls),
         'providers' => array_values($providers),
@@ -113,5 +114,4 @@ function symfonyLspBridgeSecuritySection(SymfonyLspBridgeContext $context): ?arr
         'voters' => array_values($voters),
         'warnings' => $warnings,
     ];
-    return $section;
 }

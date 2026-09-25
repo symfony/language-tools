@@ -1,6 +1,6 @@
 <?php
 
-function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): array
 {
     $paths = [];
     $globals = [];
@@ -50,14 +50,13 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
     // must keep the order each namespace was registered in
     usort($paths, static fn (array $a, array $b): int => $a['namespace'] <=> $b['namespace']);
     sort($globals);
-    $section = [
+
+    return [
         'complete' => $complete,
         'paths' => $paths,
         'globals' => $globals,
         'warnings' => $warnings,
     ];
-
-    return $section;
 }
 
 /*

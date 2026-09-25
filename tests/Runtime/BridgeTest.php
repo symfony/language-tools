@@ -450,7 +450,13 @@ PHP,
 
         $result = $process->snapshot;
         self::assertIsArray($result);
-        self::assertSame([], $result['sections']);
+        self::assertSame(['routes' => [
+            'complete' => false,
+            'items' => [],
+            'contextParameters' => [],
+            'resources' => [],
+            'warnings' => [],
+        ]], $result['sections']);
         $errors = $result['errors'] ?? null;
         self::assertIsArray($errors);
         $error = $errors[0] ?? null;

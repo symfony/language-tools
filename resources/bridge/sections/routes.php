@@ -1,7 +1,11 @@
 <?php
 
-function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): array
 {
+    $items = [];
+    $contextParameters = [];
+    $resources = [];
+    $complete = false;
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
     ) {
@@ -15,19 +19,19 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
             usort($items, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
             $contextParameters = symfonyLspBridgeRouteContextParameterNames($context);
             $resources = symfonyLspBridgeRouteResourcePaths($context);
-            $section = [
-                'complete' => true,
-                'items' => $items,
-                'contextParameters' => $contextParameters,
-                'resources' => $resources,
-                'warnings' => [],
-            ];
+            $complete = true;
         } catch (Throwable $error) {
             $context->addError('routes', $error);
         }
     }
 
-    return $section ?? null;
+    return [
+        'complete' => $complete,
+        'items' => $items,
+        'contextParameters' => $contextParameters,
+        'resources' => $resources,
+        'warnings' => [],
+    ];
 }
 
 /*

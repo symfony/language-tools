@@ -168,9 +168,7 @@ foreach ($requestedSections as $sectionName) {
             'console' => symfonyLspBridgeConsoleSection($context),
             default => throw new InvalidArgumentException(sprintf('The "%s" runtime metadata section is unknown.', $sectionName)),
         };
-        if (is_array($section)) {
-            $sections[$sectionName] = $section;
-        }
+        $sections[$sectionName] = $section;
     } catch (Throwable $error) {
         $context->addError($sectionName, $error);
     } finally {

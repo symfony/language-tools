@@ -171,7 +171,10 @@ final class BridgeRoutesTest extends TestCase
         $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertIsArray($result['sections'] ?? null);
-        self::assertArrayNotHasKey('routes', $result['sections']);
+        $routes = $result['sections']['routes'] ?? null;
+        self::assertIsArray($routes);
+        self::assertFalse($routes['complete'] ?? null);
+        self::assertSame([], $routes['items'] ?? null);
         $errors = $result['errors'] ?? null;
         self::assertIsArray($errors);
         self::assertCount(1, $errors);

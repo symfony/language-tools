@@ -81,6 +81,7 @@ final class BridgeTwigComponentsTest extends TestCase
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
+            'components' => [],
             'warnings' => [],
         ], $section);
     }
@@ -105,6 +106,7 @@ final class BridgeTwigComponentsTest extends TestCase
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
+            'components' => [],
             'warnings' => [],
         ], $section);
     }

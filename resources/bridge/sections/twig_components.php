@@ -1,30 +1,37 @@
 <?php
 
-function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context): array
 {
     $enabled = false;
+    $complete = true;
     if (class_exists(Symfony\UX\TwigComponent\ComponentFactory::class)) {
         try {
             $enabled = $context->hasExtension('twig_component');
         } catch (Throwable $error) {
+            $complete = false;
             $context->addError('twig_components', $error);
-
-            return null;
         }
     }
     if (!$enabled) {
         return [
-            'complete' => true,
+            'complete' => $complete,
             'enabled' => false,
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
+            'components' => [],
             'warnings' => [],
         ];
     }
+    $names = [];
+    $caseInsensitiveNames = [];
+    $components = [];
+    $anonymousTemplateDirectory = 'components';
+    $warnings = [];
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
     ) {
+        $complete = false;
         $context->addError('twig_components');
     } else {
         try {
@@ -62,10 +69,6 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
                     }
                 }
             }
-            $complete = true;
-            $warnings = [];
-            $names = [];
-            $components = [];
             foreach ($definitionsByTag['twig.component'] as $definition) {
                 $class = is_string($definition['class'] ?? null) ? $definition['class'] : null;
                 foreach (symfonyLspBridgeDefinitionTagParameters($definition, 'twig.component') as $parameters) {
@@ -94,7 +97,6 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
                     ];
                 }
             }
-            $caseInsensitiveNames = [];
             foreach ($definitionsByTag['ux.twig_component.twig_renderer'] as $definition) {
                 foreach (symfonyLspBridgeDefinitionTagParameters($definition, 'ux.twig_component.twig_renderer') as $parameters) {
                     $name = is_string($parameters['key'] ?? null) ? $parameters['key'] : null;
@@ -117,21 +119,21 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
             sort($caseInsensitiveNames);
             ksort($components);
             $components = array_values($components);
-            $section = [
-                'complete' => $complete,
-                'enabled' => true,
-                'names' => $names,
-                'caseInsensitiveNames' => $caseInsensitiveNames,
-                'anonymousTemplateDirectory' => $anonymousTemplateDirectory,
-                'components' => $components,
-                'warnings' => $warnings,
-            ];
         } catch (Throwable $error) {
+            $complete = false;
             $context->addError('twig_components', $error);
         }
     }
 
-    return $section ?? null;
+    return [
+        'complete' => $complete,
+        'enabled' => true,
+        'names' => $names,
+        'caseInsensitiveNames' => $caseInsensitiveNames,
+        'anonymousTemplateDirectory' => $anonymousTemplateDirectory,
+        'components' => $components,
+        'warnings' => $warnings,
+    ];
 }
 
 // Mirrors the automatic naming rule of TwigComponentPass for tags without an explicit key.

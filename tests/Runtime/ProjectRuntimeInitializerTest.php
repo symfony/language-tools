@@ -81,7 +81,6 @@ final class ProjectRuntimeInitializerTest extends TestCase
                     ],
                 ],
                 'container' => [
-                    'complete' => true,
                     'items' => [
                         ['id' => 'app.mailer', 'class' => 'App\\Mailer'],
                     ],
@@ -457,7 +456,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 ]],
                 'sections' => [
                     'routes' => ['complete' => true, 'items' => [['name' => 'replacement', 'path' => '/replacement']]],
-                    'container' => ['complete' => true, 'items' => [
+                    'container' => ['items' => [
                         ['id' => 'app.mailer', 'class' => 'App\\Mailer'],
                     ], 'parameters' => []],
                 ],
@@ -501,7 +500,6 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'sections' => [
                 'routes' => ['complete' => true, 'items' => [['name' => 'old_route', 'path' => '/old']]],
                 'container' => [
-                    'complete' => true,
                     'items' => [['id' => 'old.service', 'class' => 'App\\OldService']],
                     'parameters' => [],
                 ],
@@ -519,7 +517,6 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 'sections' => [
                     'routes' => ['complete' => true, 'items' => [['name' => 'new_route', 'path' => '/new']]],
                     'container' => [
-                        'complete' => true,
                         'items' => [['id' => 'new.service', 'class' => 'App\\NewService']],
                         'parameters' => [],
                     ],
@@ -551,7 +548,6 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame([
             'routes' => ['complete' => true, 'items' => [['name' => 'new_route', 'path' => '/new']]],
             'container' => [
-                'complete' => true,
                 'items' => [['id' => 'old.service', 'class' => 'App\\OldService']],
                 'parameters' => [],
             ],

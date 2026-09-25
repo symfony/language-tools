@@ -2,16 +2,14 @@
 
 function symfonyLspBridgeDoctrineSection(SymfonyLspBridgeContext $context): array
 {
-    if (!interface_exists(Doctrine\Persistence\ManagerRegistry::class)) {
-        return ['complete' => true, 'enabled' => false, 'entities' => []];
-    }
     $entities = [];
-    $complete = false;
-    try {
-        $container = $context->kernel()->getContainer();
-        if ($container->has('doctrine')) {
-            $registry = $container->get('doctrine');
+    $enabled = false;
+    if (interface_exists(Doctrine\Persistence\ManagerRegistry::class)) {
+        try {
+            $container = $context->kernel()->getContainer();
+            $registry = $container->has('doctrine') ? $container->get('doctrine') : null;
             if ($registry instanceof Doctrine\Persistence\ManagerRegistry) {
+                $enabled = true;
                 foreach ($registry->getManagers() as $manager) {
                     foreach ($manager->getMetadataFactory()->getAllMetadata() as $metadata) {
                         $reflection = $metadata->getReflectionClass();
@@ -32,13 +30,12 @@ function symfonyLspBridgeDoctrineSection(SymfonyLspBridgeContext $context): arra
                         ];
                     }
                 }
-                $complete = true;
             }
+        } catch (Throwable $error) {
+            $context->addError('doctrine', $error);
         }
-    } catch (Throwable $error) {
-        $context->addError('doctrine', $error);
     }
     usort($entities, static fn (array $a, array $b): int => $a['className'] <=> $b['className']);
 
-    return ['complete' => $complete, 'enabled' => true, 'entities' => $entities];
+    return ['enabled' => $enabled, 'entities' => $entities, 'warnings' => []];
 }

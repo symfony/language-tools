@@ -1,6 +1,6 @@
 <?php
 
-function symfonyLspBridgeTranslationsSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeTranslationsSection(SymfonyLspBridgeContext $context): array
 {
     $items = [];
     if (interface_exists(Symfony\Component\Translation\TranslatorBagInterface::class)) {
@@ -50,11 +50,10 @@ function symfonyLspBridgeTranslationsSection(SymfonyLspBridgeContext $context): 
         }
     }
     usort($items, static fn (array $a, array $b): int => [$a['domain'], $a['key'], $a['locale']] <=> [$b['domain'], $b['key'], $b['locale']]);
-    $section = [
+
+    return [
         'complete' => true,
         'items' => $items,
         'warnings' => [],
     ];
-
-    return $section;
 }

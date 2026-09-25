@@ -1,6 +1,6 @@
 <?php
 
-function symfonyLspBridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeAssetsSection(SymfonyLspBridgeContext $context): array
 {
     $assets = [];
     $importMap = [];
@@ -110,14 +110,14 @@ function symfonyLspBridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
     }
 
     sort($warnings);
-    $section = [
+
+    return [
         'assetsComplete' => $assetsComplete,
         'importMapComplete' => $importMapComplete,
         'assets' => array_values($assets),
         'importMap' => array_values($importMap),
         'warnings' => $warnings,
     ];
-    return $section;
 }
 
 function symfonyLspBridgeAssetAbsolutePath(string $projectRoot, string $path): ?string

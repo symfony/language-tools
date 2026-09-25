@@ -1,6 +1,6 @@
 <?php
 
-function symfonyLspBridgeMessengerSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeMessengerSection(SymfonyLspBridgeContext $context): array
 {
     $buses = [];
     $transports = [];

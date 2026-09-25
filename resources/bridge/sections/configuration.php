@@ -1,10 +1,9 @@
 <?php
 
-function symfonyLspBridgeConfigurationSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeConfigurationSection(SymfonyLspBridgeContext $context): array
 {
     $bundles = [];
     $warnings = [];
-    $complete = true;
     try {
         $builder = $context->containerBuilder();
         foreach ($context->extensions() as $alias => $extension) {
@@ -26,16 +25,13 @@ function symfonyLspBridgeConfigurationSection(SymfonyLspBridgeContext $context):
             }
         }
     } catch (Throwable $error) {
-        $complete = false;
         $context->addError('configuration', $error);
     }
     usort($bundles, static fn (array $left, array $right): int => $left['alias'] <=> $right['alias']);
     sort($warnings);
-    $section = [
-        'complete' => $complete,
+
+    return [
         'bundles' => $bundles,
         'warnings' => $warnings,
     ];
-
-    return $section;
 }

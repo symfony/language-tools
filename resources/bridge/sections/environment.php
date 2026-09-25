@@ -1,6 +1,6 @@
 <?php
 
-function symfonyLspBridgeEnvironmentSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeEnvironmentSection(SymfonyLspBridgeContext $context): array
 {
     $processors = [];
     $complete = true;
@@ -40,11 +40,10 @@ function symfonyLspBridgeEnvironmentSection(SymfonyLspBridgeContext $context): ?
     foreach ($processors as $name => $type) {
         $processorItems[] = ['name' => $name, 'type' => $type];
     }
-    $section = [
+
+    return [
         'complete' => $complete,
         'processors' => $processorItems,
         'warnings' => [],
     ];
-
-    return $section;
 }

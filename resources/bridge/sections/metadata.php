@@ -1,6 +1,6 @@
 <?php
 
-function symfonyLspBridgeMetadataSection(SymfonyLspBridgeContext $context): ?array
+function symfonyLspBridgeMetadataSection(SymfonyLspBridgeContext $context): array
 {
     $forms = [];
     $constraints = [];
@@ -82,14 +82,14 @@ function symfonyLspBridgeMetadataSection(SymfonyLspBridgeContext $context): ?arr
     ksort($forms);
     ksort($constraints);
     sort($warnings);
-    $section = [
+
+    return [
         'formsComplete' => $formsComplete,
         'constraintsComplete' => $constraintsComplete,
         'forms' => array_values($forms),
         'constraints' => array_values($constraints),
         'warnings' => $warnings,
     ];
-    return $section;
 }
 
 function symfonyLspBridgeMetadataFormDescription(object $application, array $commandOptions, string $type, array &$descriptions): ?array
