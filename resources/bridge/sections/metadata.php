@@ -90,7 +90,7 @@ function symfonyLspBridgeMetadataSection(SymfonyLspBridgeContext $context): ?arr
         'resources' => [],
         'warnings' => $warnings,
     ];
-    return symfonyLspBridgeFinalizeSection($section);
+    return $section;
 }
 
 function symfonyLspBridgeMetadataFormDescription(object $application, array $commandOptions, string $type, array &$descriptions): ?array

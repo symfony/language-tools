@@ -42,7 +42,6 @@ function symfonyLspBridgeEnvironmentSection(SymfonyLspBridgeContext $context): ?
     }
     $section = [
         'complete' => $complete,
-        'generation' => hash('sha256', json_encode($processorItems, JSON_THROW_ON_ERROR)),
         'processors' => $processorItems,
         'resources' => [],
         'warnings' => [],

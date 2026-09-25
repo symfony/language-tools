@@ -52,7 +52,6 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): ?array
     sort($globals);
     $section = [
         'complete' => $complete,
-        'generation' => hash('sha256', json_encode([$paths, $globals], JSON_THROW_ON_ERROR)),
         'paths' => $paths,
         'globals' => $globals,
         'resources' => [],

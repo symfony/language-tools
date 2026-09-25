@@ -58,7 +58,7 @@ function symfonyLspBridgeStimulusSection(SymfonyLspBridgeContext $context): ?arr
         'resources' => $resources,
         'warnings' => $warnings,
     ];
-    return symfonyLspBridgeFinalizeSection($section);
+    return $section;
 }
 
 function symfonyLspBridgeStimulusBundleRegistries(SymfonyLspBridgeContext $context, object $kernel, array &$warnings): array

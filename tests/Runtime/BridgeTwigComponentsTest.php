@@ -82,7 +82,7 @@ final class BridgeTwigComponentsTest extends TestCase
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
             'warnings' => [],
-        ], array_diff_key($section, ['generation' => true]));
+        ], $section);
     }
 
     public function testClearsTheTwigComponentsSectionWithoutTheComponentPackage(): void
@@ -106,6 +106,6 @@ final class BridgeTwigComponentsTest extends TestCase
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
             'warnings' => [],
-        ], array_diff_key($section, ['generation' => true]));
+        ], $section);
     }
 }

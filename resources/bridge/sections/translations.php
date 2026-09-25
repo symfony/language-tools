@@ -52,7 +52,6 @@ function symfonyLspBridgeTranslationsSection(SymfonyLspBridgeContext $context): 
     usort($items, static fn (array $a, array $b): int => [$a['domain'], $a['key'], $a['locale']] <=> [$b['domain'], $b['key'], $b['locale']]);
     $section = [
         'complete' => true,
-        'generation' => hash('sha256', json_encode($items, JSON_THROW_ON_ERROR)),
         'items' => $items,
         'resources' => [],
         'warnings' => [],

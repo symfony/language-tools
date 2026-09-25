@@ -44,7 +44,7 @@ function symfonyLspBridgeMessengerSection(SymfonyLspBridgeContext $context): ?ar
     ksort($messages);
     sort($warnings);
 
-    return symfonyLspBridgeFinalizeSection([
+    return [
         'complete' => $complete,
         'buses' => array_values($buses),
         'transports' => array_values($transports),
@@ -52,7 +52,7 @@ function symfonyLspBridgeMessengerSection(SymfonyLspBridgeContext $context): ?ar
         'handlers' => symfonyLspBridgeMessengerSortHandlers($handlers),
         'resources' => [],
         'warnings' => $warnings,
-    ]);
+    ];
 }
 
 function symfonyLspBridgeMessengerDefinitions(object $application, array $commandOptions): array

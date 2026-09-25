@@ -13,14 +13,14 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
         }
     }
     if (!$enabled) {
-        return symfonyLspBridgeFinalizeSection([
+        return [
             'complete' => true,
             'enabled' => false,
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
             'warnings' => [],
-        ]);
+        ];
     }
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
@@ -120,7 +120,6 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
             $section = [
                 'complete' => $complete,
                 'enabled' => true,
-                'generation' => hash('sha256', json_encode([$complete, $names, $caseInsensitiveNames, $anonymousTemplateDirectory, $components], JSON_THROW_ON_ERROR)),
                 'names' => $names,
                 'caseInsensitiveNames' => $caseInsensitiveNames,
                 'anonymousTemplateDirectory' => $anonymousTemplateDirectory,

@@ -48,7 +48,6 @@ function symfonyLspBridgeConfigurationSection(SymfonyLspBridgeContext $context):
     sort($resources);
     $section = [
         'complete' => $complete,
-        'generation' => hash('sha256', json_encode($bundles, JSON_THROW_ON_ERROR)),
         'bundles' => $bundles,
         'resources' => $resources,
         'warnings' => $warnings,

@@ -67,7 +67,7 @@ function symfonyLspBridgeEventsSection(SymfonyLspBridgeContext $context): ?array
         'resources' => [],
         'warnings' => [],
     ];
-    return symfonyLspBridgeFinalizeSection($section);
+    return $section;
 }
 
 function symfonyLspBridgeEventAliases(SymfonyLspBridgeContext $context): array

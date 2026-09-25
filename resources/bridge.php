@@ -188,7 +188,6 @@ $totalMilliseconds = $elapsedMilliseconds($bridgeStartedAt);
 
 $result = [
     'schemaVersion' => 1,
-    'generation' => hash('sha256', json_encode([$configurationGeneration, $configurationValidation, $sections], JSON_THROW_ON_ERROR)),
     'project' => $projectMetadata,
     'configurationValidation' => $configurationValidation,
     'configurationGeneration' => $configurationGeneration,

@@ -17,7 +17,6 @@ function symfonyLspBridgeRoutesSection(SymfonyLspBridgeContext $context): ?array
             $resources = symfonyLspBridgeRouteResourcePaths($context);
             $section = [
                 'complete' => true,
-                'generation' => hash('sha256', json_encode([$items, $contextParameters, $resources], JSON_THROW_ON_ERROR)),
                 'items' => $items,
                 'contextParameters' => $contextParameters,
                 'resources' => $resources,

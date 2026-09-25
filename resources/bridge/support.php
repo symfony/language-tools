@@ -28,13 +28,6 @@ function symfonyLspBridgeDiscardApplicationErrorLogs(): void
     }
 }
 
-function symfonyLspBridgeFinalizeSection(array $section): array
-{
-    $section['generation'] = hash('sha256', json_encode($section, JSON_THROW_ON_ERROR));
-
-    return $section;
-}
-
 /** @return list<string>|null */
 function symfonyLspBridgeSupportedVersions(string $url, string $cache): ?array
 {

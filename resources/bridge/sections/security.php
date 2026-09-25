@@ -114,5 +114,5 @@ function symfonyLspBridgeSecuritySection(SymfonyLspBridgeContext $context): ?arr
         'resources' => [],
         'warnings' => $warnings,
     ];
-    return symfonyLspBridgeFinalizeSection($section);
+    return $section;
 }

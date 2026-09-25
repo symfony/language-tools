@@ -544,7 +544,6 @@ final class BridgeSectionsTest extends TestCase
         self::assertIsArray($result['sections'] ?? null);
         self::assertSame([
             'complete' => false,
-            'generation' => hash('sha256', '[[],[]]'),
             'paths' => [],
             'globals' => [],
             'resources' => [],

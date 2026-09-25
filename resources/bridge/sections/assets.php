@@ -118,7 +118,7 @@ function symfonyLspBridgeAssetsSection(SymfonyLspBridgeContext $context): ?array
         'resources' => [],
         'warnings' => $warnings,
     ];
-    return symfonyLspBridgeFinalizeSection($section);
+    return $section;
 }
 
 function symfonyLspBridgeAssetAbsolutePath(string $projectRoot, string $path): ?string

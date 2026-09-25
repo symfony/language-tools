@@ -17,11 +17,11 @@ function symfonyLspBridgeConsoleSection(SymfonyLspBridgeContext $context): array
     }
     sort($warnings);
 
-    return symfonyLspBridgeFinalizeSection([
+    return [
         'complete' => $complete,
         'commands' => $commands,
         'warnings' => $warnings,
-    ]);
+    ];
 }
 
 /** @return array{list<array{class: string, file: string, arguments: list<string>, options: list<string>, complete: bool}>, bool, list<string>} */
