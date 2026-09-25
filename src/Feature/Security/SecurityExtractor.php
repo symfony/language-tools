@@ -8,12 +8,12 @@ use Symfony\Lsp\Feature\Configuration\ConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
+use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
-use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -31,6 +31,8 @@ final class SecurityExtractor
     private const LOGOUT_URL_GENERATOR = 'Symfony\\Component\\Security\\Http\\Logout\\LogoutUrlGenerator';
     private const ROLE_PATTERN = '/^ROLE_[A-Z0-9_]+$/D';
     private const FIREWALL_PATTERN = '/^[A-Za-z0-9_.-]+$/D';
+    private const ROLE_PREFIX_PATTERN = '/^ROLE_[A-Z0-9_]*$/D';
+    private const FIREWALL_PREFIX_PATTERN = '/^[A-Za-z0-9_.-]*$/D';
 
     public function __construct(
         private readonly PositionConverter $converter,
@@ -66,40 +68,8 @@ final class SecurityExtractor
         if ('twig' === $languageId && preg_match('/\bis_granted\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
         }
-        if ('php' === $languageId) {
-            $php = $this->phpParser->parse($text);
-            if (preg_match('/#\[\s*([\\\\A-Za-z_][\\\\A-Za-z0-9_]*)\s*\(\s*(?:attribute\s*:\s*)?["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)
-                && self::IS_GRANTED_ATTRIBUTE === $php->resolveName($match[1][0])
-            ) {
-                return $this->context(SecuritySymbolKind::Role, $match[2][0], $text, $match[2][1]);
-            }
-            if (preg_match('/\$this\s*->\s*(denyAccessUnlessGranted)\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)
-                && $this->isAbstractControllerAt($php, $match[1][1])
-            ) {
-                return $this->context(SecuritySymbolKind::Role, $match[2][0], $text, $match[2][1]);
-            }
-            if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(isGranted)\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL)) {
-                $property = \is_string($match[2][0] ?? null);
-                $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
-                $prefix = $match[4][0];
-                $methodOffset = $match[3][1];
-                $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
-                $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
-                if (\is_string($prefix) && null !== $call && PhpReceiverMatch::Matches === $php->matchReceiver($call, ...self::AUTHORIZATION_TYPES)) {
-                    return $this->context(SecuritySymbolKind::Role, $prefix, $text, $match[4][1]);
-                }
-            }
-            if (preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(getLogout(?:Path|Url))\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL)) {
-                $property = \is_string($match[2][0] ?? null);
-                $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
-                $prefix = $match[4][0];
-                $methodOffset = $match[3][1];
-                $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
-                $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
-                if (\is_string($prefix) && null !== $call && PhpReceiverMatch::Matches === $php->matchReceiver($call, self::LOGOUT_URL_GENERATOR)) {
-                    return $this->context(SecuritySymbolKind::Firewall, $prefix, $text, $match[4][1]);
-                }
-            }
+        if ('php' === $languageId && null !== $context = $this->phpCompletionContext($text, $offset)) {
+            return $context;
         }
         if ('twig' === $languageId && preg_match('/\blogout_(?:path|url)\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
             return $this->context(SecuritySymbolKind::Firewall, $match[1][0], $text, $match[1][1]);
@@ -118,6 +88,43 @@ final class SecurityExtractor
         }
 
         return null;
+    }
+
+    private function phpCompletionContext(string $text, int $offset): ?SecurityCompletionContext
+    {
+        $php = $this->phpParser->parse($text);
+        $cursor = $php->argumentCursorAt($offset);
+        if (null === $cursor || !$cursor->isArgumentLiteral()) {
+            return null;
+        }
+        $call = $cursor->call;
+        if ($call instanceof PhpAttribute) {
+            return self::IS_GRANTED_ATTRIBUTE === $call->name && $cursor->isNamedOrPositional('attribute', 0) && $this->isRolePrefix($cursor->prefix)
+                ? $this->context(SecuritySymbolKind::Role, $cursor->prefix, $text, $cursor->prefixStartOffset)
+                : null;
+        }
+        if (!$call instanceof PhpMethodCall || !$cursor->isPositional(0)) {
+            return null;
+        }
+        $kind = match (true) {
+            'isGranted' === $call->method => PhpReceiverMatch::Matches === $php->matchReceiver($call, ...self::AUTHORIZATION_TYPES) ? SecuritySymbolKind::Role : null,
+            'denyAccessUnlessGranted' === $call->method => PhpMethodReceiverKind::This === $call->receiverContext->kind && $this->extendsAbstractController($php, $call->className) ? SecuritySymbolKind::Role : null,
+            \in_array($call->method, ['getLogoutPath', 'getLogoutUrl'], true) => PhpReceiverMatch::Matches === $php->matchReceiver($call, self::LOGOUT_URL_GENERATOR) ? SecuritySymbolKind::Firewall : null,
+            default => null,
+        };
+        if (null === $kind) {
+            return null;
+        }
+        $matches = SecuritySymbolKind::Role === $kind
+            ? $this->isRolePrefix($cursor->prefix)
+            : 1 === preg_match(self::FIREWALL_PREFIX_PATTERN, $cursor->prefix);
+
+        return $matches ? $this->context($kind, $cursor->prefix, $text, $cursor->prefixStartOffset) : null;
+    }
+
+    private function isRolePrefix(string $prefix): bool
+    {
+        return 1 === preg_match(self::ROLE_PREFIX_PATTERN, $prefix);
     }
 
     /** @return list<SecuritySourceSymbol> */
@@ -270,15 +277,6 @@ final class SecurityExtractor
         return new SecuritySourceSymbol($kind, $literal->value, $uri, $this->converter->toRange($text, $literal->startOffset, $literal->endOffset - $literal->startOffset), false);
     }
 
-    private function isAbstractControllerAt(PhpDocument $php, int $offset): bool
-    {
-        $type = $this->containingType($php, $offset);
-
-        return null !== $type
-            && null !== $this->containingMethod($php, $type, $offset)
-            && self::ABSTRACT_CONTROLLER === $type->parentClassName;
-    }
-
     private function extendsAbstractController(PhpDocument $php, ?string $className): bool
     {
         foreach ($php->typeDeclarations as $type) {
@@ -288,32 +286,6 @@ final class SecurityExtractor
         }
 
         return false;
-    }
-
-    private function containingMethod(PhpDocument $php, PhpTypeDeclaration $type, int $offset): ?string
-    {
-        $name = null;
-        $nameOffset = -1;
-        foreach ($php->methodDeclarations as $method) {
-            if ($type->name !== $method->className || $method->nameStartOffset > $offset || $method->nameStartOffset <= $nameOffset) {
-                continue;
-            }
-            $name = $method->name;
-            $nameOffset = $method->nameStartOffset;
-        }
-
-        return $name;
-    }
-
-    private function containingType(PhpDocument $php, int $offset): ?PhpTypeDeclaration
-    {
-        foreach ($php->typeDeclarations as $type) {
-            if ($type->contains($offset)) {
-                return $type;
-            }
-        }
-
-        return null;
     }
 
     /**

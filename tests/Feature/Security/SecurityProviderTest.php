@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Security;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -261,6 +262,54 @@ YAML;
             PHP;
 
         self::assertSame([], $extractor->extract(new SourceDocument('file:///workspace/src/AdminController.php', 'php', $text))->symbols);
+    }
+
+    #[DataProvider('rejectedPhpCompletionProvider')]
+    public function testOffersNoPhpCompletionWhereIndexingReadsNoSymbol(string $body): void
+    {
+        $extractor = $this->extractor();
+        $text = <<<PHP
+            <?php
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+
+            final class DemoController extends AbstractController
+            {
+                public function index(AuthorizationCheckerInterface \$security, object \$other): void
+                {
+                    {$body}
+                }
+            }
+            PHP;
+        $cursor = strpos($text, '|');
+        self::assertIsInt($cursor);
+
+        self::assertNull($extractor->completionContext('php', str_replace('|', '', $text), $cursor));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function rejectedPhpCompletionProvider(): iterable
+    {
+        yield 'static call' => ['AuthorizationCheckerInterface::isGranted(\'ROLE_A|'];
+        yield 'untyped receiver' => ['$other->isGranted(\'ROLE_A|'];
+        yield 'array literal' => ['$security->isGranted([\'ROLE_A|'];
+        yield 'second argument' => ['$security->isGranted(\'ROLE_ADMIN\', \'ROLE_A|'];
+        yield 'controller call on another receiver' => ['$other->denyAccessUnlessGranted(\'ROLE_A|'];
+        yield 'logout path on an unrelated receiver' => ['$other->getLogoutPath(\'ma|'];
+    }
+
+    public function testCompletesRolesInGroupedIsGrantedAttributes(): void
+    {
+        $extractor = $this->extractor();
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+
+            #[\Deprecated, IsGranted('ROLE_A
+            PHP;
+
+        self::assertSame('ROLE_A', $extractor->completionContext('php', $text, \strlen($text))?->prefix);
     }
 
     public function testOffersNoSecurityCompletionsInsidePhpComments(): void
