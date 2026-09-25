@@ -11,7 +11,6 @@ use Symfony\Lsp\Feature\Twig\TwigComponentNameResolver;
 use Symfony\Lsp\Feature\Twig\TwigComponentPhpExtractor;
 use Symfony\Lsp\Feature\Twig\TwigComponentTemplateExtractor;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Html\HtmlCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -82,34 +81,6 @@ final class TwigComponentExtractorTest extends TestCase
         );
     }
 
-    public function testIgnoresComponentMarkupInsideHtmlComments(): void
-    {
-        $text = <<<'TWIG'
-            <!-- <twig:Commented data-live-action-param="commented" /> -->
-            <!-- caché
-                 <twig:Multiline /> -->
-            <p>Café</p><!-- <twig:Inline /> --><twig:Alert data-live-action-param="save" />
-            <!-- <twig:Truncated data-live-action-param="truncated" />
-            TWIG;
-        $facts = $this->extractor()->extract(
-            new Project('/workspace', 'file:///workspace'),
-            new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', $text),
-        );
-
-        self::assertSame(['Alert'], array_map(static fn ($reference): string => $reference->name, $facts->references));
-        self::assertSame(
-            [['Alert', 'save']],
-            array_map(static fn ($reference): array => [$reference->component, $reference->action], $facts->actionReferences),
-        );
-
-        $converter = new PositionConverter();
-        foreach ([[$facts->references[0]->range, 'Alert'], [$facts->actionReferences[0]->range, 'save']] as [$range, $expected]) {
-            $start = $converter->toByteOffset($text, $range->start);
-            $end = $converter->toByteOffset($text, $range->end);
-            self::assertSame($expected, substr($text, $start, $end - $start));
-        }
-    }
-
     public function testIgnoresMarkupOnIncompleteTwigDirectiveLines(): void
     {
         $facts = $this->extractor()->extract(
@@ -169,7 +140,6 @@ final class TwigComponentExtractorTest extends TestCase
                 $names,
                 new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
                 new TwigCallArgumentResolver(new TwigArgumentParser()),
-                new HtmlCommentParser(),
             ),
         );
     }

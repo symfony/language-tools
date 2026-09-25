@@ -3,9 +3,7 @@
 ## Unreleased
 
 - Keep results stable when a file is opened, so opening one of two files that declare the same name no longer changes which declaration wins
-- Ignore Twig component tags inside HTML comments, so a commented-out `<twig:Foo />` is no longer indexed or reported as unknown
 - Treat `%%` in XML service files as an escaped percent sign, so a literal like `%%message%%` is no longer read as a parameter reference
-
 ## 0.22.0 (2026-09-25)
 
 - Check YAML configuration keys and values in every environment block

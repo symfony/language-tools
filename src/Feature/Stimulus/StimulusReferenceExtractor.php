@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Parser\Html\HtmlCommentParser;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptToken;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokens;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
@@ -28,7 +27,6 @@ final class StimulusReferenceExtractor
         private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
         private readonly TwigDocumentParser $parser,
         private readonly TwigCallArgumentResolver $arguments,
-        private readonly HtmlCommentParser $htmlComments,
     ) {
     }
 
@@ -75,7 +73,7 @@ final class StimulusReferenceExtractor
     public function extractTwig(string $uri, string $text): array
     {
         $document = $this->parser->parse($text);
-        $source = $this->htmlComments->mask($document->markup());
+        $source = $this->withoutHtmlComments($document->markup());
         $references = [];
         preg_match_all('/\bdata-controller\s*=\s*([\'"])(.*?)\1/s', $source, $attributes, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         foreach ($attributes as $attribute) {
@@ -113,6 +111,19 @@ final class StimulusReferenceExtractor
         array_push($references, ...$this->helperReferences($document, $uri, $text));
 
         return $references;
+    }
+
+    /**
+     * Markup with HTML comments blanked: a browser never connects a controller
+     * a comment hides.
+     */
+    private function withoutHtmlComments(string $markup): string
+    {
+        return preg_replace_callback(
+            '/<!--.*?(?:-->|$)/s',
+            static fn (array $comment): string => preg_replace('/[^\r\n]/', ' ', $comment[0]) ?? $comment[0],
+            $markup,
+        ) ?? $markup;
     }
 
     /** @return list<StimulusReference> */

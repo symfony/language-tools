@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Parser\Html\HtmlCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
@@ -15,14 +14,13 @@ final class TwigComponentTemplateExtractor
         private readonly TwigComponentNameResolver $names,
         private readonly TwigDocumentParser $parser,
         private readonly TwigCallArgumentResolver $arguments,
-        private readonly HtmlCommentParser $htmlComments,
     ) {
     }
 
     public function extract(Project $project, string $uri, string $text): TwigComponentSourceFacts
     {
         $document = $this->parser->parse($text);
-        $masked = $this->htmlComments->mask($document->markup());
+        $masked = $document->markup();
         $name = $this->names->anonymous($project, $uri);
         $components = [];
         if (null !== $name) {
