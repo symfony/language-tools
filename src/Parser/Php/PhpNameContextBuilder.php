@@ -19,20 +19,24 @@ final class PhpNameContextBuilder
     public function build(TolerantPhpNodeCollection $collection, string $source): PhpNameContext
     {
         $namespaceDefinition = null;
-        $namespaceFound = false;
+        $namespaces = 0;
         $namespace = '';
         $imports = [];
         foreach ($collection->nameContextNodes as $node) {
-            if (!$namespaceFound && $node instanceof NamespaceDefinition) {
-                $namespaceDefinition = $node;
-                $namespaceFound = true;
-                $namespace = $node->name instanceof QualifiedName ? trim($this->scopes->qualifiedName($node->name, $source), '\\') : '';
-            } elseif ($node instanceof NamespaceUseDeclaration && null === $node->functionOrConst && $node->getNamespaceDefinition() === $namespaceDefinition) {
+            if ($node instanceof NamespaceDefinition) {
+                if (0 === $namespaces++) {
+                    $namespaceDefinition = $node;
+                    $namespace = $node->name instanceof QualifiedName ? trim($this->scopes->qualifiedName($node->name, $source), '\\') : '';
+                }
+
+                continue;
+            }
+            if (null === $node->functionOrConst && $node->getNamespaceDefinition() === $namespaceDefinition) {
                 $this->addImports($node, $source, $imports);
             }
         }
 
-        return new PhpNameContext($namespace, $imports);
+        return new PhpNameContext($namespace, $imports, $namespaces < 2);
     }
 
     /** @param array<string, string> $imports */

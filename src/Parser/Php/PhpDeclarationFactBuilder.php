@@ -39,7 +39,7 @@ final class PhpDeclarationFactBuilder
         $attributes = [];
         $attributesByNode = [];
         foreach ($collection->attributes as $node) {
-            $attribute = $this->attribute($node, $source, $classReferencesByNode);
+            $attribute = $this->attribute($node, $source, $names, $classReferencesByNode);
             $attributes[] = $attribute;
             $attributesByNode[spl_object_id($node)] = $attribute;
         }
@@ -257,8 +257,7 @@ final class PhpDeclarationFactBuilder
             if (!$type instanceof QualifiedName) {
                 continue;
             }
-            $name = $type->getResolvedName();
-            $resolved[] = null === $name ? $names->resolve($this->scopes->qualifiedName($type, $source)) : (string) $name;
+            $resolved[] = $this->scopes->resolvedName($type, $source, $names);
         }
         preg_match_all('/(?<![A-Za-z0-9_\\\\])(?:array|bool|callable|false|float|int|iterable|mixed|never|object|string|true|void)(?![A-Za-z0-9_\\\\])/i', $types->getText($source), $builtinTypes);
         foreach ($builtinTypes[0] as $type) {
@@ -273,7 +272,8 @@ final class PhpDeclarationFactBuilder
     {
         $parentClassName = null;
         if ($declaration instanceof ClassDeclaration) {
-            $parentClassName = $this->nodes->classBaseClause($declaration)?->baseClass->getResolvedName();
+            $base = $this->nodes->classBaseClause($declaration);
+            $parentClassName = null === $base ? null : $this->scopes->resolvedName($base->baseClass, $source, $names);
         }
         $kind = match (true) {
             $declaration instanceof ClassDeclaration => PhpTypeKind::Class_,
@@ -327,8 +327,7 @@ final class PhpDeclarationFactBuilder
         $traitNames = [];
         foreach ($traitUses as $traitUse) {
             foreach ($this->nodes->traitUseNames($traitUse) as $name) {
-                $resolved = $name->getResolvedName();
-                $traitNames[] = ltrim(null === $resolved ? $names->resolve($this->scopes->qualifiedName($name, $source)) : (string) $resolved, '\\');
+                $traitNames[] = $this->scopes->resolvedName($name, $source, $names);
             }
         }
 
@@ -344,8 +343,7 @@ final class PhpDeclarationFactBuilder
             if ('' === trim($text, '\\')) {
                 continue;
             }
-            $resolved = $name->getResolvedName();
-            $interfaceNames[] = ltrim(null === $resolved ? $names->resolve($text) : (string) $resolved, '\\');
+            $interfaceNames[] = $this->scopes->resolvedName($name, $source, $names);
         }
 
         return $interfaceNames;
@@ -462,12 +460,12 @@ final class PhpDeclarationFactBuilder
     }
 
     /** @param array<int, PhpClassReference> $classReferencesByNode */
-    private function attribute(Attribute $attribute, string $source, array $classReferencesByNode): PhpAttribute
+    private function attribute(Attribute $attribute, string $source, PhpNameContext $names, array $classReferencesByNode): PhpAttribute
     {
         $group = $attribute->getFirstAncestor(AttributeGroup::class);
 
         return new PhpAttribute(
-            $this->attributeName($attribute->name, $source),
+            $this->attributeName($attribute->name, $source, $names),
             $this->expressions->arguments($attribute->argumentExpressionList->children ?? [], $source, $classReferencesByNode),
             $group instanceof AttributeGroup ? $group->getStartPosition() : $attribute->getStartPosition(),
             $group instanceof AttributeGroup ? $group->getEndPosition() : $attribute->getEndPosition(),
@@ -561,13 +559,10 @@ final class PhpDeclarationFactBuilder
         return $targets;
     }
 
-    private function attributeName(Node|Token $name, string $source): string
+    private function attributeName(Node|Token $name, string $source, PhpNameContext $names): string
     {
         if ($name instanceof QualifiedName) {
-            $resolvedName = $name->getResolvedName();
-            if (null !== $resolvedName) {
-                return (string) $resolvedName;
-            }
+            return $this->scopes->resolvedName($name, $source, $names);
         }
 
         $text = $name->getText($source);

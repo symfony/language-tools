@@ -1595,4 +1595,157 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame(['App\Attribute\OnMethod'], array_map(static fn ($attribute): string => $attribute->name, $document->attributesOn(PhpAttributeTargetKind::Method, 'App\First', 'handle')));
         self::assertSame([], $document->attributesOn(PhpAttributeTargetKind::Method, 'App\First', 'missing'));
     }
+
+    public function testResolvesClassNamesAgainstTheDocumentNameContext(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Service;
+
+            use App\Model\Article;
+            use App\Model\Comment as Remark;
+            use App\Support\{Helper, Tool as Gadget};
+
+            #[Remark]
+            class Base
+            {
+            }
+
+            final class Child extends Base implements \Stringable, Remark
+            {
+                use Helper, \App\Support\Extra;
+
+                public function make(Article $article, namespace\Local $local, self $current, parent $base): void
+                {
+                    new Article();
+                    new Remark();
+                    new Gadget();
+                    new \App\Model\Raw();
+                    new namespace\Local();
+                    new Nested\Thing();
+                    new self();
+                    new static();
+                    new parent();
+                    echo Remark::class;
+                    echo self::class;
+                    echo parent::class;
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $child = $document->typeDeclarations[1];
+
+        self::assertSame([
+            'App\Model\Article',
+            'App\Model\Comment',
+            'App\Support\Tool',
+            'App\Model\Raw',
+            'App\Service\Local',
+            'App\Service\Nested\Thing',
+        ], array_map(static fn ($creation): string => $creation->className, $document->objectCreations));
+        self::assertSame(
+            ['App\Model\Comment', 'App\Service\Child', 'App\Service\Base'],
+            array_map(static fn (PhpClassReference $reference): string => $reference->className, $document->classReferences),
+        );
+        self::assertSame(['App\Model\Comment'], array_map(static fn ($attribute): string => $attribute->name, $document->attributes));
+        self::assertSame('App\Service\Base', $child->parentClassName);
+        self::assertSame(['Stringable', 'App\Model\Comment'], $child->interfaceNames);
+        self::assertSame(['App\Support\Helper', 'App\Support\Extra'], $child->traitNames);
+        self::assertSame([
+            ['App\Model\Article'],
+            ['App\Service\Local'],
+            ['self'],
+            ['parent'],
+        ], array_map(static fn (PhpParameter $parameter): array => $parameter->types, $document->methodDeclarations[0]->parameters));
+    }
+
+    public function testResolvesClassNamesInTheGlobalNamespace(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            use App\Model\Article;
+
+            final class Widget extends Base
+            {
+                public function make(): void
+                {
+                    new Article();
+                    new \App\Model\Raw();
+                    new namespace\Local();
+                    new Unknown();
+                    new self();
+                    new parent();
+                }
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+
+        self::assertSame([
+            'App\Model\Article',
+            'App\Model\Raw',
+            'Local',
+            'Unknown',
+        ], array_map(static fn ($creation): string => $creation->className, $document->objectCreations));
+        self::assertSame('Base', $document->typeDeclarations[0]->parentClassName);
+    }
+
+    public function testResolvesClassNamesPerNamespaceBlock(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace First {
+                use First\Model\Shared as Alias;
+
+                class Alpha extends Alias
+                {
+                }
+
+                new Alias();
+            }
+
+            namespace Second {
+                use Second\Model\Other as Alias;
+
+                class Beta extends Alias
+                {
+                }
+
+                new Alias();
+                echo Alias::class;
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+
+        self::assertSame(
+            ['First\Model\Shared', 'Second\Model\Other'],
+            array_map(static fn ($creation): string => $creation->className, $document->objectCreations),
+        );
+        self::assertSame(
+            ['Second\Model\Other'],
+            array_map(static fn (PhpClassReference $reference): string => $reference->className, $document->classReferences),
+        );
+        self::assertSame(
+            ['First\Model\Shared', 'Second\Model\Other'],
+            array_map(static fn ($type): string => (string) $type->parentClassName, $document->typeDeclarations),
+        );
+    }
+
+    public function testResolvesNamesOfLargeFilesInLinearTime(): void
+    {
+        $source = "<?php\n\nnamespace App;\n\nuse App\\Model\\Item;\n\n";
+        for ($index = 0; $index < 4000; ++$index) {
+            $source .= "\$collection->add(new Item('item_{$index}'));\n";
+        }
+
+        $startedAt = hrtime(true);
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $elapsed = (hrtime(true) - $startedAt) / 1_000_000_000;
+
+        self::assertCount(4000, $document->objectCreations);
+        self::assertSame('App\Model\Item', $document->objectCreations[0]->className);
+        self::assertLessThan(3.0, $elapsed);
+    }
 }

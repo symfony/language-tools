@@ -5,8 +5,11 @@ namespace Symfony\Lsp\Parser\Php;
 final class PhpNameContext
 {
     /** @param array<string, string> $imports */
-    public function __construct(public readonly string $namespace = '', public readonly array $imports = [])
-    {
+    public function __construct(
+        public readonly string $namespace = '',
+        public readonly array $imports = [],
+        public readonly bool $singleNamespace = true,
+    ) {
     }
 
     public function resolve(string $name): string

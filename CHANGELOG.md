@@ -9,6 +9,7 @@
 - Show a target entity only for association mappings, so hovering a plain column no longer reports its PHP type as an entity
 - Refuse to start renaming a route that is declared outside the application, instead of failing once the rename runs
 - Emit a single text edit when a rename touches the same range twice
+- Keep PHP class name resolution linear on files with thousands of names
 
 ## 0.22.0 (2026-09-25)
 

@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Parser\Php;
 
+use Microsoft\PhpParser\MissingToken;
 use Microsoft\PhpParser\Node;
 use Microsoft\PhpParser\Node\Expression\AnonymousFunctionCreationExpression;
 use Microsoft\PhpParser\Node\Expression\ArrowFunctionCreationExpression;
@@ -17,6 +18,7 @@ use Microsoft\PhpParser\Node\Statement\FunctionDeclaration;
 use Microsoft\PhpParser\Node\Statement\InterfaceDeclaration;
 use Microsoft\PhpParser\Node\Statement\TraitDeclaration;
 use Microsoft\PhpParser\Token;
+use Microsoft\PhpParser\TokenKind;
 
 final class TolerantPhpScopeResolver
 {
@@ -62,14 +64,13 @@ final class TolerantPhpScopeResolver
         }
         if ('parent' === strtolower($text)) {
             $base = null === $owner ? null : $this->nodes->classBaseClause($owner);
-            $parent = $base?->baseClass->getResolvedName();
+            $parent = null === $base ? null : $this->resolvedName($base->baseClass, $source, $names);
 
-            return null === $parent ? null : (string) $parent;
+            return null === $parent || '' === $parent ? null : $parent;
         }
-        $resolved = $name->getResolvedName();
-        $resolved = null === $resolved ? $names->resolve($text) : (string) $resolved;
+        $resolved = $this->resolvedName($name, $source, $names);
 
-        return '' === $resolved ? null : ltrim($resolved, '\\');
+        return '' === $resolved ? null : $resolved;
     }
 
     public function classNameFromExpression(mixed $expression, string $source, PhpNameContext $names, ?ClassDeclaration $owner): ?string
@@ -110,14 +111,44 @@ final class TolerantPhpScopeResolver
         } elseif ('parent' === $keyword) {
             [$owner] = $this->enclosingContext($reference);
             $base = $owner instanceof ClassDeclaration ? $this->nodes->classBaseClause($owner) : null;
-            $parent = $base?->baseClass->getResolvedName();
-            $className = null === $parent ? null : (string) $parent;
+            $className = null === $base ? null : $this->resolvedName($base->baseClass, $source, $names);
         } else {
-            $resolved = $qualifier->getResolvedName();
-            $className = null === $resolved ? $names->resolve($text) : (string) $resolved;
+            $className = $this->resolvedName($qualifier, $source, $names);
         }
 
         return null === $className || '' === $className ? null : ltrim($className, '\\');
+    }
+
+    /**
+     * Resolves a class-like name against the document name context, which is built once per document.
+     *
+     * Documents declaring several namespaces need one import table per block, which only the
+     * parser knows about, at the price of rebuilding that table for every name it resolves.
+     */
+    public function resolvedName(QualifiedName $name, string $source, PhpNameContext $names): string
+    {
+        if (!$names->singleNamespace) {
+            $resolved = $name->getResolvedName();
+            if (null !== $resolved) {
+                return ltrim((string) $resolved, '\\');
+            }
+        }
+        $text = $this->nameParts($name, $source);
+        if ($name->globalSpecifier instanceof Token) {
+            return $text;
+        }
+        if ('' === $text) {
+            return $names->namespace;
+        }
+        if (null !== $name->relativeSpecifier) {
+            return '' === $names->namespace ? $text : $names->namespace.'\\'.$text;
+        }
+        $keyword = strtolower($text);
+        if (\in_array($keyword, ['self', 'static', 'parent'], true)) {
+            return $keyword;
+        }
+
+        return $names->resolve($text);
     }
 
     public function qualifiedName(QualifiedName $name, string $source): string
@@ -133,6 +164,18 @@ final class TolerantPhpScopeResolver
         }
 
         return $text;
+    }
+
+    private function nameParts(QualifiedName $name, string $source): string
+    {
+        $parts = [];
+        foreach ($name->nameParts as $part) {
+            if ($part instanceof Token && !$part instanceof MissingToken && TokenKind::Name === $part->kind) {
+                $parts[] = (string) $part->getText($source);
+            }
+        }
+
+        return implode('\\', $parts);
     }
 
     public function variableName(Node|Token $variable, string $source): ?string
