@@ -8,6 +8,7 @@ use Symfony\Lsp\Feature\Route\PhpRouteReferenceCandidateExtractor;
 use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
 use Symfony\Lsp\Feature\Route\RoutePhpReceiverResolver;
 use Symfony\Lsp\Feature\Route\RouteReferenceExtractor;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 
@@ -23,6 +24,7 @@ final class RouteReferenceExtractorFactory
             new PhpRouteReferenceCandidateExtractor($converter, $receivers),
             $receivers,
             new RouteControllerClassifier(),
+            new PhpLiteralArrayKeyParser(),
         );
     }
 }

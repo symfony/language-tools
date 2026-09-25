@@ -389,7 +389,7 @@ final class RouteReferenceExtractorTest extends TestCase
         $cursor = strpos($source, '|');
         self::assertIsInt($cursor);
 
-        self::assertSame($supported, RouteReferenceExtractorFactory::create(new PositionConverter())->supportsRouteCallAt(str_replace('|', '', $source), $cursor));
+        self::assertSame($supported, null !== RouteReferenceExtractorFactory::create(new PositionConverter())->phpCompletionAt(str_replace('|', '', $source), $cursor));
     }
 
     /** @return iterable<string, array{bool, string}> */

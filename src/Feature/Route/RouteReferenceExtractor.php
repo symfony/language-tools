@@ -3,9 +3,13 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 
 final class RouteReferenceExtractor
 {
@@ -15,6 +19,7 @@ final class RouteReferenceExtractor
         private readonly PhpRouteReferenceCandidateExtractor $candidates,
         private readonly RoutePhpReceiverResolver $receivers,
         private readonly RouteControllerClassifier $controllers,
+        private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
 
@@ -41,24 +46,43 @@ final class RouteReferenceExtractor
         return $this->candidates->extract($source, $document);
     }
 
-    public function supportsRouteCallAt(string $source, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): bool
+    /**
+     * The route name or route parameter being typed at the cursor, in a route
+     * call the index reads references from.
+     */
+    public function phpCompletionAt(string $source, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): RouteCompletionContext|RouteParameterCompletionContext|null
     {
         $document = $this->parser->parse($source);
-        $call = null;
-        foreach ($document->methodCalls as $candidate) {
-            if (!\in_array($candidate->method, RoutePhpMethods::ALL, true)
-                || $candidate->startOffset > $byteOffset
-                || $candidate->endOffset < $byteOffset
-            ) {
-                continue;
-            }
-            if (null === $call || $candidate->startOffset > $call->startOffset) {
-                $call = $candidate;
-            }
+        $cursor = $document->argumentCursorAt($byteOffset);
+        $call = $cursor?->call;
+        if (null === $cursor || !$call instanceof PhpMethodCall) {
+            return null;
         }
-        $receiver = null === $call ? null : $this->receivers->resolve($document, $call);
+        $receiver = $this->receivers->resolve($document, $call);
+        if (null === $receiver || !$this->controllers->isController($receiver->controllerClass, $document, $classIndex)) {
+            return null;
+        }
+        $range = new Range(
+            $this->positionConverter->toPosition($source, $cursor->prefixStartOffset),
+            $this->positionConverter->toPosition($source, $byteOffset),
+        );
+        if ($cursor->isArgumentLiteral() && $cursor->isPositional(0)) {
+            return new RouteCompletionContext($cursor->prefix, $range);
+        }
+        $name = $call->positionalArgument(0)?->stringLiteral?->value;
+        if (!$cursor->isArrayItemLiteral() || !$cursor->isPositional(1) || null === $name || '' === $name) {
+            return null;
+        }
 
-        return null !== $receiver && $this->controllers->isController($receiver->controllerClass, $document, $classIndex);
+        return new RouteParameterCompletionContext(
+            $name,
+            $cursor->prefix,
+            $range,
+            array_values(array_unique(array_map(
+                static fn (PhpStringLiteral $key): string => $key->value,
+                $this->arrayKeys->parseArgument($cursor->argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [],
+            ))),
+        );
     }
 
     public function at(SourceDocument $document, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): ?RouteReference

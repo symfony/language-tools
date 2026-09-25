@@ -39,12 +39,11 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         }
 
         $routeIndex = $this->routeIndexes->forProject($request->project);
-        $masked = $this->comments->mask($request->document->languageId, $request->document->text);
         if ('twig' === $request->document->languageId) {
-            if (!$this->directives->insideDirective($masked, $this->positionConverter->toByteOffset($masked, $request->position))) {
+            $twigText = $this->comments->mask($request->document->languageId, $request->document->text);
+            if (!$this->directives->insideDirective($twigText, $this->positionConverter->toByteOffset($twigText, $request->position))) {
                 return null;
             }
-            $twigText = $masked;
             $parameterContext = TwigRouteParameterCompletionContext::fromTwig(
                 $twigText,
                 $request->position,
@@ -80,45 +79,29 @@ final class RouteCompletionHandler implements CompletionProviderInterface
                 $routeContext->replacementRange,
             );
         }
-        $phpText = $masked;
-        $parameterContext = RouteParameterCompletionContext::fromPhp(
-            $phpText,
-            $request->position,
-            $this->positionConverter,
+        $context = $this->phpReferenceExtractor->phpCompletionAt(
+            $request->document->text,
+            $this->positionConverter->toByteOffset($request->document->text, $request->position),
+            $this->classIndexes->forProject($request->project),
         );
-        $routeContext = null !== $parameterContext ? null : RouteCompletionContext::fromPhp(
-            $phpText,
-            $request->position,
-            $this->positionConverter,
-        );
-        if ((null === $parameterContext && null === $routeContext)
-            || !$this->phpReferenceExtractor->supportsRouteCallAt(
-                $request->document->text,
-                $this->positionConverter->toByteOffset($request->document->text, $request->position),
-                $this->classIndexes->forProject($request->project),
-            )
-        ) {
-            return null;
-        }
-        if (null !== $parameterContext) {
-            $route = $routeIndex->get($parameterContext->routeName);
+        if ($context instanceof RouteParameterCompletionContext) {
+            $route = $routeIndex->get($context->routeName);
             if (null === $route) {
                 return [];
             }
 
             return $this->withTextEdits(
-                $this->completeParameters(
-                    $route,
-                    $parameterContext->prefix,
-                    $parameterContext->existingParameters,
-                ),
-                $parameterContext->replacementRange,
+                $this->completeParameters($route, $context->prefix, $context->existingParameters),
+                $context->replacementRange,
             );
+        }
+        if (null === $context) {
+            return null;
         }
 
         return $this->withTextEdits(
-            $this->completionBuilder->complete($routeIndex, $routeContext->prefix),
-            $routeContext->replacementRange,
+            $this->completionBuilder->complete($routeIndex, $context->prefix),
+            $context->replacementRange,
         );
     }
 

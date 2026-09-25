@@ -13,14 +13,9 @@ final class RouteCompletionContextTest extends TestCase
     #[DataProvider('contextProvider')]
     public function testRecognizesRouteNameContexts(string $php, ?string $prefix): void
     {
-        $cursor = strpos($php, '|');
-        self::assertIsInt($cursor);
-        $php = str_replace('|', '', $php);
-        $converter = new PositionConverter();
+        $context = $this->completionAt($php);
 
-        $context = RouteCompletionContext::fromPhp($php, $converter->toPosition($php, $cursor), $converter);
-
-        self::assertSame($prefix, $context?->prefix);
+        self::assertSame($prefix, $context instanceof RouteCompletionContext ? $context->prefix : null);
     }
 
     /**
@@ -30,41 +25,116 @@ final class RouteCompletionContextTest extends TestCase
     {
         yield 'controller helper' => [<<<'PHP'
             <?php
-            $this->generateUrl('article_|');
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->generateUrl('article_|');
+                }
+            }
             PHP, 'article_'];
         yield 'redirection' => [<<<'PHP'
             <?php
-            $this->redirectToRoute('article_|');
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->redirectToRoute('article_|');
+                }
+            }
             PHP, 'article_'];
         yield 'router' => [<<<'PHP'
             <?php
-            $router->generate('home|');
+            use Symfony\Component\Routing\RouterInterface;
+            function notify(RouterInterface $router): void
+            {
+                $router->generate('home|');
+            }
             PHP, 'home'];
         yield 'unrelated method' => [<<<'PHP'
             <?php
-            $router->url('home|');
+            use Symfony\Component\Routing\RouterInterface;
+            function notify(RouterInterface $router): void
+            {
+                $router->url('home|');
+            }
+            PHP, null];
+        yield 'static call' => [<<<'PHP'
+            <?php
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    self::generateUrl('article_|');
+                }
+            }
             PHP, null];
         yield 'completed route name' => [<<<'PHP'
             <?php
-            $router->generate('home')|;
+            use Symfony\Component\Routing\RouterInterface;
+            function notify(RouterInterface $router): void
+            {
+                $router->generate('home')|;
+            }
+            PHP, null];
+        yield 'unknown receiver' => [<<<'PHP'
+            <?php
+            $unknown->generateUrl('article_|');
+            PHP, null];
+        yield 'route name in the parameter array' => [<<<'PHP'
+            <?php
+            use Symfony\Component\Routing\RouterInterface;
+            function notify(RouterInterface $router): void
+            {
+                $router->generate(['home|']);
+            }
             PHP, null];
     }
 
     public function testRecognizesRouteParameterContexts(): void
     {
-        $php = <<<'PHP'
+        $context = $this->completionAt(<<<'PHP'
             <?php
-            $this->generateUrl('article_show', ['section' => 'news', 'sl
-            PHP;
-        $converter = new PositionConverter();
-        $cursor = strpos($php, "'sl");
-        self::assertIsInt($cursor);
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->generateUrl('article_show', ['section' => 'news', 'sl|
+                }
+            }
+            PHP);
 
-        $context = RouteParameterCompletionContext::fromPhp($php, $converter->toPosition($php, $cursor + 3), $converter);
-
-        self::assertNotNull($context);
+        self::assertInstanceOf(RouteParameterCompletionContext::class, $context);
         self::assertSame('article_show', $context->routeName);
         self::assertSame('sl', $context->prefix);
         self::assertSame(['section'], $context->existingParameters);
+    }
+
+    public function testIgnoresParameterValuesAndNestedParameterArrays(): void
+    {
+        foreach ([
+            "\$this->generateUrl('article_show', ['section' => 'ne|", // a value, not a parameter name
+            "\$this->generateUrl('article_show', ['filters' => ['se|", // a nested array key
+            "\$this->generateUrl('article_show', 'news', ['se|", // the third argument
+        ] as $call) {
+            self::assertNull($this->completionAt(<<<PHP
+                <?php
+                class DemoController extends AbstractController
+                {
+                    public function index(): void
+                    {
+                        {$call}
+                    }
+                }
+                PHP));
+        }
+    }
+
+    private function completionAt(string $php): RouteCompletionContext|RouteParameterCompletionContext|null
+    {
+        $cursor = strpos($php, '|');
+        self::assertIsInt($cursor);
+
+        return RouteReferenceExtractorFactory::create(new PositionConverter())->phpCompletionAt(str_replace('|', '', $php), $cursor);
     }
 }
