@@ -168,6 +168,81 @@ final class CheckExecutableTest extends TestCase
         self::assertSame([], $this->decodeReport($test['stdout'])['diagnostics']);
     }
 
+    public function testSkipsSecurityAndEnvironmentDiagnosticsFromInactiveEnvironmentFiles(): void
+    {
+        if ('Windows' === \PHP_OS_FAMILY) {
+            self::markTestSkipped('The source executable integration requires Unix executable scripts.');
+        }
+
+        mkdir($this->directory.'/config/packages/test', 0777, true);
+        file_put_contents($this->directory.'/config/packages/test/security.yaml', <<<'YAML'
+            security:
+                firewalls:
+                    main:
+                        provider: php_test_users
+                    api:
+                        provider: missing_users
+            YAML);
+        file_put_contents($this->directory.'/config/packages/test/framework_extra.yaml', <<<'YAML'
+            framework:
+                default_locale: '%env(test_only_processor:APP_LOCALE)%'
+            YAML);
+        $symfonyCli = $this->directory.'/environment-bridge';
+        file_put_contents($symfonyCli, <<<'PHP'
+            #!/usr/bin/env php
+            <?php
+
+            $environment = 'dev';
+            foreach ($argv as $argument) {
+                if (str_starts_with($argument, '--environment=')) {
+                    $environment = substr($argument, strlen('--environment='));
+                }
+            }
+            $test = 'test' === $environment;
+            fwrite(STDOUT, json_encode([
+                'schemaVersion' => 1,
+                'project' => ['environment' => $environment],
+                'configurationValidation' => ['status' => 'valid'],
+                'sections' => [
+                    'security' => [
+                        'complete' => true,
+                        'firewalls' => [],
+                        'providers' => $test ? [['name' => 'php_test_users', 'type' => 'memory']] : [],
+                    ],
+                    'environment' => [
+                        'complete' => true,
+                        'processors' => $test ? [['name' => 'test_only_processor', 'type' => 'string']] : [],
+                    ],
+                ],
+                'errors' => [],
+            ], JSON_THROW_ON_ERROR)."\n");
+            PHP);
+        chmod($symfonyCli, 0700);
+        $environment = ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli];
+        $selectors = ['config/packages/test/security.yaml', 'config/packages/test/framework_extra.yaml'];
+
+        $dev = $this->execute([
+            'check',
+            '--format=json',
+            '--workspace='.$this->directory,
+            ...$selectors,
+        ], $environment);
+        $test = $this->execute([
+            'check',
+            '--format=json',
+            '--workspace='.$this->directory,
+            '--environment=test',
+            ...$selectors,
+        ], $environment);
+
+        self::assertSame(CheckCommand::EXIT_SUCCESS, $dev['exitCode'], $dev['stderr']);
+        self::assertSame([], $this->decodeReport($dev['stdout'])['diagnostics']);
+        self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $test['exitCode'], $test['stderr']);
+        $diagnostics = $this->decodeReport($test['stdout'])['diagnostics'];
+        self::assertSame(['security.unknown_provider'], array_column($diagnostics, 'code'));
+        self::assertSame('config/packages/test/security.yaml', $diagnostics[0]['path']);
+    }
+
     public function testReportsSavedFileDiagnosticsWithoutAnLspClient(): void
     {
         $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory, 'config/**/*.yaml']);

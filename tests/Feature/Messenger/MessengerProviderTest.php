@@ -631,7 +631,7 @@ YAML;
 
     /** @param list<string> $expectedCodes */
     #[DataProvider('environmentScopedTransportProvider')]
-    public function testDiagnosesTransportsOnlyInTheEnvironmentThatLoadsThem(string $uri, string $yaml, string $environment, array $expectedCodes): void
+    public function testDiagnosesTransportsOnlyInTheEnvironmentSectionsThatLoadThem(string $uri, string $yaml, string $environment, array $expectedCodes): void
     {
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $yaml));
@@ -683,8 +683,6 @@ YAML;
                             'App\Message\Ping': sync
             YAML;
 
-        yield 'inactive package directory' => ['file:///workspace/config/packages/test/messenger.yaml', $directoryYaml, 'dev', []];
-        yield 'active package directory' => ['file:///workspace/config/packages/test/messenger.yaml', $directoryYaml, 'test', ['messenger.unknown_transport']];
         yield 'inactive environment section' => ['file:///workspace/config/packages/messenger.yaml', $sectionYaml, 'dev', []];
         yield 'active environment section' => ['file:///workspace/config/packages/messenger.yaml', $sectionYaml, 'test', ['messenger.unknown_transport']];
         yield 'base section' => ['file:///workspace/config/packages/messenger.yaml', $directoryYaml, 'dev', ['messenger.unknown_transport']];

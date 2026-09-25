@@ -18,6 +18,7 @@ final class DiagnosticCollector
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly ProjectPathPolicy $paths,
         private readonly PartialParseDiagnosticFilter $partialParseFilter,
+        private readonly EnvironmentScopedDiagnosticFilter $environmentFilter,
         private readonly DiagnosticSuppressor $suppressor,
         private readonly iterable $providers,
     ) {
@@ -81,7 +82,9 @@ final class DiagnosticCollector
             }
         }
 
-        $diagnostics = $this->suppressor->suppress($document, $this->partialParseFilter->filter($document, $diagnostics));
+        $diagnostics = $this->partialParseFilter->filter($document, $diagnostics);
+        $diagnostics = $this->environmentFilter->filter($document->uri, $diagnostics);
+        $diagnostics = $this->suppressor->suppress($document, $diagnostics);
         if (!$matched && [] === $diagnostics && [] === $failures) {
             return null;
         }

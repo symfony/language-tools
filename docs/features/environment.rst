@@ -28,7 +28,9 @@ Diagnostics
   is empty, or a processor that takes an argument is missing one. Works
   without the running application;
 * ``env.unknown_processor``: no such processor is installed. Needs the running
-  application, which is where the installed processors are read from;
+  application, which is where the installed processors are read from, so it
+  isn't reported in a file the selected environment never loads, such as
+  ``config/packages/test/framework.yaml`` while you analyze ``dev``;
 * ``env.incompatible_type``: in a configuration file, the expression returns a
   type the configuration key doesn't accept. Reported as a warning.
 

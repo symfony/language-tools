@@ -36,7 +36,9 @@ Diagnostics
 * ``security.unknown_provider``: no such user provider.
 
 A name declared in any indexed YAML file is accepted, including a file that
-belongs to another environment.
+belongs to another environment. Nothing is reported in a file the selected
+environment never loads, such as ``config/packages/test/security.yaml`` while
+you analyze ``dev``; see `how it works`_.
 
 Limitations
 -----------

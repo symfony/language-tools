@@ -34,9 +34,6 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
         if (!$facts instanceof DependencyInjectionSourceFacts) {
             return [];
         }
-        if (!$this->environments->includesDocument($request->project, $request->document->uri)) {
-            return [];
-        }
 
         $localServices = array_fill_keys(array_map(
             static fn (ServiceDeclaration $declaration): string => $declaration->id,

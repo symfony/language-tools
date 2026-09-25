@@ -13,6 +13,7 @@
 - Refuse to start renaming a route that is declared outside the application, instead of failing once the rename runs
 - Emit a single text edit when a rename touches the same range twice
 - Keep PHP class name resolution linear on files with thousands of names
+- Stop reporting unknown names in files another environment loads, such as a Security provider or an environment variable processor declared in `config/packages/test/`
 
 ## 0.22.0 (2026-09-25)
 

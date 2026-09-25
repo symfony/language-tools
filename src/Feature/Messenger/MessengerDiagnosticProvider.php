@@ -44,11 +44,8 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
         if (!$index->isComplete()) {
             return [];
         }
-        $symbols = [];
-        if ($this->environments->includesDocument($request->project, $request->document->uri)) {
-            $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
-            $symbols = $facts instanceof MessengerSourceFacts ? $facts->symbols : [];
-        }
+        $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
+        $symbols = $facts instanceof MessengerSourceFacts ? $facts->symbols : [];
         $diagnostics = [];
         foreach ($symbols as $symbol) {
             if ($symbol->declaration

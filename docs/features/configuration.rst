@@ -48,8 +48,10 @@ warnings until the application boots again.
 Limitations
 -----------
 
-* select the relevant environment to check configuration for a bundle registered
-  only in that environment;
+* a key contributed by a bundle registered only in another environment is
+  reported as unknown when the section it belongs to exists in the selected
+  environment, including in a ``when@...`` section; select the relevant
+  environment to check that configuration;
 * nothing is validated for a key whose node accepts arbitrary children, since
   anything is valid there;
 * PHP configuration values are checked when they're literal;

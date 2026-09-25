@@ -14,6 +14,7 @@ use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticSuppressor;
+use Symfony\Lsp\Feature\EnvironmentScopedDiagnosticFilter;
 use Symfony\Lsp\Feature\PartialParseDiagnosticFilter;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
@@ -32,6 +33,7 @@ use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
+use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\RecordingClient;
 
@@ -123,6 +125,46 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertSame(['broken-provider', 'malformed-provider'], array_map(static fn ($failure): string => $failure->provider, $collection->failures));
         self::assertSame('Provider failed.', $collection->failures[0]->error->getMessage());
         self::assertSame('A diagnostic provider returned a non-array diagnostic.', $collection->failures[1]->error->getMessage());
+    }
+
+    public function testDropsSelectedEnvironmentDiagnosticsFromDocumentsAnotherEnvironmentLoads(): void
+    {
+        $uri = 'file:///workspace/config/packages/test/security.yaml';
+        [$registry, $client, $collector] = $this->registryForDocument(
+            $uri,
+            'yaml',
+            '',
+            [],
+            new StubDiagnosticProvider([$this->diagnostic('security.unknown_provider')], 'security'),
+            new StubDiagnosticProvider([$this->diagnostic('env.unknown_processor'), $this->diagnostic('env.malformed_chain')], 'environment'),
+        );
+        $params = ['textDocument' => ['uri' => $uri]];
+
+        $registry->publish($params);
+
+        $published = $client->notifications[0]['params']['diagnostics'];
+
+        self::assertSame(['env.malformed_chain'], array_column($this->diagnostics($collector, $params), 'code'));
+        self::assertIsArray($published);
+        self::assertSame(['env.malformed_chain'], array_column($published, 'code'));
+    }
+
+    public function testKeepsSelectedEnvironmentDiagnosticsInDocumentsThatEnvironmentLoads(): void
+    {
+        $codes = ['security.unknown_provider', 'env.unknown_processor'];
+
+        foreach (['config/packages/dev/security.yaml', 'config/packages/security.yaml', 'config/services_dev.yaml'] as $path) {
+            $uri = 'file:///workspace/'.$path;
+            [, , $collector] = $this->registryForDocument(
+                $uri,
+                'yaml',
+                '',
+                [],
+                new StubDiagnosticProvider(array_map($this->diagnostic(...), $codes)),
+            );
+
+            self::assertSame($codes, array_column($this->diagnostics($collector, ['textDocument' => ['uri' => $uri]]), 'code'), $path);
+        }
     }
 
     public function testSuppressesDiagnosticsInPublishedAndCollectedDiagnostics(): void
@@ -291,6 +333,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
             $converter,
             ProjectPaths::policy(),
             new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
+            new EnvironmentScopedDiagnosticFilter($projects, EnvironmentScopes::resolver(), new DiagnosticCodeRegistry()),
             new DiagnosticSuppressor(
                 new PositionConverter(),
                 new LspProtocolMapper(),

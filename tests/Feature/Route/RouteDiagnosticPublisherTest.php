@@ -16,6 +16,7 @@ use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Feature\DiagnosticCollector;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticSuppressor;
+use Symfony\Lsp\Feature\EnvironmentScopedDiagnosticFilter;
 use Symfony\Lsp\Feature\PartialParseDiagnosticFilter;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteCodeActionProvider;
@@ -50,6 +51,7 @@ use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
+use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\RecordingClient;
 
@@ -395,6 +397,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $uriConverter,
             ProjectPaths::policy(),
             new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
+            new EnvironmentScopedDiagnosticFilter($projects, EnvironmentScopes::resolver(), new DiagnosticCodeRegistry()),
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
                 new DocumentContextResolver($documents, $projects),
@@ -563,6 +566,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $uriConverter,
             ProjectPaths::policy(),
             new PartialParseDiagnosticFilter(new SourceOverlayHealthRegistry()),
+            new EnvironmentScopedDiagnosticFilter($projects, EnvironmentScopes::resolver(), new DiagnosticCodeRegistry()),
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
                 new DocumentContextResolver($documents, $projects),

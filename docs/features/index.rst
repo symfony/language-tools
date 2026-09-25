@@ -155,6 +155,14 @@ Symfony versions from the oldest maintained branch to the next development
 branch are supported; on an older or newer branch the application isn't
 booted and only file-based features remain.
 
+Names are checked against the environment you analyze, so an unknown name is
+only reported in the files that environment loads. A service, a Security
+provider, a Messenger transport or an environment variable processor named in
+a file another environment owns, such as ``config/packages/test/`` or
+``config/services_test.yaml``, is left alone while you analyze ``dev``: select
+that environment to check those files. Configuration keys and values are the
+exception, they're checked in every environment.
+
 Which Files Are Analyzed
 ------------------------
 

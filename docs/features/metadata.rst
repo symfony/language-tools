@@ -45,6 +45,8 @@ Limitations
 * option completion and option diagnostics cover the constraints shipped by
   the Symfony Validator. Constraints from other packages or from your own code
   are completed by name and navigable, but their options aren't checked;
+* an option added by a form type extension registered only in another
+  environment is reported as unknown; select that environment to check it;
 * only named arguments are checked, so ``#[Assert\Length(10)]`` is left alone;
 * field completion in ``$builder->add()`` needs the form type to declare a
   ``data_class`` as a static value;

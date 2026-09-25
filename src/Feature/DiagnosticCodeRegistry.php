@@ -4,48 +4,54 @@ namespace Symfony\Lsp\Feature;
 
 final class DiagnosticCodeRegistry
 {
+    // Configuration keys and values are deliberately checked in every environment
     private const CODES = [
-        'config.deprecated_key',
-        'config.duplicate_key',
-        'config.invalid_type',
-        'config.malformed_structure',
-        'config.unknown_key',
-        'console.unknown_argument',
-        'console.unknown_option',
-        'env.incompatible_type',
-        'env.malformed_chain',
-        'env.unknown_processor',
-        'event.invalid_listener_method',
-        'form.unknown_option',
-        'importmap.unknown_entrypoint',
-        'messenger.invalid_handler_signature',
-        'messenger.unknown_bus',
-        'messenger.unknown_transport',
-        'parameter.not_found',
-        'route.missing_parameters',
-        'route.not_found',
-        'security.unknown_firewall',
-        'security.unknown_provider',
-        'service.not_found',
-        'stimulus.unknown_controller',
-        'suppression.invalid',
-        'template.not_found',
-        'translation.domain_not_found',
-        'translation.not_found',
-        'translation.placeholders',
-        'twig_callable.unknown_argument',
-        'twig_component.not_found',
-        'validation.unknown_constraint_option',
+        'config.deprecated_key' => DiagnosticCodeScope::EveryEnvironment,
+        'config.duplicate_key' => DiagnosticCodeScope::EveryEnvironment,
+        'config.invalid_type' => DiagnosticCodeScope::EveryEnvironment,
+        'config.malformed_structure' => DiagnosticCodeScope::EveryEnvironment,
+        'config.unknown_key' => DiagnosticCodeScope::EveryEnvironment,
+        'console.unknown_argument' => DiagnosticCodeScope::SelectedEnvironment,
+        'console.unknown_option' => DiagnosticCodeScope::SelectedEnvironment,
+        'env.incompatible_type' => DiagnosticCodeScope::EveryEnvironment,
+        'env.malformed_chain' => DiagnosticCodeScope::EveryEnvironment,
+        'env.unknown_processor' => DiagnosticCodeScope::SelectedEnvironment,
+        'event.invalid_listener_method' => DiagnosticCodeScope::EveryEnvironment,
+        'form.unknown_option' => DiagnosticCodeScope::SelectedEnvironment,
+        'importmap.unknown_entrypoint' => DiagnosticCodeScope::SelectedEnvironment,
+        'messenger.invalid_handler_signature' => DiagnosticCodeScope::SelectedEnvironment,
+        'messenger.unknown_bus' => DiagnosticCodeScope::SelectedEnvironment,
+        'messenger.unknown_transport' => DiagnosticCodeScope::SelectedEnvironment,
+        'parameter.not_found' => DiagnosticCodeScope::SelectedEnvironment,
+        'route.missing_parameters' => DiagnosticCodeScope::SelectedEnvironment,
+        'route.not_found' => DiagnosticCodeScope::SelectedEnvironment,
+        'security.unknown_firewall' => DiagnosticCodeScope::SelectedEnvironment,
+        'security.unknown_provider' => DiagnosticCodeScope::SelectedEnvironment,
+        'service.not_found' => DiagnosticCodeScope::SelectedEnvironment,
+        'stimulus.unknown_controller' => DiagnosticCodeScope::SelectedEnvironment,
+        'suppression.invalid' => DiagnosticCodeScope::EveryEnvironment,
+        'template.not_found' => DiagnosticCodeScope::SelectedEnvironment,
+        'translation.domain_not_found' => DiagnosticCodeScope::SelectedEnvironment,
+        'translation.not_found' => DiagnosticCodeScope::SelectedEnvironment,
+        'translation.placeholders' => DiagnosticCodeScope::EveryEnvironment,
+        'twig_callable.unknown_argument' => DiagnosticCodeScope::SelectedEnvironment,
+        'twig_component.not_found' => DiagnosticCodeScope::SelectedEnvironment,
+        'validation.unknown_constraint_option' => DiagnosticCodeScope::SelectedEnvironment,
     ];
 
     /** @return list<string> */
     public function all(): array
     {
-        return self::CODES;
+        return array_keys(self::CODES);
     }
 
     public function contains(string $code): bool
     {
-        return \in_array($code, self::CODES, true);
+        return isset(self::CODES[$code]);
+    }
+
+    public function scope(string $code): ?DiagnosticCodeScope
+    {
+        return self::CODES[$code] ?? null;
     }
 }

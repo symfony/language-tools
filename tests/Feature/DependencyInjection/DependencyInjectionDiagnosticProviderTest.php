@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -86,40 +85,8 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
-    /** @param list<string> $expectedCodes */
-    #[DataProvider('environmentScopedFileProvider')]
-    public function testScopesConventionalEnvironmentFiles(string $uri, string $environment, array $expectedCodes): void
-    {
-        $text = <<<'YAML'
-            services:
-                app.consumer:
-                    arguments: ['@missing.service', '%missing.parameter%']
-            YAML;
-        $provider = $this->provider($uri, $text, $environment);
-
-        self::assertSame(
-            $expectedCodes,
-            array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'),
-        );
-    }
-
-    /** @return iterable<string, array{string, string, list<string>}> */
-    public static function environmentScopedFileProvider(): iterable
-    {
-        $diagnostics = ['service.not_found', 'parameter.not_found'];
-
-        yield 'inactive service file' => ['file:///workspace/config/services_test.yaml', 'dev', []];
-        yield 'active service file' => ['file:///workspace/config/services_test.yaml', 'test', $diagnostics];
-        yield 'active service file with yml extension' => ['file:///workspace/config/services_dev.yml', 'dev', $diagnostics];
-        yield 'inactive package directory' => ['file:///workspace/config/packages/test/framework.yaml', 'dev', []];
-        yield 'active package directory' => ['file:///workspace/config/packages/test/framework.yaml', 'test', $diagnostics];
-        yield 'inactive route directory' => ['file:///workspace/config/routes/test/api.yaml', 'dev', []];
-        yield 'package file lookalike' => ['file:///workspace/config/packages/test.yaml', 'dev', $diagnostics];
-        yield 'service file outside config' => ['file:///workspace/src/services_test.yaml', 'dev', $diagnostics];
-    }
-
     /** @param list<string> $parameters */
-    private function provider(string $uri, string $text, string $environment = 'dev', array $parameters = [], bool $indexesComplete = true): DependencyInjectionDiagnosticProvider
+    private function provider(string $uri, string $text, array $parameters = [], bool $indexesComplete = true): DependencyInjectionDiagnosticProvider
     {
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
@@ -147,7 +114,7 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
             $serviceIndexes,
             $parameterIndexes,
             $sourceIndexes,
-            EnvironmentScopes::resolver($environment),
+            EnvironmentScopes::resolver(),
         );
     }
 }
