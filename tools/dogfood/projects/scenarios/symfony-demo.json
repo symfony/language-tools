@@ -401,6 +401,24 @@
             "kind": "application",
             "reason": "The pinned application uses a configuration option deprecated by its locked dependencies.",
             "messageHash": "091412dd2ceae6933bd5b57f3d7e31623e7901c159962740c305de8f56c378f7"
+        },
+        {
+            "path": "config/packages/web_profiler.yaml",
+            "code": "config.deprecated_key",
+            "severity": "warning",
+            "range": {
+                "start": {
+                    "line": 12,
+                    "character": 12
+                },
+                "end": {
+                    "line": 12,
+                    "character": 35
+                }
+            },
+            "kind": "application",
+            "reason": "The pinned application sets the same deprecated option in its test environment block.",
+            "messageHash": "091412dd2ceae6933bd5b57f3d7e31623e7901c159962740c305de8f56c378f7"
         }
     ]
 }
