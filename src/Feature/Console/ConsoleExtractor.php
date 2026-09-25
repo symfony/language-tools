@@ -9,10 +9,8 @@ use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
-use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
-use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 use Symfony\Lsp\Parser\Php\PhpTypeKind;
 
@@ -74,35 +72,25 @@ final class ConsoleExtractor
         if ('php' !== $languageId) {
             return null;
         }
-        $masked = $this->phpComments->mask($text);
-        $before = substr($masked, 0, $offset);
-        if (!preg_match('/(?:\$([A-Za-z_][A-Za-z0-9_]*)|\$this\s*->\s*([A-Za-z_][A-Za-z0-9_]*))\s*->\s*(getArgument|getOption)\s*\(\s*([\'\"])(?<prefix>(?:\\\\.|(?!\4).)*)$/s', $before, $match, \PREG_OFFSET_CAPTURE | \PREG_UNMATCHED_AS_NULL)) {
-            return null;
-        }
         $php = $this->parser->parse($text);
-        $methodOffset = $match[3][1];
-        $property = \is_string($match[2][0] ?? null);
-        $receiver = $property ? $match[2][0] : ($match[1][0] ?? null);
-        $receiverKind = $property ? PhpMethodReceiverKind::ThisProperty : PhpMethodReceiverKind::Variable;
-        $call = \is_string($receiver) ? array_find($php->methodCalls, static fn (PhpMethodCall $call): bool => $match[3][0] === $call->method && $receiver === $call->receiverContext->name && $receiverKind === $call->receiverContext->kind && $methodOffset >= $call->startOffset && $methodOffset < $call->endOffset) : null;
-        if (null === $call || null === $call->className || PhpReceiverMatch::Matches !== $php->matchReceiver($call, self::INPUT_INTERFACE)) {
+        $cursor = $php->argumentCursorAt($offset);
+        $call = $cursor?->call;
+        if (null === $cursor || !$call instanceof PhpMethodCall || !$cursor->isArgumentLiteral() || !$cursor->isPositional(0)) {
             return null;
         }
-        $rawPrefix = $match['prefix'][0];
-        $prefixOffset = $match['prefix'][1];
-        if (!\is_string($rawPrefix)) {
+        $kind = match ($call->method) {
+            'getArgument' => ConsoleInputKind::Argument,
+            'getOption' => ConsoleInputKind::Option,
+            default => null,
+        };
+        if (null === $kind || null === $call->className || PhpReceiverMatch::Matches !== $php->matchReceiver($call, self::INPUT_INTERFACE)) {
             return null;
         }
-        $quote = $match[4][0];
-        if (!\is_string($quote) || ('"' === $quote && str_contains($rawPrefix, '$'))) {
-            return null;
-        }
-        $prefix = PhpStringLiteralDecoder::decode($quote, $rawPrefix);
 
         return new ConsoleCompletionContext(
-            'getArgument' === $match[3][0] ? ConsoleInputKind::Argument : ConsoleInputKind::Option,
-            $prefix,
-            new Range($this->converter->toPosition($text, $prefixOffset), $this->converter->toPosition($text, $offset)),
+            $kind,
+            $cursor->prefix,
+            new Range($this->converter->toPosition($text, $cursor->prefixStartOffset), $this->converter->toPosition($text, $offset)),
             $call->className,
         );
     }

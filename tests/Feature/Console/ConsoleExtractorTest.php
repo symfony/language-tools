@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Console;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
@@ -365,6 +366,38 @@ final class ConsoleExtractorTest extends TestCase
 
         $unrelated = str_replace('InputInterface $input', 'object $input', $text);
         self::assertNull($this->extractor()->completionContext('php', $unrelated, $cursor));
+    }
+
+    #[DataProvider('rejectedCompletionProvider')]
+    public function testOffersNoCompletionWhereIndexingReadsNoInputName(string $call): void
+    {
+        $text = <<<PHP
+            <?php
+            use Symfony\Component\Console\Command\Command;
+            use Symfony\Component\Console\Input\InputInterface;
+            final class DemoCommand extends Command
+            {
+                public function execute(InputInterface \$input): int
+                {
+                    {$call}
+                }
+            }
+            PHP;
+        $cursor = strpos($text, '|');
+        self::assertIsInt($cursor);
+
+        self::assertNull($this->extractor()->completionContext('php', str_replace('|', '', $text), $cursor));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function rejectedCompletionProvider(): iterable
+    {
+        yield 'static call' => ['InputInterface::getOption(\'ver|'];
+        yield 'array literal' => ['$input->getOption([\'ver|'];
+        yield 'concatenated literal' => ['$input->getOption(\'ver\' . \'bo|'];
+        yield 'second argument' => ['$input->getArgument(\'name\', \'ver|'];
+        yield 'interpolated literal' => ['$input->getOption("ver$suffix|'];
+        yield 'unrelated method' => ['$input->getParameterOption(\'ver|'];
     }
 
     public function testScopesIncompleteCompletionReceiversToTheirOwningMethods(): void
