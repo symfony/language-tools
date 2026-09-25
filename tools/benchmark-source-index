@@ -17,8 +17,8 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterTree;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Server\ContainerFactory;
 
-use function Symfony\Lsp\Tools\createBenchmarkContainer;
 use function Symfony\Lsp\Tools\installBenchmarkSyntheticServices;
 
 require dirname(__DIR__).'/vendor/autoload.php';
@@ -266,7 +266,7 @@ function generateProject(string $root, int $target): void
  */
 function bootScanner(bool $countParsers): array
 {
-    $container = createBenchmarkContainer('benchmark');
+    $container = (new ContainerFactory())->create('benchmark');
     $counter = $countParsers ? new ParseCallCounter() : null;
     if (null !== $counter) {
         $container->register(ParseCallCounter::class)->setSynthetic(true)->setPublic(true);
