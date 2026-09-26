@@ -16,15 +16,14 @@ use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\CompletionItemKind;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class TranslationProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TranslationIndexRegistry $indexes,
@@ -162,13 +161,8 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         return 'translation';
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): array
     {
-        $request = $this->requests->document($params);
-        if (null === $request) {
-            return null;
-        }
-
         $index = $this->indexes->forProject($request->project);
         $facts = $index->factsForUri($request->document->uri);
         $diagnostics = [];

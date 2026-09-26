@@ -3,13 +3,12 @@
 namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class EventDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly EventSourceIndexRegistry $sourceIndexes,
     ) {
@@ -20,10 +19,9 @@ final class EventDiagnosticProvider implements DiagnosticProviderInterface
         return 'event';
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): ?array
     {
-        $request = $this->requests->document($params);
-        if (null === $request || 'php' !== $request->document->languageId) {
+        if ('php' !== $request->document->languageId) {
             return null;
         }
         $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);

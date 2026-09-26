@@ -10,7 +10,6 @@ use Symfony\Lsp\Feature\Security\SecurityExtractor;
 use Symfony\Lsp\Feature\Security\SecurityRelationshipProvider;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class SecurityProviderTest extends TestCase
@@ -365,8 +364,8 @@ PHP;
         self::assertStringContainsString('App\\Security\\PostVoter', $kit->hoverText($relationshipProvider->hover($kit->positioned($role))));
         self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->after($yamlUri, 'provider: us')))));
         self::assertContains($twigUri, $kit->targets($relationshipProvider->references($kit->references($role))));
-        self::assertSame(['security.unknown_provider'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($yamlUri))));
-        self::assertSame(['security.unknown_firewall'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($twigUri))));
+        self::assertSame(['security.unknown_provider'], $kit->codes($diagnosticProvider->diagnostics($kit->document($yamlUri))));
+        self::assertSame(['security.unknown_firewall'], $kit->codes($diagnosticProvider->diagnostics($kit->document($twigUri))));
     }
 
     public function testPreservesDashedProviderAndFirewallNames(): void
@@ -405,8 +404,8 @@ PHP;
         self::assertSame([$yamlUri, $twigUri], $kit->targets($relationshipProvider->references($kit->references($firewall))));
         self::assertSame([$twigUri], $kit->targets($relationshipProvider->references($kit->references($firewall, includeDeclaration: false))));
 
-        self::assertSame([], $diagnosticProvider->diagnostics(LspRequests::document($yamlUri)));
-        self::assertSame([], $diagnosticProvider->diagnostics(LspRequests::document($twigUri)));
+        self::assertSame([], $diagnosticProvider->diagnostics($kit->document($yamlUri)));
+        self::assertSame([], $diagnosticProvider->diagnostics($kit->document($twigUri)));
     }
 
     public function testResolvesSymbolAtRangeEnd(): void

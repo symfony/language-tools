@@ -21,8 +21,8 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\EnvironmentScopes;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class DependencyInjectionDiagnosticProviderTest extends TestCase
 {
@@ -43,9 +43,9 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
                     app.test_consumer:
                         arguments: ['%test.client.parameters%']
             YAML;
-        $provider = $this->provider($uri, $text);
+        [$provider, $requests] = $this->provider($uri, $text);
 
-        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $provider->diagnostics($requests->document($uri));
 
         self::assertSame(
             ['service.not_found', 'service.not_found', 'parameter.not_found'],
@@ -68,9 +68,9 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
                 local:
                     directory: "%root_dir%%document_folder%"
             YAML;
-        $provider = $this->provider($uri, $text, parameters: ['root_dir', 'document_folder']);
+        [$provider, $requests] = $this->provider($uri, $text, parameters: ['root_dir', 'document_folder']);
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
     }
 
     public function testReportsNoDiagnosticsWhileBothRuntimeIndexesAreIncomplete(): void
@@ -81,13 +81,17 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
                 app.consumer:
                     arguments: ['@missing.service', '%missing.parameter%']
             YAML;
-        $provider = $this->provider($uri, $text, indexesComplete: false);
+        [$provider, $requests] = $this->provider($uri, $text, indexesComplete: false);
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
     }
 
-    /** @param list<string> $parameters */
-    private function provider(string $uri, string $text, array $parameters = [], bool $indexesComplete = true): DependencyInjectionDiagnosticProvider
+    /**
+     * @param list<string> $parameters
+     *
+     * @return array{DependencyInjectionDiagnosticProvider, ProviderRequests}
+     */
+    private function provider(string $uri, string $text, array $parameters = [], bool $indexesComplete = true): array
     {
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'yaml', 1, $text));
@@ -109,13 +113,12 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
 
-        return new DependencyInjectionDiagnosticProvider(
-            new LspRequestFactory($documents, $projects, $converter),
+        return [new DependencyInjectionDiagnosticProvider(
             new LspProtocolMapper(),
             $serviceIndexes,
             $parameterIndexes,
             $sourceIndexes,
             EnvironmentScopes::resolver(),
-        );
+        ), new ProviderRequests($documents, $projects, $converter)];
     }
 }

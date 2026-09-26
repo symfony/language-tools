@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Feature\Console;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Console\ConsoleProvider;
-use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class ConsoleProviderTest extends TestCase
@@ -47,7 +46,7 @@ final class ConsoleProviderTest extends TestCase
             'complete' => true,
         ]);
 
-        $diagnostics = $kit->get(ConsoleProvider::class)->diagnostics(LspRequests::document($uri));
+        $diagnostics = $kit->get(ConsoleProvider::class)->diagnostics($kit->document($uri));
         self::assertSame(['console.unknown_argument', 'console.unknown_option'], $kit->codes($diagnostics));
         self::assertSame([
             'Unknown Console input argument "missing-argument".',
@@ -92,10 +91,14 @@ final class ConsoleProviderTest extends TestCase
         $staticText = str_replace('$this->addOption($dynamicName);', '', $text);
         $extensible = ['class' => 'DynamicCommand', 'arguments' => [], 'options' => [], 'complete' => true];
 
-        self::assertSame([], $this->kit($uri, $text, $extensible)->get(ConsoleProvider::class)->diagnostics(LspRequests::document($uri)));
-        self::assertSame([], $this->kit($uri, $staticText, ['class' => 'DynamicCommand', 'arguments' => [], 'options' => [], 'complete' => false])->get(ConsoleProvider::class)->diagnostics(LspRequests::document($uri)));
-        self::assertSame([], $this->kit($uri, $staticText)->get(ConsoleProvider::class)->diagnostics(LspRequests::document($uri)));
-        self::assertSame([], $this->kit($uri, $staticText, $extensible, false)->get(ConsoleProvider::class)->diagnostics(LspRequests::document($uri)));
+        $extensibleKit = $this->kit($uri, $text, $extensible);
+        self::assertSame([], $extensibleKit->get(ConsoleProvider::class)->diagnostics($extensibleKit->document($uri)));
+        $incompleteKit = $this->kit($uri, $staticText, ['class' => 'DynamicCommand', 'arguments' => [], 'options' => [], 'complete' => false]);
+        self::assertSame([], $incompleteKit->get(ConsoleProvider::class)->diagnostics($incompleteKit->document($uri)));
+        $sourceOnlyKit = $this->kit($uri, $staticText);
+        self::assertSame([], $sourceOnlyKit->get(ConsoleProvider::class)->diagnostics($sourceOnlyKit->document($uri)));
+        $withoutRuntimeKit = $this->kit($uri, $staticText, $extensible, false);
+        self::assertSame([], $withoutRuntimeKit->get(ConsoleProvider::class)->diagnostics($withoutRuntimeKit->document($uri)));
     }
 
     public function testCompletesInvokableAttributeAndAdaptedTraitInputNames(): void

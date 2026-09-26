@@ -60,7 +60,6 @@ use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
@@ -329,7 +328,7 @@ final class TemplateProviderTest extends TestCase
             PHP;
         [, $navigation, , $requests] = $this->providers($uri, 'php', $text);
 
-        self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $navigation->diagnostics($requests->document($uri)));
         self::assertSame(
             ['file:///workspace/templates/article/show.html.twig'],
             array_column($navigation->links($requests->document($uri)), 'target'),
@@ -373,14 +372,14 @@ final class TemplateProviderTest extends TestCase
                 }
             }
             PHP;
-        [, $navigation] = $this->providers($uri, 'php', $text);
+        [, $navigation, , $requests] = $this->providers($uri, 'php', $text);
 
         self::assertSame(
             [
                 'Template "article/missing.html.twig" does not exist in the selected environment.',
                 'Template "article/variadic.html.twig" does not exist in the selected environment.',
             ],
-            array_column($navigation->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'message'),
+            array_column($navigation->diagnostics($requests->document($uri)), 'message'),
         );
     }
 
@@ -613,7 +612,7 @@ final class TemplateProviderTest extends TestCase
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
         $completionProvider = new TwigComponentCompletionProvider($converter, $protocol, $indexes, $componentResolver, $commentParser);
         $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
-        $diagnosticProvider = new TwigComponentDiagnosticProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, $templateIndexes, $componentResolver);
+        $diagnosticProvider = new TwigComponentDiagnosticProvider($protocol, $indexes, $templateIndexes, $componentResolver);
         $codeLensProvider = new TwigComponentCodeLensProvider($protocol, $indexes, $extractor);
         $completionPosition = $converter->toPosition($completionText, \strlen($completionText));
         self::assertSame(['Alert'], array_column($completionProvider->complete($requests->positioned([
@@ -642,7 +641,7 @@ final class TemplateProviderTest extends TestCase
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
         self::assertStringContainsString('Properties: `title`', $hover['contents']['value']);
-        self::assertSame([], $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $usageUri]]));
+        self::assertSame([], $diagnosticProvider->diagnostics($requests->document($usageUri)));
         $lenses = $codeLensProvider->codeLenses((new ProviderRequests($documents, $projects))->document($classUri));
         self::assertCount(1, $lenses);
         self::assertIsArray($lenses[0]['command'] ?? null);
@@ -684,8 +683,8 @@ final class TemplateProviderTest extends TestCase
         $requests = new ProviderRequests($documents, $projects);
         $protocol = new LspProtocolMapper();
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
-        $provider = new TwigComponentDiagnosticProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, $templateIndexes, $componentResolver);
-        $params = ['textDocument' => ['uri' => $usageUri]];
+        $provider = new TwigComponentDiagnosticProvider($protocol, $indexes, $templateIndexes, $componentResolver);
+        $params = $requests->document($usageUri);
 
         $withoutRuntimeMetadata = $provider->diagnostics($params);
         self::assertSame([], $withoutRuntimeMetadata);
@@ -736,9 +735,10 @@ final class TemplateProviderTest extends TestCase
         $templateIndexes = $this->templateIndexes();
         $templateIndexes->forProject($project)->replaceRuntime(true);
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
-        $provider = new TwigComponentDiagnosticProvider(new LspRequestFactory($documents, $projects, $converter), new LspProtocolMapper(), $indexes, $templateIndexes, $componentResolver);
+        $requests = new ProviderRequests($documents, $projects);
+        $provider = new TwigComponentDiagnosticProvider(new LspProtocolMapper(), $indexes, $templateIndexes, $componentResolver);
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $usageUri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($usageUri)));
     }
 
     public function testCompletesBundleProvidedAndAnonymousComponentNames(): void
@@ -924,9 +924,9 @@ final class TemplateProviderTest extends TestCase
             classes: (new PhpClassDeclarationExtractor($converter, $phpParser))->extract($uri, $text),
         ));
         $indexes->forProject($project)->replace(new TemplateSourceFacts($uri, null, $extractor->extractCandidates(new SourceDocument($uri, 'php', $text))));
-        $navigation = new TemplateNavigationProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
-        $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
-        self::assertIsArray($diagnostics);
+        $requests = new ProviderRequests($documents, $projects);
+        $navigation = new TemplateNavigationProvider(new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
+        $diagnostics = $navigation->diagnostics($requests->document($uri));
         $provider = new TemplateCodeActionProvider($extractor, $indexes, new UriToPathConverter(), ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes, new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
 
         $actions = $provider->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
@@ -958,8 +958,7 @@ final class TemplateProviderTest extends TestCase
         );
         $indexes->forProject($project)->replace(new TemplateSourceFacts($uri, null, $extractor->extractCandidates(new SourceDocument($uri, 'twig', $text))));
         $protocol = new LspProtocolMapper();
-        $diagnostics = (new TemplateNavigationProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), $protocol, $extractor, $indexes, $classIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]);
-        self::assertIsArray($diagnostics);
+        $diagnostics = (new TemplateNavigationProvider(new PositionedSourceSymbolResolver($converter), $protocol, $extractor, $indexes, $classIndexes))->diagnostics((new ProviderRequests($documents, $projects))->document($uri));
         $actions = (new TemplateCodeActionProvider($extractor, $indexes, new UriToPathConverter(), ProjectPaths::resolver(), $protocol, $classIndexes, new UnknownNameCodeActionBuilder($protocol)))->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
 
         self::assertSame(['Replace with "article/show.html.twig"', 'Create template "artcle/show.html.twig"'], array_column($actions, 'title'));
@@ -996,11 +995,11 @@ final class TemplateProviderTest extends TestCase
             classes: (new PhpClassDeclarationExtractor($positionConverter, $phpParser))->extract($uri, $text),
         ));
         $indexes->forProject($project)->replace(new TemplateSourceFacts($uri, null, $extractor->extractCandidates(new SourceDocument($uri, 'php', $text))));
-        $navigation = new TemplateNavigationProvider(new LspRequestFactory($documents, $projects, $positionConverter), new PositionedSourceSymbolResolver($positionConverter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
+        $requests = new ProviderRequests($documents, $projects);
+        $navigation = new TemplateNavigationProvider(new PositionedSourceSymbolResolver($positionConverter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
 
         try {
-            $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
-            self::assertIsArray($diagnostics);
+            $diagnostics = $navigation->diagnostics($requests->document($uri));
             $provider = new TemplateCodeActionProvider($extractor, $indexes, $converter, ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes, new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
 
             self::assertSame([], $provider->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics)));
@@ -1103,7 +1102,7 @@ final class TemplateProviderTest extends TestCase
         );
         self::assertSame(
             ['template.not_found'],
-            array_column($navigation->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'),
+            array_column($navigation->diagnostics($requests->document($uri)), 'code'),
         );
     }
 
@@ -1125,7 +1124,7 @@ final class TemplateProviderTest extends TestCase
             'line' => $position->line, 'character' => $position->character,
         ]];
 
-        self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $navigation->diagnostics($requests->document($uri)));
         self::assertSame(
             ['file:///workspace/templates/snippet.txt'],
             array_column($navigation->definition($requests->positioned($params)), 'uri'),
@@ -1155,7 +1154,7 @@ final class TemplateProviderTest extends TestCase
             'line' => $position->line, 'character' => $position->character,
         ]];
 
-        self::assertSame(['template.not_found'], array_column($navigation->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        self::assertSame(['template.not_found'], array_column($navigation->diagnostics($requests->document($uri)), 'code'));
         self::assertSame([], $navigation->definition($requests->positioned($params)));
     }
 
@@ -1176,21 +1175,21 @@ final class TemplateProviderTest extends TestCase
     {
         $uri = 'file:///workspace/book/design/templates/base.html.twig';
         $text = "{% extends 'missing.html.twig' %}";
-        [, $navigation] = $this->providers($uri, 'twig', $text);
+        [, $navigation, , $requests] = $this->providers($uri, 'twig', $text);
 
-        self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $navigation->diagnostics($requests->document($uri)));
     }
 
     public function testReportsNoTemplateDiagnosticsWhileTheTemplateIndexIsIncomplete(): void
     {
         $uri = 'file:///workspace/templates/page.html.twig';
         $text = "{% include 'missing.html.twig' %}";
-        [, $indexed] = $this->providers($uri, 'twig', $text);
-        self::assertSame(['template.not_found'], array_column($indexed->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        [, $indexed, , $requests] = $this->providers($uri, 'twig', $text);
+        self::assertSame(['template.not_found'], array_column($indexed->diagnostics($requests->document($uri)), 'code'));
 
-        [, $navigation] = $this->providers($uri, 'twig', $text, indexComplete: false);
+        [, $navigation, , $requests] = $this->providers($uri, 'twig', $text, indexComplete: false);
 
-        self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $navigation->diagnostics($requests->document($uri)));
     }
 
     /** @return array{TemplateCompletionHandler, TemplateNavigationProvider, PositionConverter, ProviderRequests} */
@@ -1241,7 +1240,7 @@ final class TemplateProviderTest extends TestCase
 
         return [
             new TemplateCompletionHandler($converter, new LspProtocolMapper(), $indexes, $extractor, $classIndexes, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TwigDirectiveLocator()),
-            new TemplateNavigationProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes),
+            new TemplateNavigationProvider(new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes),
             $converter,
             new ProviderRequests($documents, $projects),
         ];
@@ -1414,11 +1413,11 @@ final class TemplateProviderTest extends TestCase
     {
         $uri = 'file:///workspace/src/Controller.php';
         $text = "<?php\nuse Symfony\\Bridge\\Twig\\Attribute\\Template;\nclass Controller { #[Template('missing.html.twig')] public function show() {} }";
-        [, $navigation] = $this->providers($uri, 'php', $text);
+        [, $navigation, , $requests] = $this->providers($uri, 'php', $text);
 
         self::assertSame(
             ['template.not_found'],
-            array_column($navigation->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'),
+            array_column($navigation->diagnostics($requests->document($uri)), 'code'),
         );
     }
 

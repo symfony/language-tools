@@ -14,14 +14,12 @@ use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class AssetProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, DocumentLinkProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly UriToPathConverter $uriConverter,
         private readonly LspProtocolMapper $protocol,
@@ -160,10 +158,9 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         return 'asset';
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): ?array
     {
-        $request = $this->requests->document($params);
-        if (null === $request || 'twig' !== $request->document->languageId) {
+        if ('twig' !== $request->document->languageId) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);

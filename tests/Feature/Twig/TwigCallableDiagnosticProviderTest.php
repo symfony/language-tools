@@ -78,7 +78,7 @@ final class TwigCallableDiagnosticProviderTest extends TwigCallableProviderTestC
             $uri = 'file:///workspace/templates/diagnostics.html.twig';
             $environment = $this->providers([$extensionUri => $extensionText], [$uri => $text]);
 
-            return $environment['diagnostic']->diagnostics(['textDocument' => ['uri' => $uri]]);
+            return $environment['diagnostic']->diagnostics($environment['requests']->document($uri));
         };
 
         $unknown = $diagnostics("{{ image(name: 'a', wdith: 3) }}\n{{ text|shorten(size: 5) }}\n");

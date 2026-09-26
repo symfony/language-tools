@@ -25,7 +25,6 @@ use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
@@ -69,7 +68,7 @@ final class TranslationProviderTest extends TestCase
         [$provider, $converter, , , $requests] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
         self::assertSame([], $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
@@ -112,7 +111,7 @@ final class TranslationProviderTest extends TestCase
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
         $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
         $hover = $provider->hover($requests->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
@@ -262,10 +261,10 @@ final class TranslationProviderTest extends TestCase
             {{ "line\nkey"|trans }}
             {{ t("\x66oo") }}
             TWIG;
-        [$provider, , $configuration, $project] = $this->provider($uri, $text, 'twig');
+        [$provider, , $configuration, $project, $requests] = $this->provider($uri, $text, 'twig');
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
 
         $completionText = '{{ "\x66"|trans }}';
         [$completionProvider, $converter, , , $requests] = $this->provider($uri, $completionText, 'twig');
@@ -299,11 +298,11 @@ final class TranslationProviderTest extends TestCase
         );
         $configuration = new AnalysisSettingsRegistry();
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
-        $provider = new TranslationProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor);
+        $provider = new TranslationProvider($converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor);
+        $requests = new ProviderRequests($documents, $projects, $converter);
 
         try {
-            $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
-            self::assertIsArray($diagnostics);
+            $diagnostics = $provider->diagnostics($requests->document($uri));
             $pathResolver = ProjectPaths::resolver();
             $actions = (new TranslationCodeActionProvider($converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver), new UnknownNameCodeActionBuilder(new LspProtocolMapper())))->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
 
@@ -387,11 +386,11 @@ final class TranslationProviderTest extends TestCase
         );
         $configuration = new AnalysisSettingsRegistry();
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
-        $provider = new TranslationProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor);
+        $provider = new TranslationProvider($converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor);
+        $requests = new ProviderRequests($documents, $projects, $converter);
 
         try {
-            $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
-            self::assertIsArray($diagnostics);
+            $diagnostics = $provider->diagnostics($requests->document($uri));
             $pathResolver = ProjectPaths::resolver();
             $actions = (new TranslationCodeActionProvider($converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver), new UnknownNameCodeActionBuilder(new LspProtocolMapper())))->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
 
@@ -418,10 +417,10 @@ final class TranslationProviderTest extends TestCase
     {
         $uri = 'file:///workspace/src/Controller.php';
         $text = "<?php \$translator->trans('missing.key');";
-        [$provider, , $configuration, $project] = $this->provider($uri, $text);
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        [$provider, , $configuration, $project, $requests] = $this->provider($uri, $text);
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
-        self::assertSame(['translation.not_found'], array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'));
+        self::assertSame(['translation.not_found'], array_column($provider->diagnostics($requests->document($uri)), 'code'));
     }
 
     public function testHonorsNamedAndPositionalPhpTranslationDomains(): void
@@ -433,10 +432,10 @@ final class TranslationProviderTest extends TestCase
             $translator->trans('panel.title', [], 'admin');
             $translator->trans('panel.title', self::PARAMETERS, 'admin');
             PHP;
-        [$provider, , $configuration, $project] = $this->provider($uri, $text);
+        [$provider, , $configuration, $project, $requests] = $this->provider($uri, $text);
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
     }
 
     public function testHonorsTranslationHelperDomainsAndParameters(): void
@@ -451,12 +450,11 @@ final class TranslationProviderTest extends TestCase
             t('article.title', ['%name%' => $name]);
             t('article.title', ['%extra%' => $extra]);
             PHP;
-        [$provider, , $configuration, $project] = $this->provider($uri, $text);
+        [$provider, , $configuration, $project, $requests] = $this->provider($uri, $text);
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
-        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $provider->diagnostics($requests->document($uri));
 
-        self::assertIsArray($diagnostics);
         self::assertSame(['translation.placeholders'], array_column($diagnostics, 'code'));
         /** @var array{start: array{line: int}} $range */
         $range = $diagnostics[0]['range'];
@@ -485,10 +483,10 @@ final class TranslationProviderTest extends TestCase
                 ) }}
             </twig:Button>
             TWIG;
-        [$provider, , $configuration, $project] = $this->provider($uri, $text, 'twig');
+        [$provider, , $configuration, $project, $requests] = $this->provider($uri, $text, 'twig');
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
     }
 
     public function testTreatsDynamicPhpTranslationStringsConservatively(): void
@@ -502,29 +500,28 @@ final class TranslationProviderTest extends TestCase
             $translator->trans("panel.\x74itle", [], 'admin');
             $translator->trans('article.title', ["%{$placeholder}%" => $name]);
             PHP;
-        [$provider, , $configuration, $project] = $this->provider($uri, $text);
+        [$provider, , $configuration, $project, $requests] = $this->provider($uri, $text);
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
     }
 
     public function testFlagsOnlyMissingPlaceholdersFromLiteralParameters(): void
     {
         $uri = 'file:///workspace/templates/article.html.twig';
         $text = "{{ 'article.title'|trans({name: article.name, extra: 1}) }}\n{{ 'article.title'|trans({extra: 1}) }}\n{{ 'article.title'|trans(params) }}\n";
-        [$provider] = $this->provider($uri, $text, 'twig');
+        [$provider, , , , $requests] = $this->provider($uri, $text, 'twig');
 
-        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $provider->diagnostics($requests->document($uri));
 
-        self::assertIsArray($diagnostics);
         self::assertSame(['translation.placeholders'], array_column($diagnostics, 'code'));
         /** @var array{start: array{line: int}} $range */
         $range = $diagnostics[0]['range'];
         self::assertSame(1, $range['start']['line']);
 
         $phpText = "<?php \$translator->trans('article.title', [...\$parameters, 'extra' => 1]);";
-        [$phpProvider] = $this->provider('file:///workspace/src/Controller.php', $phpText);
-        self::assertSame([], $phpProvider->diagnostics(['textDocument' => ['uri' => 'file:///workspace/src/Controller.php']]));
+        [$phpProvider, , , , $phpRequests] = $this->provider('file:///workspace/src/Controller.php', $phpText);
+        self::assertSame([], $phpProvider->diagnostics($phpRequests->document('file:///workspace/src/Controller.php')));
     }
 
     public function testReadsPhpTranslationParametersOfLegacyArraysAndSpreadValues(): void
@@ -535,12 +532,11 @@ final class TranslationProviderTest extends TestCase
             $translator->trans('article.title', array('extra' => 1));
             $translator->trans('article.title', ['extra' => [...$nested]]);
             PHP;
-        [$provider, , $configuration, $project] = $this->provider($uri, $text);
+        [$provider, , $configuration, $project, $requests] = $this->provider($uri, $text);
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
-        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $provider->diagnostics($requests->document($uri));
 
-        self::assertIsArray($diagnostics);
         self::assertSame(['translation.placeholders', 'translation.placeholders'], array_column($diagnostics, 'code'));
     }
 
@@ -553,13 +549,13 @@ final class TranslationProviderTest extends TestCase
                 '{closeUnderline}': closeUnderline,
             }) }}
             TWIG;
-        [$provider] = $this->provider($uri, $text, 'twig', [[
+        [$provider, , , , $requests] = $this->provider($uri, $text, 'twig', [[
             'file:///workspace/translations/messages+intl-icu.en.yaml',
             'yaml',
             'showcase.manifesto: "{openUnderline}Teaching raises questions.{closeUnderline}"',
         ]]);
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
     }
 
     public function testAccountsForGlobalTranslationParameters(): void
@@ -581,13 +577,13 @@ final class TranslationProviderTest extends TestCase
                 $translator->addGlobalParameter('%current_domain_name%', 'example.com');
             }
             PHP;
-        [$provider] = $this->provider($uri, $text, 'twig', [[
+        [$provider, , , , $requests] = $this->provider($uri, $text, 'twig', [[
             'file:///workspace/src/TranslationSubscriber.php',
             'php',
             $globals,
         ]]);
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
 
         $dynamicGlobals = <<<'PHP'
             <?php
@@ -599,7 +595,7 @@ final class TranslationProviderTest extends TestCase
                 $translator->addGlobalParameter($parameter, 'dynamic');
             }
             PHP;
-        [$dynamicProvider] = $this->provider(
+        [$dynamicProvider, , , , $dynamicRequests] = $this->provider(
             'file:///workspace/templates/article.html.twig',
             "{{ 'article.title'|trans({extra: 1}) }}",
             'twig',
@@ -610,7 +606,7 @@ final class TranslationProviderTest extends TestCase
             ]],
         );
 
-        self::assertSame([], $dynamicProvider->diagnostics(['textDocument' => ['uri' => 'file:///workspace/templates/article.html.twig']]));
+        self::assertSame([], $dynamicProvider->diagnostics($dynamicRequests->document('file:///workspace/templates/article.html.twig')));
     }
 
     public function testFindsTranslationsWithPhpHeredocMessages(): void
@@ -629,14 +625,14 @@ final class TranslationProviderTest extends TestCase
                     EOT,
             ];
             PHP;
-        [$provider, , $configuration, $project] = $this->provider($uri, $text, 'twig', [[
+        [$provider, , $configuration, $project, $requests] = $this->provider($uri, $text, 'twig', [[
             'file:///workspace/translations/purchase_order.fr_FR.php',
             'php',
             $catalog,
         ]]);
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
-        self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $provider->diagnostics($requests->document($uri)));
     }
 
     public function testOffersNoTranslationCompletionsInsidePhpComments(): void
@@ -769,7 +765,7 @@ final class TranslationProviderTest extends TestCase
         $configuration = new AnalysisSettingsRegistry();
 
         return [
-            new TranslationProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor),
+            new TranslationProvider($converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor),
             $converter,
             $configuration,
             $project,

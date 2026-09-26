@@ -3,13 +3,12 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class TwigCallableDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigCallableSourceIndexRegistry $indexes,
         private readonly TwigCallableMethodResolver $methods,
@@ -21,10 +20,9 @@ final class TwigCallableDiagnosticProvider implements DiagnosticProviderInterfac
         return 'twig-callable';
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): ?array
     {
-        $request = $this->requests->document($params);
-        if (null === $request || 'twig' !== $request->document->languageId) {
+        if ('twig' !== $request->document->languageId) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);

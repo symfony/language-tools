@@ -3,13 +3,12 @@
 namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class StimulusDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly StimulusIndexRegistry $indexes,
         private readonly StimulusSourceIndexRegistry $sourceIndexes,
@@ -22,10 +21,9 @@ final class StimulusDiagnosticProvider implements DiagnosticProviderInterface
         return 'stimulus';
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): ?array
     {
-        $request = $this->requests->document($params);
-        if (null === $request || 'twig' !== $request->document->languageId) {
+        if ('twig' !== $request->document->languageId) {
             return null;
         }
         if (!$this->indexes->forProject($request->project)->isComplete()) {

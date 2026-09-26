@@ -15,7 +15,6 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class ValidationMetadataProviderTest extends MetadataTestCase
@@ -33,7 +32,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         $requests = new ProviderRequests($documents, $projects, $converter);
         $protocol = new LspProtocolMapper();
         $completionProvider = new MetadataCompletionProvider($protocol, $indexes, $sourceIndexes, $extractor);
-        $validationProvider = new ValidationMetadataProvider(new LspRequestFactory($documents, $projects, $converter), $converter, $protocol, $indexes, $sourceIndexes);
+        $validationProvider = new ValidationMetadataProvider($converter, $protocol, $indexes, $sourceIndexes);
         $constraintUri = 'file:///workspace/src/Dto/Input.php';
         $constraintText = <<<'PHP'
             <?php
@@ -68,7 +67,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         self::assertNull($this->hover([$validationProvider], $requests, $constraintUri, $constraintText, strpos($constraintText, 'env:') + 1));
         self::assertIsArray($this->hover([$validationProvider], $requests, $constraintUri, $constraintText, strpos($constraintText, 'unknown:') + 1));
         self::assertIsArray($this->hover([$validationProvider], $requests, $constraintUri, $constraintText, strpos($constraintText, "expression: 'true'") + 1));
-        $diagnostics = $this->diagnostics([$validationProvider], $constraintUri);
+        $diagnostics = $this->diagnostics([$validationProvider], $requests, $constraintUri);
         self::assertSame(['validation.unknown_constraint_option', 'validation.unknown_constraint_option'], array_column($diagnostics, 'code'));
         self::assertSame('Unknown option "unknown" for constraint "Length".', $diagnostics[0]['message'] ?? null);
         self::assertSame('Unknown option "unexpected" for constraint "When".', $diagnostics[1]['message'] ?? null);
@@ -117,7 +116,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         $requests = new ProviderRequests($documents, $projects, $converter);
         $protocol = new LspProtocolMapper();
         $completionProvider = new MetadataCompletionProvider($protocol, $indexes, $sourceIndexes, $extractor);
-        $validationProvider = new ValidationMetadataProvider(new LspRequestFactory($documents, $projects, $converter), $converter, $protocol, $indexes, $sourceIndexes);
+        $validationProvider = new ValidationMetadataProvider($converter, $protocol, $indexes, $sourceIndexes);
         $validationUri = 'file:///workspace/config/validator/User.yaml';
         $validationText = <<<'YAML'
             App\Entity\User:
@@ -135,7 +134,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
 
         self::assertSame(['max'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $validationUri, $validationText, strpos($validationText, 'max:') + 3));
         self::assertIsArray($this->hover([$validationProvider], $requests, $validationUri, $validationText, strpos($validationText, 'max:') + 1));
-        self::assertSame(['validation.unknown_constraint_option'], array_column($this->diagnostics([$validationProvider], $validationUri), 'code'));
+        self::assertSame(['validation.unknown_constraint_option'], array_column($this->diagnostics([$validationProvider], $requests, $validationUri), 'code'));
         $constraintNameUri = 'file:///workspace/config/validator/Custom.yaml';
         $constraintNameText = "App\\Entity\\User:\n    properties:\n        email:\n            - Sl";
         $documents->open(new Document($constraintNameUri, 'yaml', 1, $constraintNameText));

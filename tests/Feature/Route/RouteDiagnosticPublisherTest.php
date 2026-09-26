@@ -253,8 +253,9 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $templateIndexes = new TemplateIndexRegistry($classIndexes);
             $templateIndexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration('page.html.twig', $uri, new Range(new Position(0, 0), new Position(0, 0))));
             $sourceIndexes = $this->sourceIndexes($project, $uri, $languageId, $text, $classIndexes, $phpExtractor, $twigExtractor);
-            $diagnosticProvider = new RouteDiagnosticPublisher(new LspRequestFactory($documents, $projects, $converter), new LspProtocolMapper(), $indexes, $sourceIndexes, $templateIndexes);
-            $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
+            $diagnosticProvider = new RouteDiagnosticPublisher(new LspProtocolMapper(), $indexes, $sourceIndexes, $templateIndexes);
+            $requests = new ProviderRequests($documents, $projects, $converter);
+            $diagnostics = $diagnosticProvider->diagnostics($requests->document($uri));
             self::assertIsArray($diagnostics);
             $provider = new RouteCodeActionProvider($converter, new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
 
@@ -304,9 +305,9 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $templateIndexes = new TemplateIndexRegistry($classIndexes);
             $templateIndexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration('page.html.twig', $uri, new Range(new Position(0, 0), new Position(0, 0))));
             $sourceIndexes = $this->sourceIndexes($project, $uri, $languageId, $text, $classIndexes, $phpExtractor, $twigExtractor);
-            $requests = new LspRequestFactory($documents, $projects, $converter);
+            $requests = new ProviderRequests($documents, $projects, $converter);
             $protocol = new LspProtocolMapper();
-            $diagnostics = (new RouteDiagnosticPublisher($requests, $protocol, $indexes, $sourceIndexes, $templateIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]);
+            $diagnostics = (new RouteDiagnosticPublisher($protocol, $indexes, $sourceIndexes, $templateIndexes))->diagnostics($requests->document($uri));
             self::assertIsArray($diagnostics);
             self::assertSame('route.not_found', $diagnostics[0]['code'] ?? null);
             $actions = (new RouteCodeActionProvider($converter, $protocol, $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
@@ -386,6 +387,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
+            new LspRequestFactory($documents, $projects, $positionConverter),
             $fileScope,
             $uriConverter,
             ProjectPaths::policy(),
@@ -393,7 +395,6 @@ final class RouteDiagnosticPublisherTest extends TestCase
             new EnvironmentScopedDiagnosticFilter($projects, EnvironmentScopes::resolver(), new DiagnosticCodeRegistry()),
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
-                new LspRequestFactory($documents, $projects, $positionConverter),
                 new LspProtocolMapper(),
                 new RouteIndexRegistry(),
                 new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier()),
@@ -555,6 +556,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
+            new LspRequestFactory($documents, $projects, $positionConverter),
             $fileScope,
             $uriConverter,
             ProjectPaths::policy(),
@@ -562,7 +564,6 @@ final class RouteDiagnosticPublisherTest extends TestCase
             new EnvironmentScopedDiagnosticFilter($projects, EnvironmentScopes::resolver(), new DiagnosticCodeRegistry()),
             $this->suppressor($positionConverter),
             [new RouteDiagnosticPublisher(
-                new LspRequestFactory($documents, $projects, $positionConverter),
                 new LspProtocolMapper(),
                 $routeIndexes,
                 $sourceIndexes,

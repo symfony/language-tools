@@ -30,7 +30,6 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
@@ -83,7 +82,6 @@ final class AssetProviderTest extends TestCase
         $documents->open(new Document($importMapUri, 'php', 1, $importMapText));
         $documents->open(new Document($usageUri, 'twig', 1, $usageText));
         $provider = new AssetProvider(
-            new LspRequestFactory($documents, $projects, $converter),
             new PositionedSourceSymbolResolver($converter),
             new UriToPathConverter(),
             new LspProtocolMapper(),
@@ -136,7 +134,7 @@ final class AssetProviderTest extends TestCase
         self::assertSame([$importMapUri], array_column($provider->definition($requests->positioned($entryParams)), 'uri'));
         self::assertCount(2, $provider->references($requests->references($entryParams)));
         self::assertCount(2, $provider->links($requests->document($usageUri)));
-        $diagnostics = $provider->diagnostics(LspRequests::document($usageUri));
+        $diagnostics = $provider->diagnostics($requests->document($usageUri));
         self::assertIsArray($diagnostics);
         self::assertSame(['importmap.unknown_entrypoint'], array_column($diagnostics, 'code'));
     }
@@ -228,7 +226,6 @@ final class AssetProviderTest extends TestCase
             $documents->open(new Document($uri, 'twig', 1, $text));
             $publicAssets = new PublicAssetResolver();
             $provider = new AssetProvider(
-                new LspRequestFactory($documents, $projects, $converter),
                 new PositionedSourceSymbolResolver($converter),
                 new UriToPathConverter(),
                 new LspProtocolMapper(),

@@ -37,7 +37,6 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectTestKit;
@@ -474,8 +473,8 @@ YAML;
         self::assertSame(['async'], $kit->labels($completionProvider->complete($kit->positioned($kit->after($yamlUri, 'Ping: asy')))));
         self::assertStringContainsString('Messenger transport', $kit->hoverText($relationshipProvider->hover($kit->positioned($kit->after($yamlUri, 'from_transport: as')))));
         self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside($yamlUri, 'command.bus')))));
-        self::assertSame(['messenger.unknown_bus'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($yamlUri))));
-        self::assertSame(['messenger.invalid_handler_signature', 'messenger.invalid_handler_signature'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($handlerUri))));
+        self::assertSame(['messenger.unknown_bus'], $kit->codes($diagnosticProvider->diagnostics($kit->document($yamlUri))));
+        self::assertSame(['messenger.invalid_handler_signature', 'messenger.invalid_handler_signature'], $kit->codes($diagnosticProvider->diagnostics($kit->document($handlerUri))));
 
         $declared = $kit->at($messageUri, 'Ping');
         self::assertSame([$handlerUri], $kit->targets($relationshipProvider->definition($kit->positioned($declared))));
@@ -504,7 +503,7 @@ YAML;
             ])
         ;
 
-        $diagnostics = $kit->get(MessengerDiagnosticProvider::class)->diagnostics(LspRequests::document($uri));
+        $diagnostics = $kit->get(MessengerDiagnosticProvider::class)->diagnostics($kit->document($uri));
         if (!$invalid) {
             self::assertSame([], $diagnostics);
 
@@ -545,7 +544,7 @@ YAML;
         ;
         $kit->get(AnalysisSettingsRegistry::class)->configureWorkspace(new ProjectAnalysisSettings(environment: $environment));
 
-        self::assertSame($expectedCodes, $kit->codes($kit->get(MessengerDiagnosticProvider::class)->diagnostics(LspRequests::document($uri))));
+        self::assertSame($expectedCodes, $kit->codes($kit->get(MessengerDiagnosticProvider::class)->diagnostics($kit->document($uri))));
     }
 
     /** @return iterable<string, array{string, string, string, list<string>}> */
@@ -611,8 +610,8 @@ YAML;
                 return $this->parser->parse($source);
             }
         };
+        $requests = new ProviderRequests($documents, $projects, $converter);
         $provider = new MessengerDiagnosticProvider(
-            new LspRequestFactory($documents, $projects, $converter),
             new LspProtocolMapper(),
             $indexes,
             new MessengerSourceIndexRegistry(),
@@ -622,9 +621,9 @@ YAML;
             EnvironmentScopes::resolver(),
         );
 
-        self::assertSame([], $provider->diagnostics(LspRequests::document($serviceUri)));
+        self::assertSame([], $provider->diagnostics($requests->document($serviceUri)));
         self::assertSame([], $parser->sources);
-        self::assertSame(['messenger.invalid_handler_signature'], array_column($provider->diagnostics(LspRequests::document($handlerUri)) ?? [], 'code'));
+        self::assertSame(['messenger.invalid_handler_signature'], array_column($provider->diagnostics($requests->document($handlerUri)), 'code'));
         self::assertSame([$handlerText], $parser->sources);
     }
 

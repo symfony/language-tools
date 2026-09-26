@@ -41,7 +41,6 @@ use Symfony\Lsp\Project\SavedDocumentMatcher;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
@@ -69,7 +68,7 @@ final class ConfigurationProviderTest extends TestCase
         /** @var array{contents: array{value: string}} $hover */
         $hover = $fixture->hover->hover($fixture->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character]]));
         self::assertStringContainsString('framework.router.utf8', $hover['contents']['value']);
-        self::assertSame(['config.invalid_type', 'config.deprecated_key', 'config.invalid_type', 'config.unknown_key', 'config.duplicate_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        self::assertSame(['config.invalid_type', 'config.deprecated_key', 'config.invalid_type', 'config.unknown_key', 'config.duplicate_key'], array_column($fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [], 'code'));
     }
 
     public function testAcceptsNormalizedShorthandValuesAndUnverifiableKeys(): void
@@ -79,7 +78,7 @@ final class ConfigurationProviderTest extends TestCase
         $text = "framework:\n    assets: ~\n    loose:\n        anything: 1\n        known: true\n    dispatch:\n        App\\Message\\OrderPlaced: async\n";
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testSeparatesKeysContainingDotsFromNestedPaths(): void
@@ -97,12 +96,12 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
 
         $fixture->documents->update($uri, 2, $text."        'a.b': {}\n");
         self::assertSame(
             ['config.duplicate_key'],
-            array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'),
+            array_column($fixture->diagnostics->diagnostics($fixture->document($uri)), 'code'),
         );
     }
 
@@ -113,12 +112,12 @@ final class ConfigurationProviderTest extends TestCase
         $text = "security:\n    firewalls:\n        main:\n            custom_authenticator: App\\Security\\AppAuthenticator\n";
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
 
         $fixture->documents->update($uri, 2, str_replace('custom_authenticator:', 'custom_authenticators:', $text));
         self::assertSame(
             ['config.invalid_type'],
-            array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'),
+            array_column($fixture->diagnostics->diagnostics($fixture->document($uri)), 'code'),
         );
     }
 
@@ -137,12 +136,12 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
 
         $fixture->documents->update($uri, 2, str_replace('::SCHEMA', '::UNKNOWN', $text));
         self::assertSame(
             ['config.invalid_type'],
-            array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'),
+            array_column($fixture->diagnostics->diagnostics($fixture->document($uri)), 'code'),
         );
     }
 
@@ -162,7 +161,7 @@ final class ConfigurationProviderTest extends TestCase
 
         $text .= '!php/enum App\\ResetMode::SCHEMA';
         $fixture->documents->update($uri, 2, $text);
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
         $hoverPosition = $fixture->converter->toPosition($text, (int) strpos($text, 'strict_reset_mode') + 2);
         /** @var array{contents: array{value: string}} $hover */
         $hover = $fixture->hover->hover($fixture->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character]]));
@@ -171,7 +170,7 @@ final class ConfigurationProviderTest extends TestCase
         $fixture->documents->update($uri, 3, str_replace('::SCHEMA', '::UNKNOWN', $text));
         self::assertSame(
             ['config.invalid_type'],
-            array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'),
+            array_column($fixture->diagnostics->diagnostics($fixture->document($uri)), 'code'),
         );
     }
 
@@ -231,7 +230,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
 
         // Symfony keeps quoted and leading-zero numbers as strings
         $fixture->documents->update($uri, 2, <<<'YAML'
@@ -243,7 +242,7 @@ final class ConfigurationProviderTest extends TestCase
                         leading_zero:
                             limit: 0644
             YAML);
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri));
         self::assertSame(['config.invalid_type', 'config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame(
             [
@@ -270,11 +269,11 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
 
         $text .= "\n                - typo: true";
         $fixture->documents->update($uri, 2, $text);
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri));
         self::assertSame(
             ['Unknown configuration key "framework.items.first.policies.typo".'],
             array_column($diagnostics, 'message'),
@@ -301,7 +300,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.unknown_key', 'config.unknown_key', 'config.unknown_key', 'config.unknown_key'], array_column($diagnostics, 'code'));
         self::assertSame(
             [
@@ -348,7 +347,7 @@ final class ConfigurationProviderTest extends TestCase
         $uri = 'file:///workspace/config/packages/framework.yaml';
         $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    loose:\n        strict:\n            typo: true\n"));
 
-        self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [], 'code'));
     }
 
     public function testSkipsDiagnosticsOutsideTheApplicationConfiguration(): void
@@ -357,7 +356,7 @@ final class ConfigurationProviderTest extends TestCase
         $uri = 'file:///workspace/src/AcmeBundle/test/app/config/config.yml';
         $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
 
-        self::assertNull($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertNull($fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testStillRejectsScalarsForStrictArrayNodesAndUnknownKeys(): void
@@ -367,7 +366,7 @@ final class ConfigurationProviderTest extends TestCase
         $text = "framework:\n    router: maybe\n    assets: some-string\n    mystery: true\n";
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(
             ['config.invalid_type', 'config.invalid_type', 'config.unknown_key'],
             array_column($diagnostics, 'code'),
@@ -381,7 +380,7 @@ final class ConfigurationProviderTest extends TestCase
         $uri = 'file:///workspace/config/services.yaml';
         $fixture->documents->open(new Document($uri, 'yaml', 1, "parameters:\n    app.name: Demo\nservices:\n    _defaults:\n        autowire: true\n    App\\:\n        resource: ../src/\n"));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testSkipsConventionalRouteFilesAndResourcesLoadedByTheRouter(): void
@@ -391,14 +390,14 @@ final class ConfigurationProviderTest extends TestCase
             $uri = 'file:///workspace/'.$path;
             $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    resource: routes.yaml\n"));
 
-            self::assertNull($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+            self::assertNull($fixture->diagnostics->diagnostics($fixture->document($uri)));
             $fixture->documents->close($uri);
         }
 
         $uri = 'file:///workspace/config/packages/framework.yaml';
         $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    resource: routes.yaml\n"));
 
-        self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [], 'code'));
     }
 
     public function testDiagnosesConfigurationInEveryEnvironmentBlock(): void
@@ -422,7 +421,7 @@ final class ConfigurationProviderTest extends TestCase
                     option: true
             YAML));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type', 'config.unknown_key', 'config.deprecated_key'], array_column($diagnostics, 'code'));
         self::assertSame([6, 7, 11], array_column(array_column(array_column($diagnostics, 'range'), 'start'), 'line'));
     }
@@ -433,7 +432,7 @@ final class ConfigurationProviderTest extends TestCase
         $uri = 'file:///workspace/config/framework.yaml';
         $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    router:\n        utf8: true\nwhen@test:\n    framework:\n        router:\n            utf8: false\n"));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testReportsIncompatibleEnvironmentProcessorTypes(): void
@@ -442,7 +441,7 @@ final class ConfigurationProviderTest extends TestCase
         $uri = 'file:///workspace/config/framework.yaml';
         $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    router:\n        utf8: '%env(json:ROUTER_CONFIG)%'\n"));
 
-        self::assertSame(['env.incompatible_type'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        self::assertSame(['env.incompatible_type'], array_column($fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [], 'code'));
     }
 
     public function testDoesNotReportDynamicOrCommentedValues(): void
@@ -451,7 +450,7 @@ final class ConfigurationProviderTest extends TestCase
         $uri = 'file:///workspace/config/framework.yaml';
         $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    router:\n        utf8: '%env(bool:ROUTER_UTF8)%'\n        strict: true # selected mode\n"));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testSupportsPrototypeSequenceItems(): void
@@ -462,7 +461,7 @@ final class ConfigurationProviderTest extends TestCase
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
         $position = $fixture->converter->toPosition($text, \strlen($text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
         self::assertSame(['name'], array_column($fixture->completion->complete($fixture->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]])), 'label'));
     }
 
@@ -472,7 +471,7 @@ final class ConfigurationProviderTest extends TestCase
         $uri = 'file:///workspace/config/framework.yaml';
         $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    required_parent:\n        known: true\nwhen@test:\n    framework:\n        required_parent:\n            known: false\n"));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testAcceptsAliasesAndKeyedPrototypeEntryNames(): void
@@ -496,7 +495,7 @@ final class ConfigurationProviderTest extends TestCase
                         typo: true
             YAML));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.unknown_key', 'config.unknown_key'], array_column($diagnostics, 'code'));
         self::assertSame([
             'Unknown configuration key "framework.cache.pools.invalid.typo".',
@@ -526,7 +525,7 @@ final class ConfigurationProviderTest extends TestCase
                             always_remember_me: true
             YAML));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testValidatesYamlMergeKeysInsidePrototypeSequences(): void
@@ -544,7 +543,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame(['Expected boolean for "framework.items.handlers.nested".'], array_column($diagnostics, 'message'));
         self::assertSame(
@@ -567,7 +566,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame(['Expected boolean for "framework.items.handlers.nested".'], array_column($diagnostics, 'message'));
         self::assertSame(
@@ -593,7 +592,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame(['Expected boolean for "framework.items.handlers.nested".'], array_column($diagnostics, 'message'));
         self::assertSame(
@@ -618,7 +617,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame(
             [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '*quoted'), \strlen('*quoted'))],
@@ -644,7 +643,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame(
             [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '<<'), 2)],
@@ -665,7 +664,7 @@ final class ConfigurationProviderTest extends TestCase
                     utf8: !php/const PHP_VERSION_ID
             YAML));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testDirectAliasDiagnosticsKeepTheAliasRangeAlongsideMergeKeys(): void
@@ -684,7 +683,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
         self::assertSame(
             [$this->protocolRange($fixture->converter, $text, (int) strpos($text, '*inner'), \strlen('*inner'))],
@@ -705,7 +704,7 @@ final class ConfigurationProviderTest extends TestCase
                     strict: true
             YAML));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testValidatesConfigurationInheritedFromYamlAliases(): void
@@ -723,7 +722,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.unknown_key', 'config.invalid_type', 'config.unknown_key', 'config.unknown_key'], array_column($diagnostics, 'code'));
         self::assertSame([
             'Unknown configuration key "framework.router.mystery".',
@@ -736,7 +735,7 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([$mergeRange, $mergeRange, $aliasRange, $aliasRange], array_column($diagnostics, 'range'));
 
         $fixture->documents->update($uri, 2, $text."\nbroken: [");
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testAcceptsKeyAttributesInsideMappedPrototypeEntries(): void
@@ -752,7 +751,7 @@ final class ConfigurationProviderTest extends TestCase
                         typo: true
             YAML));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
         self::assertSame([2], array_column($diagnostics, 'severity'));
     }
@@ -777,7 +776,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
         $position = $fixture->converter->toPosition($text, \strlen($text));
         self::assertSame(['debug', 'info'], array_column($fixture->completion->complete($fixture->positioned([
             'textDocument' => ['uri' => $uri],
@@ -803,7 +802,7 @@ final class ConfigurationProviderTest extends TestCase
                         cookie_secure: 'true'
             YAML));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
 
         $text = "framework:\n    session:\n        cookie_secure: ";
@@ -847,7 +846,7 @@ final class ConfigurationProviderTest extends TestCase
         ];
         foreach ($cases as [$uri, $language, $text, $diagnostics, $hovered]) {
             $fixture->documents->open(new Document($uri, $language, 1, $text));
-            self::assertSame($diagnostics, array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+            self::assertSame($diagnostics, array_column($fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [], 'code'));
             $position = $fixture->converter->toPosition($text, strpos($text, $hovered) + 1);
             self::assertIsArray($fixture->hover->hover($fixture->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]])));
             $fixture->documents->close($uri);
@@ -884,7 +883,7 @@ final class ConfigurationProviderTest extends TestCase
             PHP;
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri));
         self::assertIsArray($diagnostics);
         self::assertSame(['config.invalid_type', 'config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame([
@@ -910,7 +909,7 @@ final class ConfigurationProviderTest extends TestCase
                 $fixture->documents->update($uri, $version, $text);
             }
 
-            self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]), $text);
+            self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)), $text);
         }
     }
 
@@ -932,11 +931,11 @@ final class ConfigurationProviderTest extends TestCase
             PHP;
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
 
         $text = str_replace('debug(true)', "debug('invalid')", $text);
         $fixture->documents->update($uri, 2, $text);
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri));
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame(['Expected boolean for "twig.debug".'], array_column($diagnostics, 'message'));
     }
@@ -957,11 +956,11 @@ final class ConfigurationProviderTest extends TestCase
             PHP;
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
 
         $text = str_replace('true', "'invalid'", $text);
         $fixture->documents->update($uri, 2, $text);
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri));
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame(['Expected boolean for "monolog.handler.main.process_psr_3_messages".'], array_column($diagnostics, 'message'));
 
@@ -977,7 +976,7 @@ final class ConfigurationProviderTest extends TestCase
 
         $text = str_replace("processPsr3Messages('invalid')", 'processPsr4Messages(true)', $text);
         $fixture->documents->update($uri, 3, $text);
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri));
         self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
         self::assertSame(['Unknown configuration key "monolog.handler.main.process_psr4_messages".'], array_column($diagnostics, 'message'));
         $fixture->documents->close($uri);
@@ -994,7 +993,7 @@ final class ConfigurationProviderTest extends TestCase
             }
             PHP;
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame(['Expected boolean for "framework.psr_3_handler.main.enabled".'], array_column($diagnostics, 'message'));
     }
@@ -1017,7 +1016,7 @@ final class ConfigurationProviderTest extends TestCase
             PHP;
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
 
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
 
         $hover = $fixture->hover->hover($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'failureHandler') + 1)));
         self::assertIsArray($hover);
@@ -1027,7 +1026,7 @@ final class ConfigurationProviderTest extends TestCase
 
         $nested = str_replace("tokenHandler('App\\Demo\\DemoTokenHandler')", "tokenHandler(['id' => 'App\\Demo\\DemoTokenHandler'])", $text);
         $fixture->documents->update($uri, 2, $nested);
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri));
         self::assertSame(['config.unknown_key'], array_column($diagnostics, 'code'));
         self::assertSame(
             ['Unknown configuration key "security.firewall.main.access_token.token_handler.failure_handler".'],
@@ -1051,7 +1050,7 @@ final class ConfigurationProviderTest extends TestCase
             PHP;
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame(['Expected boolean for "framework.router.strict".'], array_column($diagnostics, 'message'));
         self::assertSame($this->protocolRange($fixture->converter, $text, (int) strpos($text, "strict('"), \strlen('strict')), $diagnostics[0]['range'] ?? null);
@@ -1080,7 +1079,7 @@ final class ConfigurationProviderTest extends TestCase
             PHP;
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type', 'config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame([
             'Expected boolean for "framework.router.utf8".',
@@ -1169,7 +1168,7 @@ final class ConfigurationProviderTest extends TestCase
 
         foreach ($cases as [$uri, $text, $message, $hovered, $path]) {
             $fixture->documents->open(new Document($uri, 'php', 1, $text));
-            $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+            $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
 
             self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
             self::assertSame([$message], array_column($diagnostics, 'message'));
@@ -1361,7 +1360,7 @@ final class ConfigurationProviderTest extends TestCase
             PHP;
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
 
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame([
             'Expected boolean for "framework.router.utf8".',
             'Expected boolean for "framework.router.utf8".',
@@ -1408,7 +1407,7 @@ final class ConfigurationProviderTest extends TestCase
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
 
         $liveDiagnosticOffset = (int) strrpos($text, "utf8('bad')");
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame($this->protocolRange($fixture->converter, $text, $liveDiagnosticOffset, \strlen('utf8')), $diagnostics[0]['range'] ?? null);
 
@@ -1446,7 +1445,7 @@ final class ConfigurationProviderTest extends TestCase
         $fixture->documents->open(new Document($uri, 'xml', 1, $text));
 
         $liveDiagnosticOffset = (int) strpos($text, 'utf8="bad"', (int) strpos($text, '-->'));
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
         self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
         self::assertSame($this->protocolRange($fixture->converter, $text, $liveDiagnosticOffset, \strlen('utf8')), $diagnostics[0]['range'] ?? null);
 
@@ -1485,7 +1484,7 @@ final class ConfigurationProviderTest extends TestCase
         $uri = 'file:///workspace/config/packages/framework.yaml';
         $structural = "parameters:\n\tapp.name: Demo\n";
         $fixture->documents->open(new Document($uri, 'yaml', 1, $structural));
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [];
 
         self::assertSame(['config.malformed_structure'], array_column($diagnostics, 'code'));
         self::assertSame(
@@ -1495,12 +1494,12 @@ final class ConfigurationProviderTest extends TestCase
 
         $flow = "parameters:\n    app.list: [first,\n     \tsecond]\n";
         $fixture->documents->update($uri, 2, $flow);
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
 
         $blankUri = 'file:///workspace/config/packages/blank.yaml';
         $blank = "parameters:\n\t\n    app.name: Demo\n";
         $fixture->documents->open(new Document($blankUri, 'yaml', 1, $blank));
-        $diagnostics = $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $blankUri]]);
+        $diagnostics = $fixture->diagnostics->diagnostics($fixture->document($blankUri));
         self::assertIsArray($diagnostics);
         self::assertSame(['config.malformed_structure'], array_column($diagnostics, 'code'));
         /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $diagnostic */
@@ -1511,7 +1510,7 @@ final class ConfigurationProviderTest extends TestCase
         );
 
         $fixture->documents->update($uri, 3, "parameters:\n    app.script: |\n        all:\n        \techo hi\napp.msg: \"first\n\tsecond\"\n");
-        self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
+        self::assertSame([], $fixture->diagnostics->diagnostics($fixture->document($uri)));
     }
 
     public function testLinksOnlyYamlResourceValues(): void
@@ -1549,12 +1548,12 @@ final class ConfigurationProviderTest extends TestCase
         try {
             $valid = $this->providers($root, validation: new ConfigurationValidationResult(ConfigurationValidationResult::VALID, 'dev'));
             $valid->documents->open(new Document($uri, 'yaml', 1, $text));
-            $savedWarnings = $valid->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+            $savedWarnings = $valid->diagnostics->diagnostics($valid->document($uri));
             self::assertIsArray($savedWarnings);
             self::assertSame(['config.invalid_type', 'config.unknown_key'], array_column($savedWarnings, 'code'));
             self::assertSame([2, 2], array_column($savedWarnings, 'severity'));
             $valid->documents->update($uri, 2, $text."    another_mystery: true\n");
-            $provisional = $valid->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+            $provisional = $valid->diagnostics->diagnostics($valid->document($uri));
             self::assertIsArray($provisional);
             self::assertSame([2, 2, 2], array_column($provisional, 'severity'));
 
@@ -1568,7 +1567,7 @@ final class ConfigurationProviderTest extends TestCase
                 line: 3,
             ));
             $invalid->documents->open(new Document($uri, 'yaml', 1, $invalidText));
-            $diagnostics = $invalid->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]);
+            $diagnostics = $invalid->diagnostics->diagnostics($invalid->document($uri));
             self::assertIsArray($diagnostics);
             self::assertSame('config.malformed_structure', $diagnostics[0]['code'] ?? null);
             self::assertSame(1, $diagnostics[0]['severity'] ?? null);
@@ -1746,7 +1745,6 @@ final class ConfigurationProviderTest extends TestCase
                 'tree' => $this->node('services', 'array'),
             ],
         ]]));
-        $requests = new LspRequestFactory($documents, $projects, $converter);
         $protocol = new LspProtocolMapper();
         $phpComments = new PhpCommentParser();
         $xmlParser = new TolerantXmlParser();
@@ -1768,7 +1766,7 @@ final class ConfigurationProviderTest extends TestCase
         return new ConfigurationProviderFixture(
             new ConfigurationCompletionProvider($converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationHoverProvider($converter, $protocol, $indexes, $yaml, $php, $xml),
-            new ConfigurationDiagnosticProvider($requests, ProjectPaths::resolver(), $converter, $protocol, $indexes, $routeIndexes, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
+            new ConfigurationDiagnosticProvider(ProjectPaths::resolver(), $converter, $protocol, $indexes, $routeIndexes, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
             new ConfigurationDocumentLinkProvider($converter, $protocol, $uriConverter, $documentParser),
             $documents,
             $projects,

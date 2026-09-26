@@ -30,7 +30,9 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\EnvironmentScopes;
@@ -317,6 +319,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
         $collector = new DiagnosticCollector(
             $documents,
             $projects,
+            new LspRequestFactory($documents, $projects, new PositionConverter()),
             $fileScope,
             $converter,
             ProjectPaths::policy(),
@@ -378,7 +381,7 @@ final class StubDiagnosticProvider implements DiagnosticProviderInterface
         return $this->name;
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): ?array
     {
         return $this->diagnostics;
     }
@@ -391,7 +394,7 @@ final class ThrowingDiagnosticProvider implements DiagnosticProviderInterface
         return 'broken-provider';
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): ?array
     {
         throw new \RuntimeException('Provider failed.');
     }
@@ -404,7 +407,7 @@ final class MalformedDiagnosticProvider implements DiagnosticProviderInterface
         return 'malformed-provider';
     }
 
-    public function diagnostics(array $params): array
+    public function diagnostics(DocumentRequest $request): array
     {
         /** @var list<array<array-key, mixed>> $diagnostics */
         $diagnostics = (array) json_decode('[42]', true, flags: \JSON_THROW_ON_ERROR);

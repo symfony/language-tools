@@ -11,7 +11,6 @@ use Symfony\Lsp\Feature\Event\EventDiagnosticProvider;
 use Symfony\Lsp\Feature\Event\EventExtractor;
 use Symfony\Lsp\Feature\Event\EventRelationshipProvider;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class EventProviderTest extends TestCase
@@ -484,7 +483,7 @@ PHP;
 
         $declared = $kit->at($eventUri, 'OrderPlaced');
         self::assertContains($dispatcherUri, $kit->targets($relationshipProvider->references($kit->references($declared))));
-        self::assertSame(['event.invalid_listener_method'], $kit->codes($kit->get(EventDiagnosticProvider::class)->diagnostics(LspRequests::document($invalidUri))));
+        self::assertSame(['event.invalid_listener_method'], $kit->codes($kit->get(EventDiagnosticProvider::class)->diagnostics($kit->document($invalidUri))));
         self::assertSame(['1 event listener'], $kit->titles($codeLensProvider->codeLenses($kit->document($eventUri))));
         self::assertSame(['Listens to 1 event'], $kit->titles($codeLensProvider->codeLenses($kit->document($listenerUri))));
     }

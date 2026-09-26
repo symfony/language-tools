@@ -30,7 +30,6 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class EnvironmentProviderTest extends TestCase
@@ -82,7 +81,7 @@ final class EnvironmentProviderTest extends TestCase
 
         $malformed = '%env(MALFORMED_ENV%';
         $malformedOffset = (int) strpos($text, $malformed);
-        $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $diagnosticProvider->diagnostics((new ProviderRequests($documents, $projects))->document($uri));
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
         self::assertSame($this->protocolRange($converter, $text, $malformedOffset, \strlen($malformed)), $diagnostics[0]['range'] ?? null);
     }
@@ -146,7 +145,7 @@ final class EnvironmentProviderTest extends TestCase
         self::assertIsArray($hover);
         self::assertStringNotContainsString('CANARY_SECRET_VALUE', json_encode($hover, \JSON_THROW_ON_ERROR));
         self::assertSame(['file:///workspace/.env'], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($params)), 'uri'));
-        self::assertSame(['env.unknown_processor'], array_column($diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
+        self::assertSame(['env.unknown_processor'], array_column($diagnosticProvider->diagnostics((new ProviderRequests($documents, $projects))->document($uri)), 'code'));
 
         $commentUri = 'file:///workspace/templates/comment.html.twig';
         $commentText = "{## %env(APP_UR) %env(APP_URL% #}\n{{ '%env(APP_URL%' }}";
@@ -155,7 +154,7 @@ final class EnvironmentProviderTest extends TestCase
         $commentPosition = $converter->toPosition($commentText, strpos($commentText, 'APP_UR') + \strlen('APP_UR'));
         self::assertSame([], $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(['textDocument' => ['uri' => $commentUri], 'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character]])));
         $malformedOffset = (int) strrpos($commentText, '%env(APP_URL%');
-        $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $commentUri]]) ?? [];
+        $diagnostics = $diagnosticProvider->diagnostics((new ProviderRequests($documents, $projects))->document($commentUri));
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
         self::assertSame($this->protocolRange($converter, $commentText, $malformedOffset, \strlen('%env(APP_URL%')), $diagnostics[0]['range'] ?? null);
     }
@@ -204,7 +203,7 @@ final class EnvironmentProviderTest extends TestCase
         self::assertSame($this->protocolRange($converter, $text, $liveNameStart, \strlen('APP_URL')), $reference['range']);
 
         $realMalformedOffset = (int) strrpos($text, '%env(APP_URL%');
-        $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $diagnosticProvider->diagnostics((new ProviderRequests($documents, $projects))->document($uri));
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
         self::assertSame($this->protocolRange($converter, $text, $realMalformedOffset, \strlen('%env(APP_URL%')), $diagnostics[0]['range'] ?? null);
     }
@@ -249,7 +248,7 @@ final class EnvironmentProviderTest extends TestCase
 
         self::assertSame([], $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]])));
         $malformedOffset = (int) strrpos($text, '%env(APP_URL%');
-        $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
+        $diagnostics = $diagnosticProvider->diagnostics((new ProviderRequests($documents, $projects))->document($uri));
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
         self::assertSame($this->protocolRange($converter, $text, $malformedOffset, \strlen('%env(APP_URL%')), $diagnostics[0]['range'] ?? null);
     }
@@ -313,7 +312,7 @@ final class EnvironmentProviderTest extends TestCase
         return [
             new EnvironmentCompletionProvider($converter, $protocol, $indexes, $comments, $yamlParser),
             new EnvironmentRelationshipProvider($protocol, $indexes, new EnvironmentSymbolResolver(new PositionedSourceSymbolResolver($converter), $extractor)),
-            new EnvironmentDiagnosticProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, new EnvironmentProcessorChainValidator()),
+            new EnvironmentDiagnosticProvider($protocol, $indexes, new EnvironmentProcessorChainValidator()),
         ];
     }
 

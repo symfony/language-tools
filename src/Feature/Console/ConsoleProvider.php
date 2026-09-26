@@ -5,14 +5,13 @@ namespace Symfony\Lsp\Feature\Console;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Protocol\CompletionItemKind;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class ConsoleProvider implements CompletionProviderInterface, DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly ConsoleIndexRegistry $indexes,
         private readonly ConsoleSourceIndexRegistry $sourceIndexes,
@@ -63,10 +62,9 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
         return $items;
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): ?array
     {
-        $request = $this->requests->document($params);
-        if (null === $request || 'php' !== $request->document->languageId) {
+        if ('php' !== $request->document->languageId) {
             return null;
         }
         $runtimeIndex = $this->indexes->forProject($request->project);

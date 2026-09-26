@@ -70,11 +70,11 @@ abstract class MetadataTestCase extends TestCase
      *
      * @return list<array<array-key, mixed>>
      */
-    protected function diagnostics(array $providers, string $uri): array
+    protected function diagnostics(array $providers, ProviderRequests $requests, string $uri): array
     {
         $diagnostics = [];
         foreach ($providers as $provider) {
-            $provided = $provider->diagnostics(LspRequests::document($uri));
+            $provided = $provider->diagnostics($requests->document($uri));
             if (null !== $provided) {
                 array_push($diagnostics, ...$provided);
             }

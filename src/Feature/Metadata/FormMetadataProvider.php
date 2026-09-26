@@ -6,14 +6,13 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class FormMetadataProvider implements DiagnosticProviderInterface, HoverProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly MetadataIndexRegistry $indexes,
@@ -46,10 +45,9 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
         return 'form-metadata';
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): ?array
     {
-        $request = $this->requests->document($params);
-        if (null === $request || 'php' !== $request->document->languageId) {
+        if ('php' !== $request->document->languageId) {
             return null;
         }
         $index = $this->indexes->forProject($request->project);

@@ -9,8 +9,8 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegist
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Runtime\EnvironmentScopeResolver;
 
 final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
@@ -18,7 +18,6 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
     private const SCALAR_TYPES = ['array', 'bool', 'callable', 'float', 'int', 'never', 'resource', 'string', 'void'];
 
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
         private readonly MessengerSourceIndexRegistry $sourceIndexes,
@@ -34,12 +33,8 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
         return 'messenger';
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): array
     {
-        $request = $this->requests->document($params);
-        if (null === $request) {
-            return null;
-        }
         $index = $this->indexes->forProject($request->project);
         if (!$index->isComplete()) {
             return [];

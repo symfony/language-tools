@@ -7,6 +7,7 @@ use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class DiagnosticCollector
 {
@@ -14,6 +15,7 @@ final class DiagnosticCollector
     public function __construct(
         private readonly DocumentStore $documents,
         private readonly ProjectRegistry $projects,
+        private readonly LspRequestFactory $requests,
         private readonly ProjectFileScopeRegistry $fileScope,
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly ProjectPathPolicy $paths,
@@ -33,7 +35,10 @@ final class DiagnosticCollector
         if ($this->isExcluded($document->uri, $includeExcluded)) {
             return new DetailedDiagnosticCollection([], []);
         }
-        $params = ['textDocument' => ['uri' => $document->uri]];
+        $request = $this->requests->forUri($document->uri);
+        if (null === $request) {
+            return null;
+        }
 
         $diagnostics = [];
         $failures = [];
@@ -44,7 +49,7 @@ final class DiagnosticCollector
             $providerStartedAt = $measureProviders ? (float) hrtime(true) : null;
             try {
                 try {
-                    $providedDiagnostics = $provider->diagnostics($params);
+                    $providedDiagnostics = $provider->diagnostics($request);
                 } catch (\Throwable $error) {
                     $failures[] = new DiagnosticProviderFailure($providerName ?? $provider->name(), $error);
 

@@ -4,13 +4,12 @@ namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly RouteIndexRegistry $routeIndexes,
         private readonly RouteSourceIndexRegistry $sourceIndexes,
@@ -23,15 +22,10 @@ final class RouteDiagnosticPublisher implements DiagnosticProviderInterface
         return 'route';
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return list<array<array-key, mixed>>|null
-     */
-    public function diagnostics(array $params): ?array
+    /** @return list<array<array-key, mixed>>|null */
+    public function diagnostics(DocumentRequest $request): ?array
     {
-        $request = $this->requests->document($params);
-        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig'], true)) {
+        if (!\in_array($request->document->languageId, ['php', 'twig'], true)) {
             return null;
         }
 

@@ -18,7 +18,6 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
@@ -43,7 +42,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $protocol = new LspProtocolMapper();
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $completionProvider = new MetadataCompletionProvider($protocol, $indexes, $sourceIndexes, $extractor);
-        $formProvider = new FormMetadataProvider(new LspRequestFactory($documents, $projects, $converter), $converter, $protocol, $indexes, $sourceIndexes);
+        $formProvider = new FormMetadataProvider($converter, $protocol, $indexes, $sourceIndexes);
         $formUri = 'file:///workspace/src/Controller/EventController.php';
         $formText = <<<'PHP'
             <?php
@@ -71,7 +70,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame(['required'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $formUri, $formText, $firstRequired + 4));
         $builderRequired = strpos($formText, 'required', $firstRequired + 1);
         self::assertSame(['required'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $formUri, $formText, $builderRequired + 4));
-        self::assertSame(['form.unknown_option'], array_column($this->diagnostics([$formProvider], $formUri), 'code'));
+        self::assertSame(['form.unknown_option'], array_column($this->diagnostics([$formProvider], $requests, $formUri), 'code'));
         $required = strpos($formText, 'required') + 1;
         self::assertIsArray($this->hover([$formProvider], $requests, $formUri, $formText, $required));
     }
@@ -611,7 +610,8 @@ final class FormMetadataProviderTest extends MetadataTestCase
         );
         $documents = new DocumentStore();
         $sourceIndexes = new MetadataSourceIndexRegistry();
-        $formProvider = new FormMetadataProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes);
+        $formProvider = new FormMetadataProvider($converter, new LspProtocolMapper(), $indexes, $sourceIndexes);
+        $requests = new ProviderRequests($documents, $projects, $converter);
         $uri = 'file:///workspace/src/Controller/EventController.php';
         $text = <<<'PHP'
             <?php
@@ -635,7 +635,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
             static fn ($option): array => [$option->className, $option->option],
             $extractor->extract(new SourceDocument($uri, 'php', $text))->formOptions,
         ));
-        self::assertSame(['form.unknown_option'], array_column($this->diagnostics([$formProvider], $uri), 'code'));
+        self::assertSame(['form.unknown_option'], array_column($this->diagnostics([$formProvider], $requests, $uri), 'code'));
     }
 
     public function testIndexesFormOptionsOnlyForSymfonyFormCreators(): void
@@ -726,6 +726,6 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $documents->open(new Document($uri, 'php', 1, $text));
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $text)));
-        self::assertSame([], (new FormMetadataProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes))->diagnostics(LspRequests::document($uri)));
+        self::assertSame([], (new FormMetadataProvider($converter, new LspProtocolMapper(), $indexes, $sourceIndexes))->diagnostics((new ProviderRequests($documents, $projects, $converter))->document($uri)));
     }
 }

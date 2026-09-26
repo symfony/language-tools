@@ -9,13 +9,12 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly ProjectPathResolver $projectPaths,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
@@ -35,10 +34,9 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         return 'configuration';
     }
 
-    public function diagnostics(array $params): ?array
+    public function diagnostics(DocumentRequest $request): ?array
     {
-        $request = $this->requests->document($params);
-        if (null === $request || !\in_array($request->document->languageId, ['php', 'xml', 'yaml'], true)) {
+        if (!\in_array($request->document->languageId, ['php', 'xml', 'yaml'], true)) {
             return null;
         }
         // bundle-internal fixtures target other kernels, so only the
