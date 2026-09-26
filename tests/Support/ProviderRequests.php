@@ -44,18 +44,10 @@ final class ProviderRequests
         return new ReferencesRequest($this->positioned($params), $includeDeclaration);
     }
 
-    /**
-     * @param list<array<array-key, mixed>> $diagnostics
-     * @param list<string>|null             $only
-     */
-    public function codeAction(string $uri, array $diagnostics = [], ?array $only = null): CodeActionRequest
+    /** @param list<array<array-key, mixed>> $diagnostics */
+    public function codeAction(string $uri, array $diagnostics = []): CodeActionRequest
     {
-        $context = ['diagnostics' => $diagnostics];
-        if (null !== $only) {
-            $context['only'] = $only;
-        }
-
-        return $this->factory->codeAction([...LspRequests::document($uri), 'context' => $context])
+        return $this->factory->codeAction([...LspRequests::document($uri), 'context' => ['diagnostics' => $diagnostics]])
             ?? throw new \InvalidArgumentException(\sprintf('The document "%s" is not open in a project.', $uri));
     }
 
