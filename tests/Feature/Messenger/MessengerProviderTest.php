@@ -21,11 +21,8 @@ use Symfony\Lsp\Feature\Messenger\MessengerDiagnosticProvider;
 use Symfony\Lsp\Feature\Messenger\MessengerExtractor;
 use Symfony\Lsp\Feature\Messenger\MessengerHandlerDeclaration;
 use Symfony\Lsp\Feature\Messenger\MessengerIndexRegistry;
-use Symfony\Lsp\Feature\Messenger\MessengerMessage;
 use Symfony\Lsp\Feature\Messenger\MessengerRelationshipProvider;
-use Symfony\Lsp\Feature\Messenger\MessengerRelationshipResolver;
 use Symfony\Lsp\Feature\Messenger\MessengerSourceIndexRegistry;
-use Symfony\Lsp\Feature\Messenger\MessengerTransport;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -39,8 +36,10 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class MessengerProviderTest extends TestCase
 {
@@ -60,10 +59,7 @@ framework:
     routing:
       App\Message\Ping: [async]
 YAML;
-        $converter = new PositionConverter();
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser);
+        $extractor = $this->extractor();
         $facts = $extractor->extract(new SourceDocument('file:///workspace/config/packages/messenger.yaml', 'yaml', $text));
 
         $names = [];
@@ -139,10 +135,7 @@ YAML;
                         - messenger.message_handler: { bus: map.bus }
                         - { name: messenger.message_handler, bus: '%env(BUS)%' }
             YAML;
-        $converter = new PositionConverter();
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), $yamlParser);
+        $extractor = $this->extractor();
         $facts = $extractor->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $text));
 
         $references = [];
@@ -179,9 +172,7 @@ YAML;
                             senders: [async]
                             send_and_handle: true
             YAML;
-        $converter = new PositionConverter();
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $extractor = new MessengerExtractor($converter, new TolerantPhpParser(new Parser()), new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)));
+        $extractor = $this->extractor();
         $facts = $extractor->extract(new SourceDocument('file:///workspace/config/packages/messenger.yaml', 'yaml', $text));
 
         $symbols = [];
@@ -203,13 +194,7 @@ YAML;
 
     public function testIndexesOnlyCompleteClassReferencesInHandlerMessages(): void
     {
-        $converter = new PositionConverter();
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $extractor = new MessengerExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-        );
+        $extractor = $this->extractor();
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', <<<'PHP'
             <?php
             namespace App;
@@ -229,13 +214,7 @@ YAML;
 
     public function testIgnoresClassReferencesEmbeddedInHandlerExpressions(): void
     {
-        $converter = new PositionConverter();
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $extractor = new MessengerExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-        );
+        $extractor = $this->extractor();
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', <<<'PHP'
             <?php
             namespace App;
@@ -254,13 +233,7 @@ YAML;
 
     public function testPreservesGroupedRepeatableHandlerAttributes(): void
     {
-        $converter = new PositionConverter();
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $extractor = new MessengerExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-        );
+        $extractor = $this->extractor();
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Handler.php', 'php', <<<'PHP'
             <?php
             namespace App;
@@ -281,13 +254,7 @@ YAML;
 
     public function testExtractsNamedMessageInheritanceInSourceOrder(): void
     {
-        $converter = new PositionConverter();
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $extractor = new MessengerExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-        );
+        $extractor = $this->extractor();
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Message.php', 'php', <<<'PHP'
             <?php
             namespace App\Message;
@@ -339,12 +306,7 @@ YAML;
 
     public function testScopesMessageBusParametersToTheirMethod(): void
     {
-        $converter = new PositionConverter();
-        $extractor = new MessengerExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-        );
+        $extractor = $this->extractor();
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
             <?php
             namespace App;
@@ -370,13 +332,7 @@ YAML;
 
     public function testIndexesMessageReferencesCapturedInsideClosures(): void
     {
-        $converter = new PositionConverter();
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $extractor = new MessengerExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-        );
+        $extractor = $this->extractor();
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Dispatch.php', 'php', <<<'PHP'
             <?php
             namespace App;
@@ -404,12 +360,9 @@ YAML;
 
     public function testIndexesOnlyDirectPositionalMessageCreations(): void
     {
-        $converter = new PositionConverter();
-        $extractor = new MessengerExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-        );
+        $kit = new ProjectTestKit();
+        $converter = $kit->get(PositionConverter::class);
+        $extractor = $kit->get(MessengerExtractor::class);
         $text = <<<'PHP'
             <?php
             namespace App;
@@ -487,79 +440,51 @@ YAML;
         $handler = "<?php\nnamespace App\\MessageHandler;\nuse App\\Message\\Ping;\nfinal class UnrelatedHandler { public function __invoke(string \$message): void {} }\nfinal class PingHandler { public function __invoke(Ping \$message): void {} }\nfinal class NullableStringHandler { public function handle(string|null \$message): void {} }\nfinal class ScalarUnionHandler { public function handle(string|int \$message): void {} }\n";
         $controllerUri = 'file:///workspace/src/Controller/PingController.php';
         $controller = "<?php\nnamespace App\\Controller;\nuse App\\Message\\{Ping};\nuse Symfony\\Component\\Messenger\\{MessageBusInterface};\nfinal class PingController { public function __construct(private MessageBusInterface \$bus) {} public function send(): void { \$this->bus->dispatch(new Ping()); } }\n";
-        $documents = new DocumentStore();
-        $documents->open(new Document($yamlUri, 'yaml', 1, $yaml));
-        $documents->open(new Document($messageUri, 'php', 1, $message));
-        $documents->open(new Document($handlerUri, 'php', 1, $handler));
-        $documents->open(new Document($controllerUri, 'php', 1, $controller));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $converter = new PositionConverter();
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $yamlParser = new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter));
-        $comments = new CommentParserRegistry(['php' => new PhpCommentParser(), 'yaml' => new YamlCommentParser($treeSitter)]);
-        $phpParser = new TolerantPhpParser(new Parser());
-        $extractor = new MessengerExtractor($converter, $phpParser, $yamlParser);
-        $indexes = new MessengerIndexRegistry();
-        $indexes->forProject($project)->replace(
-            [new MessengerBus('command.bus', true)],
-            [new MessengerTransport('async', false)],
-            [new MessengerMessage('App\\Message\\Ping', ['async'])],
-            [
-                new MessengerHandlerDeclaration('App\\Message\\DomainEvent', 'command.bus', 'handler', 'App\\MessageHandler\\PingHandler', '__invoke', 0, 'async'),
-                new MessengerHandlerDeclaration('App\\Message\\Other', 'command.bus', 'nullable_string_handler', 'App\\MessageHandler\\NullableStringHandler', 'handle', 0, 'async'),
-                new MessengerHandlerDeclaration('App\\Message\\Other', 'command.bus', 'scalar_union_handler', 'App\\MessageHandler\\ScalarUnionHandler', 'handle', 0, 'async'),
-            ],
-            true,
-        );
-        $sourceIndexes = new MessengerSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace(
-            $extractor->extract(new SourceDocument($yamlUri, 'yaml', $yaml)),
-            $extractor->extract(new SourceDocument($messageUri, 'php', $message)),
-            $extractor->extract(new SourceDocument($handlerUri, 'php', $handler)),
-            $extractor->extract(new SourceDocument($controllerUri, 'php', $controller)),
-        );
-        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $classIndexes->forProject($project)->replace(
-            new DependencyInjectionSourceFacts($messageUri, classes: $classExtractor->extract($messageUri, $message)),
-            new DependencyInjectionSourceFacts($handlerUri, classes: $classExtractor->extract($handlerUri, $handler)),
-        );
-        $documentResolver = new DocumentContextResolver($documents, $projects);
-        $protocol = new LspProtocolMapper();
-        $relationshipResolver = new MessengerRelationshipResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
-        $completionProvider = new MessengerCompletionProvider($documentResolver, $converter, $protocol, $indexes, $yamlParser, $comments, new TolerantPhpParser(new Parser()));
-        $relationshipProvider = new MessengerRelationshipProvider($protocol, $indexes, $relationshipResolver);
-        $diagnosticProvider = new MessengerDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $classIndexes, $phpParser, $converter, EnvironmentScopes::resolver());
-        $codeLensProvider = new MessengerCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
+        $kit = (new ProjectTestKit())
+            ->open($yamlUri, $yaml)
+            ->open($messageUri, $message)
+            ->open($handlerUri, $handler)
+            ->open($controllerUri, $controller)
+            ->index()
+            ->runtime('messenger', [
+                'buses' => [['name' => 'command.bus', 'default' => true]],
+                'transports' => [['name' => 'async', 'failure' => false]],
+                'messages' => [['class' => 'App\\Message\\Ping', 'transports' => ['async']]],
+                'handlers' => [
+                    ['message' => 'App\\Message\\DomainEvent', 'bus' => 'command.bus', 'service' => 'handler', 'class' => 'App\\MessageHandler\\PingHandler', 'method' => '__invoke', 'fromTransport' => 'async'],
+                    ['message' => 'App\\Message\\Other', 'bus' => 'command.bus', 'service' => 'nullable_string_handler', 'class' => 'App\\MessageHandler\\NullableStringHandler', 'method' => 'handle', 'fromTransport' => 'async'],
+                    ['message' => 'App\\Message\\Other', 'bus' => 'command.bus', 'service' => 'scalar_union_handler', 'class' => 'App\\MessageHandler\\ScalarUnionHandler', 'method' => 'handle', 'fromTransport' => 'async'],
+                ],
+                'complete' => true,
+            ])
+        ;
+        $completionProvider = $kit->get(MessengerCompletionProvider::class);
+        $relationshipProvider = $kit->get(MessengerRelationshipProvider::class);
+        $diagnosticProvider = $kit->get(MessengerDiagnosticProvider::class);
 
-        $completionParams = LspRequests::offset($yamlUri, $yaml, strpos($yaml, 'command.bus }') + 4);
-        self::assertSame(['command.bus'], array_column($completionProvider->complete($completionParams) ?? [], 'label'));
-        $commentedCompletion = LspRequests::offset($yamlUri, $yaml, strpos($yaml, '# failure_transport: failed') + \strlen('# failure_transport: fa'));
-        self::assertNull($completionProvider->complete($commentedCompletion));
-        $argumentCompletion = LspRequests::offset($yamlUri, $yaml, strpos($yaml, '$bus: null') + \strlen('$bus: nul'));
-        self::assertNull($completionProvider->complete($argumentCompletion));
+        self::assertSame(['command.bus'], $kit->labels($completionProvider->complete($kit->after($yamlUri, 'bus: comm'))));
+        self::assertNull($completionProvider->complete($kit->after($yamlUri, '# failure_transport: fa')));
+        self::assertNull($completionProvider->complete($kit->after($yamlUri, '$bus: nul')));
         $bundleUri = 'file:///workspace/config/packages/other_bundle.yaml';
         $bundleYaml = "other_bundle:\n    bus: com";
-        $documents->open(new Document($bundleUri, 'yaml', 1, $bundleYaml));
-        self::assertNull($completionProvider->complete(LspRequests::offset($bundleUri, $bundleYaml, \strlen($bundleYaml))));
-        $routingCompletion = LspRequests::offset($yamlUri, $yaml, strpos($yaml, "async\nservices") + 3);
-        self::assertSame(['async'], array_column($completionProvider->complete($routingCompletion) ?? [], 'label'));
-        $hover = $relationshipProvider->hover(LspRequests::offset($yamlUri, $yaml, strpos($yaml, 'async }') + 2));
-        self::assertStringContainsString('Messenger transport', json_encode($hover, \JSON_THROW_ON_ERROR));
-        self::assertSame([$yamlUri], array_column($relationshipProvider->definition(LspRequests::offset($yamlUri, $yaml, strpos($yaml, 'command.bus') + 2)) ?? [], 'uri'));
-        self::assertSame(['messenger.unknown_bus'], array_column($diagnosticProvider->diagnostics(LspRequests::document($yamlUri)) ?? [], 'code'));
-        self::assertSame(['messenger.invalid_handler_signature', 'messenger.invalid_handler_signature'], array_column($diagnosticProvider->diagnostics(LspRequests::document($handlerUri)) ?? [], 'code'));
+        $kit->open($bundleUri, $bundleYaml);
+        self::assertNull($completionProvider->complete($kit->offset($bundleUri, \strlen($bundleYaml))));
+        self::assertSame(['async'], $kit->labels($completionProvider->complete($kit->after($yamlUri, 'Ping: asy'))));
+        self::assertStringContainsString('Messenger transport', $kit->hoverText($relationshipProvider->hover($kit->after($yamlUri, 'from_transport: as'))));
+        self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->inside($yamlUri, 'command.bus'))));
+        self::assertSame(['messenger.unknown_bus'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($yamlUri))));
+        self::assertSame(['messenger.invalid_handler_signature', 'messenger.invalid_handler_signature'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($handlerUri))));
 
-        $messagePosition = $converter->toPosition($message, (int) strpos($message, 'Ping'));
-        self::assertSame([$handlerUri], array_column($relationshipProvider->definition(LspRequests::position($messageUri, $messagePosition)) ?? [], 'uri'));
-        self::assertContains($controllerUri, array_column($relationshipProvider->references(LspRequests::position($messageUri, $messagePosition)) ?? [], 'uri'));
-        $dispatchPosition = $converter->toPosition($controller, (int) strrpos($controller, 'Ping'));
-        self::assertSame([$messageUri, $handlerUri], array_column($relationshipProvider->definition(LspRequests::position($controllerUri, $dispatchPosition)) ?? [], 'uri'));
-        $codeLens = $codeLensProvider->codeLenses(LspRequests::document($messageUri))[0] ?? null;
-        self::assertIsArray($codeLens);
-        self::assertIsArray($codeLens['command'] ?? null);
-        self::assertSame('1 Messenger handler', $codeLens['command']['title'] ?? null);
+        $declared = $kit->at($messageUri, 'Ping');
+        self::assertSame([$handlerUri], $kit->targets($relationshipProvider->definition($declared)));
+        self::assertContains($controllerUri, $kit->targets($relationshipProvider->references($declared)));
+        $dispatched = $kit->at($controllerUri, 'Ping());');
+        self::assertSame([$messageUri, $handlerUri], $kit->targets($relationshipProvider->definition($dispatched)));
+        self::assertSame(
+            ['1 Messenger handler', '1 Messenger handler', '1 Messenger handler'],
+            $kit->titles($kit->get(MessengerCodeLensProvider::class)->codeLenses(LspRequests::document($messageUri))),
+            'Every message the handler accepts, including the contracts it inherits from, announces it.',
+        );
     }
 
     #[DataProvider('handlerSignatureDocumentProvider')]
@@ -568,48 +493,26 @@ YAML;
         $uri = 'file:///workspace/src/Handler.php';
         $indexedText = self::handlerSource($indexedType);
         $currentText = self::handlerSource($currentType);
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 2, $currentText));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $converter = new PositionConverter();
-        $phpParser = new TolerantPhpParser(new Parser());
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $extractor = new MessengerExtractor(
-            $converter,
-            $phpParser,
-            new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
-        );
-        $indexes = new MessengerIndexRegistry();
-        $indexes->forProject($project)->replace([], [], [], [
-            new MessengerHandlerDeclaration('App\\Message', 'messenger.bus.default', 'handler', 'App\\Handler', '__invoke', 0, null),
-        ], true);
-        $sourceIndexes = new MessengerSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $indexedText)));
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $classIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts($uri, classes: (new PhpClassDeclarationExtractor($converter, $phpParser))->extract($uri, $currentText)));
-        $protocol = new LspProtocolMapper();
-        $provider = new MessengerDiagnosticProvider(
-            new DocumentContextResolver($documents, $projects),
-            $protocol,
-            $indexes,
-            $sourceIndexes,
-            $classIndexes,
-            $phpParser,
-            $converter,
-            EnvironmentScopes::resolver(),
-        );
+        $kit = (new ProjectTestKit())
+            ->open($uri, $currentText, version: 2)
+            ->index([$uri => $indexedText])
+            ->runtime('messenger', [
+                'handlers' => [['message' => 'App\\Message', 'bus' => 'messenger.bus.default', 'service' => 'handler', 'class' => 'App\\Handler', 'method' => '__invoke']],
+                'complete' => true,
+            ])
+        ;
 
-        $diagnostics = $provider->diagnostics(LspRequests::document($uri));
+        $diagnostics = $kit->get(MessengerDiagnosticProvider::class)->diagnostics(LspRequests::document($uri));
         if (!$invalid) {
             self::assertSame([], $diagnostics);
 
             return;
         }
+        $converter = $kit->get(PositionConverter::class);
         $parameterOffset = strpos($currentText, '$message');
         self::assertIsInt($parameterOffset);
         self::assertSame([[
-            'range' => $protocol->range(new Range(
+            'range' => $kit->get(LspProtocolMapper::class)->range(new Range(
                 $converter->toPosition($currentText, $parameterOffset + 1),
                 $converter->toPosition($currentText, $parameterOffset + \strlen('$message')),
             )),
@@ -633,33 +536,14 @@ YAML;
     #[DataProvider('environmentScopedTransportProvider')]
     public function testDiagnosesTransportsOnlyInTheEnvironmentSectionsThatLoadThem(string $uri, string $yaml, string $environment, array $expectedCodes): void
     {
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'yaml', 1, $yaml));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $converter = new PositionConverter();
-        $phpParser = new TolerantPhpParser(new Parser());
-        $extractor = new MessengerExtractor(
-            $converter,
-            $phpParser,
-            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-        );
-        $indexes = new MessengerIndexRegistry();
-        $indexes->forProject($project)->replace([], [new MessengerTransport('async', false)], [], [], true);
-        $sourceIndexes = new MessengerSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'yaml', $yaml)));
-        $provider = new MessengerDiagnosticProvider(
-            new DocumentContextResolver($documents, $projects),
-            new LspProtocolMapper(),
-            $indexes,
-            $sourceIndexes,
-            new DependencyInjectionSourceIndexRegistry(),
-            $phpParser,
-            $converter,
-            EnvironmentScopes::resolver($environment),
-        );
+        $kit = (new ProjectTestKit())
+            ->open($uri, $yaml)
+            ->index()
+            ->runtime('messenger', ['transports' => [['name' => 'async', 'failure' => false]], 'complete' => true])
+        ;
+        $kit->get(RuntimeConfiguration::class)->configure(['environment' => $environment]);
 
-        self::assertSame($expectedCodes, array_column($provider->diagnostics(LspRequests::document($uri)) ?? [], 'code'));
+        self::assertSame($expectedCodes, $kit->codes($kit->get(MessengerDiagnosticProvider::class)->diagnostics(LspRequests::document($uri))));
     }
 
     /** @return iterable<string, array{string, string, string, list<string>}> */
@@ -744,12 +628,7 @@ YAML;
 
     public function testExtractsBusNamesOnlyFromMessengerBusNameStampInstantiations(): void
     {
-        $converter = new PositionConverter();
-        $extractor = new MessengerExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-        );
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App;
@@ -779,12 +658,7 @@ YAML;
 
     public function testIgnoresCommentedPhpMessengerConstructs(): void
     {
-        $converter = new PositionConverter();
-        $extractor = new MessengerExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-        );
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App;
@@ -881,6 +755,11 @@ YAML;
         $position = $converter->toPosition($text, \strlen($text));
 
         self::assertNull($provider->complete(LspRequests::position($uri, $position)));
+    }
+
+    private function extractor(): MessengerExtractor
+    {
+        return (new ProjectTestKit())->get(MessengerExtractor::class);
     }
 
     private static function handlerSource(string $type): string
