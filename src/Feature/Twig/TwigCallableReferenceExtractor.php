@@ -6,7 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
+use Symfony\Lsp\Parser\Twig\TwigCall;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -17,7 +17,6 @@ final class TwigCallableReferenceExtractor
         private readonly TwigDocumentParser $parser,
         private readonly PositionConverter $converter,
         private readonly TwigDirectiveLocator $directives,
-        private readonly TwigCallArgumentResolver $arguments,
     ) {
     }
 
@@ -25,21 +24,9 @@ final class TwigCallableReferenceExtractor
     {
         $document = $this->parser->parse($text);
         $masked = $document->maskedSource();
-        foreach ([
-            ['function_call', 'function_identifier', TwigCallableKind::Function],
-            ['filter', 'filter_identifier', TwigCallableKind::Filter],
-        ] as [$containerType, $identifierType, $kind]) {
-            foreach ($document->nodesOfType($containerType) as $container) {
-                $identifier = $document->directChild($container, $identifierType);
-                if (null === $identifier || !$this->contains($identifier, $offset) || !$this->insideDirective($masked, $identifier->startByte)) {
-                    continue;
-                }
-                $name = $document->text($identifier);
-                if (!$this->validName($name)) {
-                    continue;
-                }
-
-                return new TwigCallableReference($kind, $name);
+        foreach ($document->calls() as $call) {
+            if ($this->contains($call->identifier, $offset) && $this->insideDirective($masked, $call->identifier->startByte) && $this->validName($call->name)) {
+                return new TwigCallableReference($this->kind($call), $call->name);
             }
         }
 
@@ -51,11 +38,14 @@ final class TwigCallableReferenceExtractor
         $document = $this->parser->parse($source->text);
         $usages = [];
         $calls = [];
-        foreach ($this->callableNodes($document, $this->directives->ranges($document->maskedSource())) as [$container, $identifier, $kind]) {
-            $name = $document->text($identifier);
+        foreach ($this->directiveCalls($document, $this->directives->ranges($document->maskedSource())) as $call) {
+            $name = $call->name;
             if (!$this->validName($name)) {
                 continue;
             }
+            $container = $call->node;
+            $identifier = $call->identifier;
+            $kind = $this->kind($call);
             $usages[$identifier->startByte] = new TwigCallableUsage(
                 $kind,
                 $name,
@@ -74,7 +64,7 @@ final class TwigCallableReferenceExtractor
                 continue;
             }
             $arguments = [];
-            foreach ($this->arguments->resolve($document, $container)->named() as $argument) {
+            foreach ($call->namedArguments() as $argument) {
                 $arguments[] = new TwigCallableArgumentReference(
                     $argument['name'],
                     $this->converter->toRange($source->text, $argument['offset'], \strlen($argument['name'])),
@@ -101,37 +91,27 @@ final class TwigCallableReferenceExtractor
     /**
      * @param list<array{start: int, end: int}> $directiveRanges
      *
-     * @return list<array{TreeSitterNode, TreeSitterNode, TwigCallableKind}>
+     * @return list<TwigCall>
      */
-    private function callableNodes(TwigDocument $document, array $directiveRanges): array
+    private function directiveCalls(TwigDocument $document, array $directiveRanges): array
     {
-        $nodes = [];
-        foreach ([
-            ['function_call', 'function_identifier', TwigCallableKind::Function],
-            ['filter', 'filter_identifier', TwigCallableKind::Filter],
-        ] as [$containerType, $identifierType, $kind]) {
-            foreach ($document->nodesOfType($containerType) as $container) {
-                $identifier = $document->directChild($container, $identifierType);
-                if (null === $identifier) {
-                    continue;
-                }
-                $nodes[] = [$container, $identifier, $kind];
-            }
-        }
-        usort($nodes, static fn (array $left, array $right): int => [$left[1]->startByte, $left[1]->endByte] <=> [$right[1]->startByte, $right[1]->endByte]);
-
         $inside = [];
         $rangeIndex = 0;
-        foreach ($nodes as $node) {
-            while (isset($directiveRanges[$rangeIndex]) && $directiveRanges[$rangeIndex]['end'] <= $node[1]->startByte) {
+        foreach ($document->calls() as $call) {
+            while (isset($directiveRanges[$rangeIndex]) && $directiveRanges[$rangeIndex]['end'] <= $call->identifier->startByte) {
                 ++$rangeIndex;
             }
-            if (isset($directiveRanges[$rangeIndex]) && $directiveRanges[$rangeIndex]['start'] <= $node[1]->startByte) {
-                $inside[] = $node;
+            if (isset($directiveRanges[$rangeIndex]) && $directiveRanges[$rangeIndex]['start'] <= $call->identifier->startByte) {
+                $inside[] = $call;
             }
         }
 
         return $inside;
+    }
+
+    private function kind(TwigCall $call): TwigCallableKind
+    {
+        return $call->filter ? TwigCallableKind::Filter : TwigCallableKind::Function;
     }
 
     private function contains(TreeSitterNode $node, int $offset): bool

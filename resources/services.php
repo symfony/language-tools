@@ -80,7 +80,6 @@ use Symfony\Lsp\Parser\TreeSitter\LastResultTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterParserInterface;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Xml\LastResultXmlParser;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
@@ -213,7 +212,6 @@ return static function (ContainerConfigurator $container): void {
     $services->set(JavaScriptTokenizer::class);
     $services->set(YamlScalarDecoder::class);
     $services->set(XliffXmlReferenceDecoder::class);
-    $services->set(TwigCallArgumentResolver::class);
     $services->set(CommentParserRegistry::class)
         ->arg('$parsers', [
             'php' => service(PhpCommentParser::class),
