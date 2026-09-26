@@ -106,6 +106,15 @@ final class TwigRouteReferenceExtractorTest extends TestCase
         );
     }
 
+    public function testIgnoresFiltersNamedLikeRouteFunctions(): void
+    {
+        $references = $this->extractor()->extract(new SourceDocument('file:///workspace/template.html.twig', 'twig', <<<'TWIG'
+            {{ 'custom'|path }}{{ 'other'|url('absolute') }}{{ path('home') }}
+            TWIG));
+
+        self::assertSame(['home'], array_map(static fn (RouteReference $reference): string => $reference->name, $references));
+    }
+
     public function testIgnoresUnclosedVerbatimContent(): void
     {
         $references = $this->extractor()->extract(new SourceDocument('file:///workspace/template.html.twig', 'twig', <<<'TWIG'

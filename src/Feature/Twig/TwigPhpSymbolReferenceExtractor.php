@@ -18,7 +18,7 @@ final class TwigPhpSymbolReferenceExtractor
     public function extract(string $uri, string $text, TwigDocument $document): array
     {
         $references = [];
-        foreach ($document->calls('constant', 'enum', 'enum_cases') as $call) {
+        foreach ($document->functions('constant', 'enum', 'enum_cases') as $call) {
             $name = $call->name;
             $literal = $call->argument(0, 'constant' === $name ? 'constant' : 'enum')?->literal();
             if (null === $literal) {

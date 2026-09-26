@@ -51,7 +51,7 @@ final class TwigComponentTemplateExtractor
             }
         }
 
-        foreach ($document->calls('component', 'live_action') as $call) {
+        foreach ($document->functions('component', 'live_action') as $call) {
             if ('component' === $call->name) {
                 $literal = $call->argument(0, 'name')?->literal();
                 if (null !== $literal) {

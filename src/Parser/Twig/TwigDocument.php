@@ -70,6 +70,28 @@ final class TwigDocument
      */
     public function calls(string ...$names): array
     {
+        return $this->callsOfKind(null, $names);
+    }
+
+    /** @return list<TwigCall> */
+    public function functions(string ...$names): array
+    {
+        return $this->callsOfKind(false, $names);
+    }
+
+    /** @return list<TwigCall> */
+    public function filters(string ...$names): array
+    {
+        return $this->callsOfKind(true, $names);
+    }
+
+    /**
+     * @param array<string> $names
+     *
+     * @return list<TwigCall>
+     */
+    private function callsOfKind(?bool $filter, array $names): array
+    {
         if (null === $this->calls) {
             $this->calls = [];
             foreach (['function_call' => 'function_identifier', 'filter' => 'filter_identifier'] as $type => $identifierType) {
@@ -81,11 +103,14 @@ final class TwigDocument
             }
             usort($this->calls, static fn (TwigCall $left, TwigCall $right): int => $left->node->startByte <=> $right->node->startByte);
         }
-        if ([] === $names) {
+        if (null === $filter && [] === $names) {
             return $this->calls;
         }
 
-        return array_values(array_filter($this->calls, static fn (TwigCall $call): bool => \in_array($call->name, $names, true)));
+        return array_values(array_filter(
+            $this->calls,
+            static fn (TwigCall $call): bool => (null === $filter || $filter === $call->filter) && ([] === $names || \in_array($call->name, $names, true)),
+        ));
     }
 
     public function parent(TreeSitterNode $node): ?TreeSitterNode

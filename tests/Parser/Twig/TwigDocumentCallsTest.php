@@ -24,6 +24,10 @@ final class TwigDocumentCallsTest extends TestCase
         );
         self::assertSame(['path', 'url'], array_map(static fn (TwigCall $call): string => $call->name, $document->calls('url', 'path')));
         self::assertSame([], $document->calls('missing'));
+        self::assertSame(['path', 'url'], array_map(static fn (TwigCall $call): string => $call->name, $document->functions()));
+        self::assertSame(['upper', 'trans'], array_map(static fn (TwigCall $call): string => $call->name, $document->filters()));
+        self::assertSame([], $document->functions('trans'));
+        self::assertSame([], $document->filters('path'));
     }
 
     public function testResolvesPositionalAndNamedArguments(): void

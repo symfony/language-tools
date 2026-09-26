@@ -198,7 +198,7 @@ final class SecurityExtractor
     {
         $document = $this->twigParser->parse($text);
         $symbols = [];
-        foreach ($document->calls('is_granted', 'logout_path', 'logout_url') as $call) {
+        foreach ($document->functions('is_granted', 'logout_path', 'logout_url') as $call) {
             $kind = 'is_granted' === $call->name ? SecuritySymbolKind::Role : SecuritySymbolKind::Firewall;
             $literal = $call->argument(0, SecuritySymbolKind::Role === $kind ? 'attribute' : 'key')?->literal();
             $pattern = SecuritySymbolKind::Role === $kind ? self::ROLE_PATTERN : self::FIREWALL_PATTERN;

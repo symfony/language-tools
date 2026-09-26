@@ -161,7 +161,7 @@ final class TemplateReferenceExtractor
             }
             $references[] = $this->reference($target->value, $uri, $text, $target->startOffset, $target->endOffset);
         }
-        foreach ($document->calls('include', 'source') as $call) {
+        foreach ($document->functions('include', 'source') as $call) {
             $literal = $call->argument(0, 'include' === $call->name ? 'template' : 'name')?->literal();
             if (null !== $literal) {
                 $references[] = $this->reference($literal->value, $uri, $text, $literal->startOffset, $literal->endOffset);

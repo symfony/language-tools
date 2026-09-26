@@ -22,7 +22,7 @@ final class TwigRouteReferenceExtractor
     {
         $document = $this->parser->parse($source->text);
         $references = [];
-        foreach ($document->calls('path', 'url') as $call) {
+        foreach ($document->functions('path', 'url') as $call) {
             $route = $call->argument(0, 'name')?->literal();
             if (null === $route) {
                 continue;

@@ -22,7 +22,7 @@ final class TwigAssetReferenceExtractor
     {
         $document = $this->parser->parse($text);
         $symbols = [];
-        foreach ($document->calls('asset', 'importmap') as $call) {
+        foreach ($document->functions('asset', 'importmap') as $call) {
             if ('importmap' === $call->name) {
                 foreach ($this->entrypoints($document, $call->argument(0, 'entryPoint')?->node) as $entrypoint) {
                     $symbols[] = $this->symbol(AssetSymbolKind::Entrypoint, $entrypoint, $uri, $text);
