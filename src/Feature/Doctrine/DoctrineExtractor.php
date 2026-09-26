@@ -5,12 +5,14 @@ namespace Symfony\Lsp\Feature\Doctrine;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpArgumentCursor;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpPropertyDeclaration;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
@@ -20,6 +22,7 @@ use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 final class DoctrineExtractor
 {
     private const ASSOCIATIONS = ['Embedded', 'ManyToMany', 'ManyToOne', 'OneToMany', 'OneToOne'];
+    private const FIELD_PATTERN = '/^[A-Za-z_][A-Za-z0-9_]*$/D';
 
     public function __construct(
         private readonly PositionConverter $converter,
@@ -94,21 +97,51 @@ final class DoctrineExtractor
             return null;
         }
         $php = $this->phpParser->parse($text);
+        $cursor = $php->argumentCursorAt($offset);
+        $call = $cursor?->call;
+        if (null === $cursor || null === $cursor->quote || !$call instanceof PhpMethodCall || 1 !== preg_match(self::FIELD_PATTERN, $cursor->prefix)) {
+            return null;
+        }
         $source = $this->phpComments->mask($text);
-        $before = substr($source, 0, $offset);
-        if (preg_match('/[\'"](?:choice_label|choice_value|group_by)[\'"]\s*=>\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)$/s', $before, $field, \PREG_OFFSET_CAPTURE)
-            && null !== $entityClass = $this->entityTypeClassAt($source, $php, $field[1][1])
+
+        return $this->entityTypeFieldContext($text, $source, $php, $cursor, $call)
+            ?? $this->repositoryCriteriaContext($text, $source, $php, $cursor, $call);
+    }
+
+    private function entityTypeFieldContext(string $text, string $source, PhpDocument $php, PhpArgumentCursor $cursor, PhpMethodCall $call): ?DoctrineCompletionContext
+    {
+        $options = $this->formOptionsArgument($call);
+        if (null === $options
+            || $cursor->argument !== $options
+            || !\in_array($this->arrayItemKey($source, $options, $cursor), ['choice_label', 'choice_value', 'group_by'], true)
+            || 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $call->positionalArgument($this->formTypeIndex($call))?->completeClassReference?->className
+            || null === $entityClass = $this->arrayClassReference($source, $php, $options, 'class')?->className
         ) {
-            return new DoctrineCompletionContext(
-                DoctrineCompletionKind::EntityTypeField,
-                $entityClass,
-                null,
-                $field[1][0],
-                $this->converter->toRange($text, $field[1][1], \strlen($field[1][0])),
-            );
+            return null;
         }
 
-        return $this->repositoryCompletionContext($text, $source, $offset, $php);
+        return new DoctrineCompletionContext(
+            DoctrineCompletionKind::EntityTypeField,
+            $entityClass,
+            null,
+            $cursor->prefix,
+            $this->converter->toRange($text, $cursor->prefixStartOffset, \strlen($cursor->prefix)),
+        );
+    }
+
+    /** The key whose value the cursor is typing, among the literal keys of the array the argument holds. */
+    private function arrayItemKey(string $source, PhpArgument $argument, PhpArgumentCursor $cursor): ?string
+    {
+        $valueStartOffset = $cursor->prefixStartOffset - 1;
+        foreach ($this->arrayKeys->parseArgument($argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $key) {
+            if ($key->endOffset < $valueStartOffset
+                && 1 === preg_match('/^\s*=>\s*$/', substr($source, $key->endOffset + 1, $valueStartOffset - $key->endOffset - 1))
+            ) {
+                return $key->value;
+            }
+        }
+
+        return null;
     }
 
     /** @return list<DoctrineField> */
@@ -218,29 +251,16 @@ final class DoctrineExtractor
         return null;
     }
 
-    private function entityTypeClassAt(string $source, PhpDocument $php, int $offset): ?string
+    private function formTypeIndex(PhpMethodCall $call): int
     {
-        foreach ($php->methodCalls as $call) {
-            if (!\in_array($call->method, ['createForm', 'createNamed', 'add'], true)) {
-                continue;
-            }
-            $typeIndex = 'createNamed' === $call->method ? 1 : ('add' === $call->method ? 1 : 0);
-            $optionsIndex = 'createNamed' === $call->method ? 3 : 2;
-            $options = $call->positionalArgument($optionsIndex);
-            $start = $options?->expressionStartOffset;
-            $end = $options?->expressionEndOffset;
-            if (!\is_int($start) || !\is_int($end) || $offset < $start || $offset > $end) {
-                continue;
-            }
-            $formType = $call->positionalArgument($typeIndex)?->completeClassReference;
-            if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $formType?->className) {
-                continue;
-            }
+        return 'createForm' === $call->method ? 0 : 1;
+    }
 
-            return $this->arrayClassReference($source, $php, $options, 'class')?->className;
-        }
-
-        return null;
+    private function formOptionsArgument(PhpMethodCall $call): ?PhpArgument
+    {
+        return \in_array($call->method, ['createForm', 'createNamed', 'add'], true)
+            ? $call->positionalArgument('createNamed' === $call->method ? 3 : 2)
+            : null;
     }
 
     /** @return list<DoctrineSourceSymbol> */
@@ -248,14 +268,8 @@ final class DoctrineExtractor
     {
         $symbols = [];
         foreach ($php->methodCalls as $call) {
-            if (!\in_array($call->method, ['createForm', 'createNamed', 'add'], true)) {
-                continue;
-            }
-            $typeIndex = 'createNamed' === $call->method ? 1 : ('add' === $call->method ? 1 : 0);
-            $optionsIndex = 'createNamed' === $call->method ? 3 : 2;
-            $formType = $call->positionalArgument($typeIndex)?->completeClassReference;
-            $options = $call->positionalArgument($optionsIndex);
-            if ('Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $formType?->className || null === $options) {
+            $options = $this->formOptionsArgument($call);
+            if (null === $options || 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $call->positionalArgument($this->formTypeIndex($call))?->completeClassReference?->className) {
                 continue;
             }
             $entity = $this->arrayClassReference($source, $php, $options, 'class');
@@ -346,20 +360,12 @@ final class DoctrineExtractor
         return $symbols;
     }
 
-    private function repositoryCompletionContext(string $text, string $source, int $offset, PhpDocument $php): ?DoctrineCompletionContext
+    private function repositoryCriteriaContext(string $text, string $source, PhpDocument $php, PhpArgumentCursor $cursor, PhpMethodCall $call): ?DoctrineCompletionContext
     {
-        $before = substr($source, 0, $offset);
-        if (!preg_match('/(?<receiver>(?:(?:\$this(?:\s*->\s*[A-Za-z_][A-Za-z0-9_]*)?|\$[A-Za-z_][A-Za-z0-9_]*)\s*->\s*getRepository\s*\(\s*[A-Za-z_\\\\][A-Za-z0-9_\\\\]*\s*::class\s*\)|\$this(?:\s*->\s*[A-Za-z_][A-Za-z0-9_]*)?|\$[A-Za-z_][A-Za-z0-9_]*))\s*->\s*(?:findBy|findOneBy|count)\s*\(\s*[^;]*(?:\[|,)\s*[\'"](?<prefix>[A-Za-z_][A-Za-z0-9_]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-        $call = null;
-        foreach ($php->methodCalls as $candidate) {
-            if ($match['receiver'][1] === $candidate->startOffset && \in_array($candidate->method, ['findBy', 'findOneBy', 'count'], true)) {
-                $call = $candidate;
-                break;
-            }
-        }
-        if (null === $call) {
+        if (!$cursor->isArrayItemLiteral()
+            || !\in_array($call->method, ['findBy', 'findOneBy', 'count'], true)
+            || $cursor->argument !== $call->positionalArgument(0)
+        ) {
             return null;
         }
         $localRepositoryClasses = [];
@@ -376,14 +382,13 @@ final class DoctrineExtractor
         if (null === $receiver) {
             return null;
         }
-        $prefix = $match['prefix'][0];
 
         return new DoctrineCompletionContext(
             DoctrineCompletionKind::RepositoryCriteria,
             $receiver['entityClass'],
             $receiver['repositoryClass'],
-            $prefix,
-            $this->converter->toRange($text, $match['prefix'][1], \strlen($prefix)),
+            $cursor->prefix,
+            $this->converter->toRange($text, $cursor->prefixStartOffset, \strlen($cursor->prefix)),
         );
     }
 

@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\Doctrine;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
@@ -453,6 +454,34 @@ final class DoctrineProviderTest extends TestCase
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertSame("Doctrine field: `App\Entity\Product::\$name`\n\nType: `string`", $hover['contents']['value'] ?? null);
+    }
+
+    #[DataProvider('rejectedRepositoryCompletionProvider')]
+    public function testOffersNoRepositoryCompletionWhereIndexingReadsNoCriteria(string $call): void
+    {
+        $text = <<<PHP
+            <?php
+            use App\Repository\ProductRepository;
+
+            function find(ProductRepository \$products): void
+            {
+                {$call}
+            }
+            PHP;
+        $cursor = strpos($text, '|');
+        self::assertIsInt($cursor);
+
+        self::assertNull($this->extractor()->completionContext('php', str_replace('|', '', $text), $cursor));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function rejectedRepositoryCompletionProvider(): iterable
+    {
+        yield 'order by argument' => ["\$products->findBy(['name' => 'Symfony'], ['ti|"];
+        yield 'nested criteria array' => ["\$products->findBy(['name' => ['ti|"];
+        yield 'criteria value' => ["\$products->findBy(['name' => 'Sym|"];
+        yield 'unrelated method' => ["\$products->matching(['ti|"];
+        yield 'static call' => ["ProductRepository::findBy(['ti|"];
     }
 
     public function testScopesRepositoryCompletionToTheContainingMethod(): void
