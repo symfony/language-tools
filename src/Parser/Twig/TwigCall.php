@@ -78,29 +78,40 @@ final class TwigCall
             $text = substr($text, 0, -1);
         }
         $this->parsed = TwigArgumentParser::parse($text, $offset);
-        foreach ($this->document->children($container) as $child) {
-            if ('argument' !== $child->type) {
+        $children = array_filter(
+            $this->document->children($container),
+            fn (TreeSitterNode $child): bool => !$child->error || 1 !== preg_match('/^[\s\x80-\xff]*$/D', $this->document->maskedText($child)),
+        );
+        $descendants = $this->document->descendants($container);
+        foreach ($this->parsed as $parsed) {
+            $segmentEnd = $parsed->offset + \strlen($parsed->text);
+            $start = null;
+            $end = null;
+            foreach ($children as $child) {
+                if ($child->startByte >= $parsed->offset && $child->startByte < $segmentEnd) {
+                    $start ??= $child->startByte;
+                    $end = min(max($end ?? 0, $child->endByte), $segmentEnd);
+                }
+            }
+            $start = null === $parsed->name ? $start : $parsed->valueOffset;
+            if (null === $start || null === $end || $end <= $start) {
                 continue;
             }
-            $value = $this->document->directChild($child, 'argument_value') ?? $child;
-            $argument = new TwigCallArgument($value, $this->parsedName($value), $this->document);
+            $node = null;
+            foreach ($descendants as $descendant) {
+                if ($start === $descendant->startByte && $end === $descendant->endByte) {
+                    $node = $descendant;
+
+                    break;
+                }
+            }
+            $argument = new TwigCallArgument($parsed->name, $start, $end, $node, $this->document);
             if (null === $argument->name) {
                 $this->positional[] = $argument;
             } else {
                 $this->named[] = $argument;
             }
         }
-    }
-
-    private function parsedName(TreeSitterNode $value): ?string
-    {
-        foreach ($this->parsed ?? [] as $argument) {
-            if ($value->startByte >= $argument->offset && $value->startByte < $argument->offset + \strlen($argument->text)) {
-                return $argument->name;
-            }
-        }
-
-        return null;
     }
 
     private function piped(): ?TwigCallArgument
@@ -118,6 +129,6 @@ final class TwigCall
         }
         $separator = substr($this->document->maskedSource(), $previous->endByte, $this->node->startByte - $previous->endByte);
 
-        return 1 === preg_match('/^\s*\|\s*$/D', $separator) ? new TwigCallArgument($previous, null, $this->document) : null;
+        return 1 === preg_match('/^\s*\|\s*$/D', $separator) ? new TwigCallArgument(null, $previous->startByte, $previous->endByte, $previous, $this->document) : null;
     }
 }

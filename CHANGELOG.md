@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read a Twig named argument written with a colon and a sequence value, such as `importmap(entryPoint: ['app'])`
 - Complete YAML keys on the line after an unterminated flow sequence under their real parent instead of the flow sequence key
 - Keep YAML values at their real path and `when@` environment beside a malformed line, so their service and parameter references are still checked
 - Recognize Stimulus controllers, actions and targets passed to the `stimulus_*` Twig filters or as named arguments

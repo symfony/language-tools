@@ -55,6 +55,29 @@ final class TwigDocumentCallsTest extends TestCase
         ], $named->namedArguments());
     }
 
+    public function testRecoversNamedSequenceArgumentsTheTreeCollapses(): void
+    {
+        $source = <<<'TWIG'
+            {{ importmap(attributes: {defer: true}, entryPoint: ['x', 'y']) }}
+            {{ importmap(entryPoint: ['first']) }}
+            {{ call(# vérifié
+                'after comment') }}
+            TWIG;
+        [$second, $first] = $this->parse($source)->calls('importmap');
+
+        $entrypoint = $second->argument(0, 'entryPoint');
+        self::assertNotNull($entrypoint);
+        self::assertSame("['x', 'y']", $this->text($source, $entrypoint));
+        self::assertNull($entrypoint->node);
+        self::assertNull($entrypoint->literal());
+        $attributes = $second->argument(1, 'attributes');
+        self::assertSame('{defer: true}', $this->text($source, $attributes));
+        self::assertNotNull($attributes?->node);
+        self::assertNull($second->argument(0));
+        self::assertSame("['first']", $this->text($source, $first->argument(0, 'entryPoint')));
+        self::assertSame('after comment', $this->parse($source)->calls('call')[0]->argument(0)?->literal()?->value);
+    }
+
     public function testPipedValueIsTheFirstFilterArgument(): void
     {
         $source = <<<'TWIG'
@@ -119,7 +142,7 @@ final class TwigDocumentCallsTest extends TestCase
 
     private function text(string $source, ?TwigCallArgument $argument): ?string
     {
-        return null === $argument ? null : substr($source, $argument->node->startByte, $argument->node->endByte - $argument->node->startByte);
+        return null === $argument ? null : substr($source, $argument->start, $argument->end - $argument->start);
     }
 
     private function parse(string $source): TwigDocument

@@ -4,7 +4,8 @@ namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Index\SourceSymbols;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
+use Symfony\Lsp\Parser\DelimiterScanner;
+use Symfony\Lsp\Parser\Twig\TwigCallArgument;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
@@ -24,7 +25,7 @@ final class TwigAssetReferenceExtractor
         $symbols = [];
         foreach ($document->functions('asset', 'importmap') as $call) {
             if ('importmap' === $call->name) {
-                foreach ($this->entrypoints($document, $call->argument(0, 'entryPoint')?->node) as $entrypoint) {
+                foreach ($this->entrypoints($document, $call->argument(0, 'entryPoint')) as $entrypoint) {
                     $symbols[] = $this->symbol(AssetSymbolKind::Entrypoint, $entrypoint, $uri, $text);
                 }
 
@@ -45,22 +46,22 @@ final class TwigAssetReferenceExtractor
      *
      * @return list<TwigStringLiteral>
      */
-    private function entrypoints(TwigDocument $document, ?TreeSitterNode $argument): array
+    private function entrypoints(TwigDocument $document, ?TwigCallArgument $argument): array
     {
         if (null === $argument) {
             return [];
         }
-        if (null !== $literal = $document->soleStringLiteral($argument)) {
+        if (null !== $literal = $argument->literal()) {
             return '' === $literal->value ? [] : [$literal];
         }
-        $value = trim($document->text($argument));
-        $array = $document->firstDescendant($argument, 'array');
-        if (null === $array || !str_starts_with($value, '[') || !str_ends_with($value, ']')) {
+        $value = substr($document->maskedSource(), $argument->start, $argument->end - $argument->start);
+        if (!str_starts_with($value, '[') || !str_ends_with($value, ']')) {
             return [];
         }
         $literals = [];
-        foreach ($document->children($array) as $child) {
-            $literal = $document->stringLiteral($child);
+        foreach (DelimiterScanner::split(substr($value, 1, -1), ',', $argument->start + 1) as $element) {
+            $start = $element->offset + strspn($element->text, " \t\n\r\0\x0B\f");
+            $literal = $document->stringLiteralAt($start, $element->offset + \strlen(rtrim($element->text)));
             if (null !== $literal && '' !== $literal->value) {
                 $literals[] = $literal;
             }

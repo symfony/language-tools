@@ -14,6 +14,9 @@ final class TwigDocument
     /** @var list<TwigCall>|null */
     private ?array $calls = null;
 
+    /** @var array<int, TreeSitterNode>|null */
+    private ?array $stringNodes = null;
+
     public function __construct(
         private readonly string $source,
         private readonly string $masked,
@@ -171,6 +174,19 @@ final class TwigDocument
         $raw = substr($value, 1, -1);
 
         return new TwigStringLiteral($raw, TwigStringDecoder::decode($raw, $value[0]), $node->startByte + 1, $node->endByte - 1, $value[0]);
+    }
+
+    public function stringLiteralAt(int $start, int $end): ?TwigStringLiteral
+    {
+        if (null === $this->stringNodes) {
+            $this->stringNodes = [];
+            foreach ([...$this->tree->nodesOfType('string'), ...$this->tree->nodesOfType('interpolated_string')] as $node) {
+                $this->stringNodes[$node->startByte] = $node;
+            }
+        }
+        $node = $this->stringNodes[$start] ?? null;
+
+        return null === $node || $end !== $node->endByte ? null : $this->stringLiteral($node);
     }
 
     public function directStringLiteral(TreeSitterNode $node): ?TwigStringLiteral

@@ -114,6 +114,8 @@ final class AssetProviderTest extends TestCase
             {{ importmap('attributed', {defer: true}) }}
             {{ importmap(['static', dynamic]) }}
             {{ importmap(entryPoint: 'named') }}
+            {{ importmap(attributes: {defer: true}, entryPoint: ['sequence', dynamic, 'items']) }}
+            {{ importmap(entryPoint: ['leading']) }}
             {{ importmap(entrypoint) }}
             {{ importmap() }}
             {{ app.importmap('method') }}
@@ -122,7 +124,7 @@ final class AssetProviderTest extends TestCase
             TWIG));
 
         self::assertSame(
-            ['single', 'listed', 'other', 'attributed', 'static', 'named'],
+            ['single', 'listed', 'other', 'attributed', 'static', 'named', 'sequence', 'items', 'leading'],
             array_map(static fn ($symbol): string => $symbol->name, $facts->symbols),
         );
     }

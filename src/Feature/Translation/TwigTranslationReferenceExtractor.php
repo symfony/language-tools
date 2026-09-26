@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
+use Symfony\Lsp\Parser\Twig\TwigCallArgument;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
@@ -25,7 +26,7 @@ final class TwigTranslationReferenceExtractor
 
         $references = [];
         foreach ($this->calls($document) as $call) {
-            $domain = $this->domain($document, $call['domain'], $defaultDomain);
+            $domain = $this->domain($call['domain'], $defaultDomain);
             if (null !== $domain) {
                 $references[] = $this->reference(
                     $call['key'],
@@ -51,14 +52,14 @@ final class TwigTranslationReferenceExtractor
         $defaultDomain = $this->defaultDomain($document);
         foreach ($this->calls($document) as $call) {
             if ($offset >= $call['key']->startOffset && $offset <= $call['key']->endOffset) {
-                return $this->domain($document, $call['domain'], $defaultDomain);
+                return $this->domain($call['domain'], $defaultDomain);
             }
         }
 
         return $defaultDomain;
     }
 
-    /** @return list<array{key: TwigStringLiteral, domain: ?TreeSitterNode, parameters: ?TreeSitterNode}> */
+    /** @return list<array{key: TwigStringLiteral, domain: ?TwigCallArgument, parameters: ?TreeSitterNode}> */
     private function calls(TwigDocument $document): array
     {
         $calls = [];
@@ -67,7 +68,7 @@ final class TwigTranslationReferenceExtractor
             if (null !== $key) {
                 $calls[] = [
                     'key' => $key,
-                    'domain' => $call->argument(2, 'domain')?->node,
+                    'domain' => $call->argument(2, 'domain'),
                     'parameters' => $call->argument(1, 'arguments', 'parameters')?->node,
                 ];
             }
@@ -92,9 +93,9 @@ final class TwigTranslationReferenceExtractor
         return 'messages';
     }
 
-    private function domain(TwigDocument $document, ?TreeSitterNode $argument, string $defaultDomain): ?string
+    private function domain(?TwigCallArgument $argument, string $defaultDomain): ?string
     {
-        return null === $argument ? $defaultDomain : $document->soleStringLiteral($argument)?->value;
+        return null === $argument ? $defaultDomain : $argument->literal()?->value;
     }
 
     /** @param list<string>|null $placeholders */
