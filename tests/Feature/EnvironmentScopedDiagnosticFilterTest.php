@@ -19,7 +19,7 @@ final class EnvironmentScopedDiagnosticFilterTest extends TestCase
     {
         $diagnostics = array_map(
             static fn (string $code): CollectedDiagnostic => new CollectedDiagnostic('stub', ['code' => $code]),
-            ['service.not_found', 'security.unknown_provider', 'env.unknown_processor', 'config.unknown_key', 'env.malformed_chain'],
+            ['service.not_found', 'parameter.not_found', 'messenger.unknown_transport', 'security.unknown_provider', 'env.unknown_processor', 'config.unknown_key', 'env.malformed_chain'],
         );
 
         self::assertSame(
@@ -34,7 +34,7 @@ final class EnvironmentScopedDiagnosticFilterTest extends TestCase
     /** @return iterable<string, array{string, string, list<string>}> */
     public static function conventionalEnvironmentFileProvider(): iterable
     {
-        $all = ['service.not_found', 'security.unknown_provider', 'env.unknown_processor', 'config.unknown_key', 'env.malformed_chain'];
+        $all = ['service.not_found', 'parameter.not_found', 'messenger.unknown_transport', 'security.unknown_provider', 'env.unknown_processor', 'config.unknown_key', 'env.malformed_chain'];
         $environmentAgnostic = ['config.unknown_key', 'env.malformed_chain'];
 
         yield 'inactive service file' => ['file:///workspace/config/services_test.yaml', 'dev', $environmentAgnostic];
