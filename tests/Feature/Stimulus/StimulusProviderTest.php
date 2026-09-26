@@ -3,65 +3,31 @@
 namespace Symfony\Lsp\Tests\Feature\Stimulus;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeActionProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusCodeLensProvider;
-use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
 use Symfony\Lsp\Feature\Stimulus\StimulusCompletionProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusController;
-use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
-use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
-use Symfony\Lsp\Feature\Stimulus\StimulusControllerSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusDiagnosticProvider;
 use Symfony\Lsp\Feature\Stimulus\StimulusDocumentLinkProvider;
-use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
-use Symfony\Lsp\Feature\Stimulus\StimulusReferenceExtractor;
 use Symfony\Lsp\Feature\Stimulus\StimulusRelationshipProvider;
-use Symfony\Lsp\Feature\Stimulus\StimulusResolver;
-use Symfony\Lsp\Feature\Stimulus\StimulusSourceIndexRegistry;
-use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
-use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
-use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\UriToPathConverter;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\LspRequests;
-use Symfony\Lsp\Tests\Support\ProjectPaths;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class StimulusProviderTest extends TestCase
 {
     public function testSuggestsCloseStimulusControllerNames(): void
     {
         $uri = 'file:///workspace/templates/search.html.twig';
-        $text = '<div data-controller="searc"></div>';
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'twig', 2, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
-        $indexes = new StimulusIndexRegistry();
-        $indexes->forProject($project)->replace(true, new StimulusController('search', '/workspace/assets/controllers/search_controller.js', false, false, [], [], [], [], []));
-        $sources = new StimulusSourceIndexRegistry();
-        $sources->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'twig', $text)));
-        $protocol = new LspProtocolMapper();
-        $stimulus = new StimulusResolver($converter, $protocol, $indexes, $sources, $extractor);
-        $requests = new ProviderRequests($documents, $projects, $converter);
-        $diagnostics = (new StimulusDiagnosticProvider($protocol, $indexes, $sources, $stimulus))->diagnostics($requests->document($uri));
+        $kit = (new ProjectTestKit())
+            ->open($uri, '<div data-controller="searc"></div>', version: 2)
+            ->index()
+            ->runtime('stimulus', ['complete' => true, 'controllers' => [
+                ['name' => 'search', 'sourcePath' => '/workspace/assets/controllers/search_controller.js', 'lazy' => false, 'vendor' => false],
+            ]])
+        ;
+        $diagnostics = $kit->get(StimulusDiagnosticProvider::class)->diagnostics($kit->document($uri));
         self::assertIsArray($diagnostics);
-        $actions = (new StimulusCodeActionProvider($indexes, $sources, $stimulus, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))
-            ->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
+        $actions = $kit->get(StimulusCodeActionProvider::class)->actions($kit->codeAction($uri, $diagnostics));
 
         self::assertSame(['Replace with "search"'], array_column($actions, 'title'));
         self::assertSame(['documentChanges' => [[
@@ -72,9 +38,6 @@ final class StimulusProviderTest extends TestCase
 
     public function testProvidesStimulusControllersActionsTargetsAndNavigation(): void
     {
-        $project = new Project('/workspace', 'file:///workspace');
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
         $controllerUri = 'file:///workspace/assets/controllers/search_controller.js';
         $controllerText = <<<'JS'
             import { Controller } from '@hotwired/stimulus';
@@ -110,41 +73,13 @@ final class StimulusProviderTest extends TestCase
             {{ stimulus_action('symfony/ux-autocomplete/autocomplete', 'onChange') }}
             {{ stimulus_target('symfony/ux-autocomplete/autocomplete', 'field') }}
             TWIG;
-        $documents = new DocumentStore();
-        $documents->open(new Document($controllerUri, 'javascript', 1, $controllerText));
-        $documents->open(new Document($featureControllerUri, 'javascript', 1, $featureControllerText));
-        $documents->open(new Document($usageUri, 'twig', 1, $usageText));
-        $controllerCompletionUri = 'file:///workspace/templates/controller_completion.html.twig';
-        $controllerCompletionText = '<div data-controller="sea';
-        $documents->open(new Document($controllerCompletionUri, 'twig', 1, $controllerCompletionText));
-        $packageControllerCompletionUri = 'file:///workspace/templates/package_controller_completion.html.twig';
-        $packageControllerCompletionText = "{{ stimulus_controller('@symfony/ux-auto";
-        $documents->open(new Document($packageControllerCompletionUri, 'twig', 1, $packageControllerCompletionText));
-        $actionCompletionUri = 'file:///workspace/templates/action_completion.html.twig';
-        $actionCompletionText = '<button data-action="click->search#op';
-        $documents->open(new Document($actionCompletionUri, 'twig', 1, $actionCompletionText));
-        $targetCompletionUri = 'file:///workspace/templates/target_completion.html.twig';
-        $targetCompletionText = '<input data-search-target="res';
-        $documents->open(new Document($targetCompletionUri, 'twig', 1, $targetCompletionText));
-        $packageActionCompletionUri = 'file:///workspace/templates/package_action_completion.html.twig';
-        $packageActionCompletionText = "{{ stimulus_action('@symfony/ux-autocomplete/autocomplete', 'on";
-        $documents->open(new Document($packageActionCompletionUri, 'twig', 1, $packageActionCompletionText));
-        $packageTargetCompletionUri = 'file:///workspace/templates/package_target_completion.html.twig';
-        $packageTargetCompletionText = "{{ stimulus_target('symfony/ux-autocomplete/autocomplete', 'fi";
-        $documents->open(new Document($packageTargetCompletionUri, 'twig', 1, $packageTargetCompletionText));
-        $unknownActionUri = 'file:///workspace/templates/unknown_action.html.twig';
-        $unknownActionText = '<button data-action="search#missing"></button>';
-        $documents->open(new Document($unknownActionUri, 'twig', 1, $unknownActionText));
-        $quotedAttributeUri = 'file:///workspace/templates/quoted_attribute.html.twig';
-        $quotedAttributeText = '{% set markup = \'<button data-action="click->search#op';
-        $documents->open(new Document($quotedAttributeUri, 'twig', 1, $quotedAttributeText));
-        $markupHelperUri = 'file:///workspace/templates/markup_helper.html.twig';
-        $markupHelperText = "<p>Call stimulus_controller('sea";
-        $documents->open(new Document($markupHelperUri, 'twig', 1, $markupHelperText));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project]);
-        $indexes = new StimulusIndexRegistry();
-        $indexes->forProject($project)->replace(
+        $kit = (new ProjectTestKit())
+            ->open($controllerUri, $controllerText)
+            ->open($featureControllerUri, $featureControllerText)
+            ->open($usageUri, $usageText)
+            ->index()
+        ;
+        $kit->get(StimulusIndexRegistry::class)->forProject($kit->project())->replace(
             true,
             new StimulusController(
                 'search',
@@ -169,72 +104,62 @@ final class StimulusProviderTest extends TestCase
                 [],
             ),
         );
-        $sourceIndexes = new StimulusSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace(
-            $extractor->extract($project, new SourceDocument($controllerUri, 'javascript', $controllerText)),
-            $extractor->extract($project, new SourceDocument($featureControllerUri, 'javascript', $featureControllerText)),
-            $extractor->extract($project, new SourceDocument($usageUri, 'twig', $usageText)),
-        );
-        $uriConverter = new UriToPathConverter();
-        $protocol = new LspProtocolMapper();
-        $stimulus = new StimulusResolver($converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $completionProvider = new StimulusCompletionProvider($converter, $protocol, $extractor, $stimulus);
-        $relationshipProvider = new StimulusRelationshipProvider($uriConverter, $protocol, $indexes, $sourceIndexes, $stimulus);
-        $diagnosticProvider = new StimulusDiagnosticProvider($protocol, $indexes, $sourceIndexes, $stimulus);
-        $documentLinkProvider = new StimulusDocumentLinkProvider($uriConverter, $protocol, $indexes, $extractor, $stimulus);
-        $codeLensProvider = new StimulusCodeLensProvider($protocol, $sourceIndexes, $extractor);
-        $requests = new ProviderRequests($documents, $projects);
+        $completionProvider = $kit->get(StimulusCompletionProvider::class);
+        $relationshipProvider = $kit->get(StimulusRelationshipProvider::class);
 
-        self::assertSame(['search'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($controllerCompletionUri, $controllerCompletionText, \strlen($controllerCompletionText)))), 'label'));
-        $packageControllerCompletion = $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($packageControllerCompletionUri, $packageControllerCompletionText, \strlen($packageControllerCompletionText))));
-        self::assertSame(['symfony--ux-autocomplete--autocomplete'], array_column($packageControllerCompletion, 'label'));
+        self::assertSame(['search'], $this->completeAtEnd($kit, 'file:///workspace/templates/controller_completion.html.twig', '<div data-controller="sea'));
+        $packageControllerCompletionUri = 'file:///workspace/templates/package_controller_completion.html.twig';
+        $packageControllerCompletionText = "{{ stimulus_controller('@symfony/ux-auto";
+        $kit->open($packageControllerCompletionUri, $packageControllerCompletionText);
+        $packageControllerCompletion = $completionProvider->complete($kit->positioned($kit->offset($packageControllerCompletionUri, \strlen($packageControllerCompletionText))));
+        self::assertSame(['symfony--ux-autocomplete--autocomplete'], $kit->labels($packageControllerCompletion));
         self::assertSame(['@symfony/ux-auto'], array_column($packageControllerCompletion, 'filterText'));
-        self::assertSame(['open'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($actionCompletionUri, $actionCompletionText, \strlen($actionCompletionText)))), 'label'));
-        self::assertSame(['results'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($targetCompletionUri, $targetCompletionText, \strlen($targetCompletionText)))), 'label'));
-        self::assertSame(['onChange'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($packageActionCompletionUri, $packageActionCompletionText, \strlen($packageActionCompletionText)))), 'label'));
-        self::assertSame(['field'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($packageTargetCompletionUri, $packageTargetCompletionText, \strlen($packageTargetCompletionText)))), 'label'));
-        self::assertSame([], $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($quotedAttributeUri, $quotedAttributeText, \strlen($quotedAttributeText)))));
-        self::assertSame([], $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($markupHelperUri, $markupHelperText, \strlen($markupHelperText)))));
+        self::assertSame(['open'], $this->completeAtEnd($kit, 'file:///workspace/templates/action_completion.html.twig', '<button data-action="click->search#op'));
+        self::assertSame(['results'], $this->completeAtEnd($kit, 'file:///workspace/templates/target_completion.html.twig', '<input data-search-target="res'));
+        self::assertSame(['onChange'], $this->completeAtEnd($kit, 'file:///workspace/templates/package_action_completion.html.twig', "{{ stimulus_action('@symfony/ux-autocomplete/autocomplete', 'on"));
+        self::assertSame(['field'], $this->completeAtEnd($kit, 'file:///workspace/templates/package_target_completion.html.twig', "{{ stimulus_target('symfony/ux-autocomplete/autocomplete', 'fi"));
+        $quotedAttributeUri = 'file:///workspace/templates/quoted_attribute.html.twig';
+        $quotedAttributeText = '{% set markup = \'<button data-action="click->search#op';
+        $kit->open($quotedAttributeUri, $quotedAttributeText);
+        self::assertSame([], $completionProvider->complete($kit->positioned($kit->offset($quotedAttributeUri, \strlen($quotedAttributeText)))));
+        $markupHelperUri = 'file:///workspace/templates/markup_helper.html.twig';
+        $markupHelperText = "<p>Call stimulus_controller('sea";
+        $kit->open($markupHelperUri, $markupHelperText);
+        self::assertSame([], $completionProvider->complete($kit->positioned($kit->offset($markupHelperUri, \strlen($markupHelperText)))));
 
-        $actionParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, '#open') + 2);
-        self::assertSame([$controllerUri], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($actionParams)), 'uri'));
-        self::assertCount(3, $relationshipProvider->references((new ProviderRequests($documents, $projects))->references($actionParams)));
-        $hover = $relationshipProvider->hover($requests->positioned($actionParams));
-        self::assertIsArray($hover);
-        self::assertIsArray($hover['contents'] ?? null);
-        self::assertSame('Stimulus action: `search#open`', $hover['contents']['value'] ?? null);
-        $unknownActionParams = LspRequests::offset($unknownActionUri, $unknownActionText, strpos($unknownActionText, 'missing') + 2);
-        self::assertNull($relationshipProvider->hover($requests->positioned($unknownActionParams)));
-        self::assertSame([], $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($unknownActionParams)));
+        $actionParams = $kit->offset($usageUri, strpos($usageText, '#open') + 2);
+        self::assertSame([$controllerUri], $kit->targets($relationshipProvider->definition($kit->positioned($actionParams))));
+        self::assertCount(3, $relationshipProvider->references($kit->references($actionParams)));
+        self::assertSame('Stimulus action: `search#open`', $kit->hoverText($relationshipProvider->hover($kit->positioned($actionParams))));
+        $unknownActionUri = 'file:///workspace/templates/unknown_action.html.twig';
+        $unknownActionText = '<button data-action="search#missing"></button>';
+        $kit->open($unknownActionUri, $unknownActionText);
+        $unknownActionParams = $kit->offset($unknownActionUri, strpos($unknownActionText, 'missing') + 2);
+        self::assertNull($relationshipProvider->hover($kit->positioned($unknownActionParams)));
+        self::assertSame([], $relationshipProvider->definition($kit->positioned($unknownActionParams)));
 
-        $packageControllerParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, 'symfony/ux-autocomplete/autocomplete') + 2);
+        $packageControllerParams = $kit->offset($usageUri, strpos($usageText, 'symfony/ux-autocomplete/autocomplete') + 2);
         self::assertSame(
             ['file:///workspace/vendor/symfony/ux-autocomplete/assets/dist/controller.js'],
-            array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($packageControllerParams)), 'uri'),
+            $kit->targets($relationshipProvider->definition($kit->positioned($packageControllerParams))),
         );
-        self::assertCount(5, $relationshipProvider->references((new ProviderRequests($documents, $projects))->references($packageControllerParams)));
+        self::assertCount(5, $relationshipProvider->references($kit->references($packageControllerParams)));
         foreach (['onChange', 'field'] as $member) {
-            $memberParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, $member) + 2);
             self::assertSame(
                 ['file:///workspace/vendor/symfony/ux-autocomplete/assets/dist/controller.js'],
-                array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($memberParams)), 'uri'),
+                $kit->targets($relationshipProvider->definition($kit->positioned($kit->offset($usageUri, strpos($usageText, $member) + 2)))),
             );
         }
 
-        $diagnostics = $diagnosticProvider->diagnostics($requests->document($usageUri)) ?? [];
-        self::assertSame(['stimulus.unknown_controller'], array_column($diagnostics, 'code'));
-        self::assertSame(['Unknown Stimulus controller "missing".'], array_column($diagnostics, 'message'));
-        self::assertGreaterThanOrEqual(4, \count($documentLinkProvider->links($requests->document($usageUri))));
-        $lenses = $codeLensProvider->codeLenses($requests->document($controllerUri));
-        self::assertIsArray($lenses[0]['command'] ?? null);
-        self::assertSame('3 Stimulus controller usages', $lenses[0]['command']['title'] ?? null);
+        $diagnostics = $kit->get(StimulusDiagnosticProvider::class)->diagnostics($kit->document($usageUri));
+        self::assertSame(['stimulus.unknown_controller'], $kit->codes($diagnostics));
+        self::assertSame(['Unknown Stimulus controller "missing".'], $kit->messages($diagnostics));
+        self::assertGreaterThanOrEqual(4, \count($kit->get(StimulusDocumentLinkProvider::class)->links($kit->document($usageUri))));
+        self::assertSame('3 Stimulus controller usages', $kit->titles($kit->get(StimulusCodeLensProvider::class)->codeLenses($kit->document($controllerUri)))[0] ?? null);
     }
 
     public function testRecognizesManuallyRegisteredControllers(): void
     {
-        $project = new Project('/workspace', 'file:///workspace');
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
         $bootstrapUri = 'file:///workspace/assets/app/stimulus_bootstrap.js';
         $bootstrapText = <<<'JS'
             import { startStimulusApp } from '@symfony/stimulus-bundle';
@@ -247,44 +172,23 @@ final class StimulusProviderTest extends TestCase
             JS;
         $usageUri = 'file:///workspace/templates/episode/tracked.html.twig';
         $usageText = '<div data-controller="clipboard"></div>';
-        $completionUri = 'file:///workspace/templates/completion.html.twig';
-        $completionText = '<div data-controller="clip';
-        $documents = new DocumentStore();
-        $documents->open(new Document($bootstrapUri, 'javascript', 1, $bootstrapText));
-        $documents->open(new Document($usageUri, 'twig', 1, $usageText));
-        $documents->open(new Document($completionUri, 'twig', 1, $completionText));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project]);
-        $indexes = new StimulusIndexRegistry();
-        $indexes->forProject($project)->replace(true);
-        $sourceIndexes = new StimulusSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace(
-            $extractor->extract($project, new SourceDocument($bootstrapUri, 'javascript', $bootstrapText)),
-            $extractor->extract($project, new SourceDocument($usageUri, 'twig', $usageText)),
-        );
-        $protocol = new LspProtocolMapper();
-        $stimulus = new StimulusResolver($converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $diagnosticProvider = new StimulusDiagnosticProvider($protocol, $indexes, $sourceIndexes, $stimulus);
-        $completionProvider = new StimulusCompletionProvider($converter, $protocol, $extractor, $stimulus);
-        $relationshipProvider = new StimulusRelationshipProvider(new UriToPathConverter(), $protocol, $indexes, $sourceIndexes, $stimulus);
-        $requests = new ProviderRequests($documents, $projects, $converter);
+        $kit = (new ProjectTestKit())
+            ->open($bootstrapUri, $bootstrapText)
+            ->open($usageUri, $usageText)
+            ->index()
+            ->runtime('stimulus', ['complete' => true, 'controllers' => []])
+        ;
 
-        self::assertSame([], $diagnosticProvider->diagnostics($requests->document($usageUri)));
-        self::assertSame(['clipboard'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($completionUri, $completionText, \strlen($completionText)))), 'label'));
-        self::assertSame([$bootstrapUri], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($usageUri, $usageText, strpos($usageText, 'clipboard') + 2))), 'uri'));
+        self::assertSame([], $kit->get(StimulusDiagnosticProvider::class)->diagnostics($kit->document($usageUri)));
+        self::assertSame(['clipboard'], $this->completeAtEnd($kit, 'file:///workspace/templates/completion.html.twig', '<div data-controller="clip'));
+        self::assertSame([$bootstrapUri], $kit->targets($kit->get(StimulusRelationshipProvider::class)->definition($kit->positioned($kit->offset($usageUri, strpos($usageText, 'clipboard') + 2)))));
     }
 
-    private function createExtractor(PositionConverter $converter): StimulusExtractor
+    /** @return list<mixed> */
+    private function completeAtEnd(ProjectTestKit $kit, string $uri, string $text): array
     {
-        $comments = new TwigCommentParser();
-        $tokenizer = new JavaScriptTokenizer();
-        $controllerNameNormalizer = new StimulusControllerNameNormalizer();
+        $kit->open($uri, $text);
 
-        return new StimulusExtractor(
-            new StimulusControllerExtractor($converter, ProjectPaths::resolver(), $controllerNameNormalizer, new StimulusControllerSourceAnalyzer($converter)),
-            new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()), new TwigCallArgumentResolver()),
-            new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer, new TwigDirectiveLocator()),
-            $tokenizer,
-        );
+        return $kit->labels($kit->get(StimulusCompletionProvider::class)->complete($kit->positioned($kit->offset($uri, \strlen($text)))));
     }
 }

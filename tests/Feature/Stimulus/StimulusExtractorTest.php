@@ -4,23 +4,10 @@ namespace Symfony\Lsp\Tests\Feature\Stimulus;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\Stimulus\StimulusCompletionContextResolver;
-use Symfony\Lsp\Feature\Stimulus\StimulusControllerExtractor;
-use Symfony\Lsp\Feature\Stimulus\StimulusControllerNameNormalizer;
-use Symfony\Lsp\Feature\Stimulus\StimulusControllerSourceAnalyzer;
 use Symfony\Lsp\Feature\Stimulus\StimulusExtractor;
-use Symfony\Lsp\Feature\Stimulus\StimulusReferenceExtractor;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
-use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class StimulusExtractorTest extends TestCase
 {
@@ -254,17 +241,7 @@ final class StimulusExtractorTest extends TestCase
 
     private function createExtractor(): StimulusExtractor
     {
-        $converter = new PositionConverter();
-        $comments = new TwigCommentParser();
-        $tokenizer = new JavaScriptTokenizer();
-        $controllerNameNormalizer = new StimulusControllerNameNormalizer();
-
-        return new StimulusExtractor(
-            new StimulusControllerExtractor($converter, ProjectPaths::resolver(), $controllerNameNormalizer, new StimulusControllerSourceAnalyzer($converter)),
-            new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()), new TwigCallArgumentResolver()),
-            new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer, new TwigDirectiveLocator()),
-            $tokenizer,
-        );
+        return (new ProjectTestKit())->get(StimulusExtractor::class);
     }
 
     /** @return iterable<string, array{string, string, bool}> */
