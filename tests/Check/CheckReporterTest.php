@@ -96,8 +96,8 @@ final class CheckReporterTest extends TestCase
         self::assertSame("[]\n", $this->reporter()->render($this->fixtureResult(), 'gitlab', false, 0));
     }
 
-    #[DataProvider('gitLabInformationSeverities')]
-    public function testMapsInformationAndHintDiagnosticsToGitLabInfo(int $severity): void
+    #[DataProvider('gitLabSeverities')]
+    public function testMapsDiagnosticSeveritiesToGitLabSeverities(int $severity, string $expected): void
     {
         $diagnostic = new CheckDiagnostic(
             'apps/api',
@@ -116,14 +116,16 @@ final class CheckReporterTest extends TestCase
         /** @var list<GitLabIssue> $report */
         $report = json_decode($this->reporter()->render($this->fixtureResult(diagnostic: $diagnostic), 'gitlab', false, 0), true, flags: \JSON_THROW_ON_ERROR);
 
-        self::assertSame('info', $report[0]['severity']);
+        self::assertSame($expected, $report[0]['severity']);
     }
 
-    /** @return iterable<string, array{int}> */
-    public static function gitLabInformationSeverities(): iterable
+    /** @return iterable<string, array{int, string}> */
+    public static function gitLabSeverities(): iterable
     {
-        yield 'information' => [3];
-        yield 'hint' => [4];
+        yield 'error' => [1, 'major'];
+        yield 'warning' => [2, 'minor'];
+        yield 'information' => [3, 'info'];
+        yield 'hint' => [4, 'info'];
     }
 
     public function testRendersSarifRulesLocationsFingerprintsAndBaselines(): void
