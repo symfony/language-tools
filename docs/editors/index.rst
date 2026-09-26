@@ -55,6 +55,9 @@ Custom clients invoke them as ``symfony.refreshIndex``,
 ``symfony.indexStatus``, ``symfony.switchEnvironment`` and
 ``symfony.switchKernel``.
 
+A switched environment or kernel stays selected until you switch again or
+change that setting in your configuration.
+
 Settings
 --------
 
