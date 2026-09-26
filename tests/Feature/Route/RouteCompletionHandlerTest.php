@@ -77,6 +77,29 @@ final class RouteCompletionHandlerTest extends TestCase
         self::assertSame(['slug'], $kit->labels($kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params))));
     }
 
+    #[DataProvider('rejectedTwigRouteCompletionProvider')]
+    public function testOffersNoRouteCompletionWhereTwigReadsNoRouteReference(string $text): void
+    {
+        $uri = 'file:///workspace/templates/article.html.twig';
+        $kit = $this->kit($uri, $text, [self::route('article_show', '/{section}/article/{slug}')]);
+        $cursor = strpos($text, '|');
+        self::assertIsInt($cursor);
+        $kit->open($uri, str_replace('|', '', $text));
+
+        self::assertSame([], $kit->get(RouteCompletionHandler::class)->complete($kit->positioned($kit->offset($uri, $cursor))));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function rejectedTwigRouteCompletionProvider(): iterable
+    {
+        yield 'method call' => ["{{ image.url('article_| }}"];
+        yield 'null-safe method call' => ["{{ image?.path('article_| }}"];
+        yield 'filter of the same name' => ["{{ value|path('article_| }}"];
+        yield 'filter separated by spaces' => ["{{ value | url('article_| }}"];
+        yield 'parameter value' => ["{{ path('article_show', {section: 's| }}"];
+        yield 'quoted parameter value' => ["{{ path('article_show', {'section': 's| }}"];
+    }
+
     public function testCompletesRoutesThroughAProjectControllerBaseClass(): void
     {
         $baseUri = 'file:///workspace/src/Controller/BaseController.php';
