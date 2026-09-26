@@ -6,7 +6,6 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
@@ -15,7 +14,6 @@ final class TwigRouteReferenceExtractor
     public function __construct(
         private readonly PositionConverter $positionConverter,
         private readonly TwigDocumentParser $parser,
-        private readonly TwigCallArgumentResolver $arguments,
     ) {
     }
 
@@ -24,14 +22,8 @@ final class TwigRouteReferenceExtractor
     {
         $document = $this->parser->parse($source->text);
         $references = [];
-        foreach ($document->nodesOfType('function_call') as $call) {
-            $function = $document->directChild($call, 'function_identifier');
-            if (null === $function || !\in_array($document->text($function), ['path', 'url'], true)) {
-                continue;
-            }
-            $arguments = $this->arguments->resolve($document, $call);
-            $routeArgument = $arguments->get(0, 'name');
-            $route = null === $routeArgument ? null : $document->soleStringLiteral($routeArgument);
+        foreach ($document->calls('path', 'url') as $call) {
+            $route = $call->argument(0, 'name')?->literal();
             if (null === $route) {
                 continue;
             }
@@ -43,7 +35,7 @@ final class TwigRouteReferenceExtractor
                     $this->positionConverter->toPosition($source->text, $route->startOffset),
                     $this->positionConverter->toPosition($source->text, $route->endOffset),
                 ),
-                providedParameters: $this->providedParameters($document, $arguments->get(1, 'parameters')),
+                providedParameters: $this->providedParameters($document, $call->argument(1, 'parameters')?->node),
             );
         }
 
