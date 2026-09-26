@@ -6,7 +6,6 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
@@ -19,7 +18,6 @@ final class RouteReferenceExtractor
         private readonly PhpRouteReferenceCandidateExtractor $candidates,
         private readonly RoutePhpReceiverResolver $receivers,
         private readonly RouteControllerClassifier $controllers,
-        private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
 
@@ -80,7 +78,7 @@ final class RouteReferenceExtractor
             $range,
             array_values(array_unique(array_map(
                 static fn (PhpStringLiteral $key): string => $key->value,
-                $this->arrayKeys->parseArgument($cursor->argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [],
+                $document->literalArray($cursor->argument)->keys ?? [],
             ))),
         );
     }

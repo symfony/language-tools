@@ -110,6 +110,23 @@ final class RouteCompletionContextTest extends TestCase
         self::assertSame(['section'], $context->existingParameters);
     }
 
+    public function testReadsProvidedParametersOfLegacyArrayCalls(): void
+    {
+        $context = $this->completionAt(<<<'PHP'
+            <?php
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->generateUrl('article_show', array('section' => 'news', 'sl|
+                }
+            }
+            PHP);
+
+        self::assertInstanceOf(RouteParameterCompletionContext::class, $context);
+        self::assertSame(['section'], $context->existingParameters);
+    }
+
     public function testIgnoresParameterValuesAndNestedParameterArrays(): void
     {
         foreach ([
