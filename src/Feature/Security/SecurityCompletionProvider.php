@@ -2,16 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Security;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class SecurityCompletionProvider implements CompletionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
-        private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly SecurityIndexRegistry $indexes,
         private readonly SecuritySourceIndexRegistry $sourceIndexes,
@@ -19,16 +17,12 @@ final class SecurityCompletionProvider implements CompletionProviderInterface
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $offset = $request->offset;
         $context = $this->extractor->completionContext($request->document->languageId, $request->document->text, $offset);
         if (null === $context) {
-            return null;
+            return [];
         }
         $index = $this->indexes->forProject($request->project);
         $names = match ($context->kind) {
@@ -46,12 +40,12 @@ final class SecurityCompletionProvider implements CompletionProviderInterface
         $items = [];
         foreach ($names as $name) {
             if (str_starts_with($name, $context->prefix)) {
-                $items[] = [
-                    'label' => $name,
-                    'kind' => 12,
-                    'detail' => 'Symfony security '.$context->kind->value,
-                    'textEdit' => $this->protocol->textEdit($context->range, $name),
-                ];
+                $items[] = $this->protocol->completionItem(
+                    $name,
+                    CompletionItemKind::Value,
+                    'Symfony security '.$context->kind->value,
+                    $this->protocol->textEdit($context->range, $name),
+                );
             }
         }
 

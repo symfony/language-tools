@@ -11,6 +11,7 @@ use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\LspRequestFactory;
@@ -31,17 +32,12 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->requests->positioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         $offset = $request->offset;
         $context = $this->extractor->completionContext($request->document->languageId, $request->document->text, $offset);
         if (null === $context) {
-            return null;
+            return [];
         }
         if (AssetSymbolKind::Asset === $context->kind) {
             $candidates = [];
@@ -60,12 +56,12 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
             if (!str_starts_with((string) $name, $context->prefix)) {
                 continue;
             }
-            $items[] = [
-                'label' => (string) $name,
-                'kind' => AssetSymbolKind::Asset === $context->kind ? 17 : 12,
-                'detail' => $detail,
-                'textEdit' => $this->protocol->textEdit($context->range, (string) $name),
-            ];
+            $items[] = $this->protocol->completionItem(
+                (string) $name,
+                AssetSymbolKind::Asset === $context->kind ? CompletionItemKind::File : CompletionItemKind::Value,
+                $detail,
+                $this->protocol->textEdit($context->range, (string) $name),
+            );
         }
 
         return $items;

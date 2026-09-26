@@ -2,17 +2,17 @@
 
 namespace Symfony\Lsp\Feature\Event;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class EventCompletionProvider implements CompletionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly EventIndexRegistry $indexes,
@@ -20,16 +20,12 @@ final class EventCompletionProvider implements CompletionProviderInterface
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $offset = $request->offset;
         $prefix = $this->extractor->completionPrefix($request->document->languageId, $request->document->text, $offset);
         if (null === $prefix) {
-            return null;
+            return [];
         }
         $items = [];
         foreach ($this->indexes->forProject($request->project)->events() as $event) {
@@ -46,6 +42,6 @@ final class EventCompletionProvider implements CompletionProviderInterface
     {
         $position = $this->converter->toPosition($text, $start);
 
-        return ['label' => $name, 'kind' => 12, 'textEdit' => $this->protocol->textEdit(new Range($position, $end), $name)];
+        return $this->protocol->completionItem($name, CompletionItemKind::Value, textEdit: $this->protocol->textEdit(new Range($position, $end), $name));
     }
 }

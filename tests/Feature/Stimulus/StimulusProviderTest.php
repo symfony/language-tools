@@ -182,23 +182,23 @@ final class StimulusProviderTest extends TestCase
         $uriConverter = new UriToPathConverter();
         $protocol = new LspProtocolMapper();
         $stimulus = new StimulusResolver($converter, $protocol, $indexes, $sourceIndexes, $extractor);
-        $completionProvider = new StimulusCompletionProvider($documentResolver, $converter, $protocol, $extractor, $stimulus);
+        $completionProvider = new StimulusCompletionProvider($converter, $protocol, $extractor, $stimulus);
         $relationshipProvider = new StimulusRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $uriConverter, $protocol, $indexes, $sourceIndexes, $stimulus);
         $diagnosticProvider = new StimulusDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $stimulus);
         $documentLinkProvider = new StimulusDocumentLinkProvider($uriConverter, $protocol, $indexes, $extractor, $stimulus);
         $codeLensProvider = new StimulusCodeLensProvider($protocol, $sourceIndexes, $extractor);
         $requests = new ProviderRequests($documents, $projects);
 
-        self::assertSame(['search'], array_column($completionProvider->complete(LspRequests::offset($controllerCompletionUri, $controllerCompletionText, \strlen($controllerCompletionText))) ?? [], 'label'));
-        $packageControllerCompletion = $completionProvider->complete(LspRequests::offset($packageControllerCompletionUri, $packageControllerCompletionText, \strlen($packageControllerCompletionText))) ?? [];
+        self::assertSame(['search'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($controllerCompletionUri, $controllerCompletionText, \strlen($controllerCompletionText)))), 'label'));
+        $packageControllerCompletion = $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($packageControllerCompletionUri, $packageControllerCompletionText, \strlen($packageControllerCompletionText))));
         self::assertSame(['symfony--ux-autocomplete--autocomplete'], array_column($packageControllerCompletion, 'label'));
         self::assertSame(['@symfony/ux-auto'], array_column($packageControllerCompletion, 'filterText'));
-        self::assertSame(['open'], array_column($completionProvider->complete(LspRequests::offset($actionCompletionUri, $actionCompletionText, \strlen($actionCompletionText))) ?? [], 'label'));
-        self::assertSame(['results'], array_column($completionProvider->complete(LspRequests::offset($targetCompletionUri, $targetCompletionText, \strlen($targetCompletionText))) ?? [], 'label'));
-        self::assertSame(['onChange'], array_column($completionProvider->complete(LspRequests::offset($packageActionCompletionUri, $packageActionCompletionText, \strlen($packageActionCompletionText))) ?? [], 'label'));
-        self::assertSame(['field'], array_column($completionProvider->complete(LspRequests::offset($packageTargetCompletionUri, $packageTargetCompletionText, \strlen($packageTargetCompletionText))) ?? [], 'label'));
-        self::assertNull($completionProvider->complete(LspRequests::offset($quotedAttributeUri, $quotedAttributeText, \strlen($quotedAttributeText))));
-        self::assertNull($completionProvider->complete(LspRequests::offset($markupHelperUri, $markupHelperText, \strlen($markupHelperText))));
+        self::assertSame(['open'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($actionCompletionUri, $actionCompletionText, \strlen($actionCompletionText)))), 'label'));
+        self::assertSame(['results'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($targetCompletionUri, $targetCompletionText, \strlen($targetCompletionText)))), 'label'));
+        self::assertSame(['onChange'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($packageActionCompletionUri, $packageActionCompletionText, \strlen($packageActionCompletionText)))), 'label'));
+        self::assertSame(['field'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($packageTargetCompletionUri, $packageTargetCompletionText, \strlen($packageTargetCompletionText)))), 'label'));
+        self::assertSame([], $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($quotedAttributeUri, $quotedAttributeText, \strlen($quotedAttributeText)))));
+        self::assertSame([], $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($markupHelperUri, $markupHelperText, \strlen($markupHelperText)))));
 
         $actionParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, '#open') + 2);
         self::assertSame([$controllerUri], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($actionParams)), 'uri'));
@@ -270,11 +270,11 @@ final class StimulusProviderTest extends TestCase
         $protocol = new LspProtocolMapper();
         $stimulus = new StimulusResolver($converter, $protocol, $indexes, $sourceIndexes, $extractor);
         $diagnosticProvider = new StimulusDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $stimulus);
-        $completionProvider = new StimulusCompletionProvider($documentResolver, $converter, $protocol, $extractor, $stimulus);
+        $completionProvider = new StimulusCompletionProvider($converter, $protocol, $extractor, $stimulus);
         $relationshipProvider = new StimulusRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), new UriToPathConverter(), $protocol, $indexes, $sourceIndexes, $stimulus);
 
         self::assertSame([], $diagnosticProvider->diagnostics(LspRequests::document($usageUri)));
-        self::assertSame(['clipboard'], array_column($completionProvider->complete(LspRequests::offset($completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
+        self::assertSame(['clipboard'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($completionUri, $completionText, \strlen($completionText)))), 'label'));
         self::assertSame([$bootstrapUri], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($usageUri, $usageText, strpos($usageText, 'clipboard') + 2))), 'uri'));
     }
 

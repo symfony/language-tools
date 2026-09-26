@@ -41,6 +41,7 @@ use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectTestKit;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class MessengerProviderTest extends TestCase
 {
@@ -463,14 +464,14 @@ YAML;
         $relationshipProvider = $kit->get(MessengerRelationshipProvider::class);
         $diagnosticProvider = $kit->get(MessengerDiagnosticProvider::class);
 
-        self::assertSame(['command.bus'], $kit->labels($completionProvider->complete($kit->after($yamlUri, 'bus: comm'))));
-        self::assertNull($completionProvider->complete($kit->after($yamlUri, '# failure_transport: fa')));
-        self::assertNull($completionProvider->complete($kit->after($yamlUri, '$bus: nul')));
+        self::assertSame(['command.bus'], $kit->labels($completionProvider->complete($kit->positioned($kit->after($yamlUri, 'bus: comm')))));
+        self::assertSame([], $completionProvider->complete($kit->positioned($kit->after($yamlUri, '# failure_transport: fa'))));
+        self::assertSame([], $completionProvider->complete($kit->positioned($kit->after($yamlUri, '$bus: nul'))));
         $bundleUri = 'file:///workspace/config/packages/other_bundle.yaml';
         $bundleYaml = "other_bundle:\n    bus: com";
         $kit->open($bundleUri, $bundleYaml);
-        self::assertNull($completionProvider->complete($kit->offset($bundleUri, \strlen($bundleYaml))));
-        self::assertSame(['async'], $kit->labels($completionProvider->complete($kit->after($yamlUri, 'Ping: asy'))));
+        self::assertSame([], $completionProvider->complete($kit->positioned($kit->offset($bundleUri, \strlen($bundleYaml)))));
+        self::assertSame(['async'], $kit->labels($completionProvider->complete($kit->positioned($kit->after($yamlUri, 'Ping: asy')))));
         self::assertStringContainsString('Messenger transport', $kit->hoverText($relationshipProvider->hover($kit->after($yamlUri, 'from_transport: as'))));
         self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside($yamlUri, 'command.bus')))));
         self::assertSame(['messenger.unknown_bus'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($yamlUri))));
@@ -699,7 +700,6 @@ YAML;
         $indexes = new MessengerIndexRegistry();
         $indexes->forProject($project)->replace([new MessengerBus('command.bus', true)], [], [], [], true);
         $provider = new MessengerCompletionProvider(
-            new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
             $indexes,
@@ -709,7 +709,7 @@ YAML;
         );
         $position = $converter->toPosition($text, \strlen($text));
 
-        self::assertSame($expectedLabels, array_column($provider->complete(LspRequests::position($uri, $position)) ?? [], 'label'));
+        self::assertSame($expectedLabels, array_column($provider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::position($uri, $position))), 'label'));
     }
 
     /** @return iterable<string, array{string, list<string>}> */
@@ -745,7 +745,6 @@ YAML;
         $indexes = new MessengerIndexRegistry();
         $indexes->forProject($project)->replace([new MessengerBus('command.bus', true)], [], [], [], true);
         $provider = new MessengerCompletionProvider(
-            new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
             $indexes,
@@ -755,7 +754,7 @@ YAML;
         );
         $position = $converter->toPosition($text, \strlen($text));
 
-        self::assertNull($provider->complete(LspRequests::position($uri, $position)));
+        self::assertSame([], $provider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::position($uri, $position))));
     }
 
     private function extractor(): MessengerExtractor

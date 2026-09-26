@@ -75,7 +75,7 @@ final class EnvironmentProviderTest extends TestCase
 
         $completionStart = (int) strpos($text, 'PARTIAL_EN');
         $completionOffset = $completionStart + \strlen('PARTIAL_EN');
-        $completion = $completionProvider->complete($this->positionParams($converter, $uri, $text, $completionOffset)) ?? [];
+        $completion = $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned($this->positionParams($converter, $uri, $text, $completionOffset)));
         self::assertSame(['PARTIAL_ENV'], array_column($completion, 'label'));
         /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
         $textEdit = $completion[0]['textEdit'];
@@ -137,7 +137,7 @@ final class EnvironmentProviderTest extends TestCase
         $position = $converter->toPosition($text, strpos($text, 'APP_UR') + \strlen('APP_UR'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
-        $completion = $completionProvider->complete($params) ?? [];
+        $completion = $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned($params));
         self::assertSame(['APP_URL'], array_column($completion, 'label'));
         self::assertSame([
             'range' => ['start' => ['line' => 0, 'character' => 16], 'end' => ['line' => 0, 'character' => 23]],
@@ -154,7 +154,7 @@ final class EnvironmentProviderTest extends TestCase
         $documents->open(new Document($commentUri, 'twig', 1, $commentText));
         $indexes->forProject($project)->replaceSource($extractor->extract(new SourceDocument($commentUri, 'twig', $commentText)));
         $commentPosition = $converter->toPosition($commentText, strpos($commentText, 'APP_UR') + \strlen('APP_UR'));
-        self::assertNull($completionProvider->complete(['textDocument' => ['uri' => $commentUri], 'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character]]));
+        self::assertSame([], $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(['textDocument' => ['uri' => $commentUri], 'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character]])));
         $malformedOffset = (int) strrpos($commentText, '%env(APP_URL%');
         $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $commentUri]]) ?? [];
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
@@ -182,10 +182,10 @@ final class EnvironmentProviderTest extends TestCase
         [$completionProvider, $relationshipProvider, $diagnosticProvider] = $this->providers($documents, $projects, $converter, $indexes, $extractor, $comments, $yamlParser);
 
         $commentCompletionOffset = strpos($text, 'APP_UR') + \strlen('APP_UR');
-        self::assertNull($completionProvider->complete($this->positionParams($converter, $uri, $text, $commentCompletionOffset)));
+        self::assertSame([], $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned($this->positionParams($converter, $uri, $text, $commentCompletionOffset))));
         $liveNameStart = (int) strrpos($text, 'APP_URL');
         $liveCompletionOffset = $liveNameStart + \strlen('APP_UR');
-        $completion = $completionProvider->complete($this->positionParams($converter, $uri, $text, $liveCompletionOffset)) ?? [];
+        $completion = $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned($this->positionParams($converter, $uri, $text, $liveCompletionOffset)));
         self::assertSame(['APP_URL'], array_column($completion, 'label'));
         /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
         $textEdit = $completion[0]['textEdit'];
@@ -248,7 +248,7 @@ final class EnvironmentProviderTest extends TestCase
         $completionOffset = strpos($text, 'APP_U') + \strlen('APP_U');
         $position = $converter->toPosition($text, $completionOffset);
 
-        self::assertNull($completionProvider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
+        self::assertSame([], $completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]])));
         $malformedOffset = (int) strrpos($text, '%env(APP_URL%');
         $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [];
         self::assertSame(['env.malformed_chain'], array_column($diagnostics, 'code'));
@@ -313,7 +313,7 @@ final class EnvironmentProviderTest extends TestCase
         $protocol = new LspProtocolMapper();
 
         return [
-            new EnvironmentCompletionProvider($resolver, $converter, $protocol, $indexes, $comments, $yamlParser),
+            new EnvironmentCompletionProvider($converter, $protocol, $indexes, $comments, $yamlParser),
             new EnvironmentRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, new EnvironmentSymbolResolver(new PositionedSourceSymbolResolver($converter), $extractor)),
             new EnvironmentDiagnosticProvider($resolver, $protocol, $indexes, new EnvironmentProcessorChainValidator()),
         ];

@@ -16,6 +16,7 @@ use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
@@ -37,16 +38,11 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         $document = $request->document;
         $context = match ($document->languageId) {
-            'php' => $this->extractor->phpCompletionContext($document->text, $this->converter->toByteOffset($document->text, $request->position)),
+            'php' => $this->extractor->phpCompletionContext($document->text, $request->offset),
             'twig' => TranslationCompletionContext::fromTwig(
                 $this->comments->mask('twig', $document->text),
                 $request->position,
@@ -56,7 +52,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             default => null,
         };
         if (null === $context) {
-            return null;
+            return [];
         }
 
         $index = $this->indexes->forProject($request->project);
@@ -76,12 +72,12 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             static fn (string $value): bool => str_starts_with($value, $context->prefix),
         ));
 
-        return array_map(fn (string $value): array => [
-            'label' => $value,
-            'kind' => 12,
-            'detail' => 'Symfony translation '.$context->kind,
-            'textEdit' => $this->protocol->textEdit($context->range, $this->completionValue($context, $value)),
-        ], $values);
+        return array_map(fn (string $value): array => $this->protocol->completionItem(
+            $value,
+            CompletionItemKind::Value,
+            'Symfony translation '.$context->kind,
+            $this->protocol->textEdit($context->range, $this->completionValue($context, $value)),
+        ), $values);
     }
 
     /**

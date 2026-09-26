@@ -8,6 +8,7 @@ use Symfony\Lsp\Feature\Route\RouteCompletionBuilder;
 use Symfony\Lsp\Feature\Route\RouteIndex;
 use Symfony\Lsp\Feature\Route\RouteSnapshotImporter;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\SnapshotSection;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 
@@ -30,7 +31,7 @@ final class RouteCompletionBuilderTest extends TestCase
         self::assertSame([
             ['label' => 'article_edit', 'kind' => 12, 'detail' => '/article/{id}/edit'],
             ['label' => 'article_show', 'kind' => 12, 'detail' => '/article/{id}'],
-        ], (new RouteCompletionBuilder())->complete($index, 'article_'));
+        ], (new RouteCompletionBuilder(new LspProtocolMapper()))->complete($index, 'article_'));
         self::assertTrue($index->isResource('config/routes.yaml'));
         self::assertTrue($index->isResource('config/http_endpoints.yaml'));
     }
@@ -50,7 +51,7 @@ final class RouteCompletionBuilderTest extends TestCase
 
         self::assertSame([
             ['label' => 'app_home', 'kind' => 12, 'detail' => 'Symfony route'],
-        ], (new RouteCompletionBuilder())->complete($index, ''));
+        ], (new RouteCompletionBuilder(new LspProtocolMapper()))->complete($index, ''));
         self::assertInstanceOf(Route::class, $index->get('legacy_home'));
     }
 
@@ -79,7 +80,7 @@ final class RouteCompletionBuilderTest extends TestCase
             'items' => [null, ['path' => '/']],
         ]));
 
-        self::assertSame([], (new RouteCompletionBuilder())->complete($index, ''));
+        self::assertSame([], (new RouteCompletionBuilder(new LspProtocolMapper()))->complete($index, ''));
         self::assertTrue($index->isResource('config/routes.yaml'));
     }
 

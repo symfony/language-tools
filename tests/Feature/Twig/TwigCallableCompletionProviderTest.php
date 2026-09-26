@@ -40,17 +40,18 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
         $environment = $this->providers([$extensionUri => $extensionText]);
         $provider = $environment['completion'];
         $documents = $environment['documents'];
+        $requests = $environment['requests'];
         $converter = $environment['converter'];
-        $completions = static function (string $text) use ($provider, $documents, $converter): ?array {
+        $completions = static function (string $text) use ($provider, $documents, $requests, $converter): array {
             $uri = 'file:///workspace/templates/completion.html.twig';
             $documents->open(new Document($uri, 'twig', 2, $text));
             $position = $converter->toPosition($text, \strlen($text));
-            $items = $provider->complete([
+            $items = $provider->complete($requests->positioned([
                 'textDocument' => ['uri' => $uri],
                 'position' => ['line' => $position->line, 'character' => $position->character],
-            ]);
+            ]));
 
-            return null === $items ? null : array_column($items, 'label');
+            return array_column($items, 'label');
         };
 
         self::assertSame(['function_name'], $completions('{{ func'));
@@ -60,12 +61,12 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
         self::assertSame(['filter_name'], $completions('{{ item|fil'));
         self::assertSame(['attribute_filter'], $completions('{{ item|attribute_f'));
         self::assertSame(['function_name'], $completions('{% if f'));
-        self::assertNull($completions('{% macro function_n'));
+        self::assertSame([], $completions('{% macro function_n'));
         self::assertSame(['function_name'], $completions('{{ "}}" ~ func'));
-        self::assertNull($completions('{{ "say func'));
-        self::assertNull($completions('{{ item.func'));
-        self::assertNull($completions('Plain func'));
-        self::assertNull($completions('{{ done }} func'));
+        self::assertSame([], $completions('{{ "say func'));
+        self::assertSame([], $completions('{{ item.func'));
+        self::assertSame([], $completions('Plain func'));
+        self::assertSame([], $completions('{{ done }} func'));
     }
 
     public function testCompletesNamedArguments(): void
@@ -160,17 +161,18 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
         $environment = $this->providers([$extensionUri => $extensionText]);
         $provider = $environment['completion'];
         $documents = $environment['documents'];
+        $requests = $environment['requests'];
         $converter = $environment['converter'];
-        $completions = static function (string $text) use ($provider, $documents, $converter): ?array {
+        $completions = static function (string $text) use ($provider, $documents, $requests, $converter): array {
             $uri = 'file:///workspace/templates/arguments.html.twig';
             $documents->open(new Document($uri, 'twig', 2, $text));
             $position = $converter->toPosition($text, \strlen($text));
-            $items = $provider->complete([
+            $items = $provider->complete($requests->positioned([
                 'textDocument' => ['uri' => $uri],
                 'position' => ['line' => $position->line, 'character' => $position->character],
-            ]);
+            ]));
 
-            return null === $items ? null : array_column($items, 'label');
+            return array_column($items, 'label');
         };
 
         self::assertSame(['name', 'width', 'lazy', 'pattern'], $completions('{{ image('));
@@ -186,8 +188,8 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
         self::assertSame(['length'], $completions('{{ text|attribute_shorten('));
         self::assertSame(['name'], $completions('{{ attribute_variadic('));
         self::assertSame(['name', 'width'], $completions('{{ legacy_safe('));
-        self::assertNull($completions('{% macro image(name, '));
-        self::assertNull($completions("{{ image(name: 'a"));
+        self::assertSame([], $completions('{% macro image(name, '));
+        self::assertSame([], $completions("{{ image(name: 'a"));
     }
 
     public function testCompletesDirectivesEmbeddedInQuotedMarkupAttributes(): void
@@ -229,21 +231,20 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
         $environment = $this->providers([$extensionUri => $extensionText]);
         $provider = $environment['completion'];
         $documents = $environment['documents'];
+        $requests = $environment['requests'];
         $converter = $environment['converter'];
-        $items = static function (string $text, ?int $offset = null) use ($provider, $documents, $converter): ?array {
+        $items = static function (string $text, ?int $offset = null) use ($provider, $documents, $requests, $converter): array {
             $uri = 'file:///workspace/templates/about/license.html.twig';
             $documents->open(new Document($uri, 'twig', 2, $text));
             $position = $converter->toPosition($text, $offset ?? \strlen($text));
 
-            return $provider->complete([
+            return $provider->complete($requests->positioned([
                 'textDocument' => ['uri' => $uri],
                 'position' => ['line' => $position->line, 'character' => $position->character],
-            ]);
+            ]));
         };
-        $labels = static function (string $text, ?int $offset = null) use ($items): ?array {
-            $completions = $items($text, $offset);
-
-            return null === $completions ? null : array_column($completions, 'label');
+        $labels = static function (string $text, ?int $offset = null) use ($items): array {
+            return array_column($items($text, $offset), 'label');
         };
         $textEdit = static fn (string $text, ?int $offset = null): mixed => $items($text, $offset)[0]['textEdit'] ?? null;
 
@@ -277,11 +278,11 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
 
         self::assertSame(['icon'], $labels('<i class="fa {{ ic'));
         self::assertSame([], $labels('<i class="fa {{ \'help\'|icon(onlyIcon: false, '));
-        self::assertNull($labels('<a href="{{ \'docu_l'));
-        self::assertNull($labels('<i class="fa {{ \'help\'|icon(\'fa-ic'));
-        self::assertNull($labels('<a href="{# {{ \'\'|docu_l'));
-        self::assertNull($labels('<a href="docu_l'));
-        self::assertNull($labels('<a href="{{ \'\'|docu_link }}" title="docu_l'));
-        self::assertNull($labels('<div>{% macro ic'));
+        self::assertSame([], $labels('<a href="{{ \'docu_l'));
+        self::assertSame([], $labels('<i class="fa {{ \'help\'|icon(\'fa-ic'));
+        self::assertSame([], $labels('<a href="{# {{ \'\'|docu_l'));
+        self::assertSame([], $labels('<a href="docu_l'));
+        self::assertSame([], $labels('<a href="{{ \'\'|docu_link }}" title="docu_l'));
+        self::assertSame([], $labels('<div>{% macro ic'));
     }
 }

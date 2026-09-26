@@ -129,9 +129,9 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame(['id', 'name', 'category'], array_map(static fn (DoctrineField $field): string => $field->name, $index->entity('App\\Entity\\Product')->fields ?? []));
         self::assertSame('App\\Entity\\Product', $index->repository('App\\Repository\\ProductRepository')?->entityClass);
 
-        self::assertSame(['name'], $kit->labels($completionProvider->complete($kit->offset($formCompletionUri, \strlen($formCompletionText)))));
-        self::assertSame(['name'], $kit->labels($completionProvider->complete($kit->offset($repositoryCompletionUri, \strlen($repositoryCompletionText)))));
-        self::assertSame(['category'], $kit->labels($completionProvider->complete($kit->offset($managerCompletionUri, \strlen($managerCompletionText)))));
+        self::assertSame(['name'], $kit->labels($completionProvider->complete($kit->positioned($kit->offset($formCompletionUri, \strlen($formCompletionText))))));
+        self::assertSame(['name'], $kit->labels($completionProvider->complete($kit->positioned($kit->offset($repositoryCompletionUri, \strlen($repositoryCompletionText))))));
+        self::assertSame(['category'], $kit->labels($completionProvider->complete($kit->positioned($kit->offset($managerCompletionUri, \strlen($managerCompletionText))))));
 
         $field = $kit->after($usageUri, "['na");
         self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($kit->positioned($field))));

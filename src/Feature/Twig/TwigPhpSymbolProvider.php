@@ -21,20 +21,15 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->requests->positioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         if ('twig' !== $request->document->languageId) {
-            return null;
+            return [];
         }
         $text = $request->document->text;
         $context = $this->extractor->completionContext($text, $request->offset);
         if (null === $context) {
-            return null;
+            return [];
         }
         $index = $this->indexes->forProject($request->project);
         if (\in_array($context->kind, [TwigPhpSymbolCompletionKind::ConstantType, TwigPhpSymbolCompletionKind::EnumType], true)) {
@@ -64,7 +59,7 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
         }
         $className = $context->className;
         if (null === $className) {
-            return null;
+            return [];
         }
         $declarations = $index->completableMembers($className, TwigPhpSymbolCompletionKind::EnumCase === $context->kind);
         $items = [];

@@ -2,19 +2,19 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class RouteCompletionHandler implements CompletionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $positionConverter,
         private readonly LspProtocolMapper $protocol,
         private readonly RouteIndexRegistry $routeIndexes,
@@ -26,23 +26,18 @@ final class RouteCompletionHandler implements CompletionProviderInterface
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return list<array{label: string, kind: int, detail: string, textEdit: array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string}}>|null
-     */
-    public function complete(array $params): ?array
+    /** @return list<array<array-key, mixed>> */
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig'], true)) {
-            return null;
+        if (!\in_array($request->document->languageId, ['php', 'twig'], true)) {
+            return [];
         }
 
         $routeIndex = $this->routeIndexes->forProject($request->project);
         if ('twig' === $request->document->languageId) {
             $twigText = $this->comments->mask($request->document->languageId, $request->document->text);
             if (!$this->directives->insideDirective($twigText, $this->positionConverter->toByteOffset($twigText, $request->position))) {
-                return null;
+                return [];
             }
             $parameterContext = TwigRouteParameterCompletionContext::fromTwig(
                 $twigText,
@@ -71,7 +66,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
                 $this->positionConverter,
             );
             if (null === $routeContext) {
-                return null;
+                return [];
             }
 
             return $this->withTextEdits(
@@ -81,7 +76,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         }
         $context = $this->phpReferenceExtractor->phpCompletionAt(
             $request->document->text,
-            $this->positionConverter->toByteOffset($request->document->text, $request->position),
+            $request->offset,
             $this->classIndexes->forProject($request->project),
         );
         if ($context instanceof RouteParameterCompletionContext) {
@@ -96,7 +91,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
             );
         }
         if (null === $context) {
-            return null;
+            return [];
         }
 
         return $this->withTextEdits(
@@ -108,16 +103,12 @@ final class RouteCompletionHandler implements CompletionProviderInterface
     /**
      * @param list<string> $existingParameters
      *
-     * @return list<array{label: string, kind: int, detail: string}>
+     * @return list<array<array-key, mixed>>
      */
     private function completeParameters(Route $route, string $prefix, array $existingParameters): array
     {
         return array_map(
-            static fn (string $parameter): array => [
-                'label' => $parameter,
-                'kind' => 10,
-                'detail' => \sprintf('Parameter of route %s', $route->name),
-            ],
+            fn (string $parameter): array => $this->protocol->completionItem($parameter, CompletionItemKind::Property, \sprintf('Parameter of route %s', $route->name)),
             array_values(array_filter(
                 $route->parameters(),
                 static fn (string $parameter): bool => str_starts_with($parameter, $prefix)
@@ -127,16 +118,16 @@ final class RouteCompletionHandler implements CompletionProviderInterface
     }
 
     /**
-     * @param list<array{label: string, kind: int, detail: string}> $items
+     * @param list<array<array-key, mixed>> $items
      *
-     * @return list<array{label: string, kind: int, detail: string, textEdit: array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string}}>
+     * @return list<array<array-key, mixed>>
      */
     private function withTextEdits(array $items, Range $range): array
     {
         return array_map(
             fn (array $item): array => [
                 ...$item,
-                'textEdit' => $this->protocol->textEdit($range, $item['label']),
+                'textEdit' => $this->protocol->textEdit($range, \is_string($item['label'] ?? null) ? $item['label'] : ''),
             ],
             $items,
         );

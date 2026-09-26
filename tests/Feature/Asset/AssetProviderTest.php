@@ -92,33 +92,34 @@ final class AssetProviderTest extends TestCase
             $extractor,
             new PublicAssetResolver(),
         );
+        $requests = new ProviderRequests($documents, $projects);
 
         $assetCompletionUri = 'file:///workspace/templates/asset.html.twig';
         $assetCompletionText = "{{ asset('images/lo";
         $documents->open(new Document($assetCompletionUri, 'twig', 1, $assetCompletionText));
-        self::assertSame(['images/logo.svg'], $this->completionLabels($provider, $converter, $assetCompletionUri, $assetCompletionText));
+        self::assertSame(['images/logo.svg'], $this->completionLabels($provider, $requests, $converter, $assetCompletionUri, $assetCompletionText));
 
         foreach (["{{ asset(path: 'images/lo", "{{ asset(path = 'images/lo"] as $index => $namedAssetCompletionText) {
             $namedAssetCompletionUri = 'file:///workspace/templates/named-asset-'.$index.'.html.twig';
             $documents->open(new Document($namedAssetCompletionUri, 'twig', 1, $namedAssetCompletionText));
-            self::assertSame(['images/logo.svg'], $this->completionLabels($provider, $converter, $namedAssetCompletionUri, $namedAssetCompletionText));
+            self::assertSame(['images/logo.svg'], $this->completionLabels($provider, $requests, $converter, $namedAssetCompletionUri, $namedAssetCompletionText));
         }
 
         $entryCompletionUri = 'file:///workspace/templates/entrypoint.html.twig';
         $entryCompletionText = "{{ importmap(['ap";
         $documents->open(new Document($entryCompletionUri, 'twig', 1, $entryCompletionText));
-        self::assertSame(['app'], $this->completionLabels($provider, $converter, $entryCompletionUri, $entryCompletionText));
+        self::assertSame(['app'], $this->completionLabels($provider, $requests, $converter, $entryCompletionUri, $entryCompletionText));
 
         $commentUri = 'file:///workspace/templates/comment.html.twig';
         $commentText = "{## {{ asset('images/lo') }} #}";
         $documents->open(new Document($commentUri, 'twig', 1, $commentText));
         $commentOffset = strpos($commentText, 'images/lo') + \strlen('images/lo');
-        self::assertNull($provider->complete(LspRequests::offset($commentUri, $commentText, $commentOffset)));
+        self::assertSame([], $provider->complete($requests->positioned(LspRequests::offset($commentUri, $commentText, $commentOffset))));
 
         $markupUri = 'file:///workspace/templates/markup.html.twig';
         $markupText = "<p>Call asset('images/lo";
         $documents->open(new Document($markupUri, 'twig', 1, $markupText));
-        self::assertNull($provider->complete(LspRequests::offset($markupUri, $markupText, \strlen($markupText))));
+        self::assertSame([], $provider->complete($requests->positioned(LspRequests::offset($markupUri, $markupText, \strlen($markupText)))));
 
         $assetOffset = strpos($usageText, 'images/logo.svg') + 2;
         $assetParams = LspRequests::offset($usageUri, $usageText, $assetOffset);
@@ -127,14 +128,14 @@ final class AssetProviderTest extends TestCase
         self::assertIsArray($assetHover['contents'] ?? null);
         self::assertIsString($assetHover['contents']['value'] ?? null);
         self::assertStringContainsString('AssetMapper asset', $assetHover['contents']['value']);
-        self::assertSame(['file:///workspace/assets/images/logo.svg'], array_column($provider->definition((new ProviderRequests($documents, $projects))->positioned($assetParams)), 'uri'));
-        self::assertCount(1, $provider->references((new ProviderRequests($documents, $projects))->references($assetParams)));
+        self::assertSame(['file:///workspace/assets/images/logo.svg'], array_column($provider->definition($requests->positioned($assetParams)), 'uri'));
+        self::assertCount(1, $provider->references($requests->references($assetParams)));
 
         $entryOffset = strpos($usageText, "'app'") + 2;
         $entryParams = LspRequests::offset($usageUri, $usageText, $entryOffset);
-        self::assertSame([$importMapUri], array_column($provider->definition((new ProviderRequests($documents, $projects))->positioned($entryParams)), 'uri'));
-        self::assertCount(2, $provider->references((new ProviderRequests($documents, $projects))->references($entryParams)));
-        self::assertCount(2, $provider->links((new ProviderRequests($documents, $projects))->document($usageUri)));
+        self::assertSame([$importMapUri], array_column($provider->definition($requests->positioned($entryParams)), 'uri'));
+        self::assertCount(2, $provider->references($requests->references($entryParams)));
+        self::assertCount(2, $provider->links($requests->document($usageUri)));
         $diagnostics = $provider->diagnostics(LspRequests::document($usageUri));
         self::assertIsArray($diagnostics);
         self::assertSame(['importmap.unknown_entrypoint'], array_column($diagnostics, 'code'));
@@ -200,14 +201,11 @@ final class AssetProviderTest extends TestCase
     }
 
     /** @return list<string> */
-    private function completionLabels(AssetProvider $provider, PositionConverter $converter, string $uri, string $text): array
+    private function completionLabels(AssetProvider $provider, ProviderRequests $requests, PositionConverter $converter, string $uri, string $text): array
     {
         $position = $converter->toPosition($text, \strlen($text));
         /** @var list<string> $labels */
-        $labels = array_column($provider->complete([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label');
+        $labels = array_column($provider->complete($requests->positioned(LspRequests::position($uri, $position))), 'label');
 
         return $labels;
     }
@@ -239,6 +237,7 @@ final class AssetProviderTest extends TestCase
                 $extractor,
                 $publicAssets,
             );
+            $requests = new ProviderRequests($documents, $projects);
 
             $params = LspRequests::offset($uri, $text, strpos($text, 'css/app.css') + 2);
             $hover = $provider->hover($params);
@@ -246,18 +245,18 @@ final class AssetProviderTest extends TestCase
             self::assertIsArray($hover['contents'] ?? null);
             self::assertIsString($hover['contents']['value'] ?? null);
             self::assertStringContainsString('Public asset', $hover['contents']['value']);
-            self::assertSame(['file://'.$root.'/public/css/app.css'], array_column($provider->definition((new ProviderRequests($documents, $projects))->positioned($params)), 'uri'));
-            self::assertSame([], $provider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($uri, $text, strpos($text, 'css/missing.css') + 2))));
+            self::assertSame(['file://'.$root.'/public/css/app.css'], array_column($provider->definition($requests->positioned($params)), 'uri'));
+            self::assertSame([], $provider->definition($requests->positioned(LspRequests::offset($uri, $text, strpos($text, 'css/missing.css') + 2))));
 
             $completionUri = $rootUri.'/templates/completion.html.twig';
             $completionText = "{{ asset('css/";
             $documents->open(new Document($completionUri, 'twig', 1, $completionText));
-            self::assertSame(['css/app.css'], $this->completionLabels($provider, $converter, $completionUri, $completionText));
+            self::assertSame(['css/app.css'], $this->completionLabels($provider, $requests, $converter, $completionUri, $completionText));
 
             unlink($root.'/public/css/app.css');
             file_put_contents($root.'/public/css/admin.css', 'body {}');
             $publicAssets->removeProject($project);
-            self::assertSame(['css/admin.css'], $this->completionLabels($provider, $converter, $completionUri, $completionText));
+            self::assertSame(['css/admin.css'], $this->completionLabels($provider, $requests, $converter, $completionUri, $completionText));
         } finally {
             @unlink($root.'/public/css/app.css');
             @unlink($root.'/public/css/admin.css');

@@ -62,10 +62,10 @@ final class ConsoleProviderTest extends TestCase
             'options' => ['format', 'help'],
             'complete' => true,
         ]);
-        self::assertSame(['format'], $completionKit->labels($completionKit->get(ConsoleProvider::class)->complete($completionKit->after($uri, "getOption('f"))));
+        self::assertSame(['format'], $completionKit->labels($completionKit->get(ConsoleProvider::class)->complete($completionKit->positioned($completionKit->after($uri, "getOption('f")))));
 
         $sourceOnlyKit = $this->kit($uri, $completionText);
-        self::assertSame(['format'], $sourceOnlyKit->labels($sourceOnlyKit->get(ConsoleProvider::class)->complete($sourceOnlyKit->after($uri, "getOption('f"))));
+        self::assertSame(['format'], $sourceOnlyKit->labels($sourceOnlyKit->get(ConsoleProvider::class)->complete($sourceOnlyKit->positioned($sourceOnlyKit->after($uri, "getOption('f")))));
     }
 
     public function testSuppressesDiagnosticsForIncompleteExtensibleAndMissingRuntimeDefinitions(): void
@@ -147,8 +147,8 @@ final class ConsoleProviderTest extends TestCase
         $kit = $this->kit($uri, $text);
         $provider = $kit->get(ConsoleProvider::class);
 
-        self::assertSame(['dry-run'], $kit->labels($provider->complete($kit->after($uri, "getOption('d"))));
-        self::assertSame(['shared', 'source-path'], $kit->labels($provider->complete($kit->after($uri, "getArgument('s"))));
+        self::assertSame(['dry-run'], $kit->labels($provider->complete($kit->positioned($kit->after($uri, "getOption('d")))));
+        self::assertSame(['shared', 'source-path'], $kit->labels($provider->complete($kit->positioned($kit->after($uri, "getArgument('s")))));
     }
 
     public function testReturnsEmptyAndUnrelatedCompletionContextsPrecisely(): void
@@ -171,8 +171,8 @@ final class ConsoleProviderTest extends TestCase
         $kit = $this->kit($uri, $text, ['class' => 'EmptyCommand', 'arguments' => [], 'options' => [], 'complete' => true]);
         $provider = $kit->get(ConsoleProvider::class);
 
-        self::assertSame([], $provider->complete($kit->after($uri, '$'."input->getArgument('z")));
-        self::assertNull($provider->complete($kit->after($uri, '$'."other->getArgument('z")));
+        self::assertSame([], $provider->complete($kit->positioned($kit->after($uri, '$'."input->getArgument('z"))));
+        self::assertSame([], $provider->complete($kit->positioned($kit->after($uri, '$'."other->getArgument('z"))));
     }
 
     /** @param array<string, mixed> $command */

@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\Doctrine;
 
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DoctrineFieldCompletionBuilder
@@ -28,12 +29,7 @@ final class DoctrineFieldCompletionBuilder
             if (null !== $field->type) {
                 $detail .= ' · '.$field->type;
             }
-            $items[] = [
-                'label' => $field->name,
-                'kind' => 10,
-                'detail' => $detail,
-                'textEdit' => $this->protocol->textEdit($context->range, $field->name),
-            ];
+            $items[] = $this->protocol->completionItem($field->name, CompletionItemKind::Property, $detail, $this->protocol->textEdit($context->range, $field->name));
         }
 
         return $items;

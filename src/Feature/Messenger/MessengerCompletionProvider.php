@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Messenger;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
@@ -10,14 +9,15 @@ use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class MessengerCompletionProvider implements CompletionProviderInterface
 {
     private const AS_MESSAGE_HANDLER = 'Symfony\\Component\\Messenger\\Attribute\\AsMessageHandler';
 
     public function __construct(
-        private readonly DocumentContextResolver $documents,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
@@ -27,13 +27,9 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $offset = $request->offset;
         $before = $this->comments->mask($request->document->languageId, substr($request->document->text, 0, $offset));
         $lineOffset = (int) strrpos("\n".$before, "\n");
         $kind = null;
@@ -59,7 +55,7 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
             $prefix = $match[1];
         }
         if (null === $kind) {
-            return null;
+            return [];
         }
         $names = [];
         $index = $this->indexes->forProject($request->project);
@@ -98,6 +94,6 @@ final class MessengerCompletionProvider implements CompletionProviderInterface
     {
         $position = $this->converter->toPosition($text, $start);
 
-        return ['label' => $name, 'kind' => 12, 'textEdit' => $this->protocol->textEdit(new Range($position, $end), $name)];
+        return $this->protocol->completionItem($name, CompletionItemKind::Value, textEdit: $this->protocol->textEdit(new Range($position, $end), $name));
     }
 }

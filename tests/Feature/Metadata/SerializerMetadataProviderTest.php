@@ -15,6 +15,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class SerializerMetadataProviderTest extends MetadataTestCase
 {
@@ -39,12 +40,12 @@ final class SerializerMetadataProviderTest extends MetadataTestCase
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument('file:///workspace/src/Entity/User.php', 'php', $entityText)));
         $documents = new DocumentStore();
         $resolver = new DocumentContextResolver($documents, $projects);
-        $completionProvider = new MetadataCompletionProvider($resolver, $converter, new LspProtocolMapper(), new MetadataIndexRegistry(), $sourceIndexes, $extractor);
+        $completionProvider = new MetadataCompletionProvider(new LspProtocolMapper(), new MetadataIndexRegistry(), $sourceIndexes, $extractor);
         $groupUri = 'file:///workspace/src/Serializer.php';
         $groupText = "<?php\n\$context = ['groups' => ['ad";
         $documents->open(new Document($groupUri, 'php', 1, $groupText));
 
-        self::assertSame(['admin'], $this->completionLabels($completionProvider, $groupUri, $groupText, \strlen($groupText)));
+        self::assertSame(['admin'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $groupUri, $groupText, \strlen($groupText)));
     }
 
     public function testIndexesGroupReferencesOnlyInSerializerContexts(): void

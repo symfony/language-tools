@@ -97,12 +97,12 @@ final class LiveComponentProviderTest extends TestCase
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry()), $extractor);
-        $completionProvider = new TwigComponentCompletionProvider($documentResolver, $converter, $protocol, $indexes, $componentResolver, $commentParser);
+        $completionProvider = new TwigComponentCompletionProvider($converter, $protocol, $indexes, $componentResolver, $commentParser);
         $relationshipProvider = new TwigComponentRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, $componentResolver);
 
-        self::assertSame(['submit'], array_column($completionProvider->complete(LspRequests::offset($completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
+        self::assertSame(['submit'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($completionUri, $completionText, \strlen($completionText)))), 'label'));
         $nestedActionOffset = strpos($templateText, 'submit') + \strlen('sub');
-        self::assertSame(['submit'], array_column($completionProvider->complete(LspRequests::offset($templateUri, $templateText, $nestedActionOffset)) ?? [], 'label'));
+        self::assertSame(['submit'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($templateUri, $templateText, $nestedActionOffset))), 'label'));
         $actionParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, 'submit') + 2);
         self::assertSame([$classUri], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($actionParams)), 'uri'));
         self::assertCount(4, $relationshipProvider->references((new ProviderRequests($documents, $projects))->references($actionParams)));
@@ -124,12 +124,12 @@ final class LiveComponentProviderTest extends TestCase
             $documents->update($templateUri, $version + 2, $namedActionCompletionText);
             self::assertSame(
                 ['submit'],
-                array_column($completionProvider->complete(LspRequests::offset($templateUri, $namedActionCompletionText, \strlen($namedActionCompletionText))) ?? [], 'label'),
+                array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($templateUri, $namedActionCompletionText, \strlen($namedActionCompletionText)))), 'label'),
             );
         }
 
         $eventProvider = new LiveComponentEventProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
-        self::assertSame(['search:completed'], array_column($eventProvider->complete(LspRequests::offset($classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co"))) ?? [], 'label'));
+        self::assertSame(['search:completed'], array_column($eventProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co")))), 'label'));
         $eventParams = LspRequests::offset($classUri, $classText, strpos($classText, "emit('search:completed") + \strlen("emit('search:"));
         self::assertSame([$classUri], array_column($eventProvider->definition((new ProviderRequests($documents, $projects))->positioned($eventParams)), 'uri'));
         self::assertCount(2, $eventProvider->references((new ProviderRequests($documents, $projects))->references($eventParams)));
@@ -196,7 +196,7 @@ final class LiveComponentProviderTest extends TestCase
         foreach ($cases as [$needle, $expected, $last]) {
             $offset = (int) ($last ? strrpos($text, $needle) : strpos($text, $needle)) + \strlen($needle);
 
-            self::assertSame($expected, array_column($provider->complete(LspRequests::offset($uri, $text, $offset)) ?? [], 'label'));
+            self::assertSame($expected, array_column($provider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($uri, $text, $offset))), 'label'));
         }
     }
 
@@ -262,7 +262,7 @@ final class LiveComponentProviderTest extends TestCase
         $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
         $provider = new LiveComponentEventProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
 
-        self::assertNull($provider->complete(LspRequests::offset($uri, $text, strpos($text, 'search:c') + \strlen('search:c'))));
+        self::assertSame([], $provider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($uri, $text, strpos($text, 'search:c') + \strlen('search:c')))));
     }
 
     public function testAttributesEmitCallsToTheirOwningLiveComponents(): void

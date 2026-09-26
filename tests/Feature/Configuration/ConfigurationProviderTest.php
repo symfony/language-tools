@@ -42,6 +42,7 @@ use Symfony\Lsp\Project\SavedDocumentMatcher;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 use Symfony\Lsp\Tests\Support\RuntimeSettings;
@@ -58,7 +59,7 @@ final class ConfigurationProviderTest extends TestCase
         $position = $fixture->converter->toPosition($text, \strlen($text));
         $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
-        self::assertSame(['router'], array_column($fixture->completion->complete($params) ?? [], 'label'));
+        self::assertSame(['router'], array_column($fixture->completion->complete($fixture->positioned($params)), 'label'));
         self::assertSame('file:///workspace/config/shared.yaml', $fixture->links->links($fixture->document($uri))[0]['target'] ?? null);
 
         $text = "framework:\n    router:\n        utf8: maybe\n        mode: old\n        unknown: true\n    router: {}";
@@ -156,7 +157,7 @@ final class ConfigurationProviderTest extends TestCase
 
         self::assertSame(
             ['!php/enum App\\ResetMode::SCHEMA', '!php/enum App\\ResetMode::MIGRATE'],
-            array_column($fixture->completion->complete($params) ?? [], 'label'),
+            array_column($fixture->completion->complete($fixture->positioned($params)), 'label'),
         );
 
         $text .= '!php/enum App\\ResetMode::SCHEMA';
@@ -181,7 +182,7 @@ final class ConfigurationProviderTest extends TestCase
         $text = "framework:\n    router:\n        strict_reset_mode: ";
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $enumCases = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))) ?? [];
+        $enumCases = $fixture->completion->complete($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, \strlen($text))));
         self::assertSame(
             ['!php/enum App\\ResetMode::SCHEMA', '!php/enum App\\ResetMode::MIGRATE'],
             array_column(array_column($enumCases, 'textEdit'), 'newText'),
@@ -190,7 +191,7 @@ final class ConfigurationProviderTest extends TestCase
 
         $text = "framework:\n    literal_value: ";
         $fixture->documents->update($uri, 2, $text);
-        $values = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))) ?? [];
+        $values = $fixture->completion->complete($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, \strlen($text))));
         self::assertSame(
             ['App\\Mode::FAST', '${placeholder}'],
             array_column(array_column($values, 'textEdit'), 'newText'),
@@ -201,7 +202,7 @@ final class ConfigurationProviderTest extends TestCase
         $uri = 'file:///workspace/config/framework.php';
         $text = '<?php $framework->literalV';
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
-        $methods = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))) ?? [];
+        $methods = $fixture->completion->complete($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, \strlen($text))));
         self::assertSame(
             ["literalValue('\${1:App\\\\Mode::FAST}')"],
             array_column(array_column($methods, 'textEdit'), 'newText'),
@@ -334,10 +335,10 @@ final class ConfigurationProviderTest extends TestCase
             $text = "framework:\n    {$parent}:\n        {$prefix}";
             $fixture->documents->update($uri, 2, $text);
             $position = $fixture->converter->toPosition($text, \strlen($text));
-            self::assertSame($expected, array_column($fixture->completion->complete([
+            self::assertSame($expected, array_column($fixture->completion->complete($fixture->positioned([
                 'textDocument' => ['uri' => $uri],
                 'position' => ['line' => $position->line, 'character' => $position->character],
-            ]) ?? [], 'label'));
+            ])), 'label'));
         }
     }
 
@@ -462,7 +463,7 @@ final class ConfigurationProviderTest extends TestCase
         $position = $fixture->converter->toPosition($text, \strlen($text));
 
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
-        self::assertSame(['name'], array_column($fixture->completion->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]) ?? [], 'label'));
+        self::assertSame(['name'], array_column($fixture->completion->complete($fixture->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]])), 'label'));
     }
 
     public function testDoesNotDiagnoseRequiredChildrenBeforeConfigurationIsMerged(): void
@@ -778,10 +779,10 @@ final class ConfigurationProviderTest extends TestCase
 
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
         $position = $fixture->converter->toPosition($text, \strlen($text));
-        self::assertSame(['debug', 'info'], array_column($fixture->completion->complete([
+        self::assertSame(['debug', 'info'], array_column($fixture->completion->complete($fixture->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     public function testComparesEnumValuesWithoutLosingTheirTypes(): void
@@ -808,10 +809,10 @@ final class ConfigurationProviderTest extends TestCase
         $text = "framework:\n    session:\n        cookie_secure: ";
         $fixture->documents->update($uri, 2, $text);
         $position = $fixture->converter->toPosition($text, \strlen($text));
-        self::assertSame(['true', 'false', 'auto'], array_column($fixture->completion->complete([
+        self::assertSame(['true', 'false', 'auto'], array_column($fixture->completion->complete($fixture->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
         $position = $fixture->converter->toPosition($text, strpos($text, 'cookie_secure') + 2);
         $hover = $fixture->hover->hover([
             'textDocument' => ['uri' => $uri],
@@ -827,11 +828,10 @@ final class ConfigurationProviderTest extends TestCase
         $text = '<?php $framework->session()->cookieS';
         $fixture->documents->open(new Document($uri, 'php', 1, $text));
         $position = $fixture->converter->toPosition($text, \strlen($text));
-        $completion = $fixture->completion->complete([
+        $completion = $fixture->completion->complete($fixture->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
-        self::assertIsArray($completion);
+        ]));
         self::assertIsArray($completion[0] ?? null);
         self::assertIsArray($completion[0]['textEdit'] ?? null);
         self::assertSame('cookieSecure(${1:true})', $completion[0]['textEdit']['newText'] ?? null);
@@ -1201,7 +1201,7 @@ final class ConfigurationProviderTest extends TestCase
         foreach ($cases as [$uri, $language, $text, $expected, $expectedTexts, $expectedFormats]) {
             $fixture->documents->open(new Document($uri, $language, 1, $text));
             $position = $fixture->converter->toPosition($text, \strlen($text));
-            $items = $fixture->completion->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]) ?? [];
+            $items = $fixture->completion->complete($fixture->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
             self::assertSame($expected, array_column($items, 'label'));
             self::assertSame($expectedTexts, array_column(array_column($items, 'textEdit'), 'newText'), $text);
             self::assertSame($expectedFormats, array_column($items, 'insertTextFormat'), $text);
@@ -1277,7 +1277,7 @@ final class ConfigurationProviderTest extends TestCase
         foreach ($cases as $index => [$text, $prefix, $expected]) {
             $uri = 'file:///workspace/config/packages/chain'.$index.'.php';
             $fixture->documents->open(new Document($uri, 'php', 1, $text));
-            $completion = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))) ?? [];
+            $completion = $fixture->completion->complete($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, \strlen($text))));
             self::assertSame($expected, array_column($completion, 'label'), $text);
             /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
             $textEdit = $completion[0]['textEdit'];
@@ -1331,7 +1331,7 @@ final class ConfigurationProviderTest extends TestCase
         foreach ($cases as $index => [$text, $expected]) {
             $uri = 'file:///workspace/config/packages/scope'.$index.'.php';
             $fixture->documents->open(new Document($uri, 'php', 1, $text));
-            $completion = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))) ?? [];
+            $completion = $fixture->completion->complete($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, \strlen($text))));
             self::assertSame($expected, array_column($completion, 'label'), $text);
             $fixture->documents->close($uri);
         }
@@ -1388,7 +1388,7 @@ final class ConfigurationProviderTest extends TestCase
         foreach ($texts as $index => $text) {
             $uri = 'file:///workspace/config/packages/unrelated'.$index.'.php';
             $fixture->documents->open(new Document($uri, 'php', 1, $text));
-            self::assertNull($fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, \strlen($text))), $text);
+            self::assertSame([], $fixture->completion->complete($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, \strlen($text)))), $text);
             $fixture->documents->close($uri);
         }
     }
@@ -1420,8 +1420,8 @@ final class ConfigurationProviderTest extends TestCase
         $commentCompletionOffset = strpos($text, '// $framework->router()->ut') + \strlen('// $framework->router()->ut');
         $liveCompletionStart = (int) strrpos($text, 'utf8');
         $liveCompletionOffset = $liveCompletionStart + \strlen('ut');
-        self::assertNull($fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, $commentCompletionOffset)));
-        $completion = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, $liveCompletionOffset)) ?? [];
+        self::assertSame([], $fixture->completion->complete($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, $commentCompletionOffset))));
+        $completion = $fixture->completion->complete($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, $liveCompletionOffset)));
         self::assertSame(['utf8'], array_column($completion, 'label'));
         /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
         $textEdit = $completion[0]['textEdit'];
@@ -1458,8 +1458,8 @@ final class ConfigurationProviderTest extends TestCase
         $commentCompletionOffset = strpos($text, '<framework:ut', (int) strpos($text, '-->')) + \strlen('<framework:ut');
         $liveCompletionStart = strrpos($text, '<framework:utf8') + \strlen('<framework:');
         $liveCompletionOffset = $liveCompletionStart + \strlen('ut');
-        self::assertNull($fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, $commentCompletionOffset)));
-        $completion = $fixture->completion->complete($this->positionParams($fixture->converter, $uri, $text, $liveCompletionOffset)) ?? [];
+        self::assertSame([], $fixture->completion->complete($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, $commentCompletionOffset))));
+        $completion = $fixture->completion->complete($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, $liveCompletionOffset)));
         self::assertSame(['utf8'], array_column($completion, 'label'));
         /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $textEdit */
         $textEdit = $completion[0]['textEdit'];
@@ -1766,7 +1766,7 @@ final class ConfigurationProviderTest extends TestCase
         );
 
         return new ConfigurationProviderFixture(
-            new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
+            new ConfigurationCompletionProvider($converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationDiagnosticProvider($resolver, ProjectPaths::resolver(), $converter, $protocol, $indexes, $routeIndexes, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
             new ConfigurationDocumentLinkProvider($converter, $protocol, $uriConverter, $documentParser),
@@ -1807,6 +1807,17 @@ final class ConfigurationProviderFixture
 
     public function document(string $uri): DocumentRequest
     {
-        return (new ProviderRequests($this->documents, $this->projects))->document($uri);
+        return $this->requests()->document($uri);
+    }
+
+    /** @param array<array-key, mixed> $params */
+    public function positioned(array $params): PositionedRequest
+    {
+        return $this->requests()->positioned($params);
+    }
+
+    private function requests(): ProviderRequests
+    {
+        return new ProviderRequests($this->documents, $this->projects);
     }
 }

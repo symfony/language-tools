@@ -457,8 +457,10 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replace(new TemplateSourceFacts($reference->uri, null, [$reference]));
         $indexes->forProject($project)->replaceGlobals(['app']);
         $commentParser = new TwigCommentParser();
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $requests = new ProviderRequests($documents, $projects);
         $provider = new TwigVariableProvider(
-            new DocumentContextResolver($documents, $projects),
+            $documentResolver,
             $converter,
             new LspProtocolMapper(),
             $indexes,
@@ -469,10 +471,10 @@ final class TemplateProviderTest extends TestCase
         );
         $position = $converter->toPosition($text, strpos($text, 'art') + 3);
 
-        self::assertSame(['article'], array_column($provider->complete([
+        self::assertSame(['article'], array_column($provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
         $hoverPosition = $converter->toPosition($text, strrpos($text, 'app') + 1);
         $hover = $provider->hover([
             'textDocument' => ['uri' => $uri],
@@ -506,8 +508,10 @@ final class TemplateProviderTest extends TestCase
         $projects->replace([new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
+        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $requests = new ProviderRequests($documents, $projects);
         $provider = new TwigVariableProvider(
-            new DocumentContextResolver($documents, $projects),
+            $documentResolver,
             $converter,
             new LspProtocolMapper(),
             $this->templateIndexes(),
@@ -517,12 +521,11 @@ final class TemplateProviderTest extends TestCase
             $commentParser,
         );
         $completionPosition = $converter->toPosition($text, strrpos($text, 'arti') + \strlen('arti'));
-        $items = $provider->complete([
+        $items = $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $completionPosition->line, 'character' => $completionPosition->character],
-        ]);
+        ]));
 
-        self::assertIsArray($items);
         self::assertCount(1, $items);
         self::assertSame('article', $items[0]['label'] ?? null);
         self::assertSame('Twig variable: App\Entity\Article (required)', $items[0]['detail'] ?? null);
@@ -532,11 +535,10 @@ final class TemplateProviderTest extends TestCase
         );
 
         $unicodePosition = $converter->toPosition($text, strrpos($text, 'café') + \strlen('café'));
-        $unicodeItems = $provider->complete([
+        $unicodeItems = $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $unicodePosition->line, 'character' => $unicodePosition->character],
-        ]);
-        self::assertIsArray($unicodeItems);
+        ]));
         self::assertSame(['café'], array_column($unicodeItems, 'label'));
         self::assertSame('Twig variable: string (required)', $unicodeItems[0]['detail'] ?? null);
         self::assertSame([
@@ -613,25 +615,26 @@ final class TemplateProviderTest extends TestCase
         $templateIndexes = $this->templateIndexes();
         $templateIndexes->forProject($project)->replaceRuntime(true);
         $documentResolver = new DocumentContextResolver($documents, $projects);
+        $requests = new ProviderRequests($documents, $projects);
         $protocol = new LspProtocolMapper();
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
-        $completionProvider = new TwigComponentCompletionProvider($documentResolver, $converter, $protocol, $indexes, $componentResolver, $commentParser);
+        $completionProvider = new TwigComponentCompletionProvider($converter, $protocol, $indexes, $componentResolver, $commentParser);
         $relationshipProvider = new TwigComponentRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, $componentResolver);
         $diagnosticProvider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $componentResolver);
         $codeLensProvider = new TwigComponentCodeLensProvider($protocol, $indexes, $extractor);
         $completionPosition = $converter->toPosition($completionText, \strlen($completionText));
-        self::assertSame(['Alert'], array_column($completionProvider->complete([
+        self::assertSame(['Alert'], array_column($completionProvider->complete($requests->positioned([
             'textDocument' => ['uri' => $completionUri],
             'position' => ['line' => $completionPosition->line, 'character' => $completionPosition->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
         $commentUri = 'file:///workspace/templates/comment.html.twig';
         $commentText = '{## Use <twig:Al in examples. #}';
         $documents->open(new Document($commentUri, 'twig', 1, $commentText));
         $commentPosition = $converter->toPosition($commentText, strpos($commentText, 'Al') + 2);
-        self::assertNull($completionProvider->complete([
+        self::assertSame([], $completionProvider->complete($requests->positioned([
             'textDocument' => ['uri' => $commentUri],
             'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character],
-        ]));
+        ])));
 
         $usagePosition = $converter->toPosition($usageText, strrpos($usageText, 'Alert') + 1);
         $params = [
@@ -653,7 +656,7 @@ final class TemplateProviderTest extends TestCase
         self::assertSame('1 Twig component usage', $lenses[0]['command']['title'] ?? null);
         $commentParser = new TwigCommentParser();
         $variableProvider = new TwigVariableProvider(
-            new DocumentContextResolver($documents, $projects),
+            $documentResolver,
             $converter,
             new LspProtocolMapper(),
             $this->templateIndexes(),
@@ -663,10 +666,10 @@ final class TemplateProviderTest extends TestCase
             $commentParser,
         );
         $variablePosition = $converter->toPosition($componentTemplateText, strpos($componentTemplateText, 'ti') + 2);
-        self::assertSame(['title'], array_column($variableProvider->complete([
+        self::assertSame(['title'], array_column($variableProvider->complete($requests->positioned([
             'textDocument' => ['uri' => $templateUri],
             'position' => ['line' => $variablePosition->line, 'character' => $variablePosition->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     public function testDiagnosesUnknownComponentsOnlyWithCompleteRuntimeMetadata(): void
@@ -687,6 +690,7 @@ final class TemplateProviderTest extends TestCase
         );
         $templateIndexes = $this->templateIndexes();
         $documentResolver = new DocumentContextResolver($documents, $projects);
+        $requests = new ProviderRequests($documents, $projects);
         $protocol = new LspProtocolMapper();
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
         $provider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $componentResolver);
@@ -771,16 +775,17 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration('page.html.twig', 'file:///workspace/templates/page.html.twig', $range),
         );
         $documentResolver = new DocumentContextResolver($documents, $projects);
+        $requests = new ProviderRequests($documents, $projects);
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
-        $provider = new TwigComponentCompletionProvider($documentResolver, $converter, new LspProtocolMapper(), $indexes, $componentResolver, $commentParser);
+        $provider = new TwigComponentCompletionProvider($converter, new LspProtocolMapper(), $indexes, $componentResolver, $commentParser);
 
         $position = $converter->toPosition($completionText, \strlen($completionText));
-        $items = $provider->complete([
+        $items = $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $completionUri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
+        ]));
 
-        self::assertSame(['Alert', 'Card', 'acme:badge', 'ux:icon'], array_column($items ?? [], 'label'));
+        self::assertSame(['Alert', 'Card', 'acme:badge', 'ux:icon'], array_column($items, 'label'));
     }
 
     public function testResolvesBundleTemplateNames(): void
@@ -1026,7 +1031,7 @@ final class TemplateProviderTest extends TestCase
             'line' => $position->line, 'character' => $position->character,
         ]];
 
-        self::assertSame(['article/show.html.twig'], array_column($completion->complete($params) ?? [], 'label'));
+        self::assertSame(['article/show.html.twig'], array_column($completion->complete($requests->positioned($params)), 'label'));
         self::assertSame(
             'file:///workspace/templates/article/show.html.twig',
             $navigation->links($requests->document($uri))[0]['target'] ?? null,
@@ -1037,61 +1042,61 @@ final class TemplateProviderTest extends TestCase
     {
         $uri = 'file:///workspace/templates/page.html.twig';
         $text = "{% extends 'article/sh";
-        [$completion, , $converter] = $this->providers($uri, 'twig', $text);
+        [$completion, , $converter, $requests] = $this->providers($uri, 'twig', $text);
         $position = $converter->toPosition($text, \strlen($text));
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
             'line' => $position->line, 'character' => $position->character,
         ]];
 
-        self::assertSame(['article/show.html.twig'], array_column($completion->complete($params) ?? [], 'label'));
+        self::assertSame(['article/show.html.twig'], array_column($completion->complete($requests->positioned($params)), 'label'));
 
         $markupUri = 'file:///workspace/templates/markup.html.twig';
         $markupText = "<p>Use include('article/sh";
-        [$markupCompletion, , $markupConverter] = $this->providers($markupUri, 'twig', $markupText);
+        [$markupCompletion, , $markupConverter, $markupRequests] = $this->providers($markupUri, 'twig', $markupText);
         $markupPosition = $markupConverter->toPosition($markupText, \strlen($markupText));
 
-        self::assertNull($markupCompletion->complete([
+        self::assertSame([], $markupCompletion->complete($markupRequests->positioned([
             'textDocument' => ['uri' => $markupUri],
             'position' => ['line' => $markupPosition->line, 'character' => $markupPosition->character],
-        ]));
+        ])));
     }
 
     public function testCompletesTemplateNamesForTwigEnvironmentReceivers(): void
     {
         $uri = 'file:///workspace/src/Renderer.php';
         $text = "<?php function show(\\Twig\\Environment \$twig): string { return \$twig->render(name: 'article/sh";
-        [$completion, , $converter] = $this->providers($uri, 'php', $text);
+        [$completion, , $converter, $requests] = $this->providers($uri, 'php', $text);
         $position = $converter->toPosition($text, \strlen($text));
 
-        self::assertSame(['article/show.html.twig'], array_column($completion->complete([
+        self::assertSame(['article/show.html.twig'], array_column($completion->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     public function testDoesNotCompleteTemplateNamesForUnrelatedRenderMethods(): void
     {
         $uri = 'file:///workspace/src/MarkdownRenderer.php';
         $text = "<?php class MarkdownRenderer { public function show(): string { return \$this->render('article/sh";
-        [$completion, , $converter] = $this->providers($uri, 'php', $text);
+        [$completion, , $converter, $requests] = $this->providers($uri, 'php', $text);
         $position = $converter->toPosition($text, \strlen($text));
 
-        self::assertNull($completion->complete([
+        self::assertSame([], $completion->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     public function testIgnoresTemplateCompletionInsideDocumentationComments(): void
     {
         $uri = 'file:///workspace/templates/page.html.twig';
         $text = "{## Use include('article/sh') in examples. #}";
-        [$completion, , $converter] = $this->providers($uri, 'twig', $text);
+        [$completion, , $converter, $requests] = $this->providers($uri, 'twig', $text);
         $position = $converter->toPosition($text, strpos($text, 'article/sh') + \strlen('article/sh'));
 
-        self::assertNull($completion->complete(['textDocument' => ['uri' => $uri], 'position' => [
+        self::assertSame([], $completion->complete($requests->positioned(['textDocument' => ['uri' => $uri], 'position' => [
             'line' => $position->line, 'character' => $position->character,
-        ]]));
+        ]])));
     }
 
     public function testNavigatesReferencesAndDiagnosesMissingTemplates(): void
@@ -1118,12 +1123,12 @@ final class TemplateProviderTest extends TestCase
     {
         $uri = 'file:///workspace/templates/page.html.twig';
         $completionText = "{{ source(name: './sn') }}";
-        [$completion, , $completionConverter] = $this->providers($uri, 'twig', $completionText);
+        [$completion, , $completionConverter, $requests] = $this->providers($uri, 'twig', $completionText);
         $completionPosition = $completionConverter->toPosition($completionText, (int) strpos($completionText, "')"));
-        self::assertSame(['snippet.txt'], array_column($completion->complete([
+        self::assertSame(['snippet.txt'], array_column($completion->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $completionPosition->line, 'character' => $completionPosition->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
 
         $text = "{{ source(name = './snippet.txt') }}";
         [, $navigation, $converter, $requests] = $this->providers($uri, 'twig', $text);
@@ -1148,12 +1153,12 @@ final class TemplateProviderTest extends TestCase
     {
         $uri = 'file:///workspace/templates/page.html.twig';
         $completionText = "{{ source('./@Ad') }}";
-        [$completion, , $completionConverter] = $this->providers($uri, 'twig', $completionText);
+        [$completion, , $completionConverter, $requests] = $this->providers($uri, 'twig', $completionText);
         $completionPosition = $completionConverter->toPosition($completionText, (int) strpos($completionText, "')"));
-        self::assertSame([], $completion->complete([
+        self::assertSame([], $completion->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $completionPosition->line, 'character' => $completionPosition->character],
-        ]) ?? []);
+        ])));
 
         $text = "{{ source('./@Admin/foo.html.twig') }}";
         [, $navigation, $converter, $requests] = $this->providers($uri, 'twig', $text);
@@ -1248,7 +1253,7 @@ final class TemplateProviderTest extends TestCase
         $resolver = new DocumentContextResolver($documents, $projects);
 
         return [
-            new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $classIndexes, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TwigDirectiveLocator()),
+            new TemplateCompletionHandler($converter, new LspProtocolMapper(), $indexes, $extractor, $classIndexes, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TwigDirectiveLocator()),
             new TemplateNavigationProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes),
             $converter,
             new ProviderRequests($documents, $projects),
@@ -1271,13 +1276,14 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', new Range(new Position(0, 0), new Position(0, 0))),
             [],
         ));
-        $handler = new TemplateCompletionHandler(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $this->templateReferenceExtractor($converter), $classIndexes, new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TwigDirectiveLocator());
+        $handler = new TemplateCompletionHandler($converter, new LspProtocolMapper(), $indexes, $this->templateReferenceExtractor($converter), $classIndexes, new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TwigDirectiveLocator());
+        $requests = new ProviderRequests($documents, $projects);
         $position = $converter->toPosition($text, \strlen($text));
 
-        self::assertNull($handler->complete([
+        self::assertSame([], $handler->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     public function testIgnoresRenderCallsInPhpComments(): void
@@ -1402,7 +1408,7 @@ final class TemplateProviderTest extends TestCase
             'line' => $position->line, 'character' => $position->character,
         ]];
 
-        self::assertSame(['article/show.html.twig'], array_column($completion->complete($params) ?? [], 'label'));
+        self::assertSame(['article/show.html.twig'], array_column($completion->complete($requests->positioned($params)), 'label'));
         self::assertSame(
             'file:///workspace/templates/article/show.html.twig',
             $navigation->links($requests->document($uri))[0]['target'] ?? null,

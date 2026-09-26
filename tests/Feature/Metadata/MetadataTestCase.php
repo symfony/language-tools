@@ -21,6 +21,7 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 abstract class MetadataTestCase extends TestCase
 {
@@ -41,10 +42,10 @@ abstract class MetadataTestCase extends TestCase
     }
 
     /** @return list<string> */
-    protected function completionLabels(CompletionProviderInterface $provider, string $uri, string $text, int $offset): array
+    protected function completionLabels(CompletionProviderInterface $provider, ProviderRequests $requests, string $uri, string $text, int $offset): array
     {
         /** @var list<string> $labels */
-        $labels = array_column($provider->complete(LspRequests::offset($uri, $text, $offset)) ?? [], 'label');
+        $labels = array_column($provider->complete($requests->positioned(LspRequests::offset($uri, $text, $offset))), 'label');
 
         return $labels;
     }

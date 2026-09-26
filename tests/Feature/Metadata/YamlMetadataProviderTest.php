@@ -13,6 +13,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class YamlMetadataProviderTest extends MetadataTestCase
 {
@@ -35,11 +36,11 @@ final class YamlMetadataProviderTest extends MetadataTestCase
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument('file:///workspace/src/Entity/User.php', 'php', $entityText)));
         $documents = new DocumentStore();
         $resolver = new DocumentContextResolver($documents, $projects);
-        $completionProvider = new MetadataCompletionProvider($resolver, $converter, new LspProtocolMapper(), new MetadataIndexRegistry(), $sourceIndexes, $extractor);
+        $completionProvider = new MetadataCompletionProvider(new LspProtocolMapper(), new MetadataIndexRegistry(), $sourceIndexes, $extractor);
         $propertyUri = 'file:///workspace/config/serializer/Completion.yaml';
         $propertyText = "App\\Entity\\User:\n    attributes:\n        em";
         $documents->open(new Document($propertyUri, 'yaml', 1, $propertyText));
 
-        self::assertSame(['email'], $this->completionLabels($completionProvider, $propertyUri, $propertyText, \strlen($propertyText)));
+        self::assertSame(['email'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $propertyUri, $propertyText, \strlen($propertyText)));
     }
 }

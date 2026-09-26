@@ -2,16 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Metadata;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class MetadataCompletionProvider implements CompletionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
-        private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly MetadataIndexRegistry $indexes,
         private readonly MetadataSourceIndexRegistry $sourceIndexes,
@@ -19,16 +17,12 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $offset = $request->offset;
         $context = $this->extractor->completionContext($request->document->languageId, $request->document->text, $offset);
         if (null === $context) {
-            return null;
+            return [];
         }
 
         return match ($context->kind) {
@@ -53,12 +47,12 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
             if (!str_starts_with($option, $context->prefix)) {
                 continue;
             }
-            $items[] = [
-                'label' => $option,
-                'detail' => \in_array($option, $type->requiredOptions, true) ? 'Required form option' : 'Form option',
-                'kind' => 14,
-                'textEdit' => $this->protocol->textEdit($context->range, $option),
-            ];
+            $items[] = $this->protocol->completionItem(
+                $option,
+                CompletionItemKind::Keyword,
+                \in_array($option, $type->requiredOptions, true) ? 'Required form option' : 'Form option',
+                $this->protocol->textEdit($context->range, $option),
+            );
         }
 
         return $items;
@@ -75,8 +69,7 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
             }
             $completion[] = [
                 ...$item,
-                'kind' => 14,
-                'textEdit' => $this->protocol->textEdit($context->range, $item['label']),
+                ...$this->protocol->completionItem($item['label'], CompletionItemKind::Keyword, textEdit: $this->protocol->textEdit($context->range, $item['label'])),
             ];
         }
 
@@ -95,12 +88,12 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
             if (!str_starts_with($option, $context->prefix)) {
                 continue;
             }
-            $items[] = [
-                'label' => $option,
-                'detail' => 'Constraint option',
-                'kind' => 14,
-                'textEdit' => $this->protocol->textEdit($context->range, $option),
-            ];
+            $items[] = $this->protocol->completionItem(
+                $option,
+                CompletionItemKind::Keyword,
+                'Constraint option',
+                $this->protocol->textEdit($context->range, $option),
+            );
         }
 
         return $items;
@@ -114,12 +107,12 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
             if (!str_starts_with($name, $context->prefix)) {
                 continue;
             }
-            $items[] = [
-                'label' => $name,
-                'detail' => 'Serializer group',
-                'kind' => 14,
-                'textEdit' => $this->protocol->textEdit($context->range, $name),
-            ];
+            $items[] = $this->protocol->completionItem(
+                $name,
+                CompletionItemKind::Keyword,
+                'Serializer group',
+                $this->protocol->textEdit($context->range, $name),
+            );
         }
 
         return $items;
@@ -158,12 +151,12 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
             if (!str_starts_with($name, $context->prefix)) {
                 continue;
             }
-            $items[] = [
-                'label' => $name,
-                'detail' => $declaration->signature ?? 'Mapped property',
-                'kind' => 10,
-                'textEdit' => $this->protocol->textEdit($context->range, $name),
-            ];
+            $items[] = $this->protocol->completionItem(
+                $name,
+                CompletionItemKind::Property,
+                $declaration->signature ?? 'Mapped property',
+                $this->protocol->textEdit($context->range, $name),
+            );
         }
 
         return $items;

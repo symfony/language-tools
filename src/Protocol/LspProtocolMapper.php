@@ -65,6 +65,24 @@ final class LspProtocolMapper
     }
 
     /**
+     * @param array<array-key, mixed>|null $textEdit
+     *
+     * @return array{label: string, kind: int, detail?: string, documentation?: array{kind: string, value: string}, textEdit?: array<array-key, mixed>}
+     */
+    public function completionItem(string $label, CompletionItemKind $kind, ?string $detail = null, ?array $textEdit = null, ?string $documentation = null): array
+    {
+        $item = ['label' => $label, 'kind' => $kind->value];
+        if (null !== $detail) {
+            $item['detail'] = $detail;
+        }
+        if (null !== $documentation) {
+            $item['documentation'] = ['kind' => 'markdown', 'value' => $documentation];
+        }
+
+        return null === $textEdit ? $item : [...$item, 'textEdit' => $textEdit];
+    }
+
+    /**
      * @param array<array-key, mixed>       $diagnostic
      * @param list<array<array-key, mixed>> $documentChanges
      *

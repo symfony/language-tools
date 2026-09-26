@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Answer a completion request with an empty list instead of nothing when nothing matches
 - Honor the `includeDeclaration` flag of a references request in every integration, and report the declaration when the client omits it
 - Answer a definition or references request with an empty list instead of nothing when nothing matches
 - Answer a document link request with an empty list instead of nothing when a document has no link

@@ -3,16 +3,16 @@
 namespace Symfony\Lsp\Feature\Console;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class ConsoleProvider implements CompletionProviderInterface, DiagnosticProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $documents,
-        private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly ConsoleIndexRegistry $indexes,
         private readonly ConsoleSourceIndexRegistry $sourceIndexes,
@@ -25,16 +25,12 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
         return 'console';
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $offset = $request->offset;
         $context = $this->extractor->completionContext($request->document->languageId, $request->document->text, $offset);
         if (null === $context) {
-            return null;
+            return [];
         }
 
         $sourceDefinition = $this->sourceIndexes->forProject($request->project)->definition($context->commandClass);
@@ -56,12 +52,12 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
             if (!str_starts_with($name, $context->prefix)) {
                 continue;
             }
-            $items[] = [
-                'label' => $name,
-                'detail' => ConsoleInputKind::Argument === $context->kind ? 'Console input argument' : 'Console input option',
-                'kind' => 12,
-                'textEdit' => $this->protocol->textEdit($context->range, $name),
-            ];
+            $items[] = $this->protocol->completionItem(
+                $name,
+                CompletionItemKind::Value,
+                ConsoleInputKind::Argument === $context->kind ? 'Console input argument' : 'Console input option',
+                $this->protocol->textEdit($context->range, $name),
+            );
         }
 
         return $items;

@@ -61,21 +61,24 @@ use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class ProviderRegistryTest extends TestCase
 {
-    public function testCompletionProvidersAggregateInOrderAndDistinguishNoMatchFromEmptyMatch(): void
+    public function testCompletionProvidersAggregateEveryItemOfAnOpenProjectDocument(): void
     {
-        $first = new StubProvider(null);
+        $first = new StubProvider([]);
         $second = new StubProvider([['label' => 'second']]);
         $third = new StubProvider([['label' => 'third']]);
+        $uri = 'file:///workspace/src/Kernel.php';
+        $requests = $this->requestFactory($uri, 'php', '<?php');
+        $params = LspRequests::position($uri, new Position(0, 1));
 
         self::assertSame(
             [['label' => 'second'], ['label' => 'third']],
-            (new CompletionProviderRegistry([$first, $second, $third]))->complete([]),
+            (new CompletionProviderRegistry($requests, [$first, $second, $third]))->complete($params),
         );
         self::assertSame(['complete'], $first->calls);
         self::assertSame(['complete'], $second->calls);
         self::assertSame(['complete'], $third->calls);
-        self::assertNull((new CompletionProviderRegistry([new StubProvider(null)]))->complete([]));
-        self::assertSame([], (new CompletionProviderRegistry([new StubProvider([])]))->complete([]));
+        self::assertSame([], (new CompletionProviderRegistry($requests, [$first]))->complete(LspRequests::document($uri)));
+        self::assertSame(['complete'], $first->calls);
     }
 
     public function testDefinitionProvidersAggregateEveryTargetOfAnOpenProjectDocument(): void
@@ -411,9 +414,9 @@ final class StubProvider implements CodeActionProviderInterface, CodeLensProvide
         return $this->result(__FUNCTION__) ?? [];
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        return $this->result(__FUNCTION__);
+        return $this->result(__FUNCTION__) ?? [];
     }
 
     public function definition(PositionedRequest $request): array

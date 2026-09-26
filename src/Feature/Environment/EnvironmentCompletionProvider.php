@@ -2,19 +2,19 @@
 
 namespace Symfony\Lsp\Feature\Environment;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class EnvironmentCompletionProvider implements CompletionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly EnvironmentIndexRegistry $indexes,
@@ -23,16 +23,12 @@ final class EnvironmentCompletionProvider implements CompletionProviderInterface
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $cursor = $this->converter->toByteOffset($request->document->text, $request->position);
+        $cursor = $request->offset;
         $textBeforeCursor = $this->textBeforeCursor($request->document->languageId, $request->document->text, $cursor);
         if (null === $textBeforeCursor || !preg_match('/%env\(([^)]*)$/', $textBeforeCursor, $match, \PREG_OFFSET_CAPTURE)) {
-            return null;
+            return [];
         }
         $expression = $match[1][0];
         $separator = strrpos($expression, ':');
@@ -79,6 +75,6 @@ final class EnvironmentCompletionProvider implements CompletionProviderInterface
     {
         $position = $this->converter->toPosition($text, $start);
 
-        return ['label' => $label, 'kind' => 12, 'detail' => $detail, 'textEdit' => $this->protocol->textEdit(new Range($position, $end), $newText)];
+        return $this->protocol->completionItem($label, CompletionItemKind::Value, $detail, $this->protocol->textEdit(new Range($position, $end), $newText));
     }
 }

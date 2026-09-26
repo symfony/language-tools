@@ -6,7 +6,6 @@ use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -31,6 +30,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ServiceCompletionHandlerTest extends TestCase
@@ -73,7 +73,6 @@ final class ServiceCompletionHandlerTest extends TestCase
         $cursor = strpos($text, 'app.ma') + \strlen('app.ma');
         $position = $converter->toPosition($text, $cursor);
         $handler = new ServiceCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
             new DependencyInjectionProjectLookup($indexes, $parameterIndexes, $sourceIndexes),
@@ -81,10 +80,10 @@ final class ServiceCompletionHandlerTest extends TestCase
             $this->yamlComments(),
         );
 
-        $result = $handler->complete([
+        $result = $handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
+        ]));
 
         self::assertSame([[
             'label' => 'app.mailer',
@@ -136,7 +135,6 @@ final class ServiceCompletionHandlerTest extends TestCase
         ));
         $converter = new PositionConverter();
         $handler = new ServiceCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
             new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
@@ -147,23 +145,23 @@ final class ServiceCompletionHandlerTest extends TestCase
         $serviceUri = 'file:///workspace/config/services.yaml';
         $serviceText = "arguments: ['@app.']";
         $documents->open(new Document($serviceUri, 'yaml', 1, $serviceText));
-        $serviceResult = $handler->complete(LspRequests::offset($serviceUri, $serviceText, \strlen($serviceText) - 2));
+        $serviceResult = $handler->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($serviceUri, $serviceText, \strlen($serviceText) - 2)));
 
-        self::assertSame(['app.alpha', 'app.beta', 'app.shared'], array_column($serviceResult ?? [], 'label'));
+        self::assertSame(['app.alpha', 'app.beta', 'app.shared'], array_column($serviceResult, 'label'));
         self::assertSame(
             ['App\\Alpha', 'App\\Beta', 'Alias of runtime.alias'],
-            array_column($serviceResult ?? [], 'detail'),
+            array_column($serviceResult, 'detail'),
         );
 
         $parameterUri = 'file:///workspace/config/parameters.yaml';
         $parameterText = "arguments: ['%app.']";
         $documents->open(new Document($parameterUri, 'yaml', 1, $parameterText));
-        $parameterResult = $handler->complete(LspRequests::offset($parameterUri, $parameterText, \strlen($parameterText) - 2));
+        $parameterResult = $handler->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($parameterUri, $parameterText, \strlen($parameterText) - 2)));
 
-        self::assertSame(['app.alpha', 'app.beta', 'app.shared'], array_column($parameterResult ?? [], 'label'));
+        self::assertSame(['app.alpha', 'app.beta', 'app.shared'], array_column($parameterResult, 'label'));
         self::assertSame(
             ['Symfony parameter', 'Symfony parameter', 'Deprecated Symfony parameter'],
-            array_column($parameterResult ?? [], 'detail'),
+            array_column($parameterResult, 'detail'),
         );
     }
 
@@ -189,7 +187,6 @@ final class ServiceCompletionHandlerTest extends TestCase
         $parameterIndexes->forProject($project)->replace(true, new Parameter('app.api_key', null));
         $converter = new PositionConverter();
         $handler = new ServiceCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
             new DependencyInjectionProjectLookup(
@@ -204,10 +201,10 @@ final class ServiceCompletionHandlerTest extends TestCase
         $documents->open(new Document($uri, 'yaml', 1, $text));
         $position = $converter->toPosition($text, strpos($text, $prefix) + \strlen($prefix));
 
-        self::assertNull($handler->complete([
+        self::assertSame([], $handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     /** @return iterable<string, array{string, string}> */
@@ -226,7 +223,6 @@ final class ServiceCompletionHandlerTest extends TestCase
         $parameterIndexes->forProject($project)->replace(true, new Parameter('app.api_key', null));
         $converter = new PositionConverter();
         $handler = new ServiceCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
             new DependencyInjectionProjectLookup(
@@ -242,10 +238,10 @@ final class ServiceCompletionHandlerTest extends TestCase
         $documents->open(new Document($uri, 'php', 1, $text));
         $position = $converter->toPosition($text, \strlen($text));
 
-        self::assertNull($handler->complete([
+        self::assertSame([], $handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     public function testCompletesParametersInYamlAndPhpAttributes(): void
@@ -273,7 +269,6 @@ final class ServiceCompletionHandlerTest extends TestCase
         );
         $converter = new PositionConverter();
         $handler = new ServiceCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
             new DependencyInjectionProjectLookup(
@@ -289,11 +284,10 @@ final class ServiceCompletionHandlerTest extends TestCase
         $yaml = "arguments: ['%app.st']";
         $documents->open(new Document($yamlUri, 'yaml', 1, $yaml));
         $yamlPosition = $converter->toPosition($yaml, strpos($yaml, 'app.st') + \strlen('app.st'));
-        $yamlResult = $handler->complete([
+        $yamlResult = $handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $yamlUri],
             'position' => ['line' => $yamlPosition->line, 'character' => $yamlPosition->character],
-        ]);
-        self::assertIsArray($yamlResult);
+        ]));
         self::assertIsArray($yamlResult[0]['textEdit']);
 
         self::assertSame('app.storage_dir', $yamlResult[0]['label'] ?? null);
@@ -303,11 +297,10 @@ final class ServiceCompletionHandlerTest extends TestCase
         $php = $this->php("#[Autowire(param: 'app.a')] final class Service {}");
         $documents->open(new Document($phpUri, 'php', 1, $php));
         $phpPosition = $converter->toPosition($php, strpos($php, 'app.a') + \strlen('app.a'));
-        $phpResult = $handler->complete([
+        $phpResult = $handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $phpUri],
             'position' => ['line' => $phpPosition->line, 'character' => $phpPosition->character],
-        ]);
-        self::assertIsArray($phpResult);
+        ]));
         self::assertIsArray($phpResult[0]['textEdit']);
 
         self::assertSame('app.api_key', $phpResult[0]['label'] ?? null);
@@ -320,22 +313,22 @@ final class ServiceCompletionHandlerTest extends TestCase
             $servicePhp,
             strpos($servicePhp, 'app.ma') + \strlen('app.ma'),
         );
-        $servicePhpResult = $handler->complete([
+        $servicePhpResult = $handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $servicePhpUri],
             'position' => [
                 'line' => $servicePhpPosition->line,
                 'character' => $servicePhpPosition->character,
             ],
-        ]);
+        ]));
 
         self::assertSame('app.mailer', $servicePhpResult[0]['label'] ?? null);
     }
 
     /**
-     * @param list<string>|null $labels
+     * @param list<string> $labels
      */
     #[DataProvider('phpAutowireCompletionProvider')]
-    public function testBindsPhpCompletionToTheAutowireArgumentHoldingTheCursor(string $body, string $cursorAfter, ?array $labels): void
+    public function testBindsPhpCompletionToTheAutowireArgumentHoldingTheCursor(string $body, string $cursorAfter, array $labels): void
     {
         $documents = new DocumentStore();
         $projects = new ProjectRegistry();
@@ -360,7 +353,6 @@ final class ServiceCompletionHandlerTest extends TestCase
         );
         $converter = new PositionConverter();
         $handler = new ServiceCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
             new DependencyInjectionProjectLookup(
@@ -378,15 +370,15 @@ final class ServiceCompletionHandlerTest extends TestCase
         self::assertIsInt($cursor);
         $position = $converter->toPosition($text, $cursor + \strlen($cursorAfter));
 
-        $result = $handler->complete([
+        $result = $handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
+        ]));
 
-        self::assertSame($labels, null === $result ? null : array_column($result, 'label'));
+        self::assertSame($labels, array_column($result, 'label'));
     }
 
-    /** @return iterable<string, array{string, string, list<string>|null}> */
+    /** @return iterable<string, array{string, string, list<string>}> */
     public static function phpAutowireCompletionProvider(): iterable
     {
         yield 'incomplete service argument' => ["final class S {\n    #[Autowire(service: 'app.ma\n", 'app.ma', ['app.mailer']];
@@ -402,25 +394,25 @@ final class ServiceCompletionHandlerTest extends TestCase
         yield 'service argument of a later unrelated attribute' => [
             "#[Autowire(service: 'app.mailer')]\n#[Other(service: 'app.ma",
             'app.ma',
-            null,
+            [],
         ];
         yield 'param argument of a later unrelated attribute' => [
             "#[Autowire(param: 'app.api_key')]\n#[Other(param: 'app.api",
             'app.api',
-            null,
+            [],
         ];
         yield 'placeholder of a later unrelated attribute' => [
             "#[Autowire('%app.storage_dir%')]\n#[Other('%app.st",
             'app.st',
-            null,
+            [],
         ];
         yield 'named argument of a later function call' => [
             "#[Autowire(service: 'app.mailer')]\nfinal class S { public function f() { helper(service: 'app.ma",
             'app.ma',
-            null,
+            [],
         ];
-        yield 'attribute of another namespace' => ["#[\\App\\Autowire(service: 'app.ma", 'app.ma', null];
-        yield 'cursor after a closed service argument' => ["#[Autowire(service: 'app.mailer')]", "'app.mailer'", null];
+        yield 'attribute of another namespace' => ["#[\\App\\Autowire(service: 'app.ma", 'app.ma', []];
+        yield 'cursor after a closed service argument' => ["#[Autowire(service: 'app.mailer')]", "'app.mailer'", []];
     }
 
     private function php(string $body): string

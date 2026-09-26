@@ -123,15 +123,15 @@ final class TwigPhpSymbolProviderTest extends TestCase
         self::assertCount(4, $provider->references($requests->references(LspRequests::inside($phpUri, $php, 'Status'))));
         self::assertCount(2, $provider->references($requests->references(LspRequests::inside($phpUri, $php, 'ViewOptions', (int) strpos($php, 'ViewOptions') + 2))));
 
-        $complete = static function (string $text, ?int $cursor = null) use ($provider, $documents, $converter): array {
+        $complete = static function (string $text, ?int $cursor = null) use ($provider, $documents, $projects, $converter): array {
             $uri = 'file:///workspace/templates/completion.html.twig';
             $documents->open(new Document($uri, 'twig', 2, $text));
             $position = $converter->toPosition($text, $cursor ?? \strlen($text));
 
-            return $provider->complete([
+            return $provider->complete((new ProviderRequests($documents, $projects))->positioned([
                 'textDocument' => ['uri' => $uri],
                 'position' => ['line' => $position->line, 'character' => $position->character],
-            ]) ?? [];
+            ]));
         };
         $items = $complete("{{ constant('App\\\\Model\\\\Vie");
         self::assertSame(['App\Model\ViewOptions'], array_column($items, 'label'));

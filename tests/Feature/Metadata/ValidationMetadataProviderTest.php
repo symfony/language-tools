@@ -16,6 +16,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class ValidationMetadataProviderTest extends MetadataTestCase
 {
@@ -31,7 +32,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         $documents = new DocumentStore();
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $completionProvider = new MetadataCompletionProvider($protocol, $indexes, $sourceIndexes, $extractor);
         $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes);
         $constraintUri = 'file:///workspace/src/Dto/Input.php';
         $constraintText = <<<'PHP'
@@ -58,11 +59,11 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
 
         $dependencyInjectionWhen = strpos($constraintText, 'exp)]');
         self::assertIsInt($dependencyInjectionWhen);
-        self::assertSame([], $this->completionLabels($completionProvider, $constraintUri, $constraintText, $dependencyInjectionWhen + 3));
+        self::assertSame([], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $constraintUri, $constraintText, $dependencyInjectionWhen + 3));
         $validatorWhen = strpos($constraintText, 'exp)]', $dependencyInjectionWhen + 1);
         self::assertIsInt($validatorWhen);
-        self::assertSame(['expression'], $this->completionLabels($completionProvider, $constraintUri, $constraintText, $validatorWhen + 3));
-        self::assertSame(['max'], $this->completionLabels($completionProvider, $constraintUri, $constraintText, strpos($constraintText, 'ma)') + 2));
+        self::assertSame(['expression'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $constraintUri, $constraintText, $validatorWhen + 3));
+        self::assertSame(['max'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $constraintUri, $constraintText, strpos($constraintText, 'ma)') + 2));
         self::assertNull($this->hover([$validationProvider], $constraintUri, $constraintText, strpos($constraintText, 'Assert\When') + \strlen('Assert\\')));
         self::assertNull($this->hover([$validationProvider], $constraintUri, $constraintText, strpos($constraintText, 'env:') + 1));
         self::assertIsArray($this->hover([$validationProvider], $constraintUri, $constraintText, strpos($constraintText, 'unknown:') + 1));
@@ -81,7 +82,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
             #[L
             PHP;
         $documents->open(new Document($directConstraintUri, 'php', 1, $directConstraintText));
-        self::assertSame(['Language', 'Length'], $this->completionLabels($completionProvider, $directConstraintUri, $directConstraintText, \strlen($directConstraintText)));
+        self::assertSame(['Language', 'Length'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $directConstraintUri, $directConstraintText, \strlen($directConstraintText)));
 
         $aliasedConstraintUri = 'file:///workspace/src/Dto/AliasedInput.php';
         $aliasedConstraintText = <<<'PHP'
@@ -91,7 +92,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
             #[AssertL
             PHP;
         $documents->open(new Document($aliasedConstraintUri, 'php', 1, $aliasedConstraintText));
-        self::assertSame(['AssertLength'], $this->completionLabels($completionProvider, $aliasedConstraintUri, $aliasedConstraintText, \strlen($aliasedConstraintText)));
+        self::assertSame(['AssertLength'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $aliasedConstraintUri, $aliasedConstraintText, \strlen($aliasedConstraintText)));
     }
 
     public function testProvidesYamlValidationMetadata(): void
@@ -115,7 +116,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         $documents = new DocumentStore();
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $completionProvider = new MetadataCompletionProvider($protocol, $indexes, $sourceIndexes, $extractor);
         $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes);
         $validationUri = 'file:///workspace/config/validator/User.yaml';
         $validationText = <<<'YAML'
@@ -132,13 +133,13 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
             $extractor->extract(new SourceDocument($validationUri, 'yaml', $validationText)),
         );
 
-        self::assertSame(['max'], $this->completionLabels($completionProvider, $validationUri, $validationText, strpos($validationText, 'max:') + 3));
+        self::assertSame(['max'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $validationUri, $validationText, strpos($validationText, 'max:') + 3));
         self::assertIsArray($this->hover([$validationProvider], $validationUri, $validationText, strpos($validationText, 'max:') + 1));
         self::assertSame(['validation.unknown_constraint_option'], array_column($this->diagnostics([$validationProvider], $validationUri), 'code'));
         $constraintNameUri = 'file:///workspace/config/validator/Custom.yaml';
         $constraintNameText = "App\\Entity\\User:\n    properties:\n        email:\n            - Sl";
         $documents->open(new Document($constraintNameUri, 'yaml', 1, $constraintNameText));
-        self::assertSame(['Slug'], $this->completionLabels($completionProvider, $constraintNameUri, $constraintNameText, \strlen($constraintNameText)));
+        self::assertSame(['Slug'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $constraintNameUri, $constraintNameText, \strlen($constraintNameText)));
     }
 
     public function testReadsNestedYamlConstraintsAsConstraintsRatherThanOptions(): void

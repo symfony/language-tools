@@ -360,7 +360,7 @@ PHP;
         $relationshipProvider = $kit->get(SecurityRelationshipProvider::class);
         $diagnosticProvider = $kit->get(SecurityDiagnosticProvider::class);
 
-        self::assertSame(['ROLE_ADMIN'], $kit->labels($kit->get(SecurityCompletionProvider::class)->complete($kit->after($completionUri, 'ROLE_A'))));
+        self::assertSame(['ROLE_ADMIN'], $kit->labels($kit->get(SecurityCompletionProvider::class)->complete($kit->positioned($kit->after($completionUri, 'ROLE_A')))));
         $role = $kit->inside($phpUri, 'ROLE_ADMIN');
         self::assertStringContainsString('App\\Security\\PostVoter', $kit->hoverText($relationshipProvider->hover($role)));
         self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->after($yamlUri, 'provider: us')))));

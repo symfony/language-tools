@@ -2,18 +2,17 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\PositionedDocumentContext;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class ServiceCompletionHandler implements CompletionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $positionConverter,
         private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionProjectLookup $lookup,
@@ -22,22 +21,17 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         return match ($request->document->languageId) {
             'yaml' => $this->completeYaml($request),
             'php' => $this->completePhp($request),
-            default => null,
-        };
+            default => [],
+        } ?? [];
     }
 
     /** @return list<array<array-key, mixed>>|null */
-    private function completeYaml(PositionedDocumentContext $request): ?array
+    private function completeYaml(PositionedRequest $request): ?array
     {
         $text = $this->yamlComments->mask($request->document->text);
         $parameterContext = ParameterCompletionContext::fromYaml($text, $request->position, $this->positionConverter);
@@ -51,7 +45,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
     }
 
     /** @return list<array<array-key, mixed>>|null */
-    private function completePhp(PositionedDocumentContext $request): ?array
+    private function completePhp(PositionedRequest $request): ?array
     {
         $text = $request->document->text;
         $argument = $this->autowireArguments->resolve($text, $this->positionConverter->toByteOffset($text, $request->position));
@@ -74,12 +68,12 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
     {
         $items = [];
         foreach ($this->lookup->matchingServices($project, $context->prefix) as $service) {
-            $items[] = [
-                'label' => $service->id,
-                'kind' => 18,
-                'detail' => $this->serviceDetail($service),
-                'textEdit' => $this->protocol->textEdit($context->replacementRange, $service->id),
-            ];
+            $items[] = $this->protocol->completionItem(
+                $service->id,
+                CompletionItemKind::Reference,
+                $this->serviceDetail($service),
+                $this->protocol->textEdit($context->replacementRange, $service->id),
+            );
         }
 
         return $items;
@@ -90,15 +84,12 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
     {
         $items = [];
         foreach ($this->lookup->matchingParameters($project, $context->prefix) as $parameter) {
-            $items[] = [
-                'label' => $parameter->name,
-                'kind' => 12,
-                'detail' => null !== $parameter->deprecation ? 'Deprecated Symfony parameter' : 'Symfony parameter',
-                'textEdit' => $this->protocol->textEdit(
-                    $context->replacementRange,
-                    $context->completionText($parameter->name),
-                ),
-            ];
+            $items[] = $this->protocol->completionItem(
+                $parameter->name,
+                CompletionItemKind::Value,
+                null !== $parameter->deprecation ? 'Deprecated Symfony parameter' : 'Symfony parameter',
+                $this->protocol->textEdit($context->replacementRange, $context->completionText($parameter->name)),
+            );
         }
 
         return $items;

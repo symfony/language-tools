@@ -3,18 +3,18 @@
 namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class ConfigurationCompletionProvider implements CompletionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly ConfigurationIndexRegistry $indexes,
@@ -24,19 +24,14 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         return match ($request->document->languageId) {
             'yaml' => $this->completeYaml($request->document, $request->project, $request->position),
             'php' => $this->completePhp($request->document, $request->project, $request->position),
             'xml' => $this->completeXml($request->document, $request->project, $request->position),
-            default => null,
-        };
+            default => [],
+        } ?? [];
     }
 
     /** @return list<array<array-key, mixed>>|null */
@@ -217,7 +212,10 @@ final class ConfigurationCompletionProvider implements CompletionProviderInterfa
         $range = new Range($this->converter->toPosition($text, $start), $end);
         $newText = '' === $snippet ? $literal.$suffix : $this->escapeSnippet($literal).$snippet.$this->escapeSnippet($suffix);
 
-        return ['label' => $label, 'kind' => 10, 'detail' => $detail, 'insertTextFormat' => '' === $snippet ? 1 : 2, 'textEdit' => $this->protocol->textEdit($range, $newText)];
+        return [
+            ...$this->protocol->completionItem($label, CompletionItemKind::Property, $detail, $this->protocol->textEdit($range, $newText)),
+            'insertTextFormat' => '' === $snippet ? 1 : 2,
+        ];
     }
 
     private function escapeSnippet(string $text): string

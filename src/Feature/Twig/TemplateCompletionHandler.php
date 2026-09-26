@@ -2,19 +2,19 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class TemplateCompletionHandler implements CompletionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TemplateIndexRegistry $indexes,
@@ -25,32 +25,28 @@ final class TemplateCompletionHandler implements CompletionProviderInterface
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
         $document = $request->document;
         $context = match ($document->languageId) {
             'php' => $this->extractor->phpCompletionAt(
                 $document->text,
-                $this->converter->toByteOffset($document->text, $request->position),
+                $request->offset,
                 $this->classIndexes->forProject($request->project),
             ),
             'twig' => $this->twigContext($this->comments->mask('twig', $document->text), $request->position),
             default => null,
         };
         if (null === $context) {
-            return null;
+            return [];
         }
 
-        return array_map(fn (TemplateDeclaration $template): array => [
-            'label' => $template->name,
-            'kind' => 17,
-            'detail' => $template->uri,
-            'textEdit' => $this->protocol->textEdit($context->range, $template->name),
-        ], $this->indexes->forProject($request->project)->matching($context->prefix));
+        return array_map(fn (TemplateDeclaration $template): array => $this->protocol->completionItem(
+            $template->name,
+            CompletionItemKind::File,
+            $template->uri,
+            $this->protocol->textEdit($context->range, $template->name),
+        ), $this->indexes->forProject($request->project)->matching($context->prefix));
     }
 
     private function twigContext(string $text, Position $position): ?TemplateCompletionContext

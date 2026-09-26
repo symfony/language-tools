@@ -6,7 +6,6 @@ use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
@@ -24,6 +23,7 @@ use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class RouteCompletionHandlerTest extends TestCase
 {
@@ -53,10 +53,10 @@ final class RouteCompletionHandlerTest extends TestCase
         $position = $converter->toPosition($text, $cursor);
         $handler = $this->handler($documents, $projects, $converter, $indexes);
 
-        self::assertSame(['slug'], array_column($handler->complete([
+        self::assertSame(['slug'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     public function testCompletesParametersFromAllInternationalizedRouteVariants(): void
@@ -86,10 +86,10 @@ final class RouteCompletionHandlerTest extends TestCase
         $position = $converter->toPosition($text, $cursor);
         $handler = $this->handler($documents, $projects, $converter, $indexes);
 
-        self::assertSame(['locale_en', 'locale_fr'], array_column($handler->complete([
+        self::assertSame(['locale_en', 'locale_fr'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     #[DataProvider('twigRouteNameCompletionProvider')]
@@ -110,10 +110,10 @@ final class RouteCompletionHandlerTest extends TestCase
         $position = $converter->toPosition($text, $cursor);
         $handler = $this->handler($documents, $projects, $converter, $indexes);
 
-        self::assertSame(['article_show'], array_column($handler->complete([
+        self::assertSame(['article_show'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     public function testIgnoresRouteFunctionTextOutsideTwigDirectives(): void
@@ -129,10 +129,10 @@ final class RouteCompletionHandlerTest extends TestCase
         $converter = new PositionConverter();
         $position = $converter->toPosition($text, \strlen($text));
 
-        self::assertNull($this->handler($documents, $projects, $converter, $indexes)->complete([
+        self::assertSame([], $this->handler($documents, $projects, $converter, $indexes)->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     #[DataProvider('twigRouteParameterCompletionProvider')]
@@ -152,10 +152,10 @@ final class RouteCompletionHandlerTest extends TestCase
         $position = $converter->toPosition($text, $cursor);
         $handler = $this->handler($documents, $projects, $converter, $indexes);
 
-        self::assertSame(['slug'], array_column($handler->complete([
+        self::assertSame(['slug'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     public function testCompletesRoutesThroughAProjectControllerBaseClass(): void
@@ -201,10 +201,10 @@ final class RouteCompletionHandlerTest extends TestCase
         $position = $converter->toPosition($text, strpos($text, 'article_') + \strlen('article_'));
         $handler = $this->handler($documents, $projects, $converter, $indexes, $classIndexes);
 
-        self::assertSame(['article_show'], array_column($handler->complete([
+        self::assertSame(['article_show'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     public function testReturnsRouteCompletionWithUtf16TextEdit(): void
@@ -246,10 +246,10 @@ final class RouteCompletionHandlerTest extends TestCase
                 ],
                 'newText' => 'article_edit',
             ],
-        ]], $handler->complete([
+        ]], $handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     public function testOffersNoRouteCompletionsInsideTwigComments(): void
@@ -269,10 +269,10 @@ final class RouteCompletionHandlerTest extends TestCase
             self::assertIsInt($cursor);
             $position = $converter->toPosition($text, $cursor);
 
-            self::assertNull($handler->complete([
+            self::assertSame([], $handler->complete((new ProviderRequests($documents, $projects))->positioned([
                 'textDocument' => ['uri' => $uri],
                 'position' => ['line' => $position->line, 'character' => $position->character],
-            ]));
+            ])));
         }
     }
 
@@ -307,10 +307,10 @@ final class RouteCompletionHandlerTest extends TestCase
         $position = $converter->toPosition($text, strpos($text, 'article_') + \strlen('article_'));
         $handler = $this->handler($documents, $projects, $converter, $indexes);
 
-        self::assertSame(['article_show'], array_column($handler->complete([
+        self::assertSame(['article_show'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     public function testOffersNoRouteCompletionsOnUnrelatedRouterTypes(): void
@@ -340,10 +340,10 @@ final class RouteCompletionHandlerTest extends TestCase
         $position = $converter->toPosition($text, strpos($text, 'article_') + \strlen('article_'));
         $handler = $this->handler($documents, $projects, $converter, $indexes);
 
-        self::assertNull($handler->complete([
+        self::assertSame([], $handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     public function testOffersNoRouteCompletionsInsidePhpComments(): void
@@ -370,10 +370,10 @@ final class RouteCompletionHandlerTest extends TestCase
         $position = $converter->toPosition($text, strpos($text, 'artic') + \strlen('artic'));
         $handler = $this->handler($documents, $projects, $converter, $indexes);
 
-        self::assertNull($handler->complete([
+        self::assertSame([], $handler->complete((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     /** @return iterable<string, array{string}> */
@@ -398,14 +398,13 @@ final class RouteCompletionHandlerTest extends TestCase
         ?DependencyInjectionSourceIndexRegistry $classIndexes = null,
     ): RouteCompletionHandler {
         return new RouteCompletionHandler(
-            new DocumentContextResolver($documents, $projects),
             $converter,
             new LspProtocolMapper(),
             $indexes,
             $classIndexes ?? new DependencyInjectionSourceIndexRegistry(),
             RouteReferenceExtractorFactory::create($converter),
             new CommentParserRegistry(['php' => new PhpCommentParser(), 'twig' => new TwigCommentParser()]),
-            new RouteCompletionBuilder(),
+            new RouteCompletionBuilder(new LspProtocolMapper()),
             new TwigDirectiveLocator(),
         );
     }

@@ -2,17 +2,17 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class TwigComponentCompletionProvider implements CompletionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
@@ -21,13 +21,12 @@ final class TwigComponentCompletionProvider implements CompletionProviderInterfa
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId) {
-            return null;
+        if ('twig' !== $request->document->languageId) {
+            return [];
         }
-        $cursor = $this->converter->toByteOffset($request->document->text, $request->position);
+        $cursor = $request->offset;
         $before = substr($this->commentParser->mask($request->document->text), 0, $cursor);
         $index = $this->indexes->forProject($request->project);
         $liveActionContext = $this->components->liveActionCompletionContext($request->project, $request->document->uri, $before);
@@ -41,7 +40,7 @@ final class TwigComponentCompletionProvider implements CompletionProviderInterfa
         } elseif (preg_match('/<twig:([A-Za-z_][A-Za-z0-9_:.-]*)\s+[^>]*?([A-Za-z_][A-Za-z0-9_]*)$/', $before, $match)) {
             $component = $index->get($match[1]);
             if (null === $component) {
-                return null;
+                return [];
             }
             $prefix = $match[2];
             $values = $component->properties;
@@ -62,7 +61,7 @@ final class TwigComponentCompletionProvider implements CompletionProviderInterfa
             sort($values);
             $detail = 'Symfony Twig component';
         } else {
-            return null;
+            return [];
         }
         $start = $this->converter->toPosition($request->document->text, $cursor - \strlen($prefix));
         $items = [];
@@ -70,12 +69,12 @@ final class TwigComponentCompletionProvider implements CompletionProviderInterfa
             if (!str_starts_with($value, $prefix)) {
                 continue;
             }
-            $items[] = [
-                'label' => $value,
-                'kind' => 6,
-                'detail' => $detail,
-                'textEdit' => $this->protocol->textEdit(new Range($start, $request->position), $value),
-            ];
+            $items[] = $this->protocol->completionItem(
+                $value,
+                CompletionItemKind::Variable,
+                $detail,
+                $this->protocol->textEdit(new Range($start, $request->position), $value),
+            );
         }
 
         return $items;

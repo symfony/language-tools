@@ -36,14 +36,14 @@ final class TranslationProviderTest extends TestCase
     {
         $uri = 'file:///workspace/src/Controller.php';
         $text = "<?php \$translator->trans('article.ti');";
-        [$provider, $converter] = $this->provider($uri, $text);
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
-        self::assertSame(['article.title'], array_column($provider->complete($params) ?? [], 'label'));
+        self::assertSame(['article.title'], array_column($provider->complete($requests->positioned($params)), 'label'));
 
         $fullText = "<?php \$translator->trans('article.title', ['%name%' => \$name]);";
-        [$fullProvider, $fullConverter] = $this->provider($uri, $fullText);
+        [$fullProvider, $fullConverter, , , $requests] = $this->provider($uri, $fullText);
         $fullPosition = $fullConverter->toPosition($fullText, strpos($fullText, 'article.title') + 1);
         $hover = $fullProvider->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $fullPosition->line, 'character' => $fullPosition->character]]);
         self::assertIsArray($hover);
@@ -56,39 +56,38 @@ final class TranslationProviderTest extends TestCase
     public function testCompletesNamedPhpTranslationKeys(string $text): void
     {
         $uri = 'file:///workspace/src/Controller.php';
-        [$provider, $converter] = $this->provider($uri, $text);
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
-        self::assertSame(['article.title'], array_column($provider->complete($params) ?? [], 'label'));
+        self::assertSame(['article.title'], array_column($provider->complete($requests->positioned($params)), 'label'));
     }
 
     #[DataProvider('unrelatedPhpTranslationCallProvider')]
     public function testOffersNoPhpCompletionWhereIndexingReadsNoReference(string $text): void
     {
         $uri = 'file:///workspace/src/Controller.php';
-        [$provider, $converter] = $this->provider($uri, $text);
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
-        self::assertNull($provider->complete([
+        self::assertSame([], $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     public function testCompletesMessagePlaceholders(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
         $text = "<?php \$translator->trans('article.title', ['%na']);";
-        [$provider, $converter] = $this->provider($uri, $text);
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, strpos($text, '%na') + \strlen('%na'));
 
-        $result = $provider->complete([
+        $result = $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
-        self::assertIsArray($result);
+        ]));
         self::assertIsArray($result[0]['textEdit']);
         self::assertSame('name', $result[0]['label']);
         self::assertSame('name%', $result[0]['textEdit']['newText']);
@@ -98,10 +97,10 @@ final class TranslationProviderTest extends TestCase
     {
         $uri = 'file:///workspace/templates/page.html.twig';
         $text = "{## Use t('article.ti') in examples. #}";
-        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text, 'twig');
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
 
-        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
+        self::assertSame([], $provider->complete($requests->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]])));
     }
 
     public function testDecodesEscapedQuotesInTwigTranslationKeys(): void
@@ -110,7 +109,7 @@ final class TranslationProviderTest extends TestCase
         $text = <<<'TWIG'
             <p>{{ 'don\'t panic'|trans }}</p>
             TWIG;
-        [$provider, $converter, $configuration, $project] = $this->provider($uri, $text, 'twig');
+        [$provider, $converter, $configuration, $project, $requests] = $this->provider($uri, $text, 'twig');
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
         $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
 
@@ -128,14 +127,13 @@ final class TranslationProviderTest extends TestCase
         $text = <<<'TWIG'
             {{ 'don\'t pa'|trans }}
             TWIG;
-        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text, 'twig');
         $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
-        $completion = $provider->complete([
+        $completion = $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
+        ]));
 
-        self::assertIsArray($completion);
         self::assertSame(["don't panic"], array_column($completion, 'label'));
         self::assertIsArray($completion[0]['textEdit'] ?? null);
         self::assertSame("don\\'t panic", $completion[0]['textEdit']['newText'] ?? null);
@@ -148,14 +146,13 @@ final class TranslationProviderTest extends TestCase
             <twig:ux:icon name="tabler:trash"/>
             {{ 'article.ti'|trans }}
             TWIG;
-        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text, 'twig');
         $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
-        $completion = $provider->complete([
+        $completion = $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
+        ]));
 
-        self::assertIsArray($completion);
         self::assertSame(['article.title'], array_column($completion, 'label'));
         self::assertIsArray($completion[0]['textEdit'] ?? null);
         self::assertSame(
@@ -172,14 +169,13 @@ final class TranslationProviderTest extends TestCase
             <button title="Supprimer l'élément"
                 class="btn">{{ 'article.ti'|trans }}</button>
             TWIG;
-        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text, 'twig');
         $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
-        $completion = $provider->complete([
+        $completion = $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
+        ]));
 
-        self::assertIsArray($completion);
         self::assertSame(['article.title'], array_column($completion, 'label'));
         self::assertIsArray($completion[0]['textEdit'] ?? null);
         self::assertSame(
@@ -192,14 +188,13 @@ final class TranslationProviderTest extends TestCase
     {
         $uri = 'file:///workspace/templates/page.html.twig';
         $text = "<p class='lead'>{{ 'article.title'|trans }}</p>";
-        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text, 'twig');
         $position = $converter->toPosition($text, (int) strpos($text, 'article.ti') + \strlen('article.ti'));
-        $completion = $provider->complete([
+        $completion = $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
+        ]));
 
-        self::assertIsArray($completion);
         self::assertSame(['article.title'], array_column($completion, 'label'));
         self::assertIsArray($completion[0]['textEdit'] ?? null);
         self::assertSame(
@@ -212,51 +207,51 @@ final class TranslationProviderTest extends TestCase
     public function testOffersNoTranslationCompletionsInUnrelatedTwigStrings(string $text, string $cursor): void
     {
         $uri = 'file:///workspace/templates/page.html.twig';
-        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text, 'twig');
         $position = $converter->toPosition($text, (int) strpos($text, $cursor) + \strlen($cursor));
 
-        self::assertNull($provider->complete([
+        self::assertSame([], $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     public function testScopesPhpKeyCompletionToTheLiteralDomain(): void
     {
         $uri = 'file:///workspace/src/Controller.php';
         $text = "<?php \$translator->trans('panel.ti', ['%name%' => \$name], 'admin', \$language);";
-        [$provider, $converter] = $this->provider($uri, $text);
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, (int) strpos($text, 'panel.ti') + \strlen('panel.ti'));
 
-        self::assertSame(['panel.title'], array_column($provider->complete([
+        self::assertSame(['panel.title'], array_column($provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     #[DataProvider('twigLiteralDomainProvider')]
     public function testScopesTwigKeyCompletionToTheLiteralDomain(string $text): void
     {
         $uri = 'file:///workspace/templates/page.html.twig';
-        [$provider, $converter] = $this->provider($uri, $text, 'twig');
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text, 'twig');
         $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
 
-        self::assertSame(['panel.title'], array_column($provider->complete([
+        self::assertSame(['panel.title'], array_column($provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     #[DataProvider('dynamicDomainCallProvider')]
     public function testSuggestsNoKeyWhenTheSelectedDomainIsDynamic(string $uri, string $languageId, string $text): void
     {
-        [$provider, $converter] = $this->provider($uri, $text, $languageId);
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text, $languageId);
         $position = $converter->toPosition($text, (int) strpos($text, 'article.ti') + \strlen('article.ti'));
 
-        self::assertSame([], $provider->complete([
+        self::assertSame([], $provider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 
     public function testDecodesTwigEscapeSequencesForLookupAndCompletion(): void
@@ -274,12 +269,12 @@ final class TranslationProviderTest extends TestCase
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
 
         $completionText = '{{ "\x66"|trans }}';
-        [$completionProvider, $converter] = $this->provider($uri, $completionText, 'twig');
+        [$completionProvider, $converter, , , $requests] = $this->provider($uri, $completionText, 'twig');
         $position = $converter->toPosition($completionText, (int) strpos($completionText, '"|trans'));
-        self::assertSame(['foo'], array_column($completionProvider->complete([
+        self::assertSame(['foo'], array_column($completionProvider->complete($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]) ?? [], 'label'));
+        ])), 'label'));
     }
 
     public function testAddsMissingTranslationToTheOnlyDomainResource(): void
@@ -634,10 +629,10 @@ final class TranslationProviderTest extends TestCase
     {
         $uri = 'file:///workspace/src/Controller.php';
         $text = "<?php // \$translator->trans('article.ti";
-        [$provider, $converter] = $this->provider($uri, $text);
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text);
         $position = $converter->toPosition($text, strpos($text, 'article.ti') + \strlen('article.ti'));
 
-        self::assertNull($provider->complete(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
+        self::assertSame([], $provider->complete($requests->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]])));
     }
 
     /** @return iterable<string, array{string}> */
@@ -731,7 +726,7 @@ final class TranslationProviderTest extends TestCase
     /**
      * @param list<array{string, string, string}> $sources
      *
-     * @return array{TranslationProvider, PositionConverter, AnalysisSettingsRegistry, Project}
+     * @return array{TranslationProvider, PositionConverter, AnalysisSettingsRegistry, Project, ProviderRequests}
      */
     private function provider(string $uri, string $text, string $languageId = 'php', array $sources = []): array
     {
@@ -760,6 +755,12 @@ final class TranslationProviderTest extends TestCase
         $configuration = new AnalysisSettingsRegistry();
         $documentResolver = new DocumentContextResolver($documents, $projects);
 
-        return [new TranslationProvider($documentResolver, new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor), $converter, $configuration, $project];
+        return [
+            new TranslationProvider($documentResolver, new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor),
+            $converter,
+            $configuration,
+            $project,
+            new ProviderRequests($documents, $projects),
+        ];
     }
 }

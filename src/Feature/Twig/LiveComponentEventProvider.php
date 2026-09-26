@@ -15,6 +15,7 @@ use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
@@ -36,15 +37,10 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->requests->positioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         if ('php' !== $request->document->languageId) {
-            return null;
+            return [];
         }
         $text = $request->document->text;
         $offset = $request->offset;
@@ -52,18 +48,18 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         $source = $this->phpComments->mask($text);
         $prefix = $this->completionPrefix($source, $php, $offset);
         if (null === $prefix) {
-            return null;
+            return [];
         }
         $start = $this->converter->toPosition($request->document->text, $offset - \strlen($prefix));
         $items = [];
         foreach ($this->indexes->forProject($request->project)->eventNames() as $event) {
             if (str_starts_with($event, $prefix)) {
-                $items[] = [
-                    'label' => $event,
-                    'kind' => 23,
-                    'detail' => 'Live component event',
-                    'textEdit' => $this->protocol->textEdit(new Range($start, $request->position), $event),
-                ];
+                $items[] = $this->protocol->completionItem(
+                    $event,
+                    CompletionItemKind::Event,
+                    'Live component event',
+                    $this->protocol->textEdit(new Range($start, $request->position), $event),
+                );
             }
         }
 

@@ -13,7 +13,9 @@ use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigTypeDeclaration;
 use Symfony\Lsp\Parser\Twig\TwigTypeDeclarationParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class TwigVariableProvider implements CompletionProviderInterface, HoverProviderInterface
 {
@@ -29,16 +31,15 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
     ) {
     }
 
-    public function complete(array $params): ?array
+    public function complete(PositionedRequest $request): array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId || null === $template = $this->nameResolver->resolve($request->project, $request->document->uri)) {
-            return null;
+        if ('twig' !== $request->document->languageId || null === $template = $this->nameResolver->resolve($request->project, $request->document->uri)) {
+            return [];
         }
-        $cursor = $this->converter->toByteOffset($request->document->text, $request->position);
+        $cursor = $request->offset;
         $before = substr($this->commentParser->mask($request->document->text), 0, $cursor);
         if (!preg_match('/(?:{{|{%)[^}\n]*?([A-Za-z_\x7f-\xff][A-Za-z0-9_\x7f-\xff]*)?$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
-            return null;
+            return [];
         }
         $prefix = $match[1][0] ?? '';
         $start = $cursor - \strlen($prefix);
@@ -49,12 +50,12 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
             if (!str_starts_with($variable, $prefix)) {
                 continue;
             }
-            $item = [
-                'label' => $variable,
-                'kind' => 6,
-                'detail' => 'Symfony Twig variable',
-                'textEdit' => $this->protocol->textEdit(new Range($startPosition, $request->position), $variable),
-            ];
+            $item = $this->protocol->completionItem(
+                $variable,
+                CompletionItemKind::Variable,
+                'Symfony Twig variable',
+                $this->protocol->textEdit(new Range($startPosition, $request->position), $variable),
+            );
             if (isset($declarations[$variable])) {
                 $declaration = $declarations[$variable];
                 $item['detail'] = \sprintf(

@@ -97,7 +97,7 @@ class TwigCallableProviderTestCase extends TestCase
             'requests' => new ProviderRequests($documents, $projects),
             'converter' => $converter,
             'protocol' => $protocol,
-            'completion' => new TwigCallableCompletionProvider($documentResolver, $converter, $protocol, $indexes, $methodResolver, $argumentAnalyzer, $commentParser, $directives),
+            'completion' => new TwigCallableCompletionProvider($converter, $protocol, $indexes, $methodResolver, $argumentAnalyzer, $commentParser, $directives),
             'diagnostic' => new TwigCallableDiagnosticProvider($documentResolver, $protocol, $indexes, $methodResolver),
             'relationship' => new TwigCallableRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $phpParser),
         ];

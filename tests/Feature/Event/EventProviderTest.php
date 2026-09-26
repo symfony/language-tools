@@ -477,7 +477,7 @@ PHP;
         $relationshipProvider = $kit->get(EventRelationshipProvider::class);
         $codeLensProvider = $kit->get(EventCodeLensProvider::class);
 
-        self::assertSame(['App\\Event\\OrderPlaced'], $kit->labels($kit->get(EventCompletionProvider::class)->complete($kit->after($dispatcherUri, "'App\\Event\\Ord"))));
+        self::assertSame(['App\\Event\\OrderPlaced'], $kit->labels($kit->get(EventCompletionProvider::class)->complete($kit->positioned($kit->after($dispatcherUri, "'App\\Event\\Ord")))));
         $dispatched = $kit->at($dispatcherUri, 'OrderPlaced());');
         self::assertStringContainsString('Symfony event', $kit->hoverText($relationshipProvider->hover($dispatched)));
         self::assertSame([$eventUri, $listenerUri], $kit->targets($relationshipProvider->definition($kit->positioned($dispatched))));
