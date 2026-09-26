@@ -12,22 +12,16 @@ use Symfony\Lsp\Parser\Php\PhpLiteralArrayEntry;
 use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
-use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
-use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
-use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
 final class FormMetadataExtractor
 {
     private const IDENTIFIER_PATTERN = '/^[A-Za-z_][A-Za-z0-9_]*$/D';
-    private const FORM_FACTORY_TYPES = [
-        'Symfony\\Component\\Form\\FormFactoryInterface',
-        'Symfony\\Component\\Form\\FormFactory',
-    ];
 
     public function __construct(
         private readonly PositionConverter $converter,
+        private readonly FormCallClassifier $formCalls,
     ) {
     }
 
@@ -101,7 +95,7 @@ final class FormMetadataExtractor
             foreach ($php->methodCalls as $call) {
                 if ('add' !== $call->method
                     || $method->className !== $call->className
-                    || !\in_array($builder, $this->formBuilderReceiverVariables($php, $call), true)
+                    || !\in_array($builder, $this->formCalls->builderReceiverVariables($php, $call), true)
                     || !$this->isDirectFormBuilderReceiver($call->receiver, $builder->name)
                 ) {
                     continue;
@@ -128,9 +122,9 @@ final class FormMetadataExtractor
     public function options(string $text, string $source, PhpDocument $php): array
     {
         $options = [];
-        foreach ($this->formCalls($source, $php) as $call) {
-            $type = $call->positionalArgument($this->formTypeIndex($call))?->completeClassReference;
-            $argument = $this->formOptionsArgument($call);
+        foreach ($this->formCalls->formCalls($source, $php) as $call) {
+            $type = $this->formCalls->typeArgument($call)?->completeClassReference;
+            $argument = $this->formCalls->optionsArgument($call);
             if (null === $type || null === $argument) {
                 continue;
             }
@@ -150,20 +144,20 @@ final class FormMetadataExtractor
     {
         $cursor = $php->argumentCursorAt($offset);
         $call = $cursor?->call;
-        if (null === $cursor || null === $cursor->quote || !$call instanceof PhpMethodCall || !$this->isFormCall($source, $php, $call)) {
+        if (null === $cursor || null === $cursor->quote || !$call instanceof PhpMethodCall || !$this->formCalls->isFormCall($source, $php, $call)) {
             return null;
         }
         if ('add' === $call->method && $cursor->isArgumentLiteral() && $cursor->argument === $call->positionalArgument(0)) {
-            $builder = $this->formBuilderVariableForCall($source, $php, $call);
+            $builder = $this->formCalls->builderVariable($source, $php, $call);
             $named = '' === $cursor->prefix || 1 === preg_match(self::IDENTIFIER_PATTERN, $cursor->prefix);
 
             return !$named || null === $call->className || null === $builder || !$this->isDirectFormBuilderReceiver($call->receiver, $builder->name)
                 ? null
                 : $this->context(MetadataCompletionKind::FormProperty, $cursor->prefix, $text, $cursor->prefixStartOffset, $call->className);
         }
-        $type = $call->positionalArgument($this->formTypeIndex($call))?->completeClassReference?->className;
+        $type = $this->formCalls->typeArgument($call)?->completeClassReference?->className;
         if (!$cursor->isArrayItemLiteral()
-            || $cursor->argument !== $this->formOptionsArgument($call)
+            || $cursor->argument !== $this->formCalls->optionsArgument($call)
             || 1 !== preg_match(self::IDENTIFIER_PATTERN, $cursor->prefix)
             || null === $type
         ) {
@@ -171,74 +165,6 @@ final class FormMetadataExtractor
         }
 
         return $this->context(MetadataCompletionKind::FormOption, $cursor->prefix, $text, $cursor->prefixStartOffset, $type);
-    }
-
-    private function formTypeIndex(PhpMethodCall $call): int
-    {
-        return 'createForm' === $call->method ? 0 : 1;
-    }
-
-    private function formOptionsArgument(PhpMethodCall $call): ?PhpArgument
-    {
-        return $call->positionalArgument('createNamed' === $call->method ? 3 : 2);
-    }
-
-    private function isFormCall(string $source, PhpDocument $php, PhpMethodCall $call): bool
-    {
-        if (!\in_array($call->method, ['createForm', 'createNamed', 'add'], true)) {
-            return false;
-        }
-
-        return 'add' === $call->method
-            ? null !== $this->formBuilderVariableForCall($source, $php, $call)
-            : $this->createsFormThroughSymfony($php, $call);
-    }
-
-    /** @return list<PhpMethodCall> */
-    private function formCalls(string $source, PhpDocument $php): array
-    {
-        return array_values(array_filter($php->methodCalls, fn (PhpMethodCall $call): bool => $this->isFormCall($source, $php, $call)));
-    }
-
-    /**
-     * Whether a `createForm` or `createNamed` call is Symfony's: a controller
-     * call on `$this`, or a call on a form factory.
-     */
-    private function createsFormThroughSymfony(PhpDocument $php, PhpMethodCall $call): bool
-    {
-        return match ($call->receiverContext->kind) {
-            PhpMethodReceiverKind::This => true,
-            PhpMethodReceiverKind::ThisProperty, PhpMethodReceiverKind::Variable => PhpReceiverMatch::Matches === $php->matchReceiver($call, ...self::FORM_FACTORY_TYPES),
-            PhpMethodReceiverKind::Other => false,
-        };
-    }
-
-    private function formBuilderVariableForCall(string $source, PhpDocument $php, PhpMethodCall $call): ?PhpTypedVariable
-    {
-        foreach ($this->formBuilderReceiverVariables($php, $call) as $variable) {
-            if (PhpTypedVariableKind::Parameter !== $variable->kind
-                || !\in_array('Symfony\\Component\\Form\\FormBuilderInterface', $variable->types, true)
-                || 1 !== preg_match('/^\s*\\$'.preg_quote($variable->name, '/').'\b/', $call->receiver)
-            ) {
-                continue;
-            }
-
-            return $variable;
-        }
-
-        return null;
-    }
-
-    /** @return list<PhpTypedVariable> */
-    private function formBuilderReceiverVariables(PhpDocument $php, PhpMethodCall $call): array
-    {
-        do {
-            if ([] !== $variables = $php->receiverVariables($call)) {
-                return $variables;
-            }
-        } while (null !== $call = $php->receiverCall($call));
-
-        return [];
     }
 
     private function isDirectFormBuilderReceiver(string $receiver, string $variable): bool

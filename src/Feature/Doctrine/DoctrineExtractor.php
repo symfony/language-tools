@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\Metadata\FormCallClassifier;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceSymbols;
 use Symfony\Lsp\Parser\Php\PhpArgument;
@@ -27,6 +28,7 @@ final class DoctrineExtractor
         private readonly PhpParserInterface $phpParser,
         private readonly PhpCommentParser $phpComments,
         private readonly DoctrineRepositoryReceiverResolver $repositoryReceivers,
+        private readonly FormCallClassifier $formCalls,
     ) {
     }
 
@@ -110,11 +112,11 @@ final class DoctrineExtractor
 
     private function entityTypeFieldContext(string $text, PhpDocument $php, PhpArgumentCursor $cursor, PhpMethodCall $call): ?DoctrineCompletionContext
     {
-        $options = $this->formOptionsArgument($call);
+        $options = $this->formCalls->optionsArgument($call);
         if (null === $options
             || $cursor->argument !== $options
             || !\in_array($this->arrayItemKey($php, $options, $cursor), ['choice_label', 'choice_value', 'group_by'], true)
-            || 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $call->positionalArgument($this->formTypeIndex($call))?->completeClassReference?->className
+            || 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $this->formCalls->typeArgument($call)?->completeClassReference?->className
             || null === $entityClass = $this->arrayClassReference($php, $options, 'class')?->className
         ) {
             return null;
@@ -247,25 +249,13 @@ final class DoctrineExtractor
         return null;
     }
 
-    private function formTypeIndex(PhpMethodCall $call): int
-    {
-        return 'createForm' === $call->method ? 0 : 1;
-    }
-
-    private function formOptionsArgument(PhpMethodCall $call): ?PhpArgument
-    {
-        return \in_array($call->method, ['createForm', 'createNamed', 'add'], true)
-            ? $call->positionalArgument('createNamed' === $call->method ? 3 : 2)
-            : null;
-    }
-
     /** @return list<DoctrineSourceSymbol> */
     private function formSymbols(string $uri, string $text, PhpDocument $php): array
     {
         $symbols = [];
         foreach ($php->methodCalls as $call) {
-            $options = $this->formOptionsArgument($call);
-            if (null === $options || 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $call->positionalArgument($this->formTypeIndex($call))?->completeClassReference?->className) {
+            $options = $this->formCalls->optionsArgument($call);
+            if (null === $options || 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $this->formCalls->typeArgument($call)?->completeClassReference?->className) {
                 continue;
             }
             $entity = $this->arrayClassReference($php, $options, 'class');

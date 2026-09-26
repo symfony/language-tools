@@ -27,6 +27,7 @@ use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
+use Symfony\Lsp\Feature\Metadata\FormCallClassifier;
 use Symfony\Lsp\Feature\Metadata\FormMetadataExtractor;
 use Symfony\Lsp\Feature\Metadata\MetadataExtractor;
 use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
@@ -268,14 +269,14 @@ final class ProviderRegistryTest extends TestCase
         $positionedSymbols = new PositionedSourceSymbolResolver($converter);
         $phpParser = new TolerantPhpParser(new Parser());
         $phpComments = new PhpCommentParser();
-        $doctrineExtractor = new DoctrineExtractor($converter, $phpParser, $phpComments, new DoctrineRepositoryReceiverResolver());
+        $doctrineExtractor = new DoctrineExtractor($converter, $phpParser, $phpComments, new DoctrineRepositoryReceiverResolver(), new FormCallClassifier());
         $doctrineIndexes = new DoctrineIndexRegistry();
         $doctrineIndexes->forProject($project)->replace($doctrineExtractor->extract($source));
         $metadataExtractor = new MetadataExtractor(
             $converter,
             $phpParser,
             $phpComments,
-            new FormMetadataExtractor($converter),
+            new FormMetadataExtractor($converter, new FormCallClassifier()),
             new ValidationMetadataExtractor($converter),
             new SerializerMetadataExtractor($converter),
             new YamlMetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))),
