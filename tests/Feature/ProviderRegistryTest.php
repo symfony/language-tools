@@ -42,7 +42,6 @@ use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Index\SourceParseHealth;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -224,7 +223,7 @@ final class ProviderRegistryTest extends TestCase
             $converter,
             $phpParser,
             $phpComments,
-            new FormMetadataExtractor($converter, new BalancedDelimiterMatcher(), new PhpLiteralArrayKeyParser()),
+            new FormMetadataExtractor($converter, new PhpLiteralArrayKeyParser()),
             new ValidationMetadataExtractor($converter),
             new SerializerMetadataExtractor($converter),
             new YamlMetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))),

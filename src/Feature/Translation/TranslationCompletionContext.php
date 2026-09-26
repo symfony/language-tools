@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Translation;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Parser\DelimiterScanner;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
 
@@ -34,11 +35,15 @@ final class TranslationCompletionContext
         $cursor = $converter->toByteOffset($text, $position);
         $before = substr($text, 0, $cursor);
         $directive = $directives->directiveStart($text, $cursor);
-        if (null === $directive || null === $string = self::twigOpenString($before, $directive)) {
+        if (null === $directive) {
             return null;
         }
-        [$quote, $start] = $string;
-        $content = substr($before, $start);
+        $string = DelimiterScanner::state($before, $directive)->openString;
+        if (null === $string) {
+            return null;
+        }
+        $quote = $string->quote;
+        $content = substr($before, $start = $string->contentOffset);
         if (!preg_match(self::TWIG_STRING_CONTENT[$quote], $content)) {
             return null;
         }
@@ -55,39 +60,5 @@ final class TranslationCompletionContext
         }
 
         return null;
-    }
-
-    /**
-     * The quote and content offset of the string the cursor sits in, scanning
-     * the open directive only: quotes in the surrounding markup are not Twig
-     * string delimiters.
-     *
-     * @return array{string, int}|null
-     */
-    private static function twigOpenString(string $before, int $directive): ?array
-    {
-        $quote = null;
-        $start = 0;
-        for ($offset = $directive, $length = \strlen($before); $offset < $length; ++$offset) {
-            $byte = $before[$offset];
-            if (null === $quote) {
-                if ("'" === $byte || '"' === $byte) {
-                    $quote = $byte;
-                    $start = $offset + 1;
-                }
-
-                continue;
-            }
-            if ('\\' === $byte) {
-                ++$offset;
-
-                continue;
-            }
-            if ($quote === $byte) {
-                $quote = null;
-            }
-        }
-
-        return null === $quote ? null : [$quote, $start];
     }
 }

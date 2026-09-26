@@ -11,7 +11,6 @@ use Symfony\Lsp\Feature\Console\ConsoleExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleInputKind;
 use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
 use Symfony\Lsp\Parser\Php\LastResultPhpParser;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -476,7 +475,6 @@ final class ConsoleExtractorTest extends TestCase
             PHP;
         $inner = new RecordingPhpParser(new TolerantPhpParser(new Parser()));
         $parser = new LastResultPhpParser($inner);
-        $delimiters = new BalancedDelimiterMatcher();
         $extractor = new ConsoleExtractor(
             new PositionConverter(),
             $parser,
@@ -593,8 +591,6 @@ final class ConsoleExtractorTest extends TestCase
 
     private function extractor(): ConsoleExtractor
     {
-        $delimiters = new BalancedDelimiterMatcher();
-
         return new ConsoleExtractor(
             new PositionConverter(),
             new TolerantPhpParser(new Parser()),

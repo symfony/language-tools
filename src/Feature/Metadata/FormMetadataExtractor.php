@@ -5,7 +5,8 @@ namespace Symfony\Lsp\Feature\Metadata;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\ClassNameKey;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\DelimiterScanner;
+use Symfony\Lsp\Parser\DelimiterSegment;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
@@ -26,7 +27,6 @@ final class FormMetadataExtractor
 
     public function __construct(
         private readonly PositionConverter $converter,
-        private readonly BalancedDelimiterMatcher $delimiters,
         private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
@@ -260,8 +260,7 @@ final class FormMetadataExtractor
             if (!preg_match('/^->\\s*add\\s*\\(/', $chain, $add)) {
                 return false;
             }
-            $open = \strlen($add[0]) - 1;
-            $close = $this->delimiters->matching($chain, $open, '(', ')');
+            $close = DelimiterScanner::close($chain, \strlen($add[0]) - 1);
             if (null === $close) {
                 return false;
             }
@@ -323,8 +322,8 @@ final class FormMetadataExtractor
             return null;
         }
         $arguments = array_values(array_filter(
-            $this->arguments($items, $itemsOffset),
-            fn (array $entry): bool => $this->hasCode($entry['text']),
+            DelimiterScanner::split($items, ',', $itemsOffset, phpComments: true),
+            fn (DelimiterSegment $entry): bool => $this->hasCode($entry->text),
         ));
         if (\count($arguments) !== \count($keys)) {
             return null;
@@ -332,15 +331,15 @@ final class FormMetadataExtractor
         $entries = [];
         foreach ($arguments as $index => $entry) {
             $key = $keys[$index];
-            $entryEnd = $entry['offset'] + \strlen($entry['text']);
-            if ($key->startOffset < $entry['offset'] || $key->endOffset >= $entryEnd || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $key->value)) {
+            $entryEnd = $entry->offset + \strlen($entry->text);
+            if ($key->startOffset < $entry->offset || $key->endOffset >= $entryEnd || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $key->value)) {
                 return null;
             }
-            $tailOffset = $key->endOffset - $entry['offset'] + 1;
-            if (!preg_match('/^\\s*=>\\s*(.*?)\\s*$/s', substr($entry['text'], $tailOffset), $match, \PREG_OFFSET_CAPTURE)) {
+            $tailOffset = $key->endOffset - $entry->offset + 1;
+            if (!preg_match('/^\\s*=>\\s*(.*?)\\s*$/s', substr($entry->text, $tailOffset), $match, \PREG_OFFSET_CAPTURE)) {
                 return null;
             }
-            $entries[$key->value] = ['text' => $match[1][0], 'offset' => $entry['offset'] + $tailOffset + $match[1][1]];
+            $entries[$key->value] = ['text' => $match[1][0], 'offset' => $entry->offset + $tailOffset + $match[1][1]];
         }
 
         return $entries;
@@ -408,66 +407,6 @@ final class FormMetadataExtractor
         }
 
         return $this->quotedIdentifier($propertyPath);
-    }
-
-    /** @return list<array{text: string, offset: int}> */
-    private function arguments(string $text, int $base): array
-    {
-        $arguments = [];
-        $start = 0;
-        $stack = [];
-        $quote = null;
-        $escaped = false;
-        $lineComment = false;
-        $blockComment = false;
-        $length = \strlen($text);
-        for ($index = 0; $index < $length; ++$index) {
-            $character = $text[$index];
-            if ($lineComment) {
-                if ("\n" === $character || "\r" === $character) {
-                    $lineComment = false;
-                }
-                continue;
-            }
-            if ($blockComment) {
-                if ('*' === $character && '/' === ($text[$index + 1] ?? null)) {
-                    $blockComment = false;
-                    ++$index;
-                }
-                continue;
-            }
-            if (null !== $quote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ($character === $quote) {
-                    $quote = null;
-                }
-                continue;
-            }
-            if ('/' === $character && '/' === ($text[$index + 1] ?? null)) {
-                $lineComment = true;
-                ++$index;
-            } elseif ('#' === $character && '[' !== ($text[$index + 1] ?? null)) {
-                $lineComment = true;
-            } elseif ('/' === $character && '*' === ($text[$index + 1] ?? null)) {
-                $blockComment = true;
-                ++$index;
-            } elseif ('"' === $character || "'" === $character) {
-                $quote = $character;
-            } elseif (str_contains('([{', $character)) {
-                $stack[] = $character;
-            } elseif (str_contains(')]}', $character)) {
-                array_pop($stack);
-            } elseif (',' === $character && [] === $stack) {
-                $arguments[] = ['text' => substr($text, $start, $index - $start), 'offset' => $base + $start];
-                $start = $index + 1;
-            }
-        }
-        $arguments[] = ['text' => substr($text, $start), 'offset' => $base + $start];
-
-        return $arguments;
     }
 
     private function hasCode(string $text): bool

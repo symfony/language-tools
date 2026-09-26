@@ -4,7 +4,7 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\DelimiterScanner;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 
@@ -14,7 +14,6 @@ final class EventSubscriberMapAnalyzer
 
     public function __construct(
         private readonly PositionConverter $converter,
-        private readonly BalancedDelimiterMatcher $delimiters,
     ) {
     }
 
@@ -71,7 +70,7 @@ final class EventSubscriberMapAnalyzer
                 continue;
             }
             $open = $method->bodyStartOffset + $return[0][1] + \strlen($return[0][0]) - 1;
-            $close = $this->delimiters->matching($source, $open, '[', ']') ?? \strlen($source);
+            $close = DelimiterScanner::close($source, $open) ?? \strlen($source);
             $maps[] = ['offset' => $open + 1, 'map' => substr($source, $open + 1, $close - $open - 1)];
         }
 

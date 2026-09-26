@@ -3,7 +3,7 @@
 namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
+use Symfony\Lsp\Parser\DelimiterScanner;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 
 final class ImportMapEntrypointExtractor
@@ -11,7 +11,6 @@ final class ImportMapEntrypointExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly PhpCommentParser $commentParser,
-        private readonly BalancedDelimiterMatcher $delimiters,
     ) {
     }
 
@@ -23,7 +22,7 @@ final class ImportMapEntrypointExtractor
             return [];
         }
         $open = $return[0][1] + \strlen($return[0][0]) - 1;
-        $close = $this->delimiters->matching($source, $open, '[', ']');
+        $close = DelimiterScanner::close($source, $open);
         if (null === $close) {
             $close = \strlen($source);
         }
@@ -66,7 +65,7 @@ final class ImportMapEntrypointExtractor
                 $offset = $nameEnd;
                 continue;
             }
-            $optionsClose = $this->delimiters->matching($source, $optionsOpen, '[', ']');
+            $optionsClose = DelimiterScanner::close($source, $optionsOpen);
             if (null === $optionsClose) {
                 break;
             }
