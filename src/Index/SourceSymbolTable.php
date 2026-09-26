@@ -2,11 +2,7 @@
 
 namespace Symfony\Lsp\Index;
 
-/**
- * Indexes named source symbols by kind and name.
- *
- * @template TSymbol of NamedSourceSymbolInterface
- */
+/** @template TSymbol of NamedSourceSymbolInterface */
 final class SourceSymbolTable
 {
     /** @var array<string, list<TSymbol>> */

@@ -4,10 +4,6 @@ namespace Symfony\Lsp\Project;
 
 use Symfony\Component\Filesystem\Path;
 
-/**
- * Discovers the Symfony projects of a workspace and keeps the registry,
- * the project state and the project settings in sync with them.
- */
 final class ProjectWorkspace
 {
     /** @var list<array{uri: string, name?: string}> */

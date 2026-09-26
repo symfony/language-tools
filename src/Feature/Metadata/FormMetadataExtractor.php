@@ -181,7 +181,6 @@ final class FormMetadataExtractor
         return $call->positionalArgument('createNamed' === $call->method ? 3 : 2);
     }
 
-    /** Whether the call is one Symfony reads form options from: a form creator or a direct form builder field. */
     private function isFormCall(string $source, PhpDocument $php, PhpMethodCall $call): bool
     {
         if (!\in_array($call->method, ['createForm', 'createNamed', 'add'], true)) {
@@ -287,12 +286,7 @@ final class FormMetadataExtractor
         return 'static' === $name ? null : $reference->className;
     }
 
-    /**
-     * The entries of the array literal the argument holds, keyed by identifier
-     * key, or null when a key or the array itself cannot be read statically.
-     *
-     * @return array<string, PhpLiteralArrayEntry>|null
-     */
+    /** @return array<string, PhpLiteralArrayEntry>|null */
     private function arrayEntries(PhpDocument $php, ?PhpArgument $argument): ?array
     {
         $array = $php->literalArray($argument);

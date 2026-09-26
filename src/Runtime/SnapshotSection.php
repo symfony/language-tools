@@ -130,7 +130,6 @@ final class SnapshotSection
         return $this->values[$key] ?? null;
     }
 
-    /** A nested section, such as the configuration tree of one bundle. */
     public function section(string $key): ?self
     {
         $values = $this->values[$key] ?? null;

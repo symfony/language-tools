@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Protocol;
 
-/** The completion item kinds of the protocol the server offers items of. */
 enum CompletionItemKind: int
 {
     case Function = 3;

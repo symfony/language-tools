@@ -9,10 +9,6 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectRegistry;
 
-/**
- * Decodes the parameters of a text document request once, for every feature
- * provider the registry of a capability serves.
- */
 final class LspRequestFactory
 {
     public function __construct(

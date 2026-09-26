@@ -2,9 +2,6 @@
 
 namespace Symfony\Lsp\Project;
 
-/**
- * Answers the path questions of `ProjectPathPolicy` for document URIs.
- */
 final class ProjectPathResolver
 {
     public function __construct(

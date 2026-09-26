@@ -13,7 +13,6 @@ final class TranslationExtractor
     ) {
     }
 
-    /** The PHP translation slot being typed at $offset. */
     public function phpCompletionContext(string $text, int $offset): ?TranslationCompletionContext
     {
         return $this->phpReferences->completionContext($text, $offset);

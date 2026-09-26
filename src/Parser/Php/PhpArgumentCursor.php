@@ -2,10 +2,6 @@
 
 namespace Symfony\Lsp\Parser\Php;
 
-/**
- * The argument of a call an offset sits in, with the string literal prefix
- * being typed there.
- */
 final class PhpArgumentCursor
 {
     private function __construct(
@@ -62,13 +58,11 @@ final class PhpArgumentCursor
         return $name === $this->name || $this->isPositional($position);
     }
 
-    /** Whether the cursor sits in a string literal opening the argument. */
     public function isArgumentLiteral(): bool
     {
         return null !== $this->quote && 0 === $this->literalDepth && $this->literalStartsItem;
     }
 
-    /** Whether the cursor sits in a string literal opening an item of the array the argument holds. */
     public function isArrayItemLiteral(): bool
     {
         return null !== $this->quote && 1 === $this->literalDepth && $this->literalStartsItem;

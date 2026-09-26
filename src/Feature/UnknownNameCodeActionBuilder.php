@@ -15,9 +15,6 @@ final class UnknownNameCodeActionBuilder
     }
 
     /**
-     * Suggests close existing names for the symbol an unknown name diagnostic
-     * reports, taken from the symbols of the document at the same range.
-     *
      * @template TSymbol of RangedSourceSymbolInterface
      *
      * @param list<string>                                                $codes

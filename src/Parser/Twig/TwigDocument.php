@@ -65,12 +65,7 @@ final class TwigDocument
         }
     }
 
-    /**
-     * Returns the function and filter calls in source order, restricted to the
-     * given names when any are given.
-     *
-     * @return list<TwigCall>
-     */
+    /** @return list<TwigCall> */
     public function calls(string ...$names): array
     {
         return $this->callsOfKind(null, $names);

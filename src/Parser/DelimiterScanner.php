@@ -2,11 +2,6 @@
 
 namespace Symfony\Lsp\Parser;
 
-/**
- * Scans text that quotes strings with `'` or `"`, escapes with a backslash and
- * nests with `()`, `[]` and `{}`, which is how PHP, Twig, JavaScript and JSON
- * all delimit their expressions.
- */
 final class DelimiterScanner
 {
     private const PAIRS = ['(' => ')', '[' => ']', '{' => '}'];

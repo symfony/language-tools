@@ -120,10 +120,6 @@ final class PhpDocument
         return $creations;
     }
 
-    /**
-     * The innermost argument a cursor offset sits in, across method calls,
-     * object creations and attributes.
-     */
     public function argumentCursorAt(int $offset): ?PhpArgumentCursor
     {
         $cursor = null;

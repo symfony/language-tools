@@ -5,10 +5,6 @@ namespace Symfony\Lsp\Feature;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Runtime\EnvironmentScopeResolver;
 
-/**
- * Drops the diagnostics only the selected environment's metadata can prove
- * from the documents that environment never loads.
- */
 final class EnvironmentScopedDiagnosticFilter
 {
     public function __construct(

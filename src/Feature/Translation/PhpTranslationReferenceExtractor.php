@@ -80,10 +80,6 @@ final class PhpTranslationReferenceExtractor
         );
     }
 
-    /**
-     * The translation key, placeholder, domain or locale being typed at the
-     * cursor, in a call the index reads references from.
-     */
     public function completionContext(string $text, int $offset): ?TranslationCompletionContext
     {
         $document = $this->parser->parse($text);
@@ -131,10 +127,6 @@ final class PhpTranslationReferenceExtractor
         return 'messages';
     }
 
-    /**
-     * The innermost translation call argument the cursor sits in, across
-     * translator calls, translatable messages and translation helper calls.
-     */
     private function completionCursor(string $text, PhpDocument $document, int $offset): ?PhpArgumentCursor
     {
         $cursor = $document->argumentCursorAt($offset);

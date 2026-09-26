@@ -129,7 +129,6 @@ final class DoctrineExtractor
         );
     }
 
-    /** The key whose value the cursor is typing, among the literal keys of the array the argument holds. */
     private function arrayItemKey(PhpDocument $php, PhpArgument $argument, PhpArgumentCursor $cursor): ?string
     {
         foreach ($php->literalArray($argument)->entries ?? [] as $entry) {

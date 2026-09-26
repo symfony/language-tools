@@ -69,7 +69,6 @@ abstract class AbstractSourceFactsIndex implements SourceFactsIndexInterface
         return $this->facts->forUri($uri);
     }
 
-    /** Rebuilds the derived state built by build() when facts or runtime metadata changed. */
     final protected function derive(): void
     {
         if (!$this->stale) {
@@ -81,7 +80,6 @@ abstract class AbstractSourceFactsIndex implements SourceFactsIndexInterface
         $this->build();
     }
 
-    /** Marks the derived state stale after a runtime metadata replacement. */
     final protected function invalidate(): void
     {
         $this->stale = true;

@@ -7,7 +7,6 @@ use Symfony\Lsp\Index\SourceFileChange;
 
 final class RuntimeRefreshPlanner
 {
-    /** Maps source index provider names to the runtime metadata sections their facts feed. */
     public const DOMAIN_SECTIONS = [
         'asset' => ['assets'],
         'console' => ['console'],
@@ -27,7 +26,6 @@ final class RuntimeRefreshPlanner
     /** Domains the application describes without its container, so the compiled one stays usable. */
     private const CONTAINER_FREE_DOMAINS = ['asset', 'route', 'stimulus', 'translation'];
 
-    /** Whether the change to a project-relative path can make the runtime metadata stale. */
     public function requiresRefresh(string $path, SourceFileChange $change): bool
     {
         if (!$change->requiresRuntimeRefresh() || str_starts_with($path, 'var/') || str_starts_with($path, 'vendor/')) {

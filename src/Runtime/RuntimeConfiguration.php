@@ -6,10 +6,6 @@ use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\Project;
 
-/**
- * Reads the analysis settings that drive the runtime, with the defaults the
- * runtime applies when nothing configures them.
- */
 final class RuntimeConfiguration
 {
     /** @var non-empty-list<string> */

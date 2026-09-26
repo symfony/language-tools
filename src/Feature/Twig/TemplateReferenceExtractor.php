@@ -45,7 +45,6 @@ final class TemplateReferenceExtractor
         ));
     }
 
-    /** The template name being typed at the cursor, in a call or attribute the index reads references from. */
     public function phpCompletionAt(string $source, int $offset, ?DependencyInjectionSourceIndex $classIndex = null): ?TemplateCompletionContext
     {
         $php = $this->phpParser->parse($source);
@@ -181,12 +180,7 @@ final class TemplateReferenceExtractor
         return array_values(array_unique(array_filter(array_map(static fn (PhpStringLiteral $key): string => $key->value, $keys), static fn (string $key): bool => '' !== $key)));
     }
 
-    /**
-     * The variable names a `#[Template]` attribute lists, which are the string
-     * values of a keyless array literal.
-     *
-     * @return list<string>
-     */
+    /** @return list<string> */
     private function attributeVariables(PhpDocument $php, ?PhpArgument $argument): array
     {
         $array = $php->literalArray($argument);

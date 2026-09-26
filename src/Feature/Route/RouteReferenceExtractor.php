@@ -44,10 +44,6 @@ final class RouteReferenceExtractor
         return $this->candidates->extract($source, $document);
     }
 
-    /**
-     * The route name or route parameter being typed at the cursor, in a route
-     * call the index reads references from.
-     */
     public function phpCompletionAt(string $source, int $byteOffset, ?DependencyInjectionSourceIndex $classIndex = null): RouteCompletionContext|RouteParameterCompletionContext|null
     {
         $document = $this->parser->parse($source);
