@@ -1833,6 +1833,22 @@ final class TolerantPhpParserTest extends TestCase
         );
     }
 
+    public function testFindsTheLiteralArrayOfEachArgumentInConstantTime(): void
+    {
+        $source = "<?php\n";
+        for ($index = 0; $index < 12000; ++$index) {
+            $source .= "\$repository->findBy(['name' => 'item_{$index}']);\n";
+        }
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+
+        $startedAt = hrtime(true);
+        $arrays = array_map(static fn ($call) => $document->literalArray($call->arguments[0] ?? null), $document->methodCalls);
+        $elapsed = (hrtime(true) - $startedAt) / 1_000_000_000;
+
+        self::assertCount(12000, array_filter($arrays));
+        self::assertLessThan(0.5, $elapsed);
+    }
+
     public function testResolvesNamesOfLargeFilesInLinearTime(): void
     {
         $source = "<?php\n\nnamespace App;\n\nuse App\\Model\\Item;\n\n";

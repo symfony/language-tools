@@ -6,6 +6,8 @@ final class PhpDocument
 {
     /** @var array<string, PhpMethodCall> */
     private readonly array $methodCallsByRange;
+    /** @var array<string, PhpLiteralArray> */
+    private readonly array $literalArraysByRange;
     private readonly PhpNameContext $names;
 
     /** @var ?list<PhpDiagnostic> */
@@ -54,6 +56,11 @@ final class PhpDocument
             $methodCallsByRange[$call->startOffset.':'.$call->endOffset] ??= $call;
         }
         $this->methodCallsByRange = $methodCallsByRange;
+        $literalArraysByRange = [];
+        foreach ($literalArrays as $array) {
+            $literalArraysByRange[$array->startOffset.':'.$array->endOffset] ??= $array;
+        }
+        $this->literalArraysByRange = $literalArraysByRange;
         $this->names = $names ?? new PhpNameContext();
     }
 
@@ -85,13 +92,8 @@ final class PhpDocument
         if (!\is_int($start) || !\is_int($end)) {
             return null;
         }
-        foreach ($this->literalArrays as $array) {
-            if ($start === $array->startOffset && $end === $array->endOffset) {
-                return $array;
-            }
-        }
 
-        return null;
+        return $this->literalArraysByRange[$start.':'.$end] ?? null;
     }
 
     /**
