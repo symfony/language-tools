@@ -68,7 +68,7 @@ final class TwigDirectiveLocator
                 $cursor = $marker + 1;
                 continue;
             }
-            $end = DelimiterScanner::terminator($text, $marker + 2, $terminator, $limit);
+            $end = DelimiterScanner::terminator($text, $marker + 2, $terminator, $limit, twig: true);
             if (null === $end) {
                 return [$ranges, $marker];
             }

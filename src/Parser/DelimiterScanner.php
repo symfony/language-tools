@@ -2,20 +2,21 @@
 
 namespace Symfony\Lsp\Parser;
 
+/** With $twig, the #{...} interpolations of double-quoted strings are scanned as nested code. */
 final class DelimiterScanner
 {
-    private const PAIRS = ['(' => ')', '[' => ']', '{' => '}'];
+    private const PAIRS = ['(' => ')', '[' => ']', '{' => '}', '#{' => '}'];
 
     /**
      * Splits $text on the $separator bytes that sit outside strings and nested delimiters.
      *
      * @return list<DelimiterSegment>
      */
-    public static function split(string $text, string $separator = ',', int $baseOffset = 0, bool $phpComments = false): array
+    public static function split(string $text, string $separator = ',', int $baseOffset = 0, bool $phpComments = false, bool $twig = false): array
     {
         $segments = [];
         $start = 0;
-        $scan = self::scan($text, 0, \strlen($text), $separator, null, $phpComments, false);
+        $scan = self::scan($text, 0, \strlen($text), $separator, null, $phpComments, false, $twig);
         foreach ($scan['separators'] as $offset) {
             $segments[] = new DelimiterSegment(substr($text, $start, $offset - $start), $baseOffset + $start);
             $start = $offset + 1;
@@ -26,9 +27,9 @@ final class DelimiterScanner
     }
 
     /** Offset of the first $terminator outside strings and nested delimiters. */
-    public static function terminator(string $text, int $start, string $terminator, ?int $end = null): ?int
+    public static function terminator(string $text, int $start, string $terminator, ?int $end = null, bool $twig = false): ?int
     {
-        return self::scan($text, $start, $end ?? \strlen($text), null, $terminator, false, false)['stop'];
+        return self::scan($text, $start, $end ?? \strlen($text), null, $terminator, false, false, $twig)['stop'];
     }
 
     /** Offset of the delimiter closing the one opened at $openOffset. */
@@ -40,18 +41,18 @@ final class DelimiterScanner
     }
 
     /** The string and the delimiters left open at the end of the scanned range. */
-    public static function state(string $text, int $start = 0, ?int $end = null): DelimiterState
+    public static function state(string $text, int $start = 0, ?int $end = null, bool $twig = false): DelimiterState
     {
-        $scan = self::scan($text, $start, $end ?? \strlen($text), null, null, false, false);
+        $scan = self::scan($text, $start, $end ?? \strlen($text), null, null, false, false, $twig);
 
         return new DelimiterState($scan['open'], null === $scan['quote'] ? null : new DelimiterString($scan['quote'], $scan['content']));
     }
 
     /** Replaces string contents with spaces, keeping every other byte and every offset. */
-    public static function maskStrings(string $text): string
+    public static function maskStrings(string $text, bool $twig = false): string
     {
         $masked = $text;
-        foreach (self::scan($text, 0, \strlen($text), null, null, false, true)['strings'] as [$start, $end]) {
+        foreach (self::scan($text, 0, \strlen($text), null, null, false, true, $twig)['strings'] as [$start, $end]) {
             for ($offset = $start; $offset < $end; ++$offset) {
                 if ("\n" !== $text[$offset]) {
                     $masked[$offset] = ' ';
@@ -72,7 +73,7 @@ final class DelimiterScanner
      *     strings: list<array{int, int}>,
      * }
      */
-    private static function scan(string $text, int $start, int $end, ?string $separator, ?string $terminator, bool $phpComments, bool $collectStrings): array
+    private static function scan(string $text, int $start, int $end, ?string $separator, ?string $terminator, bool $phpComments, bool $collectStrings, bool $twig): array
     {
         $separators = [];
         $strings = [];
@@ -96,6 +97,13 @@ final class DelimiterScanner
                         $strings[] = [$content, $offset];
                     }
                     $quote = null;
+                } elseif ($twig && '"' === $quote && '#' === $character && '{' === ($text[$offset + 1] ?? null)) {
+                    if ($collectStrings) {
+                        $strings[] = [$content, $offset];
+                    }
+                    $quote = null;
+                    $open[] = new DelimiterOpening('#{', $offset);
+                    ++$offset;
                 }
                 continue;
             }
@@ -144,7 +152,10 @@ final class DelimiterScanner
             if (isset(self::PAIRS[$character])) {
                 $open[] = new DelimiterOpening($character, $offset);
             } elseif ([] !== $open && $character === self::PAIRS[$open[array_key_last($open)]->delimiter]) {
-                array_pop($open);
+                if ('#{' === array_pop($open)->delimiter) {
+                    $quote = '"';
+                    $content = $offset + 1;
+                }
             }
         }
         if (null !== $quote && $collectStrings) {

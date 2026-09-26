@@ -12,7 +12,7 @@ final class TwigArgumentParser
     {
         return array_map(
             static fn (DelimiterSegment $segment): TwigArgument => self::argument($segment->text, $segment->offset),
-            DelimiterScanner::split($text, ',', $baseOffset),
+            DelimiterScanner::split($text, ',', $baseOffset, twig: true),
         );
     }
 

@@ -384,6 +384,18 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame(['page.title'], array_map(static fn ($reference): string => $reference->key, $references));
     }
 
+    public function testReadsTwigTranslationArgumentsAfterInterpolatedStrings(): void
+    {
+        $references = $this->extractor()->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {{ 'quote.label'|trans({'%quote%': "#{ '"' }"}, 'admin') }}
+            TWIG))->references;
+
+        self::assertSame(
+            [['quote.label', 'admin', ['quote']]],
+            array_map(static fn ($reference): array => [$reference->key, $reference->domain, $reference->placeholders], $references),
+        );
+    }
+
     public function testIgnoresTranslationHelpersSymfonyDoesNotDefine(): void
     {
         $references = $this->extractor()->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'

@@ -51,6 +51,57 @@ final class DelimiterScannerTest extends TestCase
     }
 
     /** @param list<string> $expected */
+    #[DataProvider('twigInterpolationProvider')]
+    public function testSplitsAroundTwigInterpolations(string $text, array $expected): void
+    {
+        self::assertSame($expected, array_map(
+            static fn (DelimiterSegment $segment): string => $segment->text,
+            DelimiterScanner::split($text, twig: true),
+        ));
+    }
+
+    /** @return iterable<string, array{string, list<string>}> */
+    public static function twigInterpolationProvider(): iterable
+    {
+        yield 'quotes and separators in an interpolation' => ['"a #{ "b, c" }", \'d\'', ['"a #{ "b, c" }"', " 'd'"]];
+        yield 'nested interpolations' => ['"#{ "#{ \'x, y\' }, z" }", w', ['"#{ "#{ \'x, y\' }, z" }"', ' w']];
+        yield 'hash in an interpolation' => ['"#{ {a: 1, b: 2}|length }", c', ['"#{ {a: 1, b: 2}|length }"', ' c']];
+        yield 'escaped interpolation' => ['"\#{ ", "}", d', ['"\#{ "', ' "}"', ' d']];
+        yield 'single-quoted strings do not interpolate' => ['\'#{\', "b"', ["'#{'", ' "b"']];
+        yield 'unterminated interpolation' => ['"a #{ b, c', ['"a #{ b, c']];
+    }
+
+    public function testKeepsInterpolationMarkersInStringsOutsideTwig(): void
+    {
+        self::assertSame(['"a #{ "b', ' c" }"', " 'd'"], array_map(
+            static fn (DelimiterSegment $segment): string => $segment->text,
+            DelimiterScanner::split('"a #{ "b, c" }", \'d\''),
+        ));
+    }
+
+    public function testScansTwigInterpolationsForTerminatorsStatesAndMasks(): void
+    {
+        $text = '{{ "#{ "}}" }}" }} tail';
+        self::assertSame(strrpos($text, '}}'), DelimiterScanner::terminator($text, 2, '}}', twig: true));
+        self::assertSame(strpos($text, '}}', 3), DelimiterScanner::terminator($text, 2, '}}'));
+
+        $text = "{{ \"a #{ path('";
+        $state = DelimiterScanner::state($text, 2, twig: true);
+        self::assertSame("'", $state->openString?->quote);
+        self::assertSame(['#{', '('], array_map(static fn ($opening): string => $opening->delimiter, $state->openDelimiters));
+        self::assertSame(strpos($text, '#'), $state->openDelimiters[0]->offset);
+
+        $text = '{{ "a #{ b } c';
+        $state = DelimiterScanner::state($text, 2, twig: true);
+        self::assertNotNull($state->openString);
+        self::assertSame('"', $state->openString->quote);
+        self::assertSame(strpos($text, ' c'), $state->openString->contentOffset);
+        self::assertSame([], $state->openDelimiters);
+
+        self::assertSame('"  #{ " " }  " ~ \'   \'', DelimiterScanner::maskStrings('"a #{ "b" } c" ~ \'#{d\'', twig: true));
+    }
+
+    /** @param list<string> $expected */
     #[DataProvider('phpCommentProvider')]
     public function testSkipsPhpCommentsWhenAsked(string $text, array $expected): void
     {

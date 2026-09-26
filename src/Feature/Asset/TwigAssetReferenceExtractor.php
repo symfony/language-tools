@@ -59,7 +59,7 @@ final class TwigAssetReferenceExtractor
             return [];
         }
         $literals = [];
-        foreach (DelimiterScanner::split(substr($value, 1, -1), ',', $argument->start + 1) as $element) {
+        foreach (DelimiterScanner::split(substr($value, 1, -1), ',', $argument->start + 1, twig: true) as $element) {
             $start = $element->offset + strspn($element->text, " \t\n\r\0\x0B\f");
             $literal = $document->stringLiteralAt($start, $element->offset + \strlen(rtrim($element->text)));
             if (null !== $literal && '' !== $literal->value) {

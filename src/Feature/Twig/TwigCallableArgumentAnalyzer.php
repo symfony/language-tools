@@ -14,7 +14,7 @@ final class TwigCallableArgumentAnalyzer
      */
     public function callableNameCompletion(string $directive): ?array
     {
-        $syntax = DelimiterScanner::maskStrings($directive);
+        $syntax = DelimiterScanner::maskStrings($directive, twig: true);
         if (1 === preg_match('/\|\s*([A-Za-z_][A-Za-z0-9_]*)?$/', $syntax, $matches)) {
             return ['kind' => TwigCallableKind::Filter, 'prefix' => $matches[1] ?? ''];
         }
@@ -35,7 +35,7 @@ final class TwigCallableArgumentAnalyzer
      */
     public function incompleteCall(string $directive, int $start): ?TwigCallableCall
     {
-        $state = DelimiterScanner::state($directive);
+        $state = DelimiterScanner::state($directive, twig: true);
         $open = $state->innermostDelimiter();
         if (null !== $state->openString || null === $open || '(' !== $open->delimiter) {
             return null;

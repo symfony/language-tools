@@ -64,6 +64,9 @@ final class TwigCallableCompletionProviderTest extends TwigCallableProviderTestC
         self::assertSame([], $completions('{% macro function_n'));
         self::assertSame(['function_name'], $completions('{{ "}}" ~ func'));
         self::assertSame([], $completions('{{ "say func'));
+        self::assertSame(['function_name'], $completions('{{ "say #{ func'));
+        self::assertSame(['function_name'], $completions('{{ "#{ "}}" }}" ~ func'));
+        self::assertSame([], $completions('{{ "say \\#{ func'));
         self::assertSame([], $completions('{{ item.func'));
         self::assertSame([], $completions('Plain func'));
         self::assertSame([], $completions('{{ done }} func'));

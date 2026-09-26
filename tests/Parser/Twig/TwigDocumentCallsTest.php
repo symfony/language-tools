@@ -132,6 +132,24 @@ final class TwigDocumentCallsTest extends TestCase
         self::assertNull($call->argument(3)?->literal());
     }
 
+    public function testKeepsInterpolatedStringArgumentsWhole(): void
+    {
+        $source = <<<'TWIG'
+            {{ foo("a #{ "b, c" }", 'd') }}
+            {{ foo("#{ '"' }", 'e', label: "#{ {x: 1, y: "z, w"}|length }") }}
+            TWIG;
+        [$commas, $quote] = $this->parse($source)->calls('foo');
+
+        $interpolated = $commas->argument(0);
+        self::assertSame('"a #{ "b, c" }"', $this->text($source, $interpolated));
+        self::assertNotNull($interpolated?->node);
+        self::assertSame('d', $commas->argument(1)?->literal()?->value);
+        self::assertSame("\"#{ '\"' }\"", $this->text($source, $quote->argument(0)));
+        self::assertSame('e', $quote->argument(1)?->literal()?->value);
+        self::assertSame('"#{ {x: 1, y: "z, w"}|length }"', $this->text($source, $quote->argument(2, 'label')));
+        self::assertSame(['label'], array_column($quote->namedArguments(), 'name'));
+    }
+
     public function testToleratesUnterminatedInput(): void
     {
         $document = $this->parse("{{ path('home') }}\n{{ path('unterminated");
