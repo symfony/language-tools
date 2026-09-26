@@ -77,9 +77,9 @@ function bridgeGeneration(string $bridge, string $project, string $environment, 
         throw new RuntimeException('The project bridge failed: '.trim($stderr));
     }
     $result = json_decode($stdout, true, flags: \JSON_THROW_ON_ERROR);
-    $generation = $result['sections'][$section]['generation'] ?? null;
+    $content = $result['sections'][$section] ?? null;
 
-    return is_string($generation) ? $generation : null;
+    return is_array($content) ? hash('sha256', json_encode($content, \JSON_THROW_ON_ERROR)) : null;
 }
 
 if (3 !== $argc) {
