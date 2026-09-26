@@ -58,6 +58,11 @@ final class PhpArgumentCursorTest extends TestCase
         yield 'array item' => ["<?php \$repository->findBy(['ti|", self::cursor('findBy', prefix: 'ti', argumentLiteral: false, arrayItemLiteral: true)];
         yield 'array value' => ["<?php \$repository->findBy(['title' => 'Sym|", self::cursor('findBy', prefix: 'Sym', argumentLiteral: false)];
         yield 'array item after a complete entry' => ["<?php \$repository->findBy(['title' => 1, 'sl|", self::cursor('findBy', prefix: 'sl', argumentLiteral: false, arrayItemLiteral: true)];
+        yield 'legacy array item' => ["<?php \$repository->findBy(array('ti|", self::cursor('findBy', prefix: 'ti', argumentLiteral: false, arrayItemLiteral: true)];
+        yield 'function call item' => ["<?php \$repository->findBy(compact('ti|", self::cursor('findBy', prefix: 'ti', argumentLiteral: false)];
+        yield 'array in a ternary' => ["<?php \$repository->findBy(\$all ? ['ti|", self::cursor('findBy', prefix: 'ti', argumentLiteral: false)];
+        yield 'array after an operator' => ["<?php \$repository->findBy(['a'] + ['ti|", self::cursor('findBy', prefix: 'ti', argumentLiteral: false)];
+        yield 'legacy array in a ternary' => ["<?php \$repository->findBy(\$all ? array('ti|", self::cursor('findBy', prefix: 'ti', argumentLiteral: false)];
         yield 'nested array item' => ["<?php \$builder->add('name', Type::class, ['attr' => ['cla|", self::cursor('add', position: 2, prefix: 'cla', argumentLiteral: false)];
         yield 'innermost call' => ["<?php \$this->render('page.html.twig', ['form' => \$this->createForm(Type::class, null, ['lab|", self::cursor('createForm', position: 2, prefix: 'lab', argumentLiteral: false, arrayItemLiteral: true)];
         yield 'escaped quote' => ["<?php \$input->getOption('out\\'pu|", self::cursor('getOption', prefix: "out'pu", raw: "out\\'pu")];

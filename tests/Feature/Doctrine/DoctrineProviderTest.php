@@ -445,6 +445,9 @@ final class DoctrineProviderTest extends TestCase
         yield 'criteria value' => ["\$products->findBy(['name' => 'Sym|"];
         yield 'unrelated method' => ["\$products->matching(['ti|"];
         yield 'static call' => ["ProductRepository::findBy(['ti|"];
+        yield 'criteria computed by a function' => ["\$products->findBy(strtolower('na|"];
+        yield 'criteria built by compact' => ["\$products->findBy(compact('na|"];
+        yield 'criteria in a ternary' => ["\$products->findBy(\$all ? ['na|"];
     }
 
     public function testScopesRepositoryCompletionToTheContainingMethod(): void

@@ -14,6 +14,7 @@ final class PhpArgumentCursor
         public readonly int $prefixStartOffset,
         private readonly int $literalDepth,
         private readonly bool $literalStartsItem,
+        private readonly bool $argumentIsArray,
     ) {
     }
 
@@ -29,7 +30,7 @@ final class PhpArgumentCursor
                 ? self::openLiteral(substr($expression, 0, $offset - $start))
                 : null;
             if (null === $literal) {
-                return new self($call, $argument, $position, $argument->name, null, '', $offset, 0, false);
+                return new self($call, $argument, $position, $argument->name, null, '', $offset, 0, false, false);
             }
 
             return new self(
@@ -42,6 +43,7 @@ final class PhpArgumentCursor
                 (int) $start + $literal['contentStart'],
                 $literal['depth'],
                 $literal['startsItem'],
+                $literal['argumentIsArray'],
             );
         }
 
@@ -65,14 +67,15 @@ final class PhpArgumentCursor
 
     public function isArrayItemLiteral(): bool
     {
-        return null !== $this->quote && 1 === $this->literalDepth && $this->literalStartsItem;
+        return null !== $this->quote && 1 === $this->literalDepth && $this->literalStartsItem && $this->argumentIsArray;
     }
 
     /**
      * The unterminated string literal the text ends in, with its raw content,
-     * the bracket depth it opens at and whether it opens an item.
+     * the bracket depth it opens at, whether it opens an item and whether the
+     * argument itself is the array literal enclosing it.
      *
-     * @return array{quote: string, content: string, contentStart: int, depth: int, startsItem: bool}|null
+     * @return array{quote: string, content: string, contentStart: int, depth: int, startsItem: bool, argumentIsArray: bool}|null
      */
     private static function openLiteral(string $text): ?array
     {
@@ -85,6 +88,8 @@ final class PhpArgumentCursor
         $startsItem = false;
         $interpolated = false;
         $heredoc = false;
+        $arrayKeyword = false;
+        $argumentIsArray = false;
         foreach (\PhpToken::tokenize('<?php '.$text) as $token) {
             if ($heredoc) {
                 $heredoc = \T_END_HEREDOC !== $token->id;
@@ -110,8 +115,11 @@ final class PhpArgumentCursor
                     'contentStart' => $token->pos - $prefix + 1,
                     'depth' => $depth,
                     'startsItem' => !$filled[$depth],
+                    'argumentIsArray' => $argumentIsArray,
                 ];
             }
+            $startsArrayArgument = 0 === $depth && (('[' === $token->text && !$filled[0]) || ('(' === $token->text && $arrayKeyword));
+            $arrayKeyword = 0 === $depth && \T_ARRAY === $token->id && !$filled[0];
             if (\in_array($token->text, ['"', '`'], true)) {
                 $quote = $token->text;
                 $contentStart = $token->pos - $prefix + 1;
@@ -121,6 +129,9 @@ final class PhpArgumentCursor
             } elseif (\T_START_HEREDOC === $token->id) {
                 $heredoc = true;
             } elseif (\in_array($token->text, ['(', '[', '{'], true) || $token->is([\T_CURLY_OPEN, \T_DOLLAR_OPEN_CURLY_BRACES, \T_ATTRIBUTE])) {
+                if (0 === $depth) {
+                    $argumentIsArray = $startsArrayArgument;
+                }
                 $filled[$depth] = true;
                 $filled[++$depth] = false;
 
@@ -145,6 +156,7 @@ final class PhpArgumentCursor
             'contentStart' => $contentStart,
             'depth' => $literalDepth,
             'startsItem' => $startsItem,
+            'argumentIsArray' => $argumentIsArray,
         ];
     }
 }

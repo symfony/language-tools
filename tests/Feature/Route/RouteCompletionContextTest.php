@@ -133,6 +133,9 @@ final class RouteCompletionContextTest extends TestCase
             "\$this->generateUrl('article_show', ['section' => 'ne|", // a value, not a parameter name
             "\$this->generateUrl('article_show', ['filters' => ['se|", // a nested array key
             "\$this->generateUrl('article_show', 'news', ['se|", // the third argument
+            "\$this->generateUrl('article_show', compact('se|",
+            "\$this->generateUrl('article_show', sprintf('se|",
+            "\$this->generateUrl('article_show', \$all ? ['se|",
         ] as $call) {
             self::assertNull($this->completionAt(<<<PHP
                 <?php

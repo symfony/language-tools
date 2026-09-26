@@ -138,6 +138,9 @@ final class FormMetadataProviderTest extends MetadataTestCase
         yield 'option in a named argument' => ["\$builder->add('title', TextType::class, options: ['requ|"];
         yield 'option without a type' => ["\$builder->add('title', \$type, ['requ|"];
         yield 'static form creator' => ["self::createForm(TextType::class, null, ['requ|"];
+        yield 'options computed by a function' => ["\$builder->add('title', TextType::class, strtolower('requ|')"];
+        yield 'options formatted by sprintf' => ["\$builder->add('title', TextType::class, sprintf('requ|')"];
+        yield 'options in a ternary' => ["\$builder->add('title', TextType::class, \$x ? ['requ|'] : [])"];
     }
 
     public function testLinksFormFieldsToDataClassProperties(): void

@@ -92,6 +92,19 @@ final class TranslationProviderTest extends TestCase
         self::assertSame('name%', $result[0]['textEdit']['newText']);
     }
 
+    #[DataProvider('computedParametersProvider')]
+    public function testOffersNoPlaceholderCompletionOutsideTheParametersArray(string $text): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text);
+        $position = $converter->toPosition($text, strpos($text, '%na') + \strlen('%na'));
+
+        self::assertSame([], $provider->complete($requests->positioned([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ])));
+    }
+
     /** @param list<string> $expected */
     #[DataProvider('placeholderDomainProvider')]
     public function testScopesPhpPlaceholderCompletionToTheCallDomain(string $text, array $expected): void
@@ -809,6 +822,14 @@ final class TranslationProviderTest extends TestCase
 
             new TranslatableMessage('article.ti
             PHP];
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function computedParametersProvider(): iterable
+    {
+        yield 'sprintf' => ["<?php \$translator->trans('article.title', sprintf('%na'));"];
+        yield 'compact' => ["<?php \$translator->trans('article.title', compact('%na'));"];
+        yield 'ternary' => ["<?php \$translator->trans('article.title', \$x ? ['%na'] : []);"];
     }
 
     /**
