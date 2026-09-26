@@ -6,8 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptToken;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokens;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
+use Symfony\Lsp\Parser\Twig\TwigCallArgument;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
@@ -26,7 +25,6 @@ final class StimulusReferenceExtractor
         private readonly PositionConverter $converter,
         private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
         private readonly TwigDocumentParser $parser,
-        private readonly TwigCallArgumentResolver $arguments,
     ) {
     }
 
@@ -130,16 +128,11 @@ final class StimulusReferenceExtractor
     private function helperReferences(TwigDocument $document, string $uri, string $text): array
     {
         $references = [];
-        foreach ($document->nodesOfType('function_call') as $call) {
-            $identifier = $document->directChild($call, 'function_identifier');
-            $function = null === $identifier ? '' : $document->text($identifier);
-            if (!\array_key_exists($function, self::HELPER_MEMBER_KINDS)) {
-                continue;
-            }
-            $kind = self::HELPER_MEMBER_KINDS[$function];
-            $arguments = $this->arguments->resolve($document, $call);
-            $controller = $this->literal($document, $arguments->get(0));
-            $member = null === $kind ? null : $this->literal($document, $arguments->get(1));
+        foreach ($document->calls(...array_keys(self::HELPER_MEMBER_KINDS)) as $call) {
+            $kind = self::HELPER_MEMBER_KINDS[$call->name];
+            $position = $call->filter ? 1 : 0;
+            $controller = $this->literal($call->argument($position, 'controllerName'));
+            $member = null === $kind ? null : $this->literal($call->argument($position + 1, StimulusMemberKind::Action === $kind ? 'actionName' : 'targetNames'));
             if (null === $controller || (null !== $kind && null === $member)) {
                 continue;
             }
@@ -153,9 +146,9 @@ final class StimulusReferenceExtractor
         return $references;
     }
 
-    private function literal(TwigDocument $document, ?TreeSitterNode $argument): ?TwigStringLiteral
+    private function literal(?TwigCallArgument $argument): ?TwigStringLiteral
     {
-        $literal = null === $argument ? null : $document->soleStringLiteral($argument);
+        $literal = $argument?->literal();
 
         return null === $literal || '' === $literal->value ? null : $literal;
     }

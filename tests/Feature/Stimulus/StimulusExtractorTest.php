@@ -218,6 +218,31 @@ final class StimulusExtractorTest extends TestCase
         );
     }
 
+    public function testExtractsTwigHelperFiltersAndNamedArguments(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            <div {{ stimulus_controller('chart')|stimulus_action('chart', 'open', 'click')|stimulus_target('chart', targetNames = 'results') }}></div>
+            <div {{ attributes|stimulus_controller(controllerName: 'filtered') }}></div>
+            {{ stimulus_action(controllerName: 'search', actionName = 'submit') }}
+            {{ 'ignored'|stimulus_controller }}
+            TWIG));
+
+        self::assertSame(
+            [
+                ['chart', null, null],
+                ['chart', null, null],
+                ['chart', 'action', 'open'],
+                ['chart', null, null],
+                ['chart', 'target', 'results'],
+                ['filtered', null, null],
+                ['search', null, null],
+                ['search', 'action', 'submit'],
+            ],
+            array_map(static fn ($reference): array => [$reference->controller, $reference->kind?->value, $reference->member], $facts->references),
+        );
+    }
+
     public function testDecodesEscapedTwigHelperArguments(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
