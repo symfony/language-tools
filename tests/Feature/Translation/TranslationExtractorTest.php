@@ -384,10 +384,10 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame(['page.title'], array_map(static fn ($reference): string => $reference->key, $references));
     }
 
-    public function testIgnoresFiltersNamedLikeTheTranslationFunction(): void
+    public function testIgnoresTranslationHelpersSymfonyDoesNotDefine(): void
     {
         $references = $this->extractor()->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
-            {{ 'custom'|t }}{{ 'filtered'|trans({}, domain: 'admin') }}{{ t('function', {}, 'admin') }}
+            {{ trans('custom.function') }}{{ 'custom'|t }}{{ 'filtered'|trans({}, domain: 'admin') }}{{ t('function', {}, 'admin') }}
             TWIG))->references;
 
         self::assertSame(
@@ -743,7 +743,7 @@ final class TranslationExtractorTest extends TestCase
 
     public function testMeasuresTwigRangesCorrectlyAfterMultibyteComments(): void
     {
-        $text = "{# vérifié #} {{ trans('greeting') }}";
+        $text = "{# vérifié #} {{ t('greeting') }}";
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', $text));
 
         self::assertCount(1, $facts->references);

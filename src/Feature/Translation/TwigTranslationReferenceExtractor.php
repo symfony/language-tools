@@ -63,7 +63,7 @@ final class TwigTranslationReferenceExtractor
     private function calls(TwigDocument $document): array
     {
         $calls = [];
-        foreach ([...$document->filters('trans'), ...$document->functions('trans', 't')] as $call) {
+        foreach ([...$document->filters('trans'), ...$document->functions('t')] as $call) {
             $key = $call->argument(0, 'id', 'message')?->literal();
             if (null !== $key) {
                 $calls[] = [
