@@ -290,22 +290,28 @@ final class YamlDocumentParser
     /**
      * An error node reparents pairs under the document root, so the tree keeps
      * the key but loses the ancestors the recovered line indentation knows.
+     * A `when@` ancestor adds no path segment, so its loss only shows in the scope.
      */
     private function withRecoveredAncestors(YamlMapping $mapping, YamlMapping $recovered): YamlMapping
     {
         $depth = \count($recovered->path) - \count($mapping->path);
-        if ($depth <= 0 || [] !== $mapping->sequence || \array_slice($recovered->path, $depth) !== $mapping->path) {
+        if ($depth < 0 || \array_slice($recovered->path, $depth) !== $mapping->path) {
+            return $mapping;
+        }
+        $restoresAncestors = 0 < $depth && [] === $mapping->sequence;
+        $restoresScope = 'base' === $mapping->scope && 'base' !== $recovered->scope;
+        if (!$restoresAncestors && !$restoresScope) {
             return $mapping;
         }
 
         return new YamlMapping(
-            $recovered->path,
+            $restoresAncestors ? $recovered->path : $mapping->path,
             $mapping->value,
             $mapping->keyStartByte,
             $mapping->keyEndByte,
             $mapping->valueStartByte,
             $mapping->valueEndByte,
-            $recovered->sequence,
+            $restoresAncestors ? $recovered->sequence : $mapping->sequence,
             $recovered->scope,
         );
     }

@@ -204,6 +204,65 @@ final class YamlDocumentParserTest extends TestCase
         );
     }
 
+    /** @param list<array{list<string>, string}> $expected */
+    #[DataProvider('environmentSectionErrorProvider')]
+    public function testKeepsEnvironmentScopeOfMappingsAroundAnErrorRegion(string $source, array $expected): void
+    {
+        $mappings = (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parse($source);
+
+        self::assertSame($expected, array_map(static fn (YamlMapping $mapping): array => [$mapping->path, $mapping->scope], $mappings));
+    }
+
+    /** @return iterable<string, array{string, list<array{list<string>, string}>}> */
+    public static function environmentSectionErrorProvider(): iterable
+    {
+        yield 'unfinished key' => [<<<'YAML'
+            framework:
+                secret: foo
+            when@prod:
+                framework:
+                    cache
+                    router:
+                        utf8: true
+            YAML, [
+            [['framework'], 'base'],
+            [['framework', 'secret'], 'base'],
+            [['framework'], 'when@prod'],
+            [['framework', 'router'], 'when@prod'],
+            [['framework', 'router', 'utf8'], 'when@prod'],
+        ]];
+        yield 'malformed line' => [<<<'YAML'
+            when@prod:
+                services:
+                    ]broken
+                    App\Foo:
+                        public: true
+            YAML, [
+            [['services'], 'when@prod'],
+            [['services', 'App\Foo'], 'when@prod'],
+            [['services', 'App\Foo', 'public'], 'when@prod'],
+        ]];
+        yield 'unterminated flow collection' => [<<<'YAML'
+            when@prod:
+                [
+                framework:
+                    router: true
+            YAML, [
+            [['framework'], 'when@prod'],
+            [['framework', 'router'], 'when@prod'],
+        ]];
+        yield 'unbalanced flow value' => [<<<'YAML'
+            when@prod:
+                cache: }
+                framework:
+                    router: true
+            YAML, [
+            [['cache'], 'when@prod'],
+            [['framework'], 'when@prod'],
+            [['framework', 'router'], 'when@prod'],
+        ]];
+    }
+
     public function testDistinguishesSiblingSequenceItemsOnMappings(): void
     {
         $source = <<<'YAML'
