@@ -74,37 +74,35 @@ final class CheckDiagnosticExecutor
                     }
                     try {
                         $collection = $this->diagnostics->collect($file->uri, $file->excluded, $this->profiler->enabled());
-                        if (null !== $collection) {
-                            $this->profiler->recordDiagnosticProviders($file->project, $collection->providerNanoseconds);
-                            $failedProviders = [];
-                            foreach ($collection->failures as $failure) {
-                                $errors[] = $this->errors->diagnosticProvider($failure->provider, $failure->error, $file, $plan->workspace);
-                                $failedProviders[$failure->provider] = true;
-                                $incompleteProjects[$root] = true;
-                            }
-                            foreach ($collection->diagnostics as $diagnostic) {
-                                $cancellation->checkpoint();
-                                try {
-                                    $collected = CheckDiagnostic::fromProtocol(
-                                        $file,
-                                        $text,
-                                        $diagnostic->diagnostic,
-                                        $this->positions,
-                                        $diagnostic->provider,
-                                    );
-                                    if (!$this->diagnosticCodes->contains($collected->code)) {
-                                        throw new \UnexpectedValueException(\sprintf('Diagnostic code "%s" is not registered.', $collected->code));
-                                    }
-                                    $diagnostics[] = $collected;
-                                } catch (CancelledException $error) {
-                                    throw $error;
-                                } catch (\Throwable $error) {
-                                    if (!isset($failedProviders[$diagnostic->provider])) {
-                                        $errors[] = $this->errors->diagnosticProvider($diagnostic->provider, $error, $file, $plan->workspace);
-                                        $failedProviders[$diagnostic->provider] = true;
-                                    }
-                                    $incompleteProjects[$root] = true;
+                        $this->profiler->recordDiagnosticProviders($file->project, $collection->providerNanoseconds);
+                        $failedProviders = [];
+                        foreach ($collection->failures as $failure) {
+                            $errors[] = $this->errors->diagnosticProvider($failure->provider, $failure->error, $file, $plan->workspace);
+                            $failedProviders[$failure->provider] = true;
+                            $incompleteProjects[$root] = true;
+                        }
+                        foreach ($collection->diagnostics as $diagnostic) {
+                            $cancellation->checkpoint();
+                            try {
+                                $collected = CheckDiagnostic::fromProtocol(
+                                    $file,
+                                    $text,
+                                    $diagnostic->diagnostic,
+                                    $this->positions,
+                                    $diagnostic->provider,
+                                );
+                                if (!$this->diagnosticCodes->contains($collected->code)) {
+                                    throw new \UnexpectedValueException(\sprintf('Diagnostic code "%s" is not registered.', $collected->code));
                                 }
+                                $diagnostics[] = $collected;
+                            } catch (CancelledException $error) {
+                                throw $error;
+                            } catch (\Throwable $error) {
+                                if (!isset($failedProviders[$diagnostic->provider])) {
+                                    $errors[] = $this->errors->diagnosticProvider($diagnostic->provider, $error, $file, $plan->workspace);
+                                    $failedProviders[$diagnostic->provider] = true;
+                                }
+                                $incompleteProjects[$root] = true;
                             }
                         }
                     } catch (CancelledException $error) {

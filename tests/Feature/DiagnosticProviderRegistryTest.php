@@ -69,6 +69,22 @@ final class DiagnosticProviderRegistryTest extends TestCase
         self::assertSame([], $client->notifications);
     }
 
+    public function testCollectionKeepsProviderTimingsWhenNoProviderAnalyzesTheDocument(): void
+    {
+        [, , $collector] = $this->registryWithProviders(
+            'file:///workspace/templates/page.html.twig',
+            new StubDiagnosticProvider(null, 'first-provider'),
+            new StubDiagnosticProvider(null, 'second-provider'),
+        );
+
+        $collection = $collector->collect('file:///workspace/templates/page.html.twig', measureProviders: true);
+
+        self::assertFalse($collection->analyzed);
+        self::assertSame([], $collection->diagnostics);
+        self::assertSame([], $collection->failures);
+        self::assertSame(['first-provider', 'second-provider'], array_keys($collection->providerNanoseconds));
+    }
+
     public function testPublishesAnEmptyListWhenAProviderMatchesWithoutDiagnostics(): void
     {
         [$registry, $client] = $this->registryWithProviders(
@@ -113,7 +129,6 @@ final class DiagnosticProviderRegistryTest extends TestCase
 
         $collection = $collector->collect('file:///workspace/templates/page.html.twig', measureProviders: true);
 
-        self::assertNotNull($collection);
         self::assertSame(['first-provider', 'broken-provider', 'malformed-provider', 'third-provider'], array_keys($collection->providerNanoseconds));
         foreach ($collection->providerNanoseconds as $nanoseconds) {
             self::assertGreaterThanOrEqual(0, $nanoseconds);
@@ -351,7 +366,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
     /** @return list<array<array-key, mixed>> */
     private function diagnostics(DiagnosticCollector $collector, string $uri, bool $includeExcluded = false): array
     {
-        return array_map(static fn ($diagnostic): array => $diagnostic->diagnostic, $collector->collect($uri, $includeExcluded)->diagnostics ?? []);
+        return array_map(static fn ($diagnostic): array => $diagnostic->diagnostic, $collector->collect($uri, $includeExcluded)->diagnostics);
     }
 
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, severity: int, source: string, code: string, message: string} */

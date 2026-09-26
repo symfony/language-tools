@@ -167,11 +167,11 @@ foreach ($documents as [$uri, $languageId, $path, $relativePath]) {
     }
     $documentStore->open(new Document($uri, $languageId, 0, $text));
     $collection = $collector->collect($uri);
-    $diagnosticCount += null === $collection ? 0 : count($collection->diagnostics);
-    $failureCount += null === $collection ? 0 : count($collection->failures);
+    $diagnosticCount += count($collection->diagnostics);
+    $failureCount += count($collection->failures);
     if (isset($cases[$relativePath])) {
         $observed[$relativePath] = [];
-        foreach ($collection->diagnostics ?? [] as $diagnostic) {
+        foreach ($collection->diagnostics as $diagnostic) {
             $observed[$relativePath][] = $diagnostic->diagnostic['code'] ?? null;
         }
     }

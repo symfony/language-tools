@@ -24,7 +24,11 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
     public function publish(string $uri): void
     {
         $document = $this->documents->get($uri);
-        if (null === $document || null === $collection = $this->collector->collect($uri)) {
+        if (null === $document) {
+            return;
+        }
+        $collection = $this->collector->collect($uri);
+        if (!$collection->analyzed) {
             return;
         }
         foreach ($collection->failures as $failure) {

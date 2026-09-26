@@ -26,18 +26,18 @@ final class DiagnosticCollector
     ) {
     }
 
-    public function collect(string $uri, bool $includeExcluded = false, bool $measureProviders = false): ?DetailedDiagnosticCollection
+    public function collect(string $uri, bool $includeExcluded = false, bool $measureProviders = false): DetailedDiagnosticCollection
     {
         $document = $this->documents->get($uri);
         if (null === $document) {
-            return null;
+            return new DetailedDiagnosticCollection([], [], analyzed: false);
         }
         if ($this->isExcluded($document->uri, $includeExcluded)) {
             return new DetailedDiagnosticCollection([], []);
         }
         $request = $this->requests->forUri($document->uri);
         if (null === $request) {
-            return null;
+            return new DetailedDiagnosticCollection([], [], analyzed: false);
         }
 
         $diagnostics = [];
@@ -83,11 +83,8 @@ final class DiagnosticCollector
         $diagnostics = $this->partialParseFilter->filter($document, $diagnostics);
         $diagnostics = $this->environmentFilter->filter($document->uri, $diagnostics);
         $diagnostics = $this->suppressor->suppress($document, $diagnostics);
-        if (!$matched && [] === $diagnostics && [] === $failures) {
-            return null;
-        }
 
-        return new DetailedDiagnosticCollection($diagnostics, $failures, $providerNanoseconds);
+        return new DetailedDiagnosticCollection($diagnostics, $failures, $providerNanoseconds, $matched || [] !== $failures);
     }
 
     private function collectedDiagnostic(string $provider, mixed $diagnostic): CollectedDiagnostic

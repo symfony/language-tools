@@ -13,6 +13,7 @@ final class DetailedDiagnosticCollection
         public readonly array $diagnostics,
         public readonly array $failures,
         public readonly array $providerNanoseconds = [],
+        public readonly bool $analyzed = true,
     ) {
     }
 }
