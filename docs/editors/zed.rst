@@ -94,6 +94,9 @@ lenses:
         "code_lens": "on"
     }
 
+Clicking a lens opens its related location, or all of them when the lens
+lists several.
+
 Troubleshooting
 ---------------
 

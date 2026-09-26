@@ -14,7 +14,8 @@ Pick your editor:
 * `OpenCode`_.
 
 Any editor with a Language Server Protocol client can run the server; see
-`installing the server`_.
+`installing the server`_. Code lenses use the ``editor.action.showReferences``
+command, which your editor must run itself to open the related locations.
 
 What Happens When You Open a Project
 ------------------------------------
