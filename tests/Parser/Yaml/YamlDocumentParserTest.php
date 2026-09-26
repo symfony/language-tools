@@ -328,6 +328,19 @@ final class YamlDocumentParserTest extends TestCase
         self::assertSame('quoted:key', substr($source, $document->mappings[0]->keyStartByte, $document->mappings[0]->keyEndByte - $document->mappings[0]->keyStartByte));
     }
 
+    public function testMeasuresBlockScalarContentFromTheIndentationOfItsLine(): void
+    {
+        $parser = new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
+        $documentStart = "|\n  first\n";
+        $nested = "parameters:\r\n    script: |\r\n        second\r\n";
+
+        $first = $parser->parseDocument($documentStart)->scalars[0];
+        $second = $parser->parseDocument($nested)->scalars[0];
+
+        self::assertSame((int) strpos($documentStart, 'first'), $first->contentStartByte);
+        self::assertSame((int) strpos($nested, 'second'), $second->contentStartByte);
+    }
+
     public function testProvidesYamlTagOffsets(): void
     {
         $source = 'value: !php/enum App\\ResetMode::SCHEMA';

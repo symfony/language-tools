@@ -256,7 +256,7 @@ final class YamlDocumentParser
 
     private function lineIndent(string $source, int $offset): int
     {
-        $lineStart = strrpos(substr($source, 0, $offset), "\n");
+        $lineStart = 0 === $offset ? false : strrpos($source, "\n", $offset - \strlen($source) - 1);
         $lineStart = false === $lineStart ? 0 : $lineStart + 1;
 
         return strspn($source, " \t", $lineStart, $offset - $lineStart);
