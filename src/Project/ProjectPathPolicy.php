@@ -7,9 +7,14 @@ use Symfony\Component\Filesystem\Path;
 /**
  * Decides which project paths hold application sources.
  *
- * Nothing is excluded by convention: dependency locations come from the tools
- * that own them and everything else generated comes from the project's own
- * ignore rules.
+ * `owns()` is the single answer to "does this project own this path": the path
+ * lies inside the project root, it still resolves inside it once symbolic links
+ * are followed, and no tool or ignore rule claims it. Nothing is excluded by
+ * convention: dependency locations come from the tools that own them and
+ * everything else generated comes from the project's own ignore rules. What a
+ * user excludes from analysis through `excludePaths` is a separate scope, kept
+ * by `ProjectFileScopeRegistry`, and which environment loads a document is a
+ * separate question, answered by `EnvironmentScopeResolver`.
  */
 final class ProjectPathPolicy
 {
@@ -23,6 +28,13 @@ final class ProjectPathPolicy
     {
     }
 
+    public function owns(Project $project, string $path): bool
+    {
+        return null !== $this->relative($project, $path)
+            && !$this->isExcluded($project, $path)
+            && PathContainment::resolvesInside($project->rootPath, $path, false);
+    }
+
     public function isExcluded(Project $project, string $path): bool
     {
         return $this->isToolOwned($project, $path) || $this->isIgnored($project, $path);
@@ -31,7 +43,7 @@ final class ProjectPathPolicy
     /** Paths owned by Git, Node, Symfony Language Tools or the Composer installation this project declares. */
     public function isToolOwned(Project $project, string $path): bool
     {
-        $relativePath = $this->relativePath($project, $path);
+        $relativePath = $this->relative($project, $path);
         if (null === $relativePath) {
             return false;
         }
@@ -56,7 +68,7 @@ final class ProjectPathPolicy
     /** Project-root dotenv files stay visible because Symfony reads them even when they are ignored. */
     public function isIgnored(Project $project, string $path): bool
     {
-        if (null === $this->relativePath($project, $path)) {
+        if (null === $this->relative($project, $path)) {
             return false;
         }
 
@@ -68,7 +80,8 @@ final class ProjectPathPolicy
         return $this->gitignore->isIgnored($project->rootPath, $path);
     }
 
-    private function relativePath(Project $project, string $path): ?string
+    /** The path relative to the project root, or null when it lies outside the project or is the root itself. */
+    public function relative(Project $project, string $path): ?string
     {
         $root = Path::canonicalize($project->rootPath);
         $path = Path::canonicalize($path);

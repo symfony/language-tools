@@ -97,17 +97,12 @@ final class DiagnosticCollector
     private function isExcluded(string $uri, bool $includeExcluded): bool
     {
         $project = $this->projects->forDocumentUri($uri);
-        if (null === $project) {
-            return false;
-        }
         $path = $this->uriToPathConverter->convert($uri);
-        if (null === $path) {
+        if (null === $project || null === $path) {
             return false;
-        }
-        if (!$includeExcluded && $this->fileScope->isExcluded($project, $path)) {
-            return true;
         }
 
-        return $this->paths->isExcluded($project, $path);
+        return !$this->paths->owns($project, $path)
+            || (!$includeExcluded && $this->fileScope->isExcluded($project, $path));
     }
 }

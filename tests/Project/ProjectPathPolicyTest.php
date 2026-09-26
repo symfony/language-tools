@@ -15,7 +15,7 @@ final class ProjectPathPolicyTest extends TestCase
     protected function setUp(): void
     {
         $this->workspace = new TestWorkspace('symfony-lsp-policy-');
-        foreach (['assets/vendor', 'node_modules', 'src/var', 'templates/vendor', 'var/cache', 'vendor/acme'] as $path) {
+        foreach (['assets/vendor', 'config/packages/test', 'node_modules', 'src', 'src/var', 'templates/vendor', 'var/cache', 'vendor/acme'] as $path) {
             $this->workspace->mkdir($path);
         }
         $this->workspace->write('.gitignore', "/var/cache/\n/vendor/\n/assets/vendor/\n*.log\n");
@@ -30,6 +30,24 @@ final class ProjectPathPolicyTest extends TestCase
     public function testExcludesToolOwnedAndIgnoredPathsOnly(string $relativePath, bool $excluded): void
     {
         self::assertSame($excluded, ProjectPaths::policy()->isExcluded($this->project(), $this->workspace->path($relativePath)));
+    }
+
+    #[DataProvider('ownedPaths')]
+    public function testOwnsEveryApplicationPathTheProjectContains(string $relativePath, bool $owned): void
+    {
+        $this->workspace->write($relativePath, '');
+
+        self::assertSame($owned, ProjectPaths::policy()->owns($this->project(), $this->workspace->path($relativePath)));
+        self::assertSame($owned, ProjectPaths::resolver()->isApplicationOwned($this->project(), 'file://'.$this->workspace->path($relativePath)));
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function ownedPaths(): iterable
+    {
+        yield 'application source' => ['src/Controller.php', true];
+        yield 'environment configuration another environment loads' => ['config/packages/test/security.yaml', true];
+        yield 'ignored cache file' => ['var/cache/app.php', false];
+        yield 'composer installation file' => ['vendor/acme/Thing.php', false];
     }
 
     /** @return iterable<string, array{string, bool}> */
