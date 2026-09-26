@@ -161,7 +161,7 @@ provider, a Messenger transport or an environment variable processor named in
 a file another environment owns, such as ``config/packages/test/`` or
 ``config/services_test.yaml``, is left alone while you analyze ``dev``: select
 that environment to check those files. Configuration keys and values are the
-exception, they're checked in every environment.
+exception: they're checked in every ``when@`` block.
 
 Which Files Are Analyzed
 ------------------------
