@@ -89,13 +89,8 @@ final class LspRequestFactory
                 $diagnostics[] = new CodeActionDiagnostic($code, $range, $diagnostic);
             }
         }
-        $only = $context['only'] ?? null;
 
-        return new CodeActionRequest(
-            $request,
-            $diagnostics,
-            \is_array($only) ? array_values(array_filter($only, \is_string(...))) : null,
-        );
+        return new CodeActionRequest($request, $diagnostics);
     }
 
     /** @param array<array-key, mixed> $params */

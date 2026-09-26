@@ -182,11 +182,10 @@ final class ProviderRegistryTest extends TestCase
                 ['range' => $range, 'message' => 'Reported by another server.'],
                 ['code' => 'template.not_found', 'message' => 'Without a range.'],
                 'not a diagnostic',
-            ], 'only' => ['quickfix', 42]],
+            ]],
         ]);
 
         self::assertNotNull($request);
-        self::assertSame(['quickfix'], $request->only);
         self::assertSame([$reported], array_column($request->diagnostics(), 'diagnostic'));
         self::assertSame([$reported], array_column($request->diagnostics('route.not_found'), 'diagnostic'));
         self::assertSame([], $request->diagnostics('template.not_found'));

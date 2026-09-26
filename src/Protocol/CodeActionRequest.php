@@ -4,14 +4,10 @@ namespace Symfony\Lsp\Protocol;
 
 final class CodeActionRequest extends DocumentRequest
 {
-    /**
-     * @param list<CodeActionDiagnostic> $diagnostics
-     * @param list<string>|null          $only
-     */
+    /** @param list<CodeActionDiagnostic> $diagnostics */
     public function __construct(
         DocumentRequest $request,
         private readonly array $diagnostics,
-        public readonly ?array $only = null,
     ) {
         parent::__construct($request->document, $request->project, $request->source);
     }
