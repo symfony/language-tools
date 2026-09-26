@@ -131,6 +131,13 @@ final class YamlDocumentParserTest extends TestCase
                     routing:
                         App\Message\Report: [as|
             YAML, ['framework', 'messenger', 'routing']];
+        yield 'after an unterminated flow sequence' => [<<<'YAML'
+            framework:
+                messenger:
+                    routing:
+                        App\Message\Report: [async
+                        rou|
+            YAML, ['framework', 'messenger', 'routing']];
         yield 'unterminated flow mapping' => [<<<'YAML'
             services:
                 App\Foo:

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete YAML keys on the line after an unterminated flow sequence under their real parent instead of the flow sequence key
 - Keep YAML values at their real path and `when@` environment beside a malformed line, so their service and parameter references are still checked
 - Complete PHP translation placeholders from the domain the call passes instead of always the `messages` domain
 - Recognize Security roles and firewalls passed as named arguments to `is_granted()`, `logout_path()` and `logout_url()` in Twig

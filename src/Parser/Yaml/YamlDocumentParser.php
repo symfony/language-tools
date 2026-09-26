@@ -280,7 +280,7 @@ final class YamlDocumentParser
                 $parsed[] = $mapping;
                 continue;
             }
-            $parsed[$index] = $this->withRecoveredAncestors($parsed[$index], $mapping);
+            $parsed[$index] = $this->withRecoveredValue($this->withRecoveredAncestors($parsed[$index], $mapping), $mapping);
         }
         usort($parsed, static fn (YamlMapping $left, YamlMapping $right): int => $left->keyStartByte <=> $right->keyStartByte);
 
@@ -313,6 +313,28 @@ final class YamlDocumentParser
             $mapping->valueEndByte,
             $restoresAncestors ? $recovered->sequence : $mapping->sequence,
             $recovered->scope,
+        );
+    }
+
+    /**
+     * An error node can split a value from its key, leaving the tree pair
+     * empty where the recovered line still reads the value.
+     */
+    private function withRecoveredValue(YamlMapping $mapping, YamlMapping $recovered): YamlMapping
+    {
+        if ('' !== $mapping->value || '' === $recovered->value || $mapping->valueStartByte !== $recovered->valueStartByte) {
+            return $mapping;
+        }
+
+        return new YamlMapping(
+            $mapping->path,
+            $recovered->value,
+            $mapping->keyStartByte,
+            $mapping->keyEndByte,
+            $recovered->valueStartByte,
+            $recovered->valueEndByte,
+            $mapping->sequence,
+            $mapping->scope,
         );
     }
 
