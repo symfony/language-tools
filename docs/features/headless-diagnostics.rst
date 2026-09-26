@@ -403,4 +403,4 @@ The checker has no watch mode and doesn't apply fixes.
 
 .. _`standalone guide`: ../index.rst#installing-a-standalone-release
 .. _`source installation guide`: ../index.rst#installing-the-server-from-source
-.. _`project configuration`: ../project-configuration.rst
+.. _`project configuration`: ../configuration.rst
