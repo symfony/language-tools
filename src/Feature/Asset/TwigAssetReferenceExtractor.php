@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Feature\Asset;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Index\SourceSymbols;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
@@ -15,7 +14,6 @@ final class TwigAssetReferenceExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TwigDocumentParser $parser,
-        private readonly TwigCallArgumentResolver $arguments,
     ) {
     }
 
@@ -24,23 +22,16 @@ final class TwigAssetReferenceExtractor
     {
         $document = $this->parser->parse($text);
         $symbols = [];
-        foreach ($document->nodesOfType('function_call') as $call) {
-            $function = $document->directChild($call, 'function_identifier');
-            $name = null === $function ? null : $document->text($function);
-            if ('asset' !== $name && 'importmap' !== $name) {
-                continue;
-            }
-            $arguments = $this->arguments->resolve($document, $call);
-            if ('importmap' === $name) {
-                foreach ($this->entrypoints($document, $arguments->get(0)) as $entrypoint) {
+        foreach ($document->calls('asset', 'importmap') as $call) {
+            if ('importmap' === $call->name) {
+                foreach ($this->entrypoints($document, $call->argument(0, 'entryPoint')?->node) as $entrypoint) {
                     $symbols[] = $this->symbol(AssetSymbolKind::Entrypoint, $entrypoint, $uri, $text);
                 }
 
                 continue;
             }
-            $path = $arguments->get(0, 'path');
-            $literal = null === $path ? null : $document->soleStringLiteral($path);
-            if (null === $literal || str_starts_with($literal->value, '/') || null !== $arguments->get(1, 'packageName')) {
+            $literal = $call->argument(0, 'path')?->literal();
+            if (null === $literal || str_starts_with($literal->value, '/') || null !== $call->argument(1, 'packageName')) {
                 continue;
             }
             $symbols[] = $this->symbol(AssetSymbolKind::Asset, $literal, $uri, $text);

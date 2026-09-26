@@ -21,7 +21,6 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -174,6 +173,7 @@ final class AssetProviderTest extends TestCase
             {{ importmap(['listed', 'other']) }}
             {{ importmap('attributed', {defer: true}) }}
             {{ importmap(['static', dynamic]) }}
+            {{ importmap(entryPoint: 'named') }}
             {{ importmap(entrypoint) }}
             {{ importmap() }}
             {{ app.importmap('method') }}
@@ -182,7 +182,7 @@ final class AssetProviderTest extends TestCase
             TWIG));
 
         self::assertSame(
-            ['single', 'listed', 'other', 'attributed', 'static'],
+            ['single', 'listed', 'other', 'attributed', 'static', 'named'],
             array_map(static fn ($symbol): string => $symbol->name, $facts->symbols),
         );
     }
@@ -271,7 +271,6 @@ final class AssetProviderTest extends TestCase
             new TwigAssetReferenceExtractor(
                 $converter,
                 new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()),
-                new TwigCallArgumentResolver(),
             ),
             new ImportMapEntrypointExtractor($converter, new PhpCommentParser()),
             new AssetCompletionContextResolver($converter, $comments, new TwigDirectiveLocator()),
