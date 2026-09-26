@@ -43,7 +43,7 @@ final class YamlDocumentParser
             $recovered = $this->recoveryParser->parse($source);
             $mappings = $this->mergeMappings($mappings, $recovered->mappings);
             if ($collectScalars) {
-                $scalars = $this->mergeScalars($scalars, $recovered->scalars);
+                $scalars = $this->mergeScalars($source, $scalars, $recovered->scalars);
             }
         }
 
@@ -325,8 +325,22 @@ final class YamlDocumentParser
      *
      * @return list<YamlScalar>
      */
-    private function mergeScalars(array $parsed, array $recovered): array
+    private function mergeScalars(string $source, array $parsed, array $recovered): array
     {
+        $recoveredByRange = [];
+        foreach ($recovered as $scalar) {
+            $recoveredByRange[$scalar->startByte.':'.$scalar->endByte] = $scalar;
+        }
+        $parsed = array_values(array_filter(
+            $parsed,
+            fn (YamlScalar $scalar): bool => !$this->isMappingKey($source, $scalar),
+        ));
+        foreach ($parsed as $index => $scalar) {
+            $match = $recoveredByRange[$scalar->startByte.':'.$scalar->endByte] ?? null;
+            if (null !== $match) {
+                $parsed[$index] = $this->withRecoveredScalarAncestors($scalar, $match);
+            }
+        }
         $byStartByte = static fn (YamlScalar $left, YamlScalar $right): int => $left->startByte <=> $right->startByte;
         usort($parsed, $byStartByte);
         usort($recovered, $byStartByte);
@@ -344,6 +358,43 @@ final class YamlDocumentParser
         usort($scalars, $byStartByte);
 
         return $scalars;
+    }
+
+    /**
+     * An error node leaves the keys of the pairs it swallows as bare scalars.
+     */
+    private function isMappingKey(string $source, YamlScalar $scalar): bool
+    {
+        return !\in_array($scalar->style, [YamlScalarStyle::BlockLiteral, YamlScalarStyle::BlockFolded], true)
+            && 1 === preg_match('/\G[ \t]*:(?:\s|$)/', $source, $match, 0, $scalar->endByte);
+    }
+
+    private function withRecoveredScalarAncestors(YamlScalar $scalar, YamlScalar $recovered): YamlScalar
+    {
+        $depth = \count($recovered->path) - \count($scalar->path);
+        if ($depth < 0 || \array_slice($recovered->path, $depth) !== $scalar->path) {
+            return $scalar;
+        }
+        $restoresEnvironment = null === $scalar->environment && null !== $recovered->environment;
+        if (0 === $depth && !$restoresEnvironment) {
+            return $scalar;
+        }
+
+        return new YamlScalar(
+            $scalar->value,
+            $scalar->raw,
+            $scalar->startByte,
+            $scalar->endByte,
+            $scalar->contentStartByte,
+            $scalar->contentEndByte,
+            $scalar->style,
+            $recovered->path,
+            0 < $depth ? $recovered->sequence : $scalar->sequence,
+            $recovered->environment,
+            $scalar->tag,
+            $scalar->tagStartByte,
+            $scalar->tagEndByte,
+        );
     }
 
     private function containsBlockCollection(TreeSitterTree $tree, TreeSitterNode $node): bool

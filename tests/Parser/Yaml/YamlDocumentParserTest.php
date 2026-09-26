@@ -343,7 +343,7 @@ final class YamlDocumentParserTest extends TestCase
         self::assertSame($tagStart + \strlen('!php/const'), $scalar->tagEndByte);
     }
 
-    public function testParsedScalarFactsTakePrecedenceOverRecoveredFactsForTheSameRange(): void
+    public function testParsedScalarFactsKeepTheRecoveredAncestorsOfTheSameRange(): void
     {
         $source = 'broken: [one';
         $recovered = array_values(array_filter(
@@ -356,10 +356,8 @@ final class YamlDocumentParserTest extends TestCase
         ))[0];
 
         self::assertSame([$recovered->startByte, $recovered->endByte], [$scalar->startByte, $scalar->endByte]);
-        self::assertSame(['broken'], $recovered->path);
-        self::assertSame([], $scalar->path);
-        self::assertSame([[1, 0]], array_map(static fn (YamlSequenceItem $item): array => [$item->pathDepth, $item->index], $recovered->sequence));
-        self::assertSame([], $scalar->sequence);
+        self::assertSame(['broken'], $scalar->path);
+        self::assertSame([[1, 0]], array_map(static fn (YamlSequenceItem $item): array => [$item->pathDepth, $item->index], $scalar->sequence));
     }
 
     public function testRejectsRecoveredScalarsThatOverlapParsedFacts(): void
@@ -376,12 +374,12 @@ final class YamlDocumentParserTest extends TestCase
         $scalars = $parser->parseDocument($quotedLines)->scalars;
 
         self::assertSame(
-            ['parameters', 'first second', 'broken'],
+            ['first second', 'broken'],
             array_map(static fn (YamlScalar $scalar): string => $scalar->value, $scalars),
         );
         self::assertSame(
             [(int) strpos($quotedLines, '"'), (int) strpos($quotedLines, 'second"') + \strlen('second"')],
-            [$scalars[1]->startByte, $scalars[1]->endByte],
+            [$scalars[0]->startByte, $scalars[0]->endByte],
         );
     }
 
@@ -502,7 +500,7 @@ final class YamlDocumentParserTest extends TestCase
 
         self::assertSame(
             [
-                ['one', [], [], null, null],
+                ['one', ['broken'], [[1, 0]], null, null],
                 ["'@after'", ['sequence'], [[1, 0]], null, '!service'],
                 ["|-\n  %env(AFTER)%\n", ['block'], [], null, null],
                 ['"scoped"', ['value'], [], 'dev', null],
@@ -513,6 +511,34 @@ final class YamlDocumentParserTest extends TestCase
                 array_map(static fn (YamlSequenceItem $item): array => [$item->pathDepth, $item->index], $scalar->sequence),
                 $scalar->environment,
                 $scalar->tag,
+            ], $document->scalars),
+        );
+    }
+
+    public function testKeepsTheAncestorsAndEnvironmentOfScalarsBesideAnErrorRegion(): void
+    {
+        $source = <<<'YAML'
+            when@prod:
+                services:
+                    app.foo:
+                        arguments: ['@app.bar']
+                        calls:
+                            - |
+                                text
+                    ]broken
+            YAML;
+        $document = (new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))->parseDocument($source);
+
+        self::assertSame(
+            [
+                ['@app.bar', ['services', 'app.foo', 'arguments'], [[3, 0]], 'prod'],
+                ["text\n", ['services', 'app.foo', 'calls'], [[3, 0]], 'prod'],
+            ],
+            array_map(static fn (YamlScalar $scalar): array => [
+                $scalar->value,
+                $scalar->path,
+                array_map(static fn (YamlSequenceItem $item): array => [$item->pathDepth, $item->index], $scalar->sequence),
+                $scalar->environment,
             ], $document->scalars),
         );
     }

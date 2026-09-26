@@ -309,6 +309,30 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
         ];
     }
 
+    public function testScopesReferencesBesideAnErrorRegionToTheirEnvironment(): void
+    {
+        $facts = $this->extractor()->extract('file:///workspace/config/services.yaml', <<<'YAML'
+            when@prod:
+                services:
+                    app.foo:
+                        arguments: ['@app.bar', '%app.limit%']
+                    ]broken
+            YAML);
+
+        self::assertSame(
+            [
+                ['service', 'app.bar', '3:26-3:33', 'prod'],
+                ['parameter', 'app.limit', '3:38-3:47', 'prod'],
+            ],
+            array_map(static fn ($reference): array => [
+                $reference->kind->value,
+                $reference->name,
+                self::rangeData($reference->range),
+                $reference->environment,
+            ], $facts->references),
+        );
+    }
+
     private function extractor(): YamlDependencyInjectionExtractor
     {
         $converter = new PositionConverter();

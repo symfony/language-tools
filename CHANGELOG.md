@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep YAML values at their real path and `when@` environment beside a malformed line, so their service and parameter references are still checked
 - Complete PHP translation placeholders from the domain the call passes instead of always the `messages` domain
 - Recognize Security roles and firewalls passed as named arguments to `is_granted()`, `logout_path()` and `logout_url()` in Twig
 - Recognize an importmap entrypoint passed as the `entryPoint` named argument in Twig
