@@ -81,11 +81,8 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
     protected function build(): void
     {
         $firstRuntimeEntities = [];
-        $mergedEntities = [];
         foreach ($this->runtime as $entity) {
-            $key = ClassNameKey::from($entity->className);
-            $firstRuntimeEntities[$key] ??= $entity;
-            $mergedEntities[$key] = $entity;
+            $firstRuntimeEntities[ClassNameKey::from($entity->className)] ??= $entity;
         }
 
         $firstSourceEntities = [];
@@ -96,9 +93,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
         ]);
         foreach ($this->facts() as $facts) {
             foreach ($facts->entities as $entity) {
-                $key = ClassNameKey::from($entity->className);
-                $firstSourceEntities[$key] ??= $entity;
-                $mergedEntities[$key] = $entity;
+                $firstSourceEntities[ClassNameKey::from($entity->className)] ??= $entity;
             }
             foreach ($facts->repositories as $repository) {
                 $this->repositoriesByClass[ClassNameKey::from($repository->className)] ??= $repository;
@@ -109,7 +104,7 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
         }
 
         $this->entitiesByClass = array_replace($firstRuntimeEntities, $firstSourceEntities);
-        $this->entities = array_values($mergedEntities);
+        $this->entities = array_values($this->entitiesByClass);
         usort($this->entities, static fn (DoctrineEntity $left, DoctrineEntity $right): int => $left->className <=> $right->className);
         $this->entitiesByRepository = [];
         foreach ($this->entities as $entity) {

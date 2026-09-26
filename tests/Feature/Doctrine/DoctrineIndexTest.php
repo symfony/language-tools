@@ -64,6 +64,7 @@ final class DoctrineIndexTest extends TestCase
         $index->overlay($first);
 
         self::assertSame('file:///src/First.php', $index->entity('App\\Duplicate')?->uri);
+        self::assertSame(['file:///src/First.php'], array_map(static fn (DoctrineEntity $entity): string => $entity->uri, $index->entities()));
     }
 
     public function testLooksClassesUpRegardlessOfCaseAndLeadingBackslash(): void

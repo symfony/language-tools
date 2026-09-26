@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Pick the same declaration of a duplicated Doctrine entity for lookups, completion and navigation
 - Read a form `data_class` written as a class name string
 - Keep a switched environment or kernel when unrelated settings change
 - Refuse to rename a translation key to a name with quotes, backslashes, whitespace or other characters its literals can't hold as written
