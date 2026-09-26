@@ -96,7 +96,7 @@ final class RouteRenameHandler implements RenameProviderInterface
             return null;
         }
 
-        $symbol = $this->symbolResolver->resolve($request->project, $request->source, $request->position);
+        $symbol = $this->symbolResolver->resolve($request);
 
         return null === $symbol ? null : [$request->project, $symbol];
     }

@@ -204,7 +204,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
     private function resolve(PositionedRequest $request): ?array
     {
         $document = $request->source;
-        $symbol = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document)->symbols);
+        $symbol = $this->positionedSymbols->resolve($document, $request->offset, $this->extractor->extract($document)->symbols);
 
         return null === $symbol ? null : [$symbol, $request->project];
     }

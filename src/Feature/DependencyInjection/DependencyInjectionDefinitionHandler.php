@@ -17,7 +17,7 @@ final class DependencyInjectionDefinitionHandler implements DefinitionProviderIn
 
     public function definition(PositionedRequest $request): array
     {
-        $symbol = $this->symbolResolver->resolve($request->source, $request->position);
+        $symbol = $this->symbolResolver->resolve($request);
         if (null === $symbol) {
             return [];
         }

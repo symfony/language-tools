@@ -105,7 +105,7 @@ final class TwigComponentResolver
     {
         $document = $request->source;
         $facts = $this->extractor->extract($request->project, $document);
-        $reference = $this->positionedSymbols->resolve($document, $request->position, $facts->actionReferences);
+        $reference = $this->positionedSymbols->resolve($document, $request->offset, $facts->actionReferences);
         if (null !== $reference) {
             $component = $this->indexes->forProject($request->project)->get($reference->component);
             if (null === $component) {
@@ -118,7 +118,7 @@ final class TwigComponentResolver
             }
         }
         foreach ($facts->components as $component) {
-            $action = $this->positionedSymbols->resolve($document, $request->position, $component->actions);
+            $action = $this->positionedSymbols->resolve($document, $request->offset, $component->actions);
             if (null !== $action) {
                 return [$this->indexes->forProject($request->project)->get($component->name) ?? $component, $action, $request->project];
             }
@@ -132,13 +132,13 @@ final class TwigComponentResolver
     {
         $document = $request->source;
         $facts = $this->extractor->extract($request->project, $document);
-        $reference = $this->positionedSymbols->resolve($document, $request->position, $facts->references);
+        $reference = $this->positionedSymbols->resolve($document, $request->offset, $facts->references);
         if (null !== $reference) {
             $component = $this->indexes->forProject($request->project)->get($reference->name);
 
             return null === $component ? null : [$component, $request->project];
         }
-        $component = $this->positionedSymbols->resolve($document, $request->position, $facts->components);
+        $component = $this->positionedSymbols->resolve($document, $request->offset, $facts->components);
 
         return null === $component ? null : [$this->indexes->forProject($request->project)->get($component->name) ?? $component, $request->project];
     }

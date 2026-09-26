@@ -148,7 +148,7 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
     private function resolve(PositionedRequest $request): ?array
     {
         $document = $request->source;
-        $event = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($request->project, $document)->events);
+        $event = $this->positionedSymbols->resolve($document, $request->offset, $this->extractor->extract($request->project, $document)->events);
 
         return null === $event ? null : [$event, $request->project];
     }

@@ -21,7 +21,7 @@ final class RouteDefinitionHandler implements DefinitionProviderInterface
             return [];
         }
 
-        $symbol = $this->symbolResolver->resolve($request->project, $request->source, $request->position);
+        $symbol = $this->symbolResolver->resolve($request);
 
         return null === $symbol ? [] : $this->protocol->locations($this->sourceIndexes->forProject($request->project)->declarations($symbol->name));
     }

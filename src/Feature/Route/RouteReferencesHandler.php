@@ -21,7 +21,7 @@ final class RouteReferencesHandler implements ReferencesProviderInterface
             return [];
         }
 
-        $symbol = $this->symbolResolver->resolve($request->project, $request->source, $request->position);
+        $symbol = $this->symbolResolver->resolve($request);
         if (null === $symbol) {
             return [];
         }

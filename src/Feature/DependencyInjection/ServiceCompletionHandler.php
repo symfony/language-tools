@@ -48,7 +48,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
     private function completePhp(PositionedRequest $request): ?array
     {
         $text = $request->document->text;
-        $argument = $this->autowireArguments->resolve($text, $this->positionConverter->toByteOffset($text, $request->position));
+        $argument = $this->autowireArguments->resolve($text, $request->offset);
         if (null === $argument) {
             return null;
         }

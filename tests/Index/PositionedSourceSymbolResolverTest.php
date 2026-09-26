@@ -19,9 +19,8 @@ final class PositionedSourceSymbolResolverTest extends TestCase
         $secondOffset = (int) strpos($document->text, 'second');
         $first = new TestRangedSourceSymbol($positions->toRange($document->text, $firstOffset, \strlen('first')));
         $second = new TestRangedSourceSymbol($positions->toRange($document->text, $secondOffset, \strlen('second')));
-        $position = $positions->toPosition($document->text, $secondOffset + \strlen('second'));
 
-        self::assertSame($second, (new PositionedSourceSymbolResolver($positions))->resolve($document, $position, [$first, $second]));
+        self::assertSame($second, (new PositionedSourceSymbolResolver($positions))->resolve($document, $secondOffset + \strlen('second'), [$first, $second]));
     }
 }
 

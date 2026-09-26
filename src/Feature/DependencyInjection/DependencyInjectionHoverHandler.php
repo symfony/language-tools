@@ -17,7 +17,7 @@ final class DependencyInjectionHoverHandler implements HoverProviderInterface
 
     public function hover(PositionedRequest $request): ?array
     {
-        $symbol = $this->symbolResolver->resolve($request->source, $request->position);
+        $symbol = $this->symbolResolver->resolve($request);
         if (null === $symbol) {
             return null;
         }

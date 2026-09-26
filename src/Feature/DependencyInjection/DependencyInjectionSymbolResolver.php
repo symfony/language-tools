@@ -2,9 +2,8 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class DependencyInjectionSymbolResolver
 {
@@ -14,14 +13,15 @@ final class DependencyInjectionSymbolResolver
     ) {
     }
 
-    public function resolve(SourceDocument $document, Position $position): ?DependencyInjectionSymbol
+    public function resolve(PositionedRequest $request): ?DependencyInjectionSymbol
     {
+        $document = $request->source;
         $facts = $this->extractor->extractForInteractive($document);
         if (null === $facts) {
             return null;
         }
 
-        $offset = $this->positionConverter->toByteOffset($document->text, $position);
+        $offset = $request->offset;
         foreach ($facts->services as $declaration) {
             if ($this->positionConverter->containsByteOffset($document->text, $declaration->range, $offset, inclusiveEnd: true)) {
                 return new DependencyInjectionSymbol(

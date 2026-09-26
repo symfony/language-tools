@@ -106,7 +106,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
     private function resolve(PositionedRequest $request): ?array
     {
         $document = $request->source;
-        $reference = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document, $this->classIndexes->forProject($request->project)));
+        $reference = $this->positionedSymbols->resolve($document, $request->offset, $this->extractor->extract($document, $this->classIndexes->forProject($request->project)));
         if (null === $reference) {
             return null;
         }

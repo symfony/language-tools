@@ -17,7 +17,7 @@ final class DependencyInjectionReferencesHandler implements ReferencesProviderIn
 
     public function references(ReferencesRequest $request): array
     {
-        $symbol = $this->symbolResolver->resolve($request->source, $request->position);
+        $symbol = $this->symbolResolver->resolve($request);
         if (null === $symbol) {
             return [];
         }

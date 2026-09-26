@@ -89,7 +89,7 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         if (!$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
             return null;
         }
-        $symbol = $this->symbolResolver->resolve($request->source, $request->position);
+        $symbol = $this->symbolResolver->resolve($request);
 
         return null === $symbol ? null : [$request->project, $symbol];
     }

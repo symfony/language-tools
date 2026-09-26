@@ -19,11 +19,11 @@ final class EnvironmentSymbolResolver
     {
         $document = $request->source;
         $facts = $this->extractor->extract($document);
-        $declaration = $this->positionedSymbols->resolve($document, $request->position, $facts->declarations);
+        $declaration = $this->positionedSymbols->resolve($document, $request->offset, $facts->declarations);
         if (null !== $declaration) {
             return [new EnvironmentReference($declaration->name, $request->document->uri, $declaration->range, []), $request->project];
         }
-        $reference = $this->positionedSymbols->resolve($document, $request->position, $facts->references);
+        $reference = $this->positionedSymbols->resolve($document, $request->offset, $facts->references);
 
         return null === $reference ? null : [$reference, $request->project];
     }

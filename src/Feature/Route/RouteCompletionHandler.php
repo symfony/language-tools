@@ -36,7 +36,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         $routeIndex = $this->routeIndexes->forProject($request->project);
         if ('twig' === $request->document->languageId) {
             $twigText = $this->comments->mask($request->document->languageId, $request->document->text);
-            if (!$this->directives->insideDirective($twigText, $this->positionConverter->toByteOffset($twigText, $request->position))) {
+            if (!$this->directives->insideDirective($twigText, $request->offset)) {
                 return [];
             }
             $parameterContext = TwigRouteParameterCompletionContext::fromTwig(

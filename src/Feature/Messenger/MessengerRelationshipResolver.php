@@ -27,12 +27,12 @@ final class MessengerRelationshipResolver
     /** @return array{MessengerSourceSymbol|null, PhpClassDeclaration|null, Project}|null */
     public function resolve(PositionedRequest $request): ?array
     {
-        $symbol = $this->positionedSymbols->resolve($request->source, $request->position, $this->extractor->extract($request->source)->symbols);
+        $symbol = $this->positionedSymbols->resolve($request->source, $request->offset, $this->extractor->extract($request->source)->symbols);
         if ($symbol instanceof MessengerSourceSymbol) {
             return [$symbol, null, $request->project];
         }
         $class = 'php' === $request->document->languageId
-            ? $this->positionedSymbols->resolve($request->source, $request->position, $this->classExtractor->extract($request->document->uri, $request->document->text))
+            ? $this->positionedSymbols->resolve($request->source, $request->offset, $this->classExtractor->extract($request->document->uri, $request->document->text))
             : null;
 
         return $class instanceof PhpClassDeclaration ? [null, $class, $request->project] : null;
