@@ -47,7 +47,7 @@ final class ContentLengthProcessClientTest extends TestCase
                 usleep(2000);
             }
             PHP);
-        $client = new ContentLengthProcessClient([$server, base64_encode($json)], 1.0);
+        $client = new ContentLengthProcessClient([$server, base64_encode($json)]);
 
         try {
             self::assertSame($message, $client->read());
@@ -64,7 +64,7 @@ final class ContentLengthProcessClientTest extends TestCase
             fwrite(STDOUT, base64_decode($argv[1]));
             fflush(STDOUT);
             PHP);
-        $client = new ContentLengthProcessClient([$server, base64_encode($frame)], 1.0);
+        $client = new ContentLengthProcessClient([$server, base64_encode($frame)]);
 
         try {
             $client->read();
@@ -89,12 +89,15 @@ final class ContentLengthProcessClientTest extends TestCase
     #[DataProvider('incompleteFrameProvider')]
     public function testIncompleteFramesCannotExceedTheReadDeadline(string $fragment): void
     {
+        $readyPath = $this->workspace->path('server.ready');
         $server = $this->server(<<<'PHP'
             fwrite(STDOUT, base64_decode($argv[1]));
             fflush(STDOUT);
+            touch($argv[2]);
             sleep(5);
             PHP);
-        $client = new ContentLengthProcessClient([$server, base64_encode($fragment)], 1.0);
+        $client = new ContentLengthProcessClient([$server, base64_encode($fragment), $readyPath]);
+        $this->awaitFile($readyPath);
         $startedAt = microtime(true);
 
         try {
@@ -123,7 +126,7 @@ final class ContentLengthProcessClientTest extends TestCase
             fwrite(STDOUT, 'Content-Length: '.strlen($json)."\r\n\r\n".$json);
             fflush(STDOUT);
             PHP);
-        $client = new ContentLengthProcessClient([$server, base64_encode($json)], 1.0);
+        $client = new ContentLengthProcessClient([$server, base64_encode($json)]);
 
         try {
             $client->read();
@@ -142,17 +145,13 @@ final class ContentLengthProcessClientTest extends TestCase
         $server = $this->server(<<<'PHP'
             $lock = fopen($argv[1], 'c+');
             flock($lock, LOCK_EX);
-            touch($argv[2]);
             fwrite(STDOUT, "Content-Length: 1\r\n\r\n{");
             fflush(STDOUT);
+            touch($argv[2]);
             sleep(5);
             PHP);
-        $client = new ContentLengthProcessClient([$server, $lockPath, $readyPath], 1.0);
-        $deadline = microtime(true) + 1.0;
-        while (!is_file($readyPath) && microtime(true) < $deadline) {
-            usleep(10000);
-        }
-        self::assertFileExists($readyPath);
+        $client = new ContentLengthProcessClient([$server, $lockPath, $readyPath]);
+        $this->awaitFile($readyPath);
 
         try {
             $client->read();
@@ -170,6 +169,15 @@ final class ContentLengthProcessClientTest extends TestCase
         } finally {
             fclose($lock);
         }
+    }
+
+    private function awaitFile(string $path): void
+    {
+        $deadline = microtime(true) + 30.0;
+        while (!is_file($path) && microtime(true) < $deadline) {
+            usleep(1000);
+        }
+        self::assertFileExists($path);
     }
 
     private function server(string $body): string
