@@ -198,6 +198,19 @@ The whole run stops after 600 seconds and each application boot after 300;
 raise them with ``--timeout=`` and ``--bridge-timeout=`` on slow machines or
 containers.
 
+Caching in CI
+-------------
+
+The checker keeps its index and the last runtime information it collected under
+``var/symfony-lsp/`` in each application, and running the application can
+update its Symfony cache; both must be writable. Caching ``var/symfony-lsp/``
+by revision, platform and Symfony Language Tools version speeds up later runs.
+Don't publish it as a build artifact or share it between untrusted projects.
+
+Reports and baselines contain diagnostic messages and application names, but
+never parameter values, environment values or secrets. Baselines contain no
+absolute paths or source snippets.
+
 Using Symfony CLI
 -----------------
 
