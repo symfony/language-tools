@@ -87,7 +87,7 @@ final class RuntimeRefreshPlanner
         if (str_starts_with($path, 'assets/')) {
             return ['asset', 'stimulus'];
         }
-        if (str_contains('/'.$path, '/translations/')) {
+        if ($this->isTranslationPath($path)) {
             return ['translation'];
         }
         if (str_starts_with($path, 'config/routes.') || str_starts_with($path, 'config/routes/')) {
@@ -104,6 +104,7 @@ final class RuntimeRefreshPlanner
             && !str_starts_with($path, 'config/routes/');
     }
 
+    /** Bundles name their catalog directory `translations` or `Translations`. */
     private function isTranslationPath(string $path): bool
     {
         return false !== stripos('/'.$path, '/translations/');

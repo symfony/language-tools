@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Answer a document link request with an empty list instead of nothing when a document has no link
-
+- Refresh only the translation catalogs when a catalog inside a `Translations` directory changes, instead of the whole runtime index
 - Reuse one YAML parse per document during completion
 - Keep reading YAML keys at their real path when the file contains an unterminated flow collection
 - Complete Security roles in an `IsGranted` attribute written next to another attribute

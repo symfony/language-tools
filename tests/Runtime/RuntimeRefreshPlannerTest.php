@@ -31,6 +31,7 @@ final class RuntimeRefreshPlannerTest extends TestCase
         yield 'asset and Stimulus' => ['assets/app.js', SourceFileChange::factsChanged(['asset', 'stimulus']), ['assets', 'stimulus']];
         yield 'new asset without facts' => ['assets/new_controller.js', SourceFileChange::untracked(), ['assets', 'stimulus']];
         yield 'new translation without facts' => ['app/Bundle/translations/en_US/messages.ini', SourceFileChange::untracked(), ['translations']];
+        yield 'new translation in a capitalized catalog directory' => ['app/Bundle/Translations/en_US/messages.ini', SourceFileChange::untracked(), ['translations']];
     }
 
     /** @param list<string> $sections */
@@ -65,6 +66,7 @@ final class RuntimeRefreshPlannerTest extends TestCase
     public static function refreshedPathProvider(): iterable
     {
         yield 'source' => ['src/Controller.php', SourceFileChange::factsChanged(['route']), true];
+        yield 'capitalized catalog directory' => ['app/Bundle/Translations/en_US/messages.ini', SourceFileChange::untracked(), true];
         yield 'manifest' => ['composer.json', SourceFileChange::untracked(), true];
         yield 'bundle service definition' => ['src/Resources/config/services.xml', SourceFileChange::untracked(), true];
         yield 'configuration' => ['config/packages/framework.yaml', SourceFileChange::untracked(), true];
