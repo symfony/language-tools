@@ -361,6 +361,17 @@ PHP;
         $diagnosticProvider = $kit->get(SecurityDiagnosticProvider::class);
 
         self::assertSame(['ROLE_ADMIN'], $kit->labels($kit->get(SecurityCompletionProvider::class)->complete($kit->positioned($kit->after($completionUri, 'ROLE_A')))));
+        foreach ([
+            "{{ is_granted(attribute: 'ROLE_A" => ['ROLE_ADMIN'],
+            "{{ logout_path(key: 'ma" => ['main'],
+            "{{ user.is_granted('ROLE_A" => [],
+            "{{ value|is_granted('ROLE_A" => [],
+            "{{ links.logout_url('ma" => [],
+        ] as $index => $case) {
+            $twigCompletionUri = 'file:///workspace/templates/completion-'.$index.'.html.twig';
+            $kit->open($twigCompletionUri, $index);
+            self::assertSame($case, $kit->labels($kit->get(SecurityCompletionProvider::class)->complete($kit->positioned($kit->offset($twigCompletionUri, \strlen($index))))), $index);
+        }
         $role = $kit->inside($phpUri, 'ROLE_ADMIN');
         self::assertStringContainsString('App\\Security\\PostVoter', $kit->hoverText($relationshipProvider->hover($kit->positioned($role))));
         self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->after($yamlUri, 'provider: us')))));

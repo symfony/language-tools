@@ -15,6 +15,7 @@ use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
+use Symfony\Lsp\Parser\Twig\TwigCallSyntax;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
@@ -64,14 +65,18 @@ final class SecurityExtractor
             return null;
         }
         $before = substr($masked, 0, $offset);
-        if ('twig' === $languageId && preg_match('/\bis_granted\s*\(\s*["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
-            return $this->context(SecuritySymbolKind::Role, $match[1][0], $text, $match[1][1]);
+        if ('twig' === $languageId && preg_match('/\b(is_granted)\s*\(\s*(?:attribute\s*[:=](?![=>])\s*)?["\'](ROLE_[A-Z0-9_]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)
+            && TwigCallSyntax::isFunctionCall($before, $match[1][1])
+        ) {
+            return $this->context(SecuritySymbolKind::Role, $match[2][0], $text, $match[2][1]);
         }
         if ('php' === $languageId && null !== $context = $this->phpCompletionContext($text, $offset)) {
             return $context;
         }
-        if ('twig' === $languageId && preg_match('/\blogout_(?:path|url)\s*\(\s*["\']([A-Za-z0-9_.-]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)) {
-            return $this->context(SecuritySymbolKind::Firewall, $match[1][0], $text, $match[1][1]);
+        if ('twig' === $languageId && preg_match('/\b(logout_(?:path|url))\s*\(\s*(?:key\s*[:=](?![=>])\s*)?["\']([A-Za-z0-9_.-]*)$/', $before, $match, \PREG_OFFSET_CAPTURE)
+            && TwigCallSyntax::isFunctionCall($before, $match[1][1])
+        ) {
+            return $this->context(SecuritySymbolKind::Firewall, $match[2][0], $text, $match[2][1]);
         }
         if ('yaml' === $languageId) {
             $lineOffset = strrpos($before, "\n");
