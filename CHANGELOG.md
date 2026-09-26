@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.23.0 (2026-09-26)
 
 - Complete translation keys inside a Twig string interpolation
 - Complete Security roles and firewalls passed as the `attribute` and `key` named arguments in Twig, and stop completing them on method calls and filters
