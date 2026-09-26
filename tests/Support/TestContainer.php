@@ -30,9 +30,13 @@ final class TestContainer
     }
 
     /** Everything the compiled wiring is derived from, so that a dump of it can never be stale. */
-    public static function key(string $root): string
+    public static function key(string $root, string $definition = __FILE__): string
     {
-        $sources = ['services' => (string) md5_file($root.'/resources/services.php'), 'packages' => (string) md5_file($root.'/composer.lock')];
+        $sources = [
+            'definition' => (string) md5_file($definition),
+            'services' => (string) md5_file($root.'/resources/services.php'),
+            'packages' => (string) md5_file($root.'/composer.lock'),
+        ];
         /** @var \SplFileInfo $file */
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root.'/src', \FilesystemIterator::SKIP_DOTS)) as $file) {
             if ($file->isFile()) {
@@ -82,9 +86,6 @@ final class TestContainer
         if (!is_dir($directory) && !mkdir($directory, 0o777, true) && !is_dir($directory)) {
             throw new \RuntimeException(\sprintf('The test container directory "%s" could not be created.', $directory));
         }
-        foreach (glob($directory.'/TestContainer*.php') ?: [] as $stale) {
-            unlink($stale);
-        }
         $dumped = (new PhpDumper($container))->dump(['class' => $class, 'namespace' => __NAMESPACE__.'\\Container']);
         if (!\is_string($dumped)) {
             throw new \RuntimeException('The test container was dumped as several files.');
@@ -92,5 +93,17 @@ final class TestContainer
         $temporary = $file.'.'.getmypid();
         file_put_contents($temporary, $dumped);
         rename($temporary, $file);
+        self::prune($directory, $file);
+    }
+
+    /** Removes the dumps older than the current one, sparing any a concurrent process with newer wiring may be about to require. */
+    public static function prune(string $directory, string $current): void
+    {
+        $dumped = filemtime($current);
+        foreach (glob($directory.'/TestContainer*.php') ?: [] as $dump) {
+            if ($dump !== $current && false !== $dumped && filemtime($dump) < $dumped) {
+                @unlink($dump);
+            }
+        }
     }
 }
