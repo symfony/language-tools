@@ -2,27 +2,10 @@
 
 namespace Symfony\Lsp\Tests\Feature\Console;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\Console\ConsoleCommandMetadata;
-use Symfony\Lsp\Feature\Console\ConsoleDefinitionExtractor;
-use Symfony\Lsp\Feature\Console\ConsoleExtractor;
-use Symfony\Lsp\Feature\Console\ConsoleIndexRegistry;
-use Symfony\Lsp\Feature\Console\ConsoleInvokableParameterExtractor;
 use Symfony\Lsp\Feature\Console\ConsoleProvider;
-use Symfony\Lsp\Feature\Console\ConsoleSourceIndexRegistry;
-use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class ConsoleProviderTest extends TestCase
 {
@@ -56,37 +39,33 @@ final class ConsoleProviderTest extends TestCase
                 }
             }
             PHP;
-        [$provider] = $this->provider($uri, $text, new ConsoleCommandMetadata(
-            'ReportCommand',
-            '/workspace/src/Command/ReportCommand.php',
-            ['command', 'report'],
-            ['env', 'format', 'help', 'no-debug', 'verbose'],
-            true,
-        ));
+        $kit = $this->kit($uri, $text, [
+            'class' => 'ReportCommand',
+            'file' => '/workspace/src/Command/ReportCommand.php',
+            'arguments' => ['command', 'report'],
+            'options' => ['env', 'format', 'help', 'no-debug', 'verbose'],
+            'complete' => true,
+        ]);
 
-        $diagnostics = $provider->diagnostics(LspRequests::document($uri));
-        self::assertIsArray($diagnostics);
-        self::assertSame(['console.unknown_argument', 'console.unknown_option'], array_column($diagnostics, 'code'));
+        $diagnostics = $kit->get(ConsoleProvider::class)->diagnostics(LspRequests::document($uri));
+        self::assertSame(['console.unknown_argument', 'console.unknown_option'], $kit->codes($diagnostics));
         self::assertSame([
             'Unknown Console input argument "missing-argument".',
             'Unknown Console input option "missing-option".',
-        ], array_column($diagnostics, 'message'));
+        ], $kit->messages($diagnostics));
 
         $completionText = str_replace("getOption('missing-option')", "getOption('f')", $text);
-        [$completionProvider, $converter] = $this->provider($uri, $completionText, new ConsoleCommandMetadata(
-            'ReportCommand',
-            '/workspace/src/Command/ReportCommand.php',
-            ['report'],
-            ['format', 'help'],
-            true,
-        ));
-        $cursor = strpos($completionText, "getOption('f") + \strlen("getOption('f");
-        $items = $completionProvider->complete(LspRequests::offset($uri, $completionText, $cursor));
-        self::assertSame(['format'], array_column($items ?? [], 'label'));
+        $completionKit = $this->kit($uri, $completionText, [
+            'class' => 'ReportCommand',
+            'file' => '/workspace/src/Command/ReportCommand.php',
+            'arguments' => ['report'],
+            'options' => ['format', 'help'],
+            'complete' => true,
+        ]);
+        self::assertSame(['format'], $completionKit->labels($completionKit->get(ConsoleProvider::class)->complete($completionKit->after($uri, "getOption('f"))));
 
-        [$sourceOnlyProvider, $sourceOnlyConverter] = $this->provider($uri, $completionText);
-        $sourceOnlyItems = $sourceOnlyProvider->complete(LspRequests::offset($uri, $completionText, $cursor));
-        self::assertSame(['format'], array_column($sourceOnlyItems ?? [], 'label'));
+        $sourceOnlyKit = $this->kit($uri, $completionText);
+        self::assertSame(['format'], $sourceOnlyKit->labels($sourceOnlyKit->get(ConsoleProvider::class)->complete($sourceOnlyKit->after($uri, "getOption('f"))));
     }
 
     public function testSuppressesDiagnosticsForIncompleteExtensibleAndMissingRuntimeDefinitions(): void
@@ -110,19 +89,13 @@ final class ConsoleProviderTest extends TestCase
                 }
             }
             PHP;
-
-        [$extensible] = $this->provider($uri, $text, new ConsoleCommandMetadata('DynamicCommand', null, [], [], true));
-        self::assertSame([], $extensible->diagnostics(LspRequests::document($uri)));
-
-        [$incomplete] = $this->provider($uri, str_replace('$this->addOption($dynamicName);', '', $text), new ConsoleCommandMetadata('DynamicCommand', null, [], [], false));
-        self::assertSame([], $incomplete->diagnostics(LspRequests::document($uri)));
-
         $staticText = str_replace('$this->addOption($dynamicName);', '', $text);
-        [$missing] = $this->provider($uri, $staticText);
-        self::assertSame([], $missing->diagnostics(LspRequests::document($uri)));
+        $extensible = ['class' => 'DynamicCommand', 'arguments' => [], 'options' => [], 'complete' => true];
 
-        [$incompleteSection] = $this->provider($uri, $staticText, new ConsoleCommandMetadata('DynamicCommand', null, [], [], true), false);
-        self::assertSame([], $incompleteSection->diagnostics(LspRequests::document($uri)));
+        self::assertSame([], $this->kit($uri, $text, $extensible)->get(ConsoleProvider::class)->diagnostics(LspRequests::document($uri)));
+        self::assertSame([], $this->kit($uri, $staticText, ['class' => 'DynamicCommand', 'arguments' => [], 'options' => [], 'complete' => false])->get(ConsoleProvider::class)->diagnostics(LspRequests::document($uri)));
+        self::assertSame([], $this->kit($uri, $staticText)->get(ConsoleProvider::class)->diagnostics(LspRequests::document($uri)));
+        self::assertSame([], $this->kit($uri, $staticText, $extensible, false)->get(ConsoleProvider::class)->diagnostics(LspRequests::document($uri)));
     }
 
     public function testCompletesInvokableAttributeAndAdaptedTraitInputNames(): void
@@ -171,15 +144,11 @@ final class ConsoleProviderTest extends TestCase
                 }
             }
             PHP;
-        [$provider, $converter] = $this->provider($uri, $text);
-        $optionCursor = strpos($text, "getOption('d") + \strlen("getOption('d");
-        $argumentCursor = strpos($text, "getArgument('s") + \strlen("getArgument('s");
+        $kit = $this->kit($uri, $text);
+        $provider = $kit->get(ConsoleProvider::class);
 
-        $options = $provider->complete(LspRequests::offset($uri, $text, $optionCursor));
-        $arguments = $provider->complete(LspRequests::offset($uri, $text, $argumentCursor));
-
-        self::assertSame(['dry-run'], array_column($options ?? [], 'label'));
-        self::assertSame(['shared', 'source-path'], array_column($arguments ?? [], 'label'));
+        self::assertSame(['dry-run'], $kit->labels($provider->complete($kit->after($uri, "getOption('d"))));
+        self::assertSame(['shared', 'source-path'], $kit->labels($provider->complete($kit->after($uri, "getArgument('s"))));
     }
 
     public function testReturnsEmptyAndUnrelatedCompletionContextsPrecisely(): void
@@ -199,42 +168,20 @@ final class ConsoleProviderTest extends TestCase
                 }
             }
             PHP;
-        [$provider, $converter] = $this->provider($uri, $text, new ConsoleCommandMetadata('EmptyCommand', null, [], [], true));
-        $inputCursor = strpos($text, '$'."input->getArgument('z") + \strlen('$'."input->getArgument('z");
-        $otherCursor = strpos($text, '$'."other->getArgument('z") + \strlen('$'."other->getArgument('z");
+        $kit = $this->kit($uri, $text, ['class' => 'EmptyCommand', 'arguments' => [], 'options' => [], 'complete' => true]);
+        $provider = $kit->get(ConsoleProvider::class);
 
-        self::assertSame([], $provider->complete(LspRequests::offset($uri, $text, $inputCursor)));
-        self::assertNull($provider->complete(LspRequests::offset($uri, $text, $otherCursor)));
+        self::assertSame([], $provider->complete($kit->after($uri, '$'."input->getArgument('z")));
+        self::assertNull($provider->complete($kit->after($uri, '$'."other->getArgument('z")));
     }
 
-    /** @return array{ConsoleProvider, PositionConverter} */
-    private function provider(string $uri, string $text, ?ConsoleCommandMetadata $command = null, bool $runtimeComplete = true): array
+    /** @param array<string, mixed> $command */
+    private function kit(string $uri, string $text, array $command = [], bool $runtimeComplete = true): ProjectTestKit
     {
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $converter = new PositionConverter();
-        $delimiters = new BalancedDelimiterMatcher();
-        $extractor = new ConsoleExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new PhpCommentParser(),
-            new ConsoleDefinitionExtractor(),
-            new ConsoleInvokableParameterExtractor(),
-        );
-        $sourceIndexes = new ConsoleSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $text)));
-        $indexes = new ConsoleIndexRegistry();
-        $indexes->forProject($project)->replace(null === $command ? [] : [$command], $runtimeComplete);
-
-        return [new ConsoleProvider(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
-            new LspProtocolMapper(),
-            $indexes,
-            $sourceIndexes,
-            $extractor,
-        ), $converter];
+        return (new ProjectTestKit())
+            ->open($uri, $text)
+            ->index()
+            ->runtime('console', ['commands' => [] === $command ? [] : [$command], 'complete' => $runtimeComplete])
+        ;
     }
 }
