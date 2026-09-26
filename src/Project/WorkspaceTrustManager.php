@@ -109,6 +109,7 @@ final class WorkspaceTrustManager implements ProjectStateInterface
             $this->configuration->phpCommand($project),
             $this->configuration->containerProjectRoot($project),
             $this->configuration->environment($project),
+            $this->configuration->kernel($project),
             $this->configuration->debug($project),
             $this->configuration->runtimeIndexing($project),
             $this->configuration->releaseMetadata($project),

@@ -146,12 +146,14 @@ final class WorkspaceTrustManagerTest extends TestCase
         $manager->requestUnknownDecisions([$project]);
         $settings->setEnvironment($project, 'test');
         $manager->requestUnknownDecisions([$project]);
+        $settings->setKernel($project, 'Admin\\Kernel');
+        $manager->requestUnknownDecisions([$project]);
         $replacement = new Project('/workspace', 'file:///workspace');
         $manager->requestUnknownDecisions([$replacement]);
         $manager->removeProject($project);
         $manager->requestUnknownDecisions([$replacement]);
 
-        self::assertSame(['/workspace', '/workspace', '/workspace'], $runtimeInitializer->projects);
+        self::assertSame(['/workspace', '/workspace', '/workspace', '/workspace'], $runtimeInitializer->projects);
     }
 
     public function testDiscardsDecisionsForProjectsRemovedWhileTheClientDecides(): void
