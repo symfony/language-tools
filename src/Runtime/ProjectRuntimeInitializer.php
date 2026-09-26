@@ -187,7 +187,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 $this->logger->verbose(\sprintf(
                     'The "%s" runtime metadata section reported: %s',
                     $name,
-                    $this->truncator->truncate($warning, 500),
+                    $warning,
                 ), [$project->rootPath]);
             }
         }

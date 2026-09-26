@@ -239,6 +239,38 @@ final class ProjectRuntimeInitializerTest extends TestCase
         );
     }
 
+    public function testRedactsSectionWarningsBeforeShorteningThem(): void
+    {
+        $source = $this->workspace->path('source.php');
+        file_put_contents($source, '<?php');
+        $head = '';
+        while (\strlen($head) < 380) {
+            $head .= $this->workspace->rootPath.' ';
+        }
+        $head .= str_repeat('a', 494 - \strlen($head) - \strlen('https://user:'));
+        $payload = json_encode([
+            'schemaVersion' => 1,
+            'sections' => [
+                'twig' => ['complete' => false, 'paths' => [], 'warnings' => [$head.'https://user:supersecretvalue@db.example']],
+            ],
+        ], \JSON_THROW_ON_ERROR);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
+        $output = new CapturingWritableStream();
+        $logger = new ServerLogger($output, new SensitiveDataRedactor());
+        $logger->configure('verbose');
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
+            new CapturingProcessRunner(new ProcessResult(0, $payload, '')),
+            self::snapshotLoaders(),
+            self::projects($project),
+            logger: $logger,
+        );
+
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
+
+        self::assertStringNotContainsString('user:sup', $output->contents());
+        self::assertStringContainsString('[redacted]@db.example', $output->contents());
+    }
+
     public function testNeverLoadsMetadataForAProjectRemovedWhileTheBridgeRan(): void
     {
         $source = $this->workspace->path('source.php');
