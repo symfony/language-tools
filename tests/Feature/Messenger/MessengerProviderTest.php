@@ -488,6 +488,26 @@ YAML;
         );
     }
 
+    public function testRelatesMessageReferencesWrittenWithAnotherCaseOrALeadingBackslash(): void
+    {
+        $messageUri = 'file:///workspace/src/Message/Foo.php';
+        $controllerUri = 'file:///workspace/src/Controller/FooController.php';
+        $kit = (new ProjectTestKit())
+            ->open($messageUri, "<?php\nnamespace App\\Message;\nfinal class Foo {}\n")
+            ->open($controllerUri, "<?php\nnamespace App\\Controller;\nuse Symfony\\Component\\Messenger\\MessageBusInterface;\nfunction send(MessageBusInterface \$bus): void { \$bus->dispatch(new \\app\\message\\FOO()); }\n")
+            ->index()
+            ->runtime('messenger', [
+                'buses' => [['name' => 'command.bus', 'default' => true]],
+                'transports' => [],
+                'messages' => [['class' => 'App\\Message\\Foo', 'transports' => []]],
+                'handlers' => [],
+                'complete' => true,
+            ])
+        ;
+
+        self::assertContains($controllerUri, $kit->targets($kit->get(MessengerRelationshipProvider::class)->references($kit->references($kit->at($messageUri, 'Foo')))));
+    }
+
     #[DataProvider('handlerSignatureDocumentProvider')]
     public function testDiagnosesRuntimeHandlerSignaturesFromCurrentDocument(string $indexedType, string $currentType, bool $invalid): void
     {

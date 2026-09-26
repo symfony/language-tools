@@ -90,7 +90,10 @@ final class DoctrineIndex extends AbstractSourceFactsIndex
 
         $firstSourceEntities = [];
         $this->repositoriesByClass = [];
-        $this->symbols = new SourceSymbolTable();
+        $this->symbols = new SourceSymbolTable([
+            DoctrineSymbolKind::Entity->value => ClassNameKey::from(...),
+            DoctrineSymbolKind::Repository->value => ClassNameKey::from(...),
+        ]);
         foreach ($this->facts() as $facts) {
             foreach ($facts->entities as $entity) {
                 $key = ClassNameKey::from($entity->className);

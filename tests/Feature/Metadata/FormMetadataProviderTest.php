@@ -19,6 +19,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class FormMetadataProviderTest extends MetadataTestCase
@@ -509,6 +510,45 @@ final class FormMetadataProviderTest extends MetadataTestCase
                 array_values(array_filter($facts->symbols, static fn ($symbol): bool => MetadataSymbolKind::Property === $symbol->kind && !$symbol->declaration)),
             ),
         );
+    }
+
+    public function testLinksFormFieldsToDataClassesWrittenWithAnotherCase(): void
+    {
+        $dtoUri = 'file:///workspace/src/Dto/Article.php';
+        $formUri = 'file:///workspace/src/Dto/ArticleType.php';
+        $formText = <<<'PHP'
+            <?php
+            namespace App\Dto;
+
+            use Symfony\Component\Form\AbstractType;
+            use Symfony\Component\Form\FormBuilderInterface;
+            use Symfony\Component\OptionsResolver\OptionsResolver;
+
+            final class ArticleType extends AbstractType
+            {
+                public function buildForm(FormBuilderInterface $builder, array $options): void
+                {
+                    $builder->add('title');
+                    $builder->add('Title');
+                }
+
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefaults(['data_class' => article::class]);
+                }
+            }
+            PHP;
+        $kit = (new ProjectTestKit())
+            ->open($dtoUri, "<?php\nnamespace App\\Dto;\n\nfinal class Article\n{\n    public string \$title;\n}\n")
+            ->open($formUri, $formText)
+            ->index()
+        ;
+        $relationshipProvider = $kit->get(MetadataRelationshipProvider::class);
+
+        self::assertSame([$dtoUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside($formUri, "'title'")))));
+        self::assertSame([], $relationshipProvider->definition($kit->positioned($kit->inside($formUri, "'Title'"))));
+        self::assertContains($formUri, $kit->targets($relationshipProvider->references($kit->references($kit->inside($dtoUri, '$title')))));
+        self::assertSame(['title'], $kit->labels($kit->get(MetadataCompletionProvider::class)->complete($kit->positioned($kit->after($formUri, "add('ti")))));
     }
 
     public function testResolvesSelfDataClassReferencesButNotLateBoundOnes(): void

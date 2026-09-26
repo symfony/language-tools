@@ -44,7 +44,7 @@ final class MessengerSourceIndex extends AbstractSourceFactsIndex
 
     protected function build(): void
     {
-        $this->symbols = new SourceSymbolTable();
+        $this->symbols = new SourceSymbolTable([MessengerSymbolKind::Message->name => ClassNameKey::from(...)]);
         $this->parents = [];
         foreach ($this->facts() as $source) {
             foreach ($source->symbols as $symbol) {

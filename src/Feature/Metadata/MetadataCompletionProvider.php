@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Feature\CompletionProviderInterface;
+use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\PositionedRequest;
@@ -138,11 +139,12 @@ final class MetadataCompletionProvider implements CompletionProviderInterface
     /** @return list<array<array-key, mixed>> */
     private function propertyItems(MetadataCompletionContext $context, MetadataSourceIndex $sourceIndex, string $className): array
     {
-        $prefix = $className.'::$';
+        $prefix = ClassNameKey::from($className).'::$';
         $declarations = [];
         foreach ($sourceIndex->symbols(MetadataSymbolKind::Property) as $symbol) {
-            if ($symbol->declaration && str_starts_with($symbol->name, $prefix)) {
-                $declarations[substr($symbol->name, \strlen($prefix))] = $symbol;
+            $key = MetadataSourceIndex::propertyKey($symbol->name);
+            if ($symbol->declaration && str_starts_with($key, $prefix)) {
+                $declarations[substr($key, \strlen($prefix))] = $symbol;
             }
         }
         ksort($declarations);

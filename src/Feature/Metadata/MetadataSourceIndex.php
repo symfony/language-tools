@@ -40,7 +40,10 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
 
     protected function build(): void
     {
-        $this->symbols = new SourceSymbolTable();
+        $this->symbols = new SourceSymbolTable([
+            MetadataSymbolKind::MappedClass->value => ClassNameKey::from(...),
+            MetadataSymbolKind::Property->value => self::propertyKey(...),
+        ]);
         $this->formDataClasses = [];
         foreach ($this->facts() as $facts) {
             foreach ($facts->formDataClasses as $formDataClass) {
@@ -50,5 +53,12 @@ final class MetadataSourceIndex extends AbstractSourceFactsIndex
                 $this->symbols->add($symbol->kind->value, $symbol);
             }
         }
+    }
+
+    public static function propertyKey(string $name): string
+    {
+        $separator = strpos($name, '::$');
+
+        return false === $separator ? $name : ClassNameKey::from(substr($name, 0, $separator)).substr($name, $separator);
     }
 }

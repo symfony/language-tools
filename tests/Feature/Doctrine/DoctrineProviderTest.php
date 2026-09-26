@@ -146,6 +146,41 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame(['Entity: App\\Entity\\Product'], $kit->titles($codeLensProvider->codeLenses($kit->document($repositoryUri))));
     }
 
+    public function testRelatesEntityReferencesWrittenWithAnotherCaseOrALeadingBackslash(): void
+    {
+        $entityUri = 'file:///workspace/src/Entity/Product.php';
+        $entityText = <<<'PHP'
+            <?php
+            namespace App\Entity;
+
+            use Doctrine\ORM\Mapping as ORM;
+
+            #[ORM\Entity]
+            class Product
+            {
+            }
+            PHP;
+        $usageUri = 'file:///workspace/src/Form/ProductType.php';
+        $usageText = <<<'PHP'
+            <?php
+            namespace App\Entity;
+
+            use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+
+            $builder->add('lower', EntityType::class, ['class' => product::class]);
+            $builder->add('upper', EntityType::class, ['class' => \app\entity\PRODUCT::class]);
+            PHP;
+        $kit = (new ProjectTestKit())
+            ->open($entityUri, $entityText)
+            ->open($usageUri, $usageText)
+            ->index()
+        ;
+        $relationshipProvider = $kit->get(DoctrineRelationshipProvider::class);
+
+        self::assertCount(3, $relationshipProvider->references($kit->references($kit->inside($entityUri, 'Product'))));
+        self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside($usageUri, 'PRODUCT')))));
+    }
+
     public function testMapsOnlyCompleteClassReferencesInMappingAttributes(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Entity/Product.php', 'php', <<<'PHP'
