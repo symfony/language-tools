@@ -2,42 +2,17 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
-use Symfony\Lsp\Feature\RenameEditBuilder;
-use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
-use Symfony\Lsp\Feature\Route\Route;
-use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
 use Symfony\Lsp\Feature\Route\RouteDeclaration;
-use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteReference;
 use Symfony\Lsp\Feature\Route\RouteRenameHandler;
 use Symfony\Lsp\Feature\Route\RouteSourceFacts;
 use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
-use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
-use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
-use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\UriToPathConverter;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\RenameRequest;
-use Symfony\Lsp\Tests\Support\ProjectPaths;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class RouteRenameHandlerTest extends TestCase
 {
@@ -102,14 +77,10 @@ final class RouteRenameHandlerTest extends TestCase
                 path: /article/{id}
                 controller: App\Controller\ArticleController::show
             YAML;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'yaml', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
+        $kit = (new ProjectTestKit())->open($uri, $text);
+        $sourceIndexes = $kit->get(RouteSourceIndexRegistry::class)->forProject($kit->project());
         $consumerUri = 'file:///workspace/src/ConsumerController.php';
-        $sourceIndexes->forProject($project)->replace(
+        $sourceIndexes->replace(
             new RouteSourceFacts($uri, [new RouteDeclaration(
                 'article_show',
                 $uri,
@@ -121,11 +92,10 @@ final class RouteRenameHandlerTest extends TestCase
                 new Range(new Position(5, 28), new Position(5, 40)),
             )]),
         );
-        $routes = new RouteIndexRegistry();
-        $routes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
-        $handler = $this->createHandler($documents, $projects, $classIndexes, $sourceIndexes, $routes);
+        $kit->runtime('routes', ['complete' => true, 'items' => [['name' => 'article_show', 'path' => '/article/{id}']]]);
+        $handler = $kit->get(RouteRenameHandler::class);
 
-        $edit = $handler->rename((new ProviderRequests($documents, $projects))->rename([
+        $edit = $handler->rename($kit->rename([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => 0, 'character' => 3],
         ], 'article_display'));
@@ -170,23 +140,18 @@ final class RouteRenameHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
+        $kit = (new ProjectTestKit())->open($uri, $text);
+        $sourceIndexes = $kit->get(RouteSourceIndexRegistry::class)->forProject($kit->project());
         $range = new Range(new Position(5, 28), new Position(5, 40));
-        $sourceIndexes->forProject($project)->replace(new RouteSourceFacts(
+        $sourceIndexes->replace(new RouteSourceFacts(
             $uri,
             [new RouteDeclaration('article_show', $uri, $range)],
             [new RouteReference('article_show', $uri, $range)],
         ));
-        $routes = new RouteIndexRegistry();
-        $routes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
-        $handler = $this->createHandler($documents, $projects, $classIndexes, $sourceIndexes, $routes);
+        $kit->runtime('routes', ['complete' => true, 'items' => [['name' => 'article_show', 'path' => '/article/{id}']]]);
+        $handler = $kit->get(RouteRenameHandler::class);
 
-        $edit = $handler->rename((new ProviderRequests($documents, $projects))->rename([
+        $edit = $handler->rename($kit->rename([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => 5, 'character' => 31],
         ], 'article_display'));
@@ -219,14 +184,10 @@ final class RouteRenameHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
+        $kit = (new ProjectTestKit())->open($uri, $text);
+        $sourceIndexes = $kit->get(RouteSourceIndexRegistry::class)->forProject($kit->project());
         $vendorUri = 'file:///workspace/vendor/acme/Consumer.php';
-        $sourceIndexes->forProject($project)->replace(
+        $sourceIndexes->replace(
             new RouteSourceFacts($declarationUri, [new RouteDeclaration(
                 'article_show',
                 $declarationUri,
@@ -243,46 +204,14 @@ final class RouteRenameHandlerTest extends TestCase
                 new Range(new Position(5, 28), new Position(5, 40)),
             )]),
         );
-        $routes = new RouteIndexRegistry();
-        $routes->forProject($project)->replace(
-            new Route('article_show', '/article/{id}', [], [], null, null),
-            new Route('homepage', '/', [], [], null, null),
-        );
+        $kit->runtime('routes', ['complete' => true, 'items' => [['name' => 'article_show', 'path' => '/article/{id}'], ['name' => 'homepage', 'path' => '/']]]);
 
         return [
-            $this->createHandler($documents, $projects, $classIndexes, $sourceIndexes, $routes),
-            (new ProviderRequests($documents, $projects))->positioned([
+            $kit->get(RouteRenameHandler::class),
+            $kit->positioned([
                 'textDocument' => ['uri' => $uri],
                 'position' => ['line' => 5, 'character' => 31],
             ]),
         ];
-    }
-
-    private function createHandler(
-        DocumentStore $documents,
-        ProjectRegistry $projects,
-        DependencyInjectionSourceIndexRegistry $classIndexes,
-        RouteSourceIndexRegistry $sourceIndexes,
-        RouteIndexRegistry $routes,
-    ): RouteRenameHandler {
-        $positionConverter = new PositionConverter();
-        $protocol = new LspProtocolMapper();
-
-        return new RouteRenameHandler(
-            $protocol,
-            new RouteSymbolResolver(
-                $positionConverter,
-                RouteReferenceExtractorFactory::create($positionConverter),
-                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator())),
-                new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
-                new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-                new UriToPathConverter(),
-                $classIndexes,
-            ),
-            $sourceIndexes,
-            $routes,
-            ProjectPaths::resolver(),
-            new RenameEditBuilder($protocol),
-        );
     }
 }

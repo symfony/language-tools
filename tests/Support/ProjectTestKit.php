@@ -13,6 +13,7 @@ use Symfony\Lsp\Protocol\CodeActionRequest;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
+use Symfony\Lsp\Protocol\RenameRequest;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
@@ -142,6 +143,12 @@ final class ProjectTestKit
     public function references(array $params, bool $includeDeclaration = true): ReferencesRequest
     {
         return $this->requests()->references($params, $includeDeclaration);
+    }
+
+    /** @param array<array-key, mixed> $params */
+    public function rename(array $params, string $newName): RenameRequest
+    {
+        return $this->requests()->rename($params, $newName);
     }
 
     /**

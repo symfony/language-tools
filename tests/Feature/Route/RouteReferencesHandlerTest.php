@@ -2,38 +2,9 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\Position;
-use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
-use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
-use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
-use Symfony\Lsp\Feature\Route\RouteDeclaration;
-use Symfony\Lsp\Feature\Route\RouteReference;
 use Symfony\Lsp\Feature\Route\RouteReferencesHandler;
-use Symfony\Lsp\Feature\Route\RouteSourceFacts;
-use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
-use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
-use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
-use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\UriToPathConverter;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class RouteReferencesHandlerTest extends TestCase
 {
@@ -43,70 +14,28 @@ final class RouteReferencesHandlerTest extends TestCase
         $text = <<<'PHP'
             <?php
             use Symfony\Component\Routing\Attribute\Route;
-            #[Route('/article', name: 'article_list')]
-            final class ArticleController {}
+            final class ArticleController { #[Route('/article', name: 'article_list')] public function list(): void {} }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
-        $positionConverter = new PositionConverter();
-        $classExtractor = new PhpClassDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser()));
         $baseUri = 'file:///workspace/src/BaseController.php';
-        $base = '<?php namespace App\\Controller; use Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController; abstract class BaseController extends AbstractController {}';
+        $base = '<?php namespace App\Controller; use Symfony\Bundle\FrameworkBundle\Controller\AbstractController; abstract class BaseController extends AbstractController {}';
         $consumerUri = 'file:///workspace/src/Navigation.php';
-        $consumer = '<?php namespace App\\Controller; final class DemoController extends BaseController {}';
-        $classIndexes->forProject($project)->replace(
-            new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
-            new DependencyInjectionSourceFacts($consumerUri, classes: $classExtractor->extract($consumerUri, $consumer)),
-        );
-        $sourceIndexes->forProject($project)->replace(
-            new RouteSourceFacts($uri, [new RouteDeclaration(
-                'article_list',
-                $uri,
-                new Range(new Position(2, 32), new Position(2, 44)),
-            )], []),
-            new RouteSourceFacts($consumerUri, [], [new RouteReference(
-                'article_list',
-                $consumerUri,
-                new Range(new Position(12, 20), new Position(12, 32)),
-                'App\\Controller\\DemoController',
-            )]),
-        );
-        $handler = new RouteReferencesHandler(new LspProtocolMapper(),
-            new RouteSymbolResolver(
-                $positionConverter,
-                RouteReferenceExtractorFactory::create($positionConverter),
-                new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator())),
-                new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
-                new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-                new UriToPathConverter(),
-                $classIndexes,
-            ),
-            $sourceIndexes,
-        );
+        $consumer = "<?php namespace App\\Controller; final class DemoController extends BaseController {\n    public function index(): void { \$this->generateUrl('article_list'); }\n}";
+        $kit = (new ProjectTestKit())
+            ->open($uri, $text)
+            ->open($baseUri, $base)
+            ->open($consumerUri, $consumer)
+            ->index()
+        ;
 
         self::assertSame([
             [
                 'uri' => $consumerUri,
-                'range' => [
-                    'start' => ['line' => 12, 'character' => 20],
-                    'end' => ['line' => 12, 'character' => 32],
-                ],
+                'range' => ['start' => $kit->at($consumerUri, 'article_list')['position'], 'end' => $kit->after($consumerUri, 'article_list')['position']],
             ],
             [
                 'uri' => $uri,
-                'range' => [
-                    'start' => ['line' => 2, 'character' => 32],
-                    'end' => ['line' => 2, 'character' => 44],
-                ],
+                'range' => ['start' => $kit->at($uri, 'article_list')['position'], 'end' => $kit->after($uri, 'article_list')['position']],
             ],
-        ], $handler->references((new ProviderRequests($documents, $projects))->references([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => 2, 'character' => 35],
-            'context' => ['includeDeclaration' => true],
-        ])));
+        ], $kit->get(RouteReferencesHandler::class)->references($kit->references($kit->inside($uri, 'article_list'))));
     }
 }

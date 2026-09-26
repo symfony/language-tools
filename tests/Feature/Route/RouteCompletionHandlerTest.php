@@ -2,28 +2,10 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
-use Symfony\Lsp\Feature\Route\Route;
-use Symfony\Lsp\Feature\Route\RouteCompletionBuilder;
 use Symfony\Lsp\Feature\Route\RouteCompletionHandler;
-use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
-use Symfony\Lsp\Parser\CommentParserRegistry;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class RouteCompletionHandlerTest extends TestCase
 {
@@ -40,23 +22,10 @@ final class RouteCompletionHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(
-            new Route('article_show', '/{section}/article/{slug}', [], [], null, null),
-        );
-        $converter = new PositionConverter();
-        $cursor = strpos($text, "'s']") + 2;
-        $position = $converter->toPosition($text, $cursor);
-        $handler = $this->handler($documents, $projects, $converter, $indexes);
+        $kit = $this->kit($uri, $text, [self::route('article_show', '/{section}/article/{slug}')]);
+        $params = $kit->offset($uri, strpos($text, "'s']") + 2);
 
-        self::assertSame(['slug'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])), 'label'));
+        self::assertSame(['slug'], $kit->labels($kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params))));
     }
 
     public function testCompletesParametersFromAllInternationalizedRouteVariants(): void
@@ -72,90 +41,40 @@ final class RouteCompletionHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(
-            new Route('app_home.en', '/en/{locale_en}', [], [], null, null, canonicalName: 'app_home'),
-            new Route('app_home.fr', '/fr/{locale_fr}', [], [], null, null, canonicalName: 'app_home'),
-        );
-        $converter = new PositionConverter();
-        $cursor = strpos($text, "locale_']") + \strlen('locale_');
-        $position = $converter->toPosition($text, $cursor);
-        $handler = $this->handler($documents, $projects, $converter, $indexes);
+        $kit = $this->kit($uri, $text, [self::route('app_home.en', '/en/{locale_en}', 'app_home'), self::route('app_home.fr', '/fr/{locale_fr}', 'app_home')]);
+        $params = $kit->offset($uri, strpos($text, "locale_']") + \strlen('locale_'));
 
-        self::assertSame(['locale_en', 'locale_fr'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])), 'label'));
+        self::assertSame(['locale_en', 'locale_fr'], $kit->labels($kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params))));
     }
 
     #[DataProvider('twigRouteNameCompletionProvider')]
     public function testCompletesRouteNamesInTwigFunctions(string $text): void
     {
         $uri = 'file:///workspace/templates/article.html.twig';
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'twig', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(
-            new Route('article_show', '/article/{id}', [], [], null, null),
-            new Route('homepage', '/', [], [], null, null),
-        );
-        $converter = new PositionConverter();
-        $cursor = strpos($text, 'article_') + \strlen('article_');
-        $position = $converter->toPosition($text, $cursor);
-        $handler = $this->handler($documents, $projects, $converter, $indexes);
+        $kit = $this->kit($uri, $text, [self::route('article_show', '/article/{id}'), self::route('homepage', '/')]);
+        $params = $kit->offset($uri, strpos($text, 'article_') + \strlen('article_'));
 
-        self::assertSame(['article_show'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])), 'label'));
+        self::assertSame(['article_show'], $kit->labels($kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params))));
     }
 
     public function testIgnoresRouteFunctionTextOutsideTwigDirectives(): void
     {
         $uri = 'file:///workspace/templates/article.html.twig';
         $text = "<p>Call path('article_";
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'twig', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
-        $converter = new PositionConverter();
-        $position = $converter->toPosition($text, \strlen($text));
+        $kit = $this->kit($uri, $text, [self::route('article_show', '/article/{id}')]);
+        $params = $kit->offset($uri, \strlen($text));
 
-        self::assertSame([], $this->handler($documents, $projects, $converter, $indexes)->complete((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])));
+        self::assertSame([], $kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params)));
     }
 
     #[DataProvider('twigRouteParameterCompletionProvider')]
     public function testCompletesRouteParametersInTwigFunctions(string $text): void
     {
         $uri = 'file:///workspace/templates/article.html.twig';
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'twig', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(
-            new Route('article_show', '/{section}/article/{slug}', [], [], null, null),
-        );
-        $converter = new PositionConverter();
-        $cursor = strpos($text, "'s')") + 2;
-        $position = $converter->toPosition($text, $cursor);
-        $handler = $this->handler($documents, $projects, $converter, $indexes);
+        $kit = $this->kit($uri, $text, [self::route('article_show', '/{section}/article/{slug}')]);
+        $params = $kit->offset($uri, strpos($text, "'s')") + 2);
 
-        self::assertSame(['slug'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])), 'label'));
+        self::assertSame(['slug'], $kit->labels($kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params))));
     }
 
     public function testCompletesRoutesThroughAProjectControllerBaseClass(): void
@@ -184,27 +103,10 @@ final class RouteCompletionHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
-        $converter = new PositionConverter();
-        $parser = new TolerantPhpParser(new Parser());
-        $classExtractor = new PhpClassDeclarationExtractor($converter, $parser);
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $classIndexes->forProject($project)->replace(
-            new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
-            new DependencyInjectionSourceFacts($uri, classes: $classExtractor->extract($uri, $text)),
-        );
-        $position = $converter->toPosition($text, strpos($text, 'article_') + \strlen('article_'));
-        $handler = $this->handler($documents, $projects, $converter, $indexes, $classIndexes);
+        $kit = $this->kit($uri, $text, [self::route('article_show', '/article/{id}')])->open($baseUri, $base)->index();
+        $params = $kit->offset($uri, strpos($text, 'article_') + \strlen('article_'));
 
-        self::assertSame(['article_show'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])), 'label'));
+        self::assertSame(['article_show'], $kit->labels($kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params))));
     }
 
     public function testReturnsRouteCompletionWithUtf16TextEdit(): void
@@ -221,19 +123,8 @@ final class RouteCompletionHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(
-            new Route('article_edit', '/article/{id}/edit', [], [], null, null),
-            new Route('homepage', '/', [], [], null, null),
-        );
-        $converter = new PositionConverter();
-        $cursor = strpos($text, 'article_') + \strlen('article_');
-        $position = $converter->toPosition($text, $cursor);
-        $handler = $this->handler($documents, $projects, $converter, $indexes);
+        $kit = $this->kit($uri, $text, [self::route('article_edit', '/article/{id}/edit'), self::route('homepage', '/')]);
+        $params = $kit->offset($uri, strpos($text, 'article_') + \strlen('article_'));
 
         self::assertSame([[
             'label' => 'article_edit',
@@ -246,33 +137,19 @@ final class RouteCompletionHandlerTest extends TestCase
                 ],
                 'newText' => 'article_edit',
             ],
-        ]], $handler->complete((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])));
+        ]], $kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params)));
     }
 
     public function testOffersNoRouteCompletionsInsideTwigComments(): void
     {
         $uri = 'file:///workspace/templates/article.html.twig';
-        $documents = new DocumentStore();
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(new Route('article_show', '/article/{slug}', [], [], null, null));
-        $converter = new PositionConverter();
-        $handler = $this->handler($documents, $projects, $converter, $indexes);
-
         foreach (["{# {{ path('artic') }} #}", "{# {{ path('article_show', {'s') }} #}"] as $text) {
-            $documents->open(new Document($uri, 'twig', 1, $text));
+            $kit = $this->kit($uri, $text, [self::route('article_show', '/article/{slug}')]);
             $cursor = strpos($text, "')");
             self::assertIsInt($cursor);
-            $position = $converter->toPosition($text, $cursor);
+            $params = $kit->offset($uri, $cursor);
 
-            self::assertSame([], $handler->complete((new ProviderRequests($documents, $projects))->positioned([
-                'textDocument' => ['uri' => $uri],
-                'position' => ['line' => $position->line, 'character' => $position->character],
-            ])));
+            self::assertSame([], $kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params)));
         }
     }
 
@@ -297,20 +174,10 @@ final class RouteCompletionHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(new Route('article_show', '/article/{slug}', [], [], null, null));
-        $converter = new PositionConverter();
-        $position = $converter->toPosition($text, strpos($text, 'article_') + \strlen('article_'));
-        $handler = $this->handler($documents, $projects, $converter, $indexes);
+        $kit = $this->kit($uri, $text, [self::route('article_show', '/article/{slug}')]);
+        $params = $kit->offset($uri, strpos($text, 'article_') + \strlen('article_'));
 
-        self::assertSame(['article_show'], array_column($handler->complete((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])), 'label'));
+        self::assertSame(['article_show'], $kit->labels($kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params))));
     }
 
     public function testOffersNoRouteCompletionsOnUnrelatedRouterTypes(): void
@@ -330,20 +197,10 @@ final class RouteCompletionHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(new Route('article_show', '/article/{slug}', [], [], null, null));
-        $converter = new PositionConverter();
-        $position = $converter->toPosition($text, strpos($text, 'article_') + \strlen('article_'));
-        $handler = $this->handler($documents, $projects, $converter, $indexes);
+        $kit = $this->kit($uri, $text, [self::route('article_show', '/article/{slug}')]);
+        $params = $kit->offset($uri, strpos($text, 'article_') + \strlen('article_'));
 
-        self::assertSame([], $handler->complete((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])));
+        self::assertSame([], $kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params)));
     }
 
     public function testOffersNoRouteCompletionsInsidePhpComments(): void
@@ -360,20 +217,10 @@ final class RouteCompletionHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(new Route('article_show', '/article/{slug}', [], [], null, null));
-        $converter = new PositionConverter();
-        $position = $converter->toPosition($text, strpos($text, 'artic') + \strlen('artic'));
-        $handler = $this->handler($documents, $projects, $converter, $indexes);
+        $kit = $this->kit($uri, $text, [self::route('article_show', '/article/{slug}')]);
+        $params = $kit->offset($uri, strpos($text, 'artic') + \strlen('artic'));
 
-        self::assertSame([], $handler->complete((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])));
+        self::assertSame([], $kit->get(RouteCompletionHandler::class)->complete($kit->positioned($params)));
     }
 
     /** @return iterable<string, array{string}> */
@@ -390,22 +237,15 @@ final class RouteCompletionHandlerTest extends TestCase
         yield 'named' => ["{{ path(name = 'article_show', parameters = {'section': 'news', 's') }}"];
     }
 
-    private function handler(
-        DocumentStore $documents,
-        ProjectRegistry $projects,
-        PositionConverter $converter,
-        RouteIndexRegistry $indexes,
-        ?DependencyInjectionSourceIndexRegistry $classIndexes = null,
-    ): RouteCompletionHandler {
-        return new RouteCompletionHandler(
-            $converter,
-            new LspProtocolMapper(),
-            $indexes,
-            $classIndexes ?? new DependencyInjectionSourceIndexRegistry(),
-            RouteReferenceExtractorFactory::create($converter),
-            new CommentParserRegistry(['php' => new PhpCommentParser(), 'twig' => new TwigCommentParser()]),
-            new RouteCompletionBuilder(new LspProtocolMapper()),
-            new TwigDirectiveLocator(),
-        );
+    /** @param list<array<string, string>> $routes */
+    private function kit(string $uri, string $text, array $routes): ProjectTestKit
+    {
+        return (new ProjectTestKit())->open($uri, $text)->runtime('routes', ['complete' => true, 'items' => $routes]);
+    }
+
+    /** @return array<string, string> */
+    private static function route(string $name, string $path, ?string $canonicalName = null): array
+    {
+        return ['name' => $name, 'path' => $path] + (null === $canonicalName ? [] : ['canonical' => $canonicalName]);
     }
 }

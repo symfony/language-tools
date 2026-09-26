@@ -2,28 +2,9 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
-use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteHoverHandler;
-use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
-use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
-use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class RouteHoverHandlerTest extends TestCase
 {
@@ -53,47 +34,28 @@ final class RouteHoverHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $indexes = new RouteIndexRegistry();
-        $indexes->forProject($project)->replace(new Route(
-            'article_show',
-            '/article/{id}',
-            ['GET'],
-            ['https'],
-            '{subdomain}.example.com',
-            'App\\Controller\\ArticleController::show',
-            ['locale'],
-            ['id' => '\\d+'],
-            alias: 'article_detail',
-        ));
-        $converter = new PositionConverter();
-        $offset = strpos($text, 'article_show') + 3;
-        $position = $converter->toPosition($text, $offset);
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
-        $classIndexes->forProject($project)->replace(
-            new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
-            new DependencyInjectionSourceFacts($uri, classes: $classExtractor->extract($uri, $text)),
-        );
-        $handler = new RouteHoverHandler(
-            new LspProtocolMapper(),
-            $indexes,
-            $classIndexes,
-            RouteReferenceExtractorFactory::create($converter),
-            new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator())),
-        );
+        $kit = (new ProjectTestKit())
+            ->open($baseUri, $base)
+            ->open($uri, $text)
+            ->index()
+            ->runtime('routes', ['complete' => true, 'items' => [[
+                'name' => 'article_show',
+                'path' => '/article/{id}',
+                'methods' => ['GET'],
+                'schemes' => ['https'],
+                'host' => '{subdomain}.example.com',
+                'controller' => 'App\\Controller\\ArticleController::show',
+                'defaults' => ['locale'],
+                'requirements' => ['id' => '\\d+'],
+                'alias' => 'article_detail',
+            ]]])
+        ;
 
         self::assertSame([
             'contents' => [
                 'kind' => 'markdown',
                 'value' => "`article_show`\n\nAlias of: `article_detail`\n\nPath: `/article/{id}`\n\nHost: `{subdomain}.example.com`\n\nMethods: `GET`\n\nSchemes: `https`\n\nDefaults: `locale`\n\nRequirements: `id: \\d+`\n\nController: `App\\Controller\\ArticleController::show`",
             ],
-        ], $handler->hover((new ProviderRequests($documents, $projects, $converter))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])));
+        ], $kit->get(RouteHoverHandler::class)->hover($kit->positioned($kit->offset($uri, strpos($text, 'article_show') + 3))));
     }
 }

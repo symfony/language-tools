@@ -2,37 +2,9 @@
 
 namespace Symfony\Lsp\Tests\Feature\Route;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\Position;
-use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
-use Symfony\Lsp\Feature\Route\PhpRouteDeclarationExtractor;
-use Symfony\Lsp\Feature\Route\RouteControllerClassifier;
-use Symfony\Lsp\Feature\Route\RouteDeclaration;
 use Symfony\Lsp\Feature\Route\RouteDefinitionHandler;
-use Symfony\Lsp\Feature\Route\RouteSourceFacts;
-use Symfony\Lsp\Feature\Route\RouteSourceIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteSymbolResolver;
-use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
-use Symfony\Lsp\Feature\Route\YamlRouteDeclarationExtractor;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
-use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\UriToPathConverter;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class RouteDefinitionHandlerTest extends TestCase
 {
@@ -62,48 +34,34 @@ final class RouteDefinitionHandlerTest extends TestCase
                 }
             }
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'php', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes = new RouteSourceIndexRegistry($classIndexes, new RouteControllerClassifier());
         $declarationUri = 'file:///workspace/src/ArticleController.php';
-        $sourceIndexes->forProject($project)->replace(new RouteSourceFacts($declarationUri, [new RouteDeclaration(
-            'article_show',
-            $declarationUri,
-            new Range(new Position(10, 20), new Position(10, 32)),
-        )], []));
-        $converter = new PositionConverter();
-        $cursor = strpos($text, 'article_show') + 3;
-        $position = $converter->toPosition($text, $cursor);
-        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
-        $classIndexes->forProject($project)->replace(
-            new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
-            new DependencyInjectionSourceFacts($uri, classes: $classExtractor->extract($uri, $text)),
-        );
-        $handler = new RouteDefinitionHandler(new LspProtocolMapper(),
-            new RouteSymbolResolver(
-                $converter,
-                RouteReferenceExtractorFactory::create($converter),
-                new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator())),
-                new PhpRouteDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
-                new YamlRouteDeclarationExtractor($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-                new UriToPathConverter(),
-                $classIndexes,
-            ),
-            $sourceIndexes,
-        );
+        $declaration = <<<'PHP'
+            <?php
+            namespace App\Controller;
+
+            use Symfony\Component\Routing\Attribute\Route;
+
+            final class ArticleController
+            {
+                #[Route('/article/{id}', name: 'article_show')]
+                public function show(): void
+                {
+                }
+            }
+            PHP;
+        $kit = (new ProjectTestKit())
+            ->open($baseUri, $base)
+            ->open($uri, $text)
+            ->open($declarationUri, $declaration)
+            ->index()
+        ;
 
         self::assertSame([[
-            'uri' => 'file:///workspace/src/ArticleController.php',
+            'uri' => $declarationUri,
             'range' => [
-                'start' => ['line' => 10, 'character' => 20],
-                'end' => ['line' => 10, 'character' => 32],
+                'start' => $kit->at($declarationUri, 'article_show')['position'],
+                'end' => $kit->after($declarationUri, 'article_show')['position'],
             ],
-        ]], $handler->definition((new ProviderRequests($documents, $projects))->positioned([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ])));
+        ]], $kit->get(RouteDefinitionHandler::class)->definition($kit->positioned($kit->offset($uri, strpos($text, 'article_show') + 3))));
     }
 }
