@@ -88,20 +88,20 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
         }
         [$symbol, $class, $project] = $resolved;
         if ($symbol instanceof EventSourceSymbol) {
-            return $this->relationships->sourceLocations($project, $symbol->name);
+            return $this->protocol->locations($request->reported($this->relationships->sourceSymbols($project, $symbol->name)));
         }
         if (!$class instanceof PhpClassDeclaration) {
             return [];
         }
         $index = $this->indexes->forProject($project);
         if (null !== $index->event($class->className) || [] !== $index->listenersForEvent($class->className)) {
-            return $this->relationships->sourceLocations($project, $class->className);
+            return $this->protocol->locations($request->reported($this->relationships->sourceSymbols($project, $class->className)));
         }
-        $locations = [];
+        $symbols = [];
         foreach ($index->listenersByClass($class->className) as $listener) {
-            array_push($locations, ...$this->relationships->sourceLocations($project, $listener->event));
+            array_push($symbols, ...$this->relationships->sourceSymbols($project, $listener->event));
         }
 
-        return $this->relationships->uniqueLocations($locations);
+        return $this->protocol->locations($request->reported($symbols));
     }
 }

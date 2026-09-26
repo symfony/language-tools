@@ -73,15 +73,10 @@ final class EventRelationshipResolver
         return $this->classLocations($project, array_keys($classes));
     }
 
-    /** @return list<array<array-key, mixed>> */
-    public function sourceLocations(Project $project, string $name): array
+    /** @return list<EventSourceSymbol> */
+    public function sourceSymbols(Project $project, string $name): array
     {
-        $locations = [];
-        foreach ($this->sourceIndexes->forProject($project)->symbols($name) as $symbol) {
-            $locations[] = $this->protocol->location($symbol->uri, $symbol->range);
-        }
-
-        return $locations;
+        return $this->sourceIndexes->forProject($project)->symbols($name);
     }
 
     /**

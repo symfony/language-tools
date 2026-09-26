@@ -483,6 +483,8 @@ PHP;
 
         $declared = $kit->at($eventUri, 'OrderPlaced');
         self::assertContains($dispatcherUri, $kit->targets($relationshipProvider->references($kit->references($declared))));
+        self::assertContains($listenerUri, $kit->targets($relationshipProvider->references($kit->references($declared))));
+        self::assertSame([$dispatcherUri, $dispatcherUri], $kit->targets($relationshipProvider->references($kit->references($declared, false))));
         self::assertSame(['event.invalid_listener_method'], $kit->codes($kit->get(EventDiagnosticProvider::class)->diagnostics($kit->document($invalidUri))));
         self::assertSame(['1 event listener'], $kit->titles($codeLensProvider->codeLenses($kit->document($eventUri))));
         self::assertSame(['Listens to 1 event'], $kit->titles($codeLensProvider->codeLenses($kit->document($listenerUri))));
