@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Tests\Feature\Configuration;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
@@ -12,40 +11,14 @@ use Symfony\Lsp\Feature\Configuration\ConfigurationCompletionProvider;
 use Symfony\Lsp\Feature\Configuration\ConfigurationDiagnosticProvider;
 use Symfony\Lsp\Feature\Configuration\ConfigurationDocumentLinkProvider;
 use Symfony\Lsp\Feature\Configuration\ConfigurationHoverProvider;
-use Symfony\Lsp\Feature\Configuration\ConfigurationIndexRegistry;
-use Symfony\Lsp\Feature\Configuration\ConfigurationValidationReconciler;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationResult;
-use Symfony\Lsp\Feature\Configuration\ConfigurationValueValidator;
-use Symfony\Lsp\Feature\Configuration\PhpConfigurationAnalyzer;
-use Symfony\Lsp\Feature\Configuration\ProjectConfigurationSnapshotLoader;
-use Symfony\Lsp\Feature\Configuration\XmlConfigurationAnalyzer;
-use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
-use Symfony\Lsp\Feature\Configuration\YamlIndentationAnalyzer;
-use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
-use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
-use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
-use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
-use Symfony\Lsp\Parser\Xml\XmlCommentParser;
-use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\ProjectAnalysisSettings;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\SavedDocumentMatcher;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\DocumentRequest;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\PositionedRequest;
-use Symfony\Lsp\Tests\Support\ProjectPaths;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
-use Symfony\Lsp\Tests\Support\RuntimeSettings;
-use Symfony\Lsp\Tests\Support\SnapshotSections;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class ConfigurationProviderTest extends TestCase
 {
@@ -1600,178 +1573,145 @@ final class ConfigurationProviderTest extends TestCase
 
     private function providers(string $root = '/workspace', string $environment = 'dev', ?ConfigurationValidationResult $validation = null): ConfigurationProviderFixture
     {
-        $documents = new DocumentStore();
-        $projects = new ProjectRegistry();
-        $uriConverter = new UriToPathConverter();
-        $project = new Project($root, $uriConverter->toUri($root));
-        $projects->replace([$project]);
-        $converter = new PositionConverter();
-        $indexes = new ConfigurationIndexRegistry();
-        $routeIndexes = new RouteIndexRegistry();
-        $routeIndexes->forProject($project)->replaceRuntime(['config/http_endpoints.yaml', 'config/routes/framework.yaml'], []);
-        $environmentIndexes = new EnvironmentIndexRegistry();
-        $environmentIndexes->forProject($project)->replaceProcessors(['bool' => 'bool', 'json' => 'array']);
-        $validations = new ConfigurationValidationRegistry();
-        if (null !== $validation) {
-            $validations->replace($project, $validation);
-        }
-        $runtimeConfiguration = RuntimeSettings::configuration(new ProjectAnalysisSettings(environment: $environment));
-        (new ProjectConfigurationSnapshotLoader($indexes))->load($project, SnapshotSections::of($project, ['bundles' => [
-            [
-                'alias' => 'framework',
-                'tree' => $this->node('framework', 'array', children: [
-                    $this->node('router', 'array', children: [
-                        $this->node('utf8', 'boolean', info: 'Use UTF-8 routes.'),
-                        $this->node('strict', 'boolean'),
-                        $this->node('mode', 'enum', deprecated: true, allowedValues: ['dev', 'prod']),
-                        $this->node('reset_mode', 'enum', allowedValues: ['schema', 'migrate'], allowedEnumCases: ['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE']),
-                        $this->node('strict_reset_mode', 'enum', allowedEnumCases: ['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE']),
-                    ]),
-                    $this->node('rate_limiter', 'array', children: [
-                        $this->node('limiters', 'array', prototype: $this->node('limiter', 'array', children: [
-                            $this->node('policy', 'scalar'),
-                            $this->node('limit', 'integer'),
-                        ]), keyAttribute: 'name'),
-                    ], aliases: ['limiter' => 'limiters']),
-                    $this->node('normalized_section', 'array', children: [
-                        $this->node('nested_key', 'boolean'),
-                        $this->node('mixed_nested_key', 'boolean'),
-                        $this->node('twin_key', 'boolean'),
-                    ]),
-                    $this->node('exact_keys', 'array', children: [
-                        $this->node('default-src', 'boolean'),
-                    ], normalizeKeys: false),
-                    $this->node('exact_items', 'array', prototype: $this->node('exact_item', 'array', children: [
-                        $this->node('default-src', 'boolean'),
-                    ], normalizeKeys: false)),
-                    $this->node('required_parent', 'array', children: [
-                        $this->node('known', 'boolean'),
-                        $this->node('token', 'scalar', required: true),
-                    ]),
-                    $this->node('cache', 'array', children: [
-                        $this->node('pools', 'array', prototype: $this->node('pool', 'array', children: [
-                            $this->node('adapters', 'array', accepts: ['scalar' => true]),
-                        ], aliases: ['adapter' => 'adapters']), keyAttribute: 'name'),
-                    ]),
-                    $this->node('session', 'array', children: [
-                        $this->node('cookie_secure', 'enum', allowedValues: [true, false, 'auto']),
-                    ]),
-                    $this->node('literal_value', 'enum', allowedValues: ['App\\Mode::FAST', '${placeholder}']),
-                    $this->node('items', 'array', prototype: $this->node('item', 'array', children: [
-                        $this->node('name', 'boolean'),
-                        $this->node('handlers', 'array', prototype: $this->node('handler', 'array', children: [
-                            $this->node('type', 'scalar'),
-                            $this->node('nested', 'boolean'),
-                        ]), keyAttribute: 'name'),
-                        $this->node('policies', 'array', prototype: $this->node('policy', 'array', children: [
+        $kit = (new ProjectTestKit($root))
+            ->runtime('routes', ['complete' => true, 'items' => [], 'resources' => ['config/http_endpoints.yaml', 'config/routes/framework.yaml']])
+            ->runtime('environment', ['complete' => true, 'processors' => [['name' => 'bool', 'type' => 'bool'], ['name' => 'json', 'type' => 'array']]])
+            ->runtime('configuration', ['bundles' => [
+                [
+                    'alias' => 'framework',
+                    'tree' => $this->node('framework', 'array', children: [
+                        $this->node('router', 'array', children: [
+                            $this->node('utf8', 'boolean', info: 'Use UTF-8 routes.'),
+                            $this->node('strict', 'boolean'),
+                            $this->node('mode', 'enum', deprecated: true, allowedValues: ['dev', 'prod']),
+                            $this->node('reset_mode', 'enum', allowedValues: ['schema', 'migrate'], allowedEnumCases: ['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE']),
+                            $this->node('strict_reset_mode', 'enum', allowedEnumCases: ['App\\ResetMode::SCHEMA', 'App\\ResetMode::MIGRATE']),
+                        ]),
+                        $this->node('rate_limiter', 'array', children: [
+                            $this->node('limiters', 'array', prototype: $this->node('limiter', 'array', children: [
+                                $this->node('policy', 'scalar'),
+                                $this->node('limit', 'integer'),
+                            ]), keyAttribute: 'name'),
+                        ], aliases: ['limiter' => 'limiters']),
+                        $this->node('normalized_section', 'array', children: [
+                            $this->node('nested_key', 'boolean'),
+                            $this->node('mixed_nested_key', 'boolean'),
+                            $this->node('twin_key', 'boolean'),
+                        ]),
+                        $this->node('exact_keys', 'array', children: [
+                            $this->node('default-src', 'boolean'),
+                        ], normalizeKeys: false),
+                        $this->node('exact_items', 'array', prototype: $this->node('exact_item', 'array', children: [
                             $this->node('default-src', 'boolean'),
                         ], normalizeKeys: false)),
-                    ]), keyAttribute: 'name'),
-                    $this->node('groups', 'array', prototype: $this->node('group', 'array', children: [
-                        $this->node('handlers', 'array', prototype: $this->node('handler', 'array', children: [
-                            $this->node('nested', 'boolean'),
-                        ]), keyAttribute: 'name'),
-                    ], aliases: ['handler' => 'handlers'])),
-                    $this->node('psr_3', 'array', children: [
-                        $this->node('enabled', 'boolean'),
-                    ]),
-                    $this->node('psr_3_handlers', 'array', prototype: $this->node('psr_3_handler', 'array', children: [
-                        $this->node('enabled', 'boolean'),
-                    ]), keyAttribute: 'name'),
-                    $this->node('assets', 'array', accepts: ['null' => true, 'true' => true, 'false' => true, 'scalar' => false, 'unknownKeys' => false], children: [
-                        $this->node('enabled', 'boolean'),
-                    ]),
-                    $this->node('loose', 'array', accepts: ['unknownKeys' => true], children: [
-                        $this->node('known', 'boolean'),
-                        $this->node('strict', 'array', children: [
+                        $this->node('required_parent', 'array', children: [
                             $this->node('known', 'boolean'),
+                            $this->node('token', 'scalar', required: true),
                         ]),
-                    ]),
-                    $this->node('dispatch', 'array', prototype: $this->node('sender', 'array', accepts: ['scalar' => true], children: [
-                        $this->node('senders', 'array'),
-                    ])),
-                ], aliases: ['psr_3_handler' => 'psr_3_handlers']),
-            ],
-            [
-                'alias' => 'monolog',
-                'tree' => $this->node('monolog', 'array', children: [
-                    $this->node('handlers', 'array', prototype: $this->node('handler', 'array', children: [
-                        $this->node('name', 'scalar'),
-                        $this->node('type', 'scalar'),
-                        $this->node('path', 'scalar'),
-                        $this->node('level', 'enum', allowedValues: ['debug', 'info']),
-                        $this->node('nested', 'boolean'),
-                        $this->node('process_psr_3_messages', 'boolean'),
-                    ]), keyAttribute: 'name'),
-                ], aliases: ['handler' => 'handlers']),
-            ],
-            [
-                'alias' => 'twig',
-                'tree' => $this->node('twig', 'array', children: [
-                    $this->node('default_path', 'scalar'),
-                    $this->node('paths', 'array', prototype: $this->node('path', 'scalar')),
-                    $this->node('extensions', 'array', prototype: $this->node('extension', 'scalar')),
-                    $this->node('debug', 'boolean'),
-                ], aliases: ['path' => 'paths']),
-            ],
-            [
-                'alias' => 'security',
-                'tree' => $this->node('security', 'array', children: [
-                    $this->node('password_hashers', 'array', prototype: $this->node('password_hasher', 'array', children: [
-                        $this->node('algorithm', 'scalar'),
-                        $this->node('migrate_from', 'array'),
-                    ]), keyAttribute: 'class'),
-                    $this->node('firewalls', 'array', prototype: $this->node('firewall', 'array', children: [
-                        $this->node('pattern', 'scalar'),
-                        $this->node('stateless', 'boolean'),
-                        $this->node('remember_me', 'array', children: [
-                            $this->node('secret', 'scalar'),
-                            $this->node('name', 'scalar'),
-                            $this->node('always_remember_me', 'boolean'),
+                        $this->node('cache', 'array', children: [
+                            $this->node('pools', 'array', prototype: $this->node('pool', 'array', children: [
+                                $this->node('adapters', 'array', accepts: ['scalar' => true]),
+                            ], aliases: ['adapter' => 'adapters']), keyAttribute: 'name'),
                         ]),
-                        $this->node('access_token', 'array', children: [
-                            $this->node('token_handler', 'array', accepts: ['scalar' => true], children: [
-                                $this->node('id', 'scalar'),
+                        $this->node('session', 'array', children: [
+                            $this->node('cookie_secure', 'enum', allowedValues: [true, false, 'auto']),
+                        ]),
+                        $this->node('literal_value', 'enum', allowedValues: ['App\\Mode::FAST', '${placeholder}']),
+                        $this->node('items', 'array', prototype: $this->node('item', 'array', children: [
+                            $this->node('name', 'boolean'),
+                            $this->node('handlers', 'array', prototype: $this->node('handler', 'array', children: [
+                                $this->node('type', 'scalar'),
+                                $this->node('nested', 'boolean'),
+                            ]), keyAttribute: 'name'),
+                            $this->node('policies', 'array', prototype: $this->node('policy', 'array', children: [
+                                $this->node('default-src', 'boolean'),
+                            ], normalizeKeys: false)),
+                        ]), keyAttribute: 'name'),
+                        $this->node('groups', 'array', prototype: $this->node('group', 'array', children: [
+                            $this->node('handlers', 'array', prototype: $this->node('handler', 'array', children: [
+                                $this->node('nested', 'boolean'),
+                            ]), keyAttribute: 'name'),
+                        ], aliases: ['handler' => 'handlers'])),
+                        $this->node('psr_3', 'array', children: [
+                            $this->node('enabled', 'boolean'),
+                        ]),
+                        $this->node('psr_3_handlers', 'array', prototype: $this->node('psr_3_handler', 'array', children: [
+                            $this->node('enabled', 'boolean'),
+                        ]), keyAttribute: 'name'),
+                        $this->node('assets', 'array', accepts: ['null' => true, 'true' => true, 'false' => true, 'scalar' => false, 'unknownKeys' => false], children: [
+                            $this->node('enabled', 'boolean'),
+                        ]),
+                        $this->node('loose', 'array', accepts: ['unknownKeys' => true], children: [
+                            $this->node('known', 'boolean'),
+                            $this->node('strict', 'array', children: [
+                                $this->node('known', 'boolean'),
                             ]),
-                            $this->node('failure_handler', 'scalar'),
                         ]),
-                        $this->node('custom_authenticators', 'array', prototype: $this->node('custom_authenticator', 'scalar')),
-                    ], aliases: ['custom_authenticator' => 'custom_authenticators']), keyAttribute: 'name'),
-                    $this->node('role_hierarchy', 'array', prototype: $this->node('role', 'array', prototype: $this->node('inherited_role', 'scalar')), keyAttribute: 'id'),
-                ], aliases: ['firewall' => 'firewalls', 'role' => 'role_hierarchy']),
-            ],
-            [
-                'alias' => 'services',
-                'tree' => $this->node('services', 'array'),
-            ],
-        ]]));
-        $protocol = new LspProtocolMapper();
-        $phpComments = new PhpCommentParser();
-        $xmlParser = new TolerantXmlParser();
-        $xmlComments = new XmlCommentParser($xmlParser);
-        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
-        $documentParser = new YamlDocumentParser($treeSitter);
-        $php = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), $phpComments);
-        $xml = new XmlConfigurationAnalyzer($xmlParser, $xmlComments);
-        $yaml = new YamlConfigurationParser($converter, $documentParser);
-        $values = new ConfigurationValueValidator($environmentIndexes, new EnvironmentExpressionParser(new ParameterExpressionScanner()));
-        $validationReconciler = new ConfigurationValidationReconciler(
-            $validations,
-            new SavedDocumentMatcher(ProjectPaths::resolver()),
-            $runtimeConfiguration,
-            $converter,
-            $protocol,
-        );
+                        $this->node('dispatch', 'array', prototype: $this->node('sender', 'array', accepts: ['scalar' => true], children: [
+                            $this->node('senders', 'array'),
+                        ])),
+                    ], aliases: ['psr_3_handler' => 'psr_3_handlers']),
+                ],
+                [
+                    'alias' => 'monolog',
+                    'tree' => $this->node('monolog', 'array', children: [
+                        $this->node('handlers', 'array', prototype: $this->node('handler', 'array', children: [
+                            $this->node('name', 'scalar'),
+                            $this->node('type', 'scalar'),
+                            $this->node('path', 'scalar'),
+                            $this->node('level', 'enum', allowedValues: ['debug', 'info']),
+                            $this->node('nested', 'boolean'),
+                            $this->node('process_psr_3_messages', 'boolean'),
+                        ]), keyAttribute: 'name'),
+                    ], aliases: ['handler' => 'handlers']),
+                ],
+                [
+                    'alias' => 'twig',
+                    'tree' => $this->node('twig', 'array', children: [
+                        $this->node('default_path', 'scalar'),
+                        $this->node('paths', 'array', prototype: $this->node('path', 'scalar')),
+                        $this->node('extensions', 'array', prototype: $this->node('extension', 'scalar')),
+                        $this->node('debug', 'boolean'),
+                    ], aliases: ['path' => 'paths']),
+                ],
+                [
+                    'alias' => 'security',
+                    'tree' => $this->node('security', 'array', children: [
+                        $this->node('password_hashers', 'array', prototype: $this->node('password_hasher', 'array', children: [
+                            $this->node('algorithm', 'scalar'),
+                            $this->node('migrate_from', 'array'),
+                        ]), keyAttribute: 'class'),
+                        $this->node('firewalls', 'array', prototype: $this->node('firewall', 'array', children: [
+                            $this->node('pattern', 'scalar'),
+                            $this->node('stateless', 'boolean'),
+                            $this->node('remember_me', 'array', children: [
+                                $this->node('secret', 'scalar'),
+                                $this->node('name', 'scalar'),
+                                $this->node('always_remember_me', 'boolean'),
+                            ]),
+                            $this->node('access_token', 'array', children: [
+                                $this->node('token_handler', 'array', accepts: ['scalar' => true], children: [
+                                    $this->node('id', 'scalar'),
+                                ]),
+                                $this->node('failure_handler', 'scalar'),
+                            ]),
+                            $this->node('custom_authenticators', 'array', prototype: $this->node('custom_authenticator', 'scalar')),
+                        ], aliases: ['custom_authenticator' => 'custom_authenticators']), keyAttribute: 'name'),
+                        $this->node('role_hierarchy', 'array', prototype: $this->node('role', 'array', prototype: $this->node('inherited_role', 'scalar')), keyAttribute: 'id'),
+                    ], aliases: ['firewall' => 'firewalls', 'role' => 'role_hierarchy']),
+                ],
+                [
+                    'alias' => 'services',
+                    'tree' => $this->node('services', 'array'),
+                ],
+            ]])
+        ;
+        $kit->get(AnalysisSettingsRegistry::class)->configureWorkspace(new ProjectAnalysisSettings(environment: $environment));
+        if (null !== $validation) {
+            $kit->get(ConfigurationValidationRegistry::class)->replace($kit->project(), $validation);
+        }
 
-        return new ConfigurationProviderFixture(
-            new ConfigurationCompletionProvider($converter, $protocol, $indexes, $yaml, $php, $xml),
-            new ConfigurationHoverProvider($converter, $protocol, $indexes, $yaml, $php, $xml),
-            new ConfigurationDiagnosticProvider(ProjectPaths::resolver(), $converter, $protocol, $indexes, $routeIndexes, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
-            new ConfigurationDocumentLinkProvider($converter, $protocol, $uriConverter, $documentParser),
-            $documents,
-            $projects,
-            $converter,
-        );
+        return new ConfigurationProviderFixture($kit);
     }
 
     /**
@@ -1792,30 +1732,31 @@ final class ConfigurationProviderTest extends TestCase
 
 final class ConfigurationProviderFixture
 {
-    public function __construct(
-        public readonly ConfigurationCompletionProvider $completion,
-        public readonly ConfigurationHoverProvider $hover,
-        public readonly ConfigurationDiagnosticProvider $diagnostics,
-        public readonly ConfigurationDocumentLinkProvider $links,
-        public readonly DocumentStore $documents,
-        public readonly ProjectRegistry $projects,
-        public readonly PositionConverter $converter,
-    ) {
+    public readonly ConfigurationCompletionProvider $completion;
+    public readonly ConfigurationHoverProvider $hover;
+    public readonly ConfigurationDiagnosticProvider $diagnostics;
+    public readonly ConfigurationDocumentLinkProvider $links;
+    public readonly DocumentStore $documents;
+    public readonly PositionConverter $converter;
+
+    public function __construct(private readonly ProjectTestKit $kit)
+    {
+        $this->completion = $kit->get(ConfigurationCompletionProvider::class);
+        $this->hover = $kit->get(ConfigurationHoverProvider::class);
+        $this->diagnostics = $kit->get(ConfigurationDiagnosticProvider::class);
+        $this->links = $kit->get(ConfigurationDocumentLinkProvider::class);
+        $this->documents = $kit->get(DocumentStore::class);
+        $this->converter = $kit->get(PositionConverter::class);
     }
 
     public function document(string $uri): DocumentRequest
     {
-        return $this->requests()->document($uri);
+        return $this->kit->document($uri);
     }
 
     /** @param array<array-key, mixed> $params */
     public function positioned(array $params): PositionedRequest
     {
-        return $this->requests()->positioned($params);
-    }
-
-    private function requests(): ProviderRequests
-    {
-        return new ProviderRequests($this->documents, $this->projects);
+        return $this->kit->positioned($params);
     }
 }

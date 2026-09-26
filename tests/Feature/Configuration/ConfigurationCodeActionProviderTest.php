@@ -2,66 +2,32 @@
 
 namespace Symfony\Lsp\Tests\Feature\Configuration;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Configuration\ConfigurationCodeActionProvider;
-use Symfony\Lsp\Feature\Configuration\ConfigurationIndexRegistry;
-use Symfony\Lsp\Feature\Configuration\ConfigurationNode;
-use Symfony\Lsp\Feature\Configuration\PhpConfigurationAnalyzer;
-use Symfony\Lsp\Feature\Configuration\XmlConfigurationAnalyzer;
-use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
-use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
-use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
-use Symfony\Lsp\Parser\Xml\XmlCommentParser;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\ProjectAnalysisSettings;
-use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\ProjectPaths;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
-use Symfony\Lsp\Tests\Support\RuntimeSettings;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class ConfigurationCodeActionProviderTest extends TestCase
 {
     #[DataProvider('configurationTypoProvider')]
     public function testSuggestsOnlySiblingsWithSyntaxPreservingEdits(string $language, string $uri, string $text, string $diagnosed, string $replacement, string $edited, bool $suggestion): void
     {
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, $language, 3, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $index = new ConfigurationIndexRegistry();
         $router = $this->node('router', [$this->node('utf8')]);
         $root = $this->node('framework', [$router, $this->node('cache', [$this->node('strict')])]);
-        $index->forProject($project)->replace(['framework' => $root]);
-        $converter = new PositionConverter();
-        $protocol = new LspProtocolMapper();
-        $xmlParser = new TolerantXmlParser();
-        $runtime = RuntimeSettings::configuration(new ProjectAnalysisSettings(environment: 'dev'));
-        $provider = new ConfigurationCodeActionProvider(
-            ProjectPaths::resolver(),
-            $converter,
-            $index,
-            new RouteIndexRegistry(),
-            $runtime,
-            new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), new PhpCommentParser()),
-            new XmlConfigurationAnalyzer($xmlParser, new XmlCommentParser($xmlParser)),
-            new UnknownNameCodeActionBuilder($protocol),
-        );
+        $kit = (new ProjectTestKit())
+            ->open($uri, $text, $language, 3)
+            ->runtime('configuration', ['bundles' => [['alias' => 'framework', 'tree' => $root]]])
+        ;
+        $kit->get(AnalysisSettingsRegistry::class)->configureWorkspace(new ProjectAnalysisSettings(environment: 'dev'));
+        $converter = $kit->get(PositionConverter::class);
+        $protocol = $kit->get(LspProtocolMapper::class);
         $start = (int) strpos($text, $diagnosed);
         $diagnostic = $protocol->diagnostic($converter->toRange($text, $start, \strlen($diagnosed)), 1, 'config.unknown_key', 'Unknown configuration key.');
-        $actions = $provider->actions((new ProviderRequests($documents, $projects))->codeAction($uri, [$diagnostic]));
+        $actions = $kit->get(ConfigurationCodeActionProvider::class)->actions($kit->codeAction($uri, [$diagnostic]));
 
         if (!$suggestion) {
             self::assertSame([], $actions);
@@ -102,9 +68,13 @@ final class ConfigurationCodeActionProviderTest extends TestCase
         yield 'route configuration' => ['yaml', 'file:///workspace/config/routes.yaml', "framework:\n  router:\n    ut8: true\n", 'ut8', 'utf8', 'ut8', false];
     }
 
-    /** @param list<ConfigurationNode> $children */
-    private function node(string $name, array $children = []): ConfigurationNode
+    /**
+     * @param list<array<string, mixed>> $children
+     *
+     * @return array<string, mixed>
+     */
+    private function node(string $name, array $children = []): array
     {
-        return new ConfigurationNode($name, 'array', false, false, null, null, null, false, [], [], $children, null);
+        return ['name' => $name, 'type' => 'array', 'children' => $children];
     }
 }
