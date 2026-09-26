@@ -15,7 +15,6 @@ use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
@@ -41,7 +40,6 @@ final class SecurityExtractor
         private readonly CommentParserRegistry $comments,
         private readonly PhpParserInterface $phpParser,
         private readonly TwigDocumentParser $twigParser,
-        private readonly TwigCallArgumentResolver $twigArguments,
         private readonly TwigDirectiveLocator $twigDirectives,
         private readonly ?YamlDocumentParser $yamlParser = null,
     ) {
@@ -200,18 +198,9 @@ final class SecurityExtractor
     {
         $document = $this->twigParser->parse($text);
         $symbols = [];
-        foreach ($document->nodesOfType('function_call') as $call) {
-            $identifier = $document->directChild($call, 'function_identifier');
-            $kind = match (null === $identifier ? null : $document->text($identifier)) {
-                'is_granted' => SecuritySymbolKind::Role,
-                'logout_path', 'logout_url' => SecuritySymbolKind::Firewall,
-                default => null,
-            };
-            if (null === $kind) {
-                continue;
-            }
-            $argument = $this->twigArguments->resolve($document, $call)->get(0);
-            $literal = null === $argument ? null : $document->soleStringLiteral($argument);
+        foreach ($document->calls('is_granted', 'logout_path', 'logout_url') as $call) {
+            $kind = 'is_granted' === $call->name ? SecuritySymbolKind::Role : SecuritySymbolKind::Firewall;
+            $literal = $call->argument(0, SecuritySymbolKind::Role === $kind ? 'attribute' : 'key')?->literal();
             $pattern = SecuritySymbolKind::Role === $kind ? self::ROLE_PATTERN : self::FIREWALL_PATTERN;
             if (null !== $literal && 1 === preg_match($pattern, $literal->value)) {
                 $symbols[] = $this->twigSymbol($kind, $literal, $uri, $text);

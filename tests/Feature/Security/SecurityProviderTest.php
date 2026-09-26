@@ -66,13 +66,14 @@ YAML;
             {{ is_granted('ROLE_SUBJECT', post) }}
             {{ is_granted(role) }}
             {{ is_granted('POST_EDIT', post) }}
+            {{ is_granted(attribute: 'ROLE_NAMED') }}{{ logout_path(key: 'named') }}
             {{ user.is_granted('ROLE_METHOD') }}
             {% set snippet = 'is_granted(\'ROLE_STRING\') and logout_path(\'string\')' %}
             {% verbatim %}{{ is_granted('ROLE_VERBATIM') }}{{ logout_path('verbatim') }}{% endverbatim %}
             TWIG));
 
         self::assertSame(
-            [['role', 'ROLE_ADMIN'], ['firewall', 'main'], ['firewall', 'api'], ['role', 'ROLE_SUBJECT']],
+            [['role', 'ROLE_ADMIN'], ['firewall', 'main'], ['firewall', 'api'], ['role', 'ROLE_SUBJECT'], ['role', 'ROLE_NAMED'], ['firewall', 'named']],
             array_map(static fn ($symbol): array => [$symbol->kind->value, $symbol->name], $facts->symbols),
         );
     }

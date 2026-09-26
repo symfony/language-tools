@@ -49,7 +49,6 @@ use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -773,7 +772,6 @@ PHP;
                 new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]),
                 new TolerantPhpParser(new Parser()),
                 new TwigDocumentParser($treeSitter, new TwigCommentParser(), new TwigDirectiveLocator()),
-                new TwigCallArgumentResolver(),
                 new TwigDirectiveLocator(),
             ),
         );

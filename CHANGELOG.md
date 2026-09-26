@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Complete PHP translation placeholders from the domain the call passes instead of always the `messages` domain
+- Recognize Security roles and firewalls passed as named arguments to `is_granted()`, `logout_path()` and `logout_url()` in Twig
 - Recognize an importmap entrypoint passed as the `entryPoint` named argument in Twig
 - Answer a completion request with an empty list instead of nothing when nothing matches
 - Check the translation parameters of a call written with the legacy `array()` syntax or spreading an array inside a parameter value
