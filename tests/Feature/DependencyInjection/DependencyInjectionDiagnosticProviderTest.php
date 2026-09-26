@@ -3,26 +3,8 @@
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDiagnosticProvider;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\Parameter;
-use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
-use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
-use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
-use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\EnvironmentScopes;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class DependencyInjectionDiagnosticProviderTest extends TestCase
 {
@@ -43,19 +25,19 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
                     app.test_consumer:
                         arguments: ['%test.client.parameters%']
             YAML;
-        [$provider, $requests] = $this->provider($uri, $text);
+        $kit = $this->kit($uri, $text);
 
-        $diagnostics = $provider->diagnostics($requests->document($uri));
+        $diagnostics = $kit->get(DependencyInjectionDiagnosticProvider::class)->diagnostics($kit->document($uri));
 
         self::assertSame(
             ['service.not_found', 'service.not_found', 'parameter.not_found'],
-            array_column($diagnostics ?? [], 'code'),
+            $kit->codes($diagnostics),
         );
         self::assertSame([
             'Service "missing.service" does not exist in the selected environment.',
             'Service "test.only" does not exist in the selected environment.',
             'Parameter "missing.parameter" does not exist in the selected environment.',
-        ], array_column($diagnostics ?? [], 'message'));
+        ], $kit->messages($diagnostics));
     }
 
     public function testAcceptsAdjacentParameterReferences(): void
@@ -68,9 +50,9 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
                 local:
                     directory: "%root_dir%%document_folder%"
             YAML;
-        [$provider, $requests] = $this->provider($uri, $text, parameters: ['root_dir', 'document_folder']);
+        $kit = $this->kit($uri, $text, parameters: ['root_dir', 'document_folder']);
 
-        self::assertSame([], $provider->diagnostics($requests->document($uri)));
+        self::assertSame([], $kit->get(DependencyInjectionDiagnosticProvider::class)->diagnostics($kit->document($uri)));
     }
 
     public function testReportsNoDiagnosticsWhileBothRuntimeIndexesAreIncomplete(): void
@@ -81,44 +63,19 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
                 app.consumer:
                     arguments: ['@missing.service', '%missing.parameter%']
             YAML;
-        [$provider, $requests] = $this->provider($uri, $text, indexesComplete: false);
+        $kit = $this->kit($uri, $text, indexesComplete: false);
 
-        self::assertSame([], $provider->diagnostics($requests->document($uri)));
+        self::assertSame([], $kit->get(DependencyInjectionDiagnosticProvider::class)->diagnostics($kit->document($uri)));
     }
 
-    /**
-     * @param list<string> $parameters
-     *
-     * @return array{DependencyInjectionDiagnosticProvider, ProviderRequests}
-     */
-    private function provider(string $uri, string $text, array $parameters = [], bool $indexesComplete = true): array
+    /** @param list<string> $parameters */
+    private function kit(string $uri, string $text, array $parameters = [], bool $indexesComplete = true): ProjectTestKit
     {
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'yaml', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $serviceIndexes = new ServiceIndexRegistry();
-        $serviceIndexes->forProject($project)->replace($indexesComplete);
-        $parameterIndexes = new ParameterIndexRegistry();
-        $parameterIndexes->forProject($project)->replace(
-            $indexesComplete,
-            ...array_map(static fn (string $name): Parameter => new Parameter($name, null), $parameters),
-        );
-        $converter = new PositionConverter();
-        $yamlExtractor = new YamlDependencyInjectionExtractor(
-            new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-            new YamlDependencyInjectionDeclarationExtractor($converter),
-            new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
-        );
-        $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
-
-        return [new DependencyInjectionDiagnosticProvider(
-            new LspProtocolMapper(),
-            $serviceIndexes,
-            $parameterIndexes,
-            $sourceIndexes,
-            EnvironmentScopes::resolver(),
-        ), new ProviderRequests($documents, $projects, $converter)];
+        return (new ProjectTestKit())->open($uri, $text)->index()->runtime('container', [
+            'servicesComplete' => $indexesComplete,
+            'items' => [],
+            'parametersComplete' => $indexesComplete,
+            'parameters' => array_map(static fn (string $name): array => ['name' => $name], $parameters),
+        ]);
     }
 }

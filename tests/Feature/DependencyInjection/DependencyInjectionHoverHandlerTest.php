@@ -2,38 +2,13 @@
 
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionHoverHandler;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionProjectLookup;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
-use Symfony\Lsp\Feature\DependencyInjection\Parameter;
-use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
-use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
-use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
-use Symfony\Lsp\Feature\DependencyInjection\Service;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceDeclaration;
-use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
-use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
-use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\LspRequests;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class DependencyInjectionHoverHandlerTest extends TestCase
 {
@@ -47,55 +22,26 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
                 app.consumer:
                     arguments: ['@app.mailer', '%app.api_key%']
             YAML;
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'yaml', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $converter = new PositionConverter();
-        $yamlExtractor = new YamlDependencyInjectionExtractor(
-            new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-            new YamlDependencyInjectionDeclarationExtractor($converter),
-            new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
-        );
-        $phpParser = new TolerantPhpParser(new Parser());
-        $extractor = new DependencyInjectionDocumentExtractor(
-            $yamlExtractor,
-            new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
-            new PhpAutowireReferenceExtractor($converter, $phpParser, new ParameterExpressionScanner()),
-            new PhpClassDeclarationExtractor($converter, $phpParser),
-        );
-        $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
-        $serviceIndexes = new ServiceIndexRegistry();
-        $serviceIndexes->forProject($project)->replace(true, new Service(
-            'app.mailer',
-            'App\\Mailer',
-            null,
-            false,
-            true,
-            'Use app.new_mailer.',
-            ['kernel.reset'],
-            'mailer',
-            ['App\\MailerInterface'],
-            ['app.mailer', 'mailer.inner'],
-        ));
-        $parameterIndexes = new ParameterIndexRegistry();
-        $parameterIndexes->forProject($project)->replace(
-            true,
-            new Parameter('app.api_key', 'Use app.new_api_key.'),
-        );
-        $handler = new DependencyInjectionHoverHandler(
-            new LspProtocolMapper(),
-            new DependencyInjectionSymbolResolver($converter, $extractor),
-            new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
-        );
+        $kit = (new ProjectTestKit())->open($uri, $text)->index()->runtime('container', [
+            'servicesComplete' => true,
+            'items' => [[
+                'id' => 'app.mailer',
+                'class' => 'App\\Mailer',
+                'public' => false,
+                'lazy' => true,
+                'deprecation' => 'Use app.new_mailer.',
+                'tags' => ['kernel.reset'],
+                'decorates' => 'mailer',
+                'autowiringTypes' => ['App\\MailerInterface'],
+                'decorationStack' => ['app.mailer', 'mailer.inner'],
+            ]],
+            'parametersComplete' => true,
+            'parameters' => [['name' => 'app.api_key', 'deprecation' => 'Use app.new_api_key.']],
+        ]);
+        $handler = $kit->get(DependencyInjectionHoverHandler::class);
 
-        $serviceHover = $handler->hover((new ProviderRequests($documents, $projects, $converter))->positioned(LspRequests::inside($uri, $text, 'app.mailer')));
-        $parameterHover = $handler->hover((new ProviderRequests($documents, $projects, $converter))->positioned(LspRequests::inside($uri, $text, 'app.api_key%')));
-        self::assertIsArray($serviceHover);
-        self::assertIsArray($serviceHover['contents']);
-        self::assertIsArray($parameterHover);
-        self::assertIsArray($parameterHover['contents']);
+        $serviceHover = $handler->hover($kit->positioned($kit->inside($uri, 'app.mailer')));
+        $parameterHover = $handler->hover($kit->positioned($kit->inside($uri, 'app.api_key%')));
 
         self::assertSame(<<<'MARKDOWN'
             Service: `app.mailer`
@@ -115,12 +61,12 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             Autowiring types: `App\MailerInterface`
 
             Decoration stack: `app.mailer` → `mailer.inner`
-            MARKDOWN, $serviceHover['contents']['value'] ?? null);
+            MARKDOWN, $kit->hoverText($serviceHover));
         self::assertSame(<<<'MARKDOWN'
             Parameter: `app.api_key`
 
             Deprecated: Use app.new_api_key.
-            MARKDOWN, $parameterHover['contents']['value'] ?? null);
+            MARKDOWN, $kit->hoverText($parameterHover));
         self::assertStringNotContainsString(
             'CANARY_SECRET_VALUE',
             json_encode([$serviceHover, $parameterHover], \JSON_THROW_ON_ERROR),
@@ -131,26 +77,21 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
     {
         $uri = 'file:///workspace/config/services.yaml';
         $text = "services:\n    app.shared: ~\n";
-        $documents = new DocumentStore();
-        $documents->open(new Document($uri, 'yaml', 1, $text));
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $converter = new PositionConverter();
-        $yamlExtractor = new YamlDependencyInjectionExtractor(
-            new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-            new YamlDependencyInjectionDeclarationExtractor($converter),
-            new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
-        );
-        $phpParser = new TolerantPhpParser(new Parser());
-        $extractor = new DependencyInjectionDocumentExtractor(
-            $yamlExtractor,
-            new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
-            new PhpAutowireReferenceExtractor($converter, $phpParser, new ParameterExpressionScanner()),
-            new PhpClassDeclarationExtractor($converter, $phpParser),
-        );
-        $parsedDeclaration = $yamlExtractor->extract($uri, $text)->services[0];
-        $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts($uri, [new ServiceDeclaration(
+        $kit = (new ProjectTestKit())->open($uri, $text)->runtime('container', [
+            'servicesComplete' => true,
+            'items' => [[
+                'id' => 'app.shared',
+                'class' => 'App\\RuntimeShared',
+                'public' => false,
+                'lazy' => true,
+                'deprecation' => 'Use app.replacement.',
+                'decorates' => 'runtime.decorated',
+                'autowiringTypes' => ['App\\SharedInterface'],
+                'decorationStack' => ['app.shared', 'app.inner'],
+            ]],
+        ]);
+        $parsedDeclaration = $kit->get(YamlDependencyInjectionExtractor::class)->extract($uri, $text)->services[0];
+        $kit->get(DependencyInjectionSourceIndexRegistry::class)->forProject($kit->project())->replace(new DependencyInjectionSourceFacts($uri, [new ServiceDeclaration(
             'app.shared',
             $uri,
             $parsedDeclaration->range,
@@ -159,28 +100,8 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             'source.decorated',
             ['source.tag'],
         )]));
-        $serviceIndexes = new ServiceIndexRegistry();
-        $serviceIndexes->forProject($project)->replace(true, new Service(
-            'app.shared',
-            'App\\RuntimeShared',
-            null,
-            false,
-            true,
-            'Use app.replacement.',
-            [],
-            'runtime.decorated',
-            ['App\\SharedInterface'],
-            ['app.shared', 'app.inner'],
-        ));
-        $handler = new DependencyInjectionHoverHandler(
-            new LspProtocolMapper(),
-            new DependencyInjectionSymbolResolver($converter, $extractor),
-            new DependencyInjectionProjectLookup($serviceIndexes, new ParameterIndexRegistry(), $sourceIndexes),
-        );
 
-        $hover = $handler->hover((new ProviderRequests($documents, $projects, $converter))->positioned(LspRequests::inside($uri, $text, 'app.shared')));
-        self::assertIsArray($hover);
-        self::assertIsArray($hover['contents']);
+        $hover = $kit->get(DependencyInjectionHoverHandler::class)->hover($kit->positioned($kit->inside($uri, 'app.shared')));
 
         self::assertSame(<<<'MARKDOWN'
             Service: `app.shared`
@@ -200,6 +121,6 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             Autowiring types: `App\SharedInterface`
 
             Decoration stack: `app.shared` → `app.inner`
-            MARKDOWN, $hover['contents']['value'] ?? null);
+            MARKDOWN, $kit->hoverText($hover));
     }
 }
