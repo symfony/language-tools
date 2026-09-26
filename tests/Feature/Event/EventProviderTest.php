@@ -2,39 +2,17 @@
 
 namespace Symfony\Lsp\Tests\Feature\Event;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
-use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
-use Symfony\Lsp\Feature\Event\Event;
 use Symfony\Lsp\Feature\Event\EventCodeLensProvider;
 use Symfony\Lsp\Feature\Event\EventCompletionProvider;
 use Symfony\Lsp\Feature\Event\EventDiagnosticProvider;
 use Symfony\Lsp\Feature\Event\EventExtractor;
-use Symfony\Lsp\Feature\Event\EventIndexRegistry;
-use Symfony\Lsp\Feature\Event\EventListener;
 use Symfony\Lsp\Feature\Event\EventRelationshipProvider;
-use Symfony\Lsp\Feature\Event\EventRelationshipResolver;
-use Symfony\Lsp\Feature\Event\EventSourceIndexRegistry;
-use Symfony\Lsp\Feature\Event\EventSubscriberMapAnalyzer;
-use Symfony\Lsp\Feature\Event\EventYamlListenerAnalyzer;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\BalancedDelimiterMatcher;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class EventProviderTest extends TestCase
 {
@@ -42,8 +20,9 @@ final class EventProviderTest extends TestCase
 
     public function testExtractsHighConfidenceEventReferences(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->extractor($converter);
+        $kit = new ProjectTestKit();
+        $converter = $kit->get(PositionConverter::class);
+        $extractor = $kit->get(EventExtractor::class);
         $php = <<<'PHP'
 <?php
 namespace App;
@@ -269,7 +248,7 @@ YAML;
 
     public function testExtractsYamlListenerEventsFromBlockAndFlowTagsWithByteExactRanges(): void
     {
-        $converter = new PositionConverter();
+        $converter = (new ProjectTestKit())->get(PositionConverter::class);
         $text = <<<'YAML'
             services:
               App\InlineListener:
@@ -282,7 +261,7 @@ YAML;
               App\FlowListener:
                 tags: [{ name: 'kernel.event_listener', event: flow.first }, { name: kernel.event_listener, event: "App\\Event\\FlowSecond" }]
             YAML;
-        $facts = $this->extractor($converter)->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $text));
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/config/services.yaml', 'yaml', $text));
 
         self::assertSame(
             ['legacy.order_placed', 'App\Event\OrderPlaced', 'flow.first', 'App\Event\FlowSecond'],
@@ -405,8 +384,9 @@ YAML;
 
     public function testIndexesOnlyDirectPositionalEventCreations(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->extractor($converter);
+        $kit = new ProjectTestKit();
+        $converter = $kit->get(PositionConverter::class);
+        $extractor = $kit->get(EventExtractor::class);
         $text = <<<'PHP'
             <?php
             namespace App;
@@ -482,58 +462,31 @@ final class InvalidListener
 {
 }
 PHP;
-        $documents = new DocumentStore();
-        foreach ([[$eventUri, $event], [$listenerUri, $listener], [$dispatcherUri, $dispatcher], [$invalidUri, $invalid]] as [$uri, $text]) {
-            $documents->open(new Document($uri, 'php', 1, $text));
-        }
-        $projects = new ProjectRegistry();
-        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $converter = new PositionConverter();
-        $extractor = $this->extractor($converter);
-        $indexes = new EventIndexRegistry();
-        $indexes->forProject($project)->replace(
-            [new Event('App\\Event\\OrderPlaced', 'App\\Event\\OrderPlaced')],
-            [new EventListener('App\\Event\\OrderPlaced', 'App\\EventListener\\NotifyCustomer', 'onOrderPlaced', 10)],
-            true,
-        );
-        $sourceIndexes = new EventSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace(
-            $extractor->extract(new SourceDocument($listenerUri, 'php', $listener)),
-            $extractor->extract(new SourceDocument($dispatcherUri, 'php', $dispatcher)),
-            $extractor->extract(new SourceDocument($invalidUri, 'php', $invalid)),
-        );
-        $classExtractor = new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser()));
-        $classIndexes = new DependencyInjectionSourceIndexRegistry();
-        $classIndexes->forProject($project)->replace(
-            new DependencyInjectionSourceFacts($eventUri, classes: $classExtractor->extract($eventUri, $event)),
-            new DependencyInjectionSourceFacts($listenerUri, classes: $classExtractor->extract($listenerUri, $listener)),
-            new DependencyInjectionSourceFacts($dispatcherUri, classes: $classExtractor->extract($dispatcherUri, $dispatcher)),
-        );
-        $documentResolver = new DocumentContextResolver($documents, $projects);
-        $protocol = new LspProtocolMapper();
-        $relationshipResolver = new EventRelationshipResolver($documentResolver, $converter, $protocol, $sourceIndexes, $extractor, $classExtractor, $classIndexes);
-        $completionProvider = new EventCompletionProvider($documentResolver, $converter, $protocol, $indexes, $extractor);
-        $relationshipProvider = new EventRelationshipProvider($protocol, $indexes, $relationshipResolver);
-        $diagnosticProvider = new EventDiagnosticProvider($documentResolver, $protocol, $sourceIndexes);
-        $codeLensProvider = new EventCodeLensProvider($documentResolver, $protocol, $indexes, $classExtractor, $relationshipResolver);
+        $kit = (new ProjectTestKit())
+            ->open($eventUri, $event)
+            ->open($listenerUri, $listener)
+            ->open($dispatcherUri, $dispatcher)
+            ->open($invalidUri, $invalid)
+            ->index()
+            ->runtime('events', [
+                'events' => [['name' => 'App\\Event\\OrderPlaced', 'class' => 'App\\Event\\OrderPlaced']],
+                'listeners' => [['event' => 'App\\Event\\OrderPlaced', 'class' => 'App\\EventListener\\NotifyCustomer', 'method' => 'onOrderPlaced', 'priority' => 10]],
+                'complete' => true,
+            ])
+        ;
+        $relationshipProvider = $kit->get(EventRelationshipProvider::class);
+        $codeLensProvider = $kit->get(EventCodeLensProvider::class);
 
-        $completionOffset = strpos($dispatcher, "App\\Event\\Ord');") + \strlen('App\\Event\\Ord');
-        self::assertSame(['App\\Event\\OrderPlaced'], array_column($completionProvider->complete(LspRequests::offset($dispatcherUri, $dispatcher, $completionOffset)) ?? [], 'label'));
-        $dispatchPosition = $converter->toPosition($dispatcher, (int) strpos($dispatcher, 'OrderPlaced());'));
-        self::assertStringContainsString('Symfony event', json_encode($relationshipProvider->hover(LspRequests::position($dispatcherUri, $dispatchPosition)), \JSON_THROW_ON_ERROR));
-        self::assertSame([$eventUri, $listenerUri], array_column($relationshipProvider->definition(LspRequests::position($dispatcherUri, $dispatchPosition)) ?? [], 'uri'));
+        self::assertSame(['App\\Event\\OrderPlaced'], $kit->labels($kit->get(EventCompletionProvider::class)->complete($kit->after($dispatcherUri, "'App\\Event\\Ord"))));
+        $dispatched = $kit->at($dispatcherUri, 'OrderPlaced());');
+        self::assertStringContainsString('Symfony event', $kit->hoverText($relationshipProvider->hover($dispatched)));
+        self::assertSame([$eventUri, $listenerUri], $kit->targets($relationshipProvider->definition($dispatched)));
 
-        $eventPosition = $converter->toPosition($event, (int) strpos($event, 'OrderPlaced'));
-        self::assertContains($dispatcherUri, array_column($relationshipProvider->references(LspRequests::position($eventUri, $eventPosition)) ?? [], 'uri'));
-        self::assertSame(['event.invalid_listener_method'], array_column($diagnosticProvider->diagnostics(LspRequests::document($invalidUri)) ?? [], 'code'));
-        $eventLens = $codeLensProvider->codeLenses(LspRequests::document($eventUri))[0] ?? null;
-        self::assertIsArray($eventLens);
-        self::assertIsArray($eventLens['command'] ?? null);
-        self::assertSame('1 event listener', $eventLens['command']['title'] ?? null);
-        $listenerLens = $codeLensProvider->codeLenses(LspRequests::document($listenerUri))[0] ?? null;
-        self::assertIsArray($listenerLens);
-        self::assertIsArray($listenerLens['command'] ?? null);
-        self::assertSame('Listens to 1 event', $listenerLens['command']['title'] ?? null);
+        $declared = $kit->at($eventUri, 'OrderPlaced');
+        self::assertContains($dispatcherUri, $kit->targets($relationshipProvider->references($declared)));
+        self::assertSame(['event.invalid_listener_method'], $kit->codes($kit->get(EventDiagnosticProvider::class)->diagnostics(LspRequests::document($invalidUri))));
+        self::assertSame(['1 event listener'], $kit->titles($codeLensProvider->codeLenses(LspRequests::document($eventUri))));
+        self::assertSame(['Listens to 1 event'], $kit->titles($codeLensProvider->codeLenses(LspRequests::document($listenerUri))));
     }
 
     public function testIgnoresCommentedPhpEventConstructs(): void
@@ -564,17 +517,9 @@ PHP;
         self::assertSame([], $facts->listeners);
     }
 
-    private function extractor(?PositionConverter $converter = null): EventExtractor
+    private function extractor(): EventExtractor
     {
-        $converter ??= new PositionConverter();
-
-        return new EventExtractor(
-            $converter,
-            new TolerantPhpParser(new Parser()),
-            new PhpCommentParser(),
-            new EventYamlListenerAnalyzer($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
-            new EventSubscriberMapAnalyzer($converter, new BalancedDelimiterMatcher()),
-        );
+        return (new ProjectTestKit())->get(EventExtractor::class);
     }
 
     public function testScopesEventDispatcherCompletionsToTheirReceiver(): void
