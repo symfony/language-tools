@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recognize Doctrine repository criteria and Console input names passed as the `criteria` and `name` named arguments
 - Stop reading a Twig `trans()` function call as a translation reference, since Symfony only defines the `trans` filter
 - Recognize Stimulus controllers, actions and targets passed to the `stimulus_*` Twig filters or as named arguments
 - Complete PHP translation placeholders from the domain the call passes instead of always the `messages` domain

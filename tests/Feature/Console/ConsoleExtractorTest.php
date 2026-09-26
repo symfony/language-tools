@@ -367,6 +367,40 @@ final class ConsoleExtractorTest extends TestCase
         self::assertNull($this->extractor()->completionContext('php', $unrelated, $cursor));
     }
 
+    public function testIndexesAndCompletesInputNamesPassedAsANamedArgument(): void
+    {
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\Console\Command\Command;
+            use Symfony\Component\Console\Input\InputInterface;
+            final class DemoCommand extends Command
+            {
+                public function execute(InputInterface $input): int
+                {
+                    $input->getArgument(name: 'user');
+                    $input->getOption(name: 'verbose');
+                    $input->getOption(other: 'ignored');
+                    $input->getOption(name: 'dry|
+                }
+            }
+            PHP;
+        $cursor = strpos($text, '|');
+        self::assertIsInt($cursor);
+        $text = str_replace('|', '', $text);
+        $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Command/DemoCommand.php', 'php', $text));
+        $context = $this->extractor()->completionContext('php', $text, $cursor);
+
+        self::assertSame(
+            [[ConsoleInputKind::Argument, 'user'], [ConsoleInputKind::Option, 'verbose']],
+            array_map(static fn ($reference): array => [$reference->kind, $reference->name], $facts->references),
+        );
+        self::assertSame(ConsoleInputKind::Option, $context?->kind);
+        self::assertSame('dry', $context->prefix);
+
+        $wrongName = str_replace("getOption(name: 'dry", "getOption(other: 'dry", $text);
+        self::assertNull($this->extractor()->completionContext('php', $wrongName, $cursor + 1));
+    }
+
     #[DataProvider('rejectedCompletionProvider')]
     public function testOffersNoCompletionWhereIndexingReadsNoInputName(string $call): void
     {

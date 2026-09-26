@@ -50,7 +50,7 @@ final class ConsoleExtractor
             if (!\in_array($call->method, ['getArgument', 'getOption'], true) || PhpReceiverMatch::Matches !== $php->matchReceiver($call, self::INPUT_INTERFACE)) {
                 continue;
             }
-            $name = $call->positionalArgument(0)?->stringLiteral;
+            $name = $call->namedOrPositionalArgument('name', 0)?->stringLiteral;
             $className = $call->className;
             if (null === $name || null === $className) {
                 continue;
@@ -75,7 +75,7 @@ final class ConsoleExtractor
         $php = $this->parser->parse($text);
         $cursor = $php->argumentCursorAt($offset);
         $call = $cursor?->call;
-        if (null === $cursor || !$call instanceof PhpMethodCall || !$cursor->isArgumentLiteral() || !$cursor->isPositional(0)) {
+        if (null === $cursor || !$call instanceof PhpMethodCall || !$cursor->isArgumentLiteral() || !$cursor->isNamedOrPositional('name', 0)) {
             return null;
         }
         $kind = match ($call->method) {

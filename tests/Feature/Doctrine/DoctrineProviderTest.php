@@ -574,6 +574,34 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame([], $extractor->extract(new SourceDocument('file:///workspace/src/Usage.php', 'php', $text))->symbols);
     }
 
+    public function testIndexesAndCompletesCriteriaPassedAsANamedArgument(): void
+    {
+        $extractor = $this->extractor();
+        $text = <<<'PHP'
+            <?php
+            use App\Repository\ProductRepository;
+
+            function find(ProductRepository $products): void
+            {
+                $products->findBy(criteria: ['name' => 'Symfony']);
+                $products->findOneBy(orderBy: ['price' => 'ASC'], criteria: ['category' => null]);
+                $products->count(criteria: ['stock' => 0]);
+                $products->findBy(orderBy: ['ignored' => 'ASC']);
+            }
+            PHP;
+
+        self::assertSame(
+            ['name', 'category', 'stock'],
+            array_map(static fn ($symbol): string => $symbol->name, $extractor->extract(new SourceDocument('file:///workspace/src/Usage.php', 'php', $text))->symbols),
+        );
+        foreach (['findBy', 'findOneBy', 'count'] as $method) {
+            $completion = "<?php\nuse App\\Repository\\ProductRepository;\nfunction find(ProductRepository \$products): void {\n    \$products->{$method}(criteria: ['na";
+            self::assertSame('na', $extractor->completionContext('php', $completion, \strlen($completion))?->prefix, $method);
+        }
+        $orderBy = "<?php\nuse App\\Repository\\ProductRepository;\nfunction find(ProductRepository \$products): void {\n    \$products->findBy(orderBy: ['na";
+        self::assertNull($extractor->completionContext('php', $orderBy, \strlen($orderBy)));
+    }
+
     public function testIgnoresComputedDoctrineContextClassArguments(): void
     {
         $facts = $this->extractor()->extract(new SourceDocument('file:///workspace/src/Usage.php', 'php', <<<'PHP'

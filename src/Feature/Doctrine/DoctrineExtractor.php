@@ -317,7 +317,8 @@ final class DoctrineExtractor
         $receivers = $this->repositoryReceivers->resolveCalls($source, $php, $php->methodCalls, $localRepositoryClasses);
         $symbols = [];
         foreach ($php->methodCalls as $call) {
-            if (!\in_array($call->method, ['findBy', 'findOneBy', 'count'], true) || null === $call->positionalArgument(0)) {
+            $criteria = $this->criteriaArgument($call);
+            if (null === $criteria) {
                 continue;
             }
             $receiver = $receivers[spl_object_id($call)] ?? null;
@@ -325,10 +326,15 @@ final class DoctrineExtractor
             if (null === $owner) {
                 continue;
             }
-            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $php, $call->positionalArgument(0), $owner));
+            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $php, $criteria, $owner));
         }
 
         return $symbols;
+    }
+
+    private function criteriaArgument(PhpMethodCall $call): ?PhpArgument
+    {
+        return \in_array($call->method, ['findBy', 'findOneBy', 'count'], true) ? $call->namedOrPositionalArgument('criteria', 0) : null;
     }
 
     /** @return list<DoctrineSourceSymbol> */
@@ -354,10 +360,7 @@ final class DoctrineExtractor
 
     private function repositoryCriteriaContext(string $text, string $source, PhpDocument $php, PhpArgumentCursor $cursor, PhpMethodCall $call): ?DoctrineCompletionContext
     {
-        if (!$cursor->isArrayItemLiteral()
-            || !\in_array($call->method, ['findBy', 'findOneBy', 'count'], true)
-            || $cursor->argument !== $call->positionalArgument(0)
-        ) {
+        if (!$cursor->isArrayItemLiteral() || $cursor->argument !== $this->criteriaArgument($call)) {
             return null;
         }
         $localRepositoryClasses = [];
