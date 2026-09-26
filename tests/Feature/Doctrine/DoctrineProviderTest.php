@@ -2,34 +2,26 @@
 
 namespace Symfony\Lsp\Tests\Feature\Doctrine;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Doctrine\DoctrineCompletionProvider;
-use Symfony\Lsp\Feature\Doctrine\DoctrineEntity;
 use Symfony\Lsp\Feature\Doctrine\DoctrineExtractor;
 use Symfony\Lsp\Feature\Doctrine\DoctrineField;
-use Symfony\Lsp\Feature\Doctrine\DoctrineFieldCompletionBuilder;
 use Symfony\Lsp\Feature\Doctrine\DoctrineIndexRegistry;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipProvider;
-use Symfony\Lsp\Feature\Doctrine\DoctrineRepositoryReceiverResolver;
 use Symfony\Lsp\Feature\Doctrine\DoctrineSymbolKind;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class DoctrineProviderTest extends TestCase
 {
@@ -121,69 +113,37 @@ final class DoctrineProviderTest extends TestCase
             $repository->findBy(['ca
             PHP;
 
-        $converter = new PositionConverter();
-        $extractor = $this->extractor($converter);
-        $project = new Project('/workspace', 'file:///workspace');
-        $projects = new ProjectRegistry();
-        $projects->replace([$project]);
-        $indexes = new DoctrineIndexRegistry();
-        $index = $indexes->forProject($project);
-        $index->replace(
-            $extractor->extract(new SourceDocument($entityUri, 'php', $entityText)),
-            $extractor->extract(new SourceDocument($repositoryUri, 'php', $repositoryText)),
-            $extractor->extract(new SourceDocument($usageUri, 'php', $usageText)),
-        );
-        $fieldNames = [];
-        foreach ($index->entity('App\\Entity\\Product')->fields ?? [] as $field) {
-            $fieldNames[] = $field->name;
-        }
-        self::assertSame(['id', 'name', 'category'], $fieldNames);
+        $kit = (new ProjectTestKit())
+            ->open($entityUri, $entityText)
+            ->open($repositoryUri, $repositoryText)
+            ->open($usageUri, $usageText)
+            ->open($formCompletionUri, $formCompletionText)
+            ->open($repositoryCompletionUri, $repositoryCompletionText)
+            ->open($managerCompletionUri, $managerCompletionText)
+            ->index([$entityUri => $entityText, $repositoryUri => $repositoryText, $usageUri => $usageText])
+        ;
+        $index = $kit->get(DoctrineIndexRegistry::class)->forProject($kit->project());
+        $completionProvider = $kit->get(DoctrineCompletionProvider::class);
+        $relationshipProvider = $kit->get(DoctrineRelationshipProvider::class);
+
+        self::assertSame(['id', 'name', 'category'], array_map(static fn (DoctrineField $field): string => $field->name, $index->entity('App\\Entity\\Product')->fields ?? []));
         self::assertSame('App\\Entity\\Product', $index->repository('App\\Repository\\ProductRepository')?->entityClass);
 
-        $documents = new DocumentStore();
-        foreach ([
-            [$entityUri, $entityText],
-            [$repositoryUri, $repositoryText],
-            [$usageUri, $usageText],
-            [$formCompletionUri, $formCompletionText],
-            [$repositoryCompletionUri, $repositoryCompletionText],
-            [$managerCompletionUri, $managerCompletionText],
-        ] as [$uri, $text]) {
-            $documents->open(new Document($uri, 'php', 1, $text));
-        }
-        $resolver = new DocumentContextResolver($documents, $projects);
-        $protocol = new LspProtocolMapper();
-        $completionBuilder = new DoctrineFieldCompletionBuilder($protocol);
-        $completionProvider = new DoctrineCompletionProvider($resolver, $converter, $indexes, $extractor, $completionBuilder);
-        $relationshipProvider = new DoctrineRelationshipProvider($resolver, new PositionedSourceSymbolResolver($converter), $protocol, $indexes, $extractor);
-        $codeLensProvider = new DoctrineRelationshipCodeLensProvider($resolver, $protocol, $indexes, $extractor);
+        self::assertSame(['name'], $kit->labels($completionProvider->complete($kit->offset($formCompletionUri, \strlen($formCompletionText)))));
+        self::assertSame(['name'], $kit->labels($completionProvider->complete($kit->offset($repositoryCompletionUri, \strlen($repositoryCompletionText)))));
+        self::assertSame(['category'], $kit->labels($completionProvider->complete($kit->offset($managerCompletionUri, \strlen($managerCompletionText)))));
 
-        self::assertSame(['name'], array_column($completionProvider->complete(LspRequests::offset($formCompletionUri, $formCompletionText, \strlen($formCompletionText))) ?? [], 'label'));
-        self::assertSame(['name'], array_column($completionProvider->complete(LspRequests::offset($repositoryCompletionUri, $repositoryCompletionText, \strlen($repositoryCompletionText))) ?? [], 'label'));
-        self::assertSame(['category'], array_column($completionProvider->complete(LspRequests::offset($managerCompletionUri, $managerCompletionText, \strlen($managerCompletionText))) ?? [], 'label'));
+        $field = $kit->after($usageUri, "['na");
+        self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($field)));
+        self::assertCount(3, $relationshipProvider->references($field) ?? []);
+        self::assertStringContainsString('Doctrine field: `App\\Entity\\Product::$name`', $kit->hoverText($relationshipProvider->hover($field)));
 
-        $fieldParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, "['name'") + 3);
-        self::assertSame([$entityUri], array_column($relationshipProvider->definition($fieldParams) ?? [], 'uri'));
-        self::assertCount(3, $relationshipProvider->references($fieldParams) ?? []);
-        $fieldHover = $relationshipProvider->hover($fieldParams);
-        self::assertIsArray($fieldHover);
-        self::assertIsArray($fieldHover['contents'] ?? null);
-        self::assertIsString($fieldHover['contents']['value'] ?? null);
-        self::assertStringContainsString('Doctrine field: `App\\Entity\\Product::$name`', $fieldHover['contents']['value']);
+        self::assertSame([$repositoryUri], $kit->targets($relationshipProvider->definition($kit->inside($entityUri, 'ProductRepository:'))));
+        self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($kit->inside($repositoryUri, 'Product:'))));
 
-        $repositoryParams = LspRequests::offset($entityUri, $entityText, strpos($entityText, 'ProductRepository::class') + 2);
-        self::assertSame([$repositoryUri], array_column($relationshipProvider->definition($repositoryParams) ?? [], 'uri'));
-        $entityParams = LspRequests::offset($repositoryUri, $repositoryText, strpos($repositoryText, 'Product::class') + 2);
-        self::assertSame([$entityUri], array_column($relationshipProvider->definition($entityParams) ?? [], 'uri'));
-
-        $entityLenses = $codeLensProvider->codeLenses(LspRequests::document($entityUri));
-        self::assertIsArray($entityLenses);
-        self::assertIsArray($entityLenses[0]['command'] ?? null);
-        self::assertSame('Repository: App\\Repository\\ProductRepository', $entityLenses[0]['command']['title'] ?? null);
-        $repositoryLenses = $codeLensProvider->codeLenses(LspRequests::document($repositoryUri));
-        self::assertIsArray($repositoryLenses);
-        self::assertIsArray($repositoryLenses[0]['command'] ?? null);
-        self::assertSame('Entity: App\\Entity\\Product', $repositoryLenses[0]['command']['title'] ?? null);
+        $codeLensProvider = $kit->get(DoctrineRelationshipCodeLensProvider::class);
+        self::assertSame(['Repository: App\\Repository\\ProductRepository'], $kit->titles($codeLensProvider->codeLenses(LspRequests::document($entityUri))));
+        self::assertSame(['Entity: App\\Entity\\Product'], $kit->titles($codeLensProvider->codeLenses(LspRequests::document($repositoryUri))));
     }
 
     public function testMapsOnlyCompleteClassReferencesInMappingAttributes(): void
@@ -268,8 +228,9 @@ final class DoctrineProviderTest extends TestCase
 
     public function testUsesPropertyPlacementAndScopedRepositoryReceivers(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->extractor($converter);
+        $kit = new ProjectTestKit();
+        $converter = $kit->get(PositionConverter::class);
+        $extractor = $kit->get(DoctrineExtractor::class);
         $entityText = <<<'PHP'
             <?php
             namespace App\Entity;
@@ -417,8 +378,9 @@ final class DoctrineProviderTest extends TestCase
 
     public function testGivesATargetEntityToAssociationsOnly(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->extractor($converter);
+        $kit = new ProjectTestKit();
+        $converter = $kit->get(PositionConverter::class);
+        $extractor = $kit->get(DoctrineExtractor::class);
         $uri = 'file:///workspace/src/Entity/Product.php';
         $text = <<<'PHP'
             <?php
@@ -606,8 +568,9 @@ final class DoctrineProviderTest extends TestCase
 
     public function testExtractsConservativeDecodedLiteralArrayFacts(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->extractor($converter);
+        $kit = new ProjectTestKit();
+        $converter = $kit->get(PositionConverter::class);
+        $extractor = $kit->get(DoctrineExtractor::class);
         $text = <<<'PHP'
             <?php
             namespace App\Service;
@@ -660,8 +623,9 @@ final class DoctrineProviderTest extends TestCase
 
     public function testIgnoresCommentedDoctrinePhpWhilePreservingActiveRanges(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->extractor($converter);
+        $kit = new ProjectTestKit();
+        $converter = $kit->get(PositionConverter::class);
+        $extractor = $kit->get(DoctrineExtractor::class);
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -714,21 +678,7 @@ final class DoctrineProviderTest extends TestCase
 
     public function testNavigatesToRuntimeOnlyEntities(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->extractor($converter);
-        $project = new Project('/workspace', 'file:///workspace');
-        $projects = new ProjectRegistry();
-        $projects->replace([$project]);
-        $indexes = new DoctrineIndexRegistry();
         $entityUri = 'file:///workspace/vendor/acme/entity/Book.php';
-        $range = new Range(new Position(0, 0), new Position(0, 0));
-        $indexes->forProject($project)->replaceRuntime(new DoctrineEntity(
-            'Acme\Entity\Book',
-            $entityUri,
-            $range,
-            null,
-            [new DoctrineField('title', $entityUri, $range, false, 'string')],
-        ));
         $usageUri = 'file:///workspace/src/Finder.php';
         $usageText = <<<'PHP'
             <?php
@@ -736,17 +686,19 @@ final class DoctrineProviderTest extends TestCase
             $repository = $manager->getRepository(Book::class);
             $repository->findBy(['title' => 'Symfony']);
             PHP;
-        $documents = new DocumentStore();
-        $documents->open(new Document($usageUri, 'php', 1, $usageText));
-        $provider = new DoctrineRelationshipProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor);
+        $kit = (new ProjectTestKit())
+            ->open($usageUri, $usageText)
+            ->runtime('doctrine', ['entities' => [[
+                'className' => 'Acme\Entity\Book',
+                'file' => '/workspace/vendor/acme/entity/Book.php',
+                'fields' => [['name' => 'title', 'type' => 'string']],
+            ]]])
+        ;
+        $provider = $kit->get(DoctrineRelationshipProvider::class);
+        $field = $kit->after($usageUri, "['ti");
 
-        $params = LspRequests::offset($usageUri, $usageText, strpos($usageText, "['title'") + 3);
-        self::assertSame([$entityUri], array_column($provider->definition($params) ?? [], 'uri'));
-        $hover = $provider->hover($params);
-        self::assertIsArray($hover);
-        self::assertIsArray($hover['contents'] ?? null);
-        self::assertIsString($hover['contents']['value'] ?? null);
-        self::assertStringContainsString('Doctrine field: `Acme\Entity\Book::$title`', $hover['contents']['value']);
+        self::assertSame([$entityUri], $kit->targets($provider->definition($field)));
+        self::assertStringContainsString('Doctrine field: `Acme\Entity\Book::$title`', $kit->hoverText($provider->hover($field)));
     }
 
     public function testOffersNoDoctrineCompletionsInsidePhpComments(): void
@@ -763,14 +715,8 @@ final class DoctrineProviderTest extends TestCase
         self::assertNull($extractor->completionContext('php', $text, strpos($text, "['na") + \strlen("['na")));
     }
 
-    private function extractor(?PositionConverter $converter = null): DoctrineExtractor
+    private function extractor(): DoctrineExtractor
     {
-        return new DoctrineExtractor(
-            $converter ?? new PositionConverter(),
-            new TolerantPhpParser(new Parser()),
-            new PhpCommentParser(),
-            new DoctrineRepositoryReceiverResolver(),
-            new PhpLiteralArrayKeyParser(),
-        );
+        return (new ProjectTestKit())->get(DoctrineExtractor::class);
     }
 }
