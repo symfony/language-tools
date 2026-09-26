@@ -143,7 +143,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             return [];
         }
 
-        return array_map(fn (TranslationDeclaration $declaration): array => $this->protocol->location($declaration->uri, $declaration->range), $this->indexes->forProject($resolved->project)->declarations($resolved->reference->domain, $resolved->reference->key));
+        return $this->declarationLocations($resolved);
     }
 
     public function references(ReferencesRequest $request): array
@@ -153,7 +153,9 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             return [];
         }
 
-        return array_map(fn (TranslationReference $item): array => $this->protocol->location($item->uri, $item->range), $this->indexes->forProject($resolved->project)->references($resolved->reference->domain, $resolved->reference->key));
+        $locations = array_map(fn (TranslationReference $item): array => $this->protocol->location($item->uri, $item->range), $this->indexes->forProject($resolved->project)->references($resolved->reference->domain, $resolved->reference->key));
+
+        return $request->includeDeclaration ? [...$locations, ...$this->declarationLocations($resolved)] : $locations;
     }
 
     public function name(): string
@@ -219,6 +221,12 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
     private function missingKeyDiagnostics(Project $project): bool
     {
         return true === $this->settings->forProject($project)->translationDiagnostics;
+    }
+
+    /** @return list<array{uri: string, range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}}> */
+    private function declarationLocations(ResolvedTranslationReference $resolved): array
+    {
+        return array_map(fn (TranslationDeclaration $declaration): array => $this->protocol->location($declaration->uri, $declaration->range), $this->indexes->forProject($resolved->project)->declarations($resolved->reference->domain, $resolved->reference->key));
     }
 
     private function resolve(PositionedRequest $request): ?ResolvedTranslationReference

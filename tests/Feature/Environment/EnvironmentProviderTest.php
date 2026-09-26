@@ -138,7 +138,8 @@ final class EnvironmentProviderTest extends TestCase
         $liveParams = $kit->offset($uri, $liveNameStart + 1);
         self::assertIsArray($relationshipProvider->hover($kit->positioned($liveParams)));
         self::assertSame([self::DOTENV_URI], $kit->targets($relationshipProvider->definition($kit->positioned($liveParams))));
-        $references = $relationshipProvider->references($kit->references($liveParams));
+        self::assertSame([$uri, self::DOTENV_URI], $kit->targets($relationshipProvider->references($kit->references($liveParams))));
+        $references = $relationshipProvider->references($kit->references($liveParams, false));
         self::assertSame([$uri], $kit->targets($references));
         /** @var array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}} $reference */
         $reference = $references[0];

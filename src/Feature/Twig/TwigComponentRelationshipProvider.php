@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Twig;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
@@ -73,16 +74,8 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
             return [];
         }
         [$component, $project] = $resolved;
-        $locations = [];
-        foreach ($this->indexes->forProject($project)->declarations($component->name) as $declaration) {
-            $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
-        }
-        if ([] === $locations && '' !== $component->uri) {
-            // vendor components have no source declaration; open the class
-            $locations[] = $this->protocol->location($component->uri, $component->range);
-        }
 
-        return $locations;
+        return $this->componentLocations($component, $project);
     }
 
     public function references(ReferencesRequest $request): array
@@ -105,6 +98,21 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
         $locations = [];
         foreach ($this->indexes->forProject($project)->references($component->name) as $reference) {
             $locations[] = $this->protocol->location($reference->uri, $reference->range);
+        }
+
+        return $request->includeDeclaration ? [...$locations, ...$this->componentLocations($component, $project)] : $locations;
+    }
+
+    /** @return list<array{uri: string, range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}}> */
+    private function componentLocations(TwigComponent $component, Project $project): array
+    {
+        $locations = [];
+        foreach ($this->indexes->forProject($project)->declarations($component->name) as $declaration) {
+            $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
+        }
+        if ([] === $locations && '' !== $component->uri) {
+            // vendor components have no source declaration; open the class
+            $locations[] = $this->protocol->location($component->uri, $component->range);
         }
 
         return $locations;

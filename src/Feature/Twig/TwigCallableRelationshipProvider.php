@@ -65,6 +65,50 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
             return [];
         }
         [, $declarations, $project] = $resolved;
+
+        return $this->declarationLocations($project, $declarations);
+    }
+
+    public function references(ReferencesRequest $request): array
+    {
+        $resolved = $this->resolve($request);
+        if (null !== $resolved) {
+            [, $declarations, $project] = $resolved;
+
+            return $this->referenceLocations($request, $project, $declarations);
+        }
+
+        if ('php' !== $request->document->languageId) {
+            return [];
+        }
+        $index = $this->indexes->forProject($request->project);
+        $declaration = $index->declarationAt($request->document->uri, $request->position);
+        if (null !== $declaration) {
+            return $this->referenceLocations($request, $request->project, [$declaration]);
+        }
+        if (!$index->hasCallableDeclarations()) {
+            return [];
+        }
+        $offset = $request->offset;
+        foreach ($this->phpParser->parse($request->document->text)->methodDeclarations as $method) {
+            if ($offset < $method->nameStartOffset || $offset > $method->nameEndOffset) {
+                continue;
+            }
+            $declarations = $index->declarationsForCallable($method->className, $method->name);
+
+            return $this->referenceLocations($request, $request->project, $declarations);
+        }
+
+        return [];
+    }
+
+    /**
+     * @param list<TwigCallableDeclaration> $declarations
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    private function declarationLocations(Project $project, array $declarations): array
+    {
         $methods = [];
         foreach ($this->methods->resolve($project, $declarations) as $method) {
             $methods[TwigCallableKey::from($method->declaration->className, $method->declaration->name)][] = $method;
@@ -92,39 +136,6 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
         return $this->unique($locations);
     }
 
-    public function references(ReferencesRequest $request): array
-    {
-        $resolved = $this->resolve($request);
-        if (null !== $resolved) {
-            [, $declarations, $project] = $resolved;
-
-            return $this->referenceLocations($project, $declarations);
-        }
-
-        if ('php' !== $request->document->languageId) {
-            return [];
-        }
-        $index = $this->indexes->forProject($request->project);
-        $declaration = $index->declarationAt($request->document->uri, $request->position);
-        if (null !== $declaration) {
-            return $this->referenceLocations($request->project, [$declaration]);
-        }
-        if (!$index->hasCallableDeclarations()) {
-            return [];
-        }
-        $offset = $request->offset;
-        foreach ($this->phpParser->parse($request->document->text)->methodDeclarations as $method) {
-            if ($offset < $method->nameStartOffset || $offset > $method->nameEndOffset) {
-                continue;
-            }
-            $declarations = $index->declarationsForCallable($method->className, $method->name);
-
-            return $this->referenceLocations($request->project, $declarations);
-        }
-
-        return [];
-    }
-
     /** @return array{TwigCallableReference, list<TwigCallableDeclaration>, Project}|null */
     private function resolve(PositionedRequest $request): ?array
     {
@@ -144,9 +155,9 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
     /**
      * @param list<TwigCallableDeclaration> $declarations
      *
-     * @return list<array<string, mixed>>
+     * @return list<array<array-key, mixed>>
      */
-    private function referenceLocations(Project $project, array $declarations): array
+    private function referenceLocations(ReferencesRequest $request, Project $project, array $declarations): array
     {
         $pairs = [];
         foreach ($declarations as $declaration) {
@@ -161,10 +172,12 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
             usort($usages, SourceSymbolOrder::byLocation(...));
         }
 
-        return array_map(
+        $locations = array_map(
             fn (TwigCallableUsage $usage): array => $this->protocol->location($usage->uri, $usage->range),
             $usages,
         );
+
+        return $request->includeDeclaration ? [...$locations, ...$this->declarationLocations($project, $declarations)] : $locations;
     }
 
     /**

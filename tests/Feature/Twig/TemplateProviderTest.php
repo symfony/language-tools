@@ -633,7 +633,8 @@ final class TemplateProviderTest extends TestCase
         ];
         $requests = new ProviderRequests($documents, $projects);
         self::assertSame([$classUri, $templateUri], array_column($relationshipProvider->definition($requests->positioned($params)), 'uri'));
-        self::assertCount(1, $relationshipProvider->references($requests->references($params)));
+        self::assertSame([$usageUri], array_column($relationshipProvider->references($requests->references($params, false)), 'uri'));
+        self::assertSame([$usageUri, $classUri, $templateUri], array_column($relationshipProvider->references($requests->references($params)), 'uri'));
         $hover = $relationshipProvider->hover($requests->positioned($params));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
@@ -1130,7 +1131,8 @@ final class TemplateProviderTest extends TestCase
             'file:///workspace/templates/snippet.txt',
             $navigation->links($requests->document($uri))[0]['target'] ?? null,
         );
-        self::assertSame([$uri], array_column($navigation->references($requests->references($params)), 'uri'));
+        self::assertSame([$uri], array_column($navigation->references($requests->references($params, false)), 'uri'));
+        self::assertSame([$uri, 'file:///workspace/templates/snippet.txt'], array_column($navigation->references($requests->references($params)), 'uri'));
     }
 
     public function testKeepsLeadingDotSlashNamesInTheMainNamespace(): void

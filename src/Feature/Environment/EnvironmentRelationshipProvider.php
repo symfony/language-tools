@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Environment;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
@@ -52,7 +53,7 @@ final class EnvironmentRelationshipProvider implements DefinitionProviderInterfa
         }
         [$reference, $project] = $resolved;
 
-        return array_map(fn (EnvironmentDeclaration $declaration): array => $this->protocol->location($declaration->uri, $declaration->range), $this->indexes->forProject($project)->declarations($reference->name));
+        return $this->declarationLocations($project, $reference->name);
     }
 
     public function references(ReferencesRequest $request): array
@@ -63,6 +64,14 @@ final class EnvironmentRelationshipProvider implements DefinitionProviderInterfa
         }
         [$reference, $project] = $resolved;
 
-        return array_map(fn (EnvironmentReference $item): array => $this->protocol->location($item->uri, $item->range), $this->indexes->forProject($project)->references($reference->name));
+        $locations = array_map(fn (EnvironmentReference $item): array => $this->protocol->location($item->uri, $item->range), $this->indexes->forProject($project)->references($reference->name));
+
+        return $request->includeDeclaration ? [...$locations, ...$this->declarationLocations($project, $reference->name)] : $locations;
+    }
+
+    /** @return list<array{uri: string, range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}}> */
+    private function declarationLocations(Project $project, string $name): array
+    {
+        return array_map(fn (EnvironmentDeclaration $declaration): array => $this->protocol->location($declaration->uri, $declaration->range), $this->indexes->forProject($project)->declarations($name));
     }
 }

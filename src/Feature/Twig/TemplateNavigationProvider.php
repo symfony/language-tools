@@ -60,7 +60,9 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         }
         [$template, $project] = $resolved;
 
-        return array_map(fn (TemplateReference $reference): array => $this->protocol->location($reference->uri, $reference->range), $this->indexes->forProject($project)->references($template->name));
+        $locations = array_map(fn (TemplateReference $reference): array => $this->protocol->location($reference->uri, $reference->range), $this->indexes->forProject($project)->references($template->name));
+
+        return $request->includeDeclaration ? [...$locations, $this->protocol->location($template->uri, $template->range)] : $locations;
     }
 
     public function links(DocumentRequest $request): array

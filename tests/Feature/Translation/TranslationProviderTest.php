@@ -25,6 +25,7 @@ use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
@@ -425,6 +426,19 @@ final class TranslationProviderTest extends TestCase
             @rmdir($root.'/translations');
             @rmdir($root);
         }
+    }
+
+    public function testReportsTheCatalogDeclarationOnlyWhenReferencesIncludeIt(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $text = "{{ 'foo'|trans }}";
+        $catalogUri = 'file:///workspace/translations/messages.en.yaml';
+        [$provider, , , , $requests] = $this->provider($uri, $text, 'twig', [[$catalogUri, 'yaml', "foo: Foo\n"]]);
+        $params = LspRequests::inside($uri, $text, 'foo');
+
+        self::assertSame([$catalogUri], array_column($provider->definition($requests->positioned($params)), 'uri'));
+        self::assertSame([$uri], array_column($provider->references($requests->references($params, false)), 'uri'));
+        self::assertSame([$uri, $catalogUri], array_column($provider->references($requests->references($params)), 'uri'));
     }
 
     public function testMissingDiagnosticsAreProjectScopedAndOptIn(): void
