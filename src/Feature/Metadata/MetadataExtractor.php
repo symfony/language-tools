@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceSymbols;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -102,12 +103,6 @@ final class MetadataExtractor
      */
     private function unique(array $symbols): array
     {
-        $unique = [];
-        foreach ($symbols as $symbol) {
-            $key = $symbol->kind->value.'|'.$symbol->range->start->line.'|'.$symbol->range->start->character;
-            $unique[$key] = $symbol;
-        }
-
-        return array_values($unique);
+        return SourceSymbols::unique($symbols, static fn (MetadataSourceSymbol $symbol): string => $symbol->kind->value);
     }
 }

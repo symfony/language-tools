@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Index\SourceSymbols;
 use Symfony\Lsp\Parser\Yaml\YamlDocument;
 use Symfony\Lsp\Parser\Yaml\YamlScalar;
 
@@ -71,13 +72,10 @@ final class YamlDependencyInjectionReferenceExtractor
             array_push($references, ...$lineReferences);
         }
 
-        $unique = [];
-        foreach ($references as $reference) {
-            $key = $reference->kind->value."\0".$reference->name."\0".$reference->range->start->line."\0".$reference->range->start->character;
-            $unique[$key] = $reference;
-        }
-
-        return array_values($unique);
+        return SourceSymbols::unique(
+            $references,
+            static fn (DependencyInjectionReference $reference): string => $reference->kind->value."\0".$reference->name,
+        );
     }
 
     /** @return array<string, true> */

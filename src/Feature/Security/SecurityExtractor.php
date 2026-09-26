@@ -7,6 +7,7 @@ use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\ConfigurationOccurrence;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceSymbols;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -55,7 +56,7 @@ final class SecurityExtractor
             default => [],
         };
 
-        return new SecuritySourceFacts($document->uri, $this->unique($symbols));
+        return new SecuritySourceFacts($document->uri, SourceSymbols::unique($symbols, static fn (SecuritySourceSymbol $symbol): string => $symbol->kind->value));
     }
 
     public function completionContext(string $languageId, string $text, int $offset): ?SecurityCompletionContext
@@ -286,21 +287,5 @@ final class SecurityExtractor
         }
 
         return false;
-    }
-
-    /**
-     * @param list<SecuritySourceSymbol> $symbols
-     *
-     * @return list<SecuritySourceSymbol>
-     */
-    private function unique(array $symbols): array
-    {
-        $unique = [];
-        foreach ($symbols as $symbol) {
-            $key = $symbol->kind->value.'|'.$symbol->range->start->line.'|'.$symbol->range->start->character;
-            $unique[$key] = $symbol;
-        }
-
-        return array_values($unique);
     }
 }

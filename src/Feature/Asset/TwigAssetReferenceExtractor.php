@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Index\SourceSymbols;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
@@ -45,7 +46,7 @@ final class TwigAssetReferenceExtractor
             $symbols[] = $this->symbol(AssetSymbolKind::Asset, $literal, $uri, $text);
         }
 
-        return $this->unique($symbols);
+        return SourceSymbols::unique($symbols, static fn (AssetSourceSymbol $symbol): string => $symbol->kind->value);
     }
 
     /**
@@ -86,21 +87,5 @@ final class TwigAssetReferenceExtractor
             $this->converter->toRange($text, $literal->startOffset, $literal->endOffset - $literal->startOffset),
             false,
         );
-    }
-
-    /**
-     * @param list<AssetSourceSymbol> $symbols
-     *
-     * @return list<AssetSourceSymbol>
-     */
-    private function unique(array $symbols): array
-    {
-        $unique = [];
-        foreach ($symbols as $symbol) {
-            $key = $symbol->kind->value.'|'.$symbol->range->start->line.'|'.$symbol->range->start->character;
-            $unique[$key] = $symbol;
-        }
-
-        return array_values($unique);
     }
 }

@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceSymbols;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -90,7 +91,12 @@ final class MessengerExtractor
             }
         }
 
-        return new MessengerSourceFacts($document->uri, $this->unique($symbols), $parents, $handlers);
+        return new MessengerSourceFacts(
+            $document->uri,
+            SourceSymbols::unique($symbols, static fn (MessengerSourceSymbol $symbol): string => $symbol->kind->name),
+            $parents,
+            $handlers,
+        );
     }
 
     /** @return list<MessengerSourceSymbol> */
@@ -216,21 +222,5 @@ final class MessengerExtractor
         }
 
         return $parents;
-    }
-
-    /**
-     * @param list<MessengerSourceSymbol> $symbols
-     *
-     * @return list<MessengerSourceSymbol>
-     */
-    private function unique(array $symbols): array
-    {
-        $unique = [];
-        foreach ($symbols as $symbol) {
-            $key = $symbol->kind->name.'|'.$symbol->range->start->line.'|'.$symbol->range->start->character;
-            $unique[$key] = $symbol;
-        }
-
-        return array_values($unique);
     }
 }

@@ -3,9 +3,10 @@
 namespace Symfony\Lsp\Feature\Messenger;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 use Symfony\Lsp\Index\NamedSourceSymbolInterface;
 
-final class MessengerSourceSymbol implements NamedSourceSymbolInterface
+final class MessengerSourceSymbol implements LocatedSourceSymbolInterface, NamedSourceSymbolInterface
 {
     public function __construct(
         public readonly MessengerSymbolKind $kind,

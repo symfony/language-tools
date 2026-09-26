@@ -3,10 +3,10 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 use Symfony\Lsp\Index\NamedSourceSymbolInterface;
-use Symfony\Lsp\Index\RangedSourceSymbolInterface;
 
-final class MetadataSourceSymbol implements NamedSourceSymbolInterface, RangedSourceSymbolInterface
+final class MetadataSourceSymbol implements LocatedSourceSymbolInterface, NamedSourceSymbolInterface
 {
     public function __construct(
         public readonly MetadataSymbolKind $kind,

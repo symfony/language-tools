@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Feature\Event;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceSymbols;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
@@ -145,7 +146,12 @@ final class EventExtractor
 
         array_push($symbols, ...$this->subscriberMapAnalyzer->symbols($uri, $text, $source, $php));
 
-        return new EventSourceFacts($uri, $this->unique($symbols), $invalidListenerMethods, $listeners);
+        return new EventSourceFacts(
+            $uri,
+            SourceSymbols::unique($symbols, static fn (EventSourceSymbol $symbol): string => $symbol->name),
+            $invalidListenerMethods,
+            $listeners,
+        );
     }
 
     private function symbol(string $name, string $uri, string $text, int $offset, bool $declaration, ?int $length = null): EventSourceSymbol
@@ -181,21 +187,5 @@ final class EventExtractor
     private function hasEventDispatcherReceiver(PhpDocument $php, PhpMethodCall $call): bool
     {
         return PhpReceiverMatch::Matches === $php->matchReceiver($call, ...self::DISPATCHER_TYPES);
-    }
-
-    /**
-     * @param list<EventSourceSymbol> $symbols
-     *
-     * @return list<EventSourceSymbol>
-     */
-    private function unique(array $symbols): array
-    {
-        $unique = [];
-        foreach ($symbols as $symbol) {
-            $key = $symbol->name.'|'.$symbol->range->start->line.'|'.$symbol->range->start->character;
-            $unique[$key] = $symbol;
-        }
-
-        return array_values($unique);
     }
 }

@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 
-final class ServiceDeclaration
+final class ServiceDeclaration implements LocatedSourceSymbolInterface
 {
     /** @param list<string> $tags */
     public function __construct(

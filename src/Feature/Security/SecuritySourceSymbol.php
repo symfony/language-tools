@@ -3,10 +3,10 @@
 namespace Symfony\Lsp\Feature\Security;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 use Symfony\Lsp\Index\NamedSourceSymbolInterface;
-use Symfony\Lsp\Index\RangedSourceSymbolInterface;
 
-final class SecuritySourceSymbol implements NamedSourceSymbolInterface, RangedSourceSymbolInterface
+final class SecuritySourceSymbol implements LocatedSourceSymbolInterface, NamedSourceSymbolInterface
 {
     public function __construct(
         public readonly SecuritySymbolKind $kind,

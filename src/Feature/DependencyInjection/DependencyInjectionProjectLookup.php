@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
+use Symfony\Lsp\Index\SourceSymbols;
 use Symfony\Lsp\Project\Project;
 
 final class DependencyInjectionProjectLookup
@@ -129,7 +130,7 @@ final class DependencyInjectionProjectLookup
             }
         }
 
-        return $this->uniqueTargets($targets);
+        return SourceSymbols::unique($targets);
     }
 
     /** @return list<ServiceDeclaration|ParameterDeclaration> */
@@ -171,22 +172,5 @@ final class DependencyInjectionProjectLookup
             $declaration->decorates,
             [],
         );
-    }
-
-    /**
-     * @param list<ServiceDeclaration|PhpClassDeclaration> $targets
-     *
-     * @return list<ServiceDeclaration|PhpClassDeclaration>
-     */
-    private function uniqueTargets(array $targets): array
-    {
-        $unique = [];
-        foreach ($targets as $target) {
-            $range = $target->range;
-            $key = $target->uri."\0".$range->start->line."\0".$range->start->character."\0".$range->end->line."\0".$range->end->character;
-            $unique[$key] = $target;
-        }
-
-        return array_values($unique);
     }
 }

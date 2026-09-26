@@ -3,10 +3,10 @@
 namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 use Symfony\Lsp\Index\NamedSourceSymbolInterface;
-use Symfony\Lsp\Index\RangedSourceSymbolInterface;
 
-final class DoctrineSourceSymbol implements NamedSourceSymbolInterface, RangedSourceSymbolInterface
+final class DoctrineSourceSymbol implements LocatedSourceSymbolInterface, NamedSourceSymbolInterface
 {
     public function __construct(
         public readonly DoctrineSymbolKind $kind,

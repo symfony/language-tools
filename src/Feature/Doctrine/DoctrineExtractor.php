@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Doctrine;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceSymbols;
 use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpArgumentCursor;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
@@ -88,7 +89,10 @@ final class DoctrineExtractor
         array_push($symbols, ...$this->formSymbols($document->uri, $document->text, $source, $php));
         array_push($symbols, ...$this->repositorySymbols($document->uri, $document->text, $source, $php, $repositories));
 
-        return new DoctrineSourceFacts($document->uri, $entities, $repositories, $this->unique($symbols));
+        return new DoctrineSourceFacts($document->uri, $entities, $repositories, SourceSymbols::unique(
+            $symbols,
+            static fn (DoctrineSourceSymbol $symbol): string => $symbol->kind->value."\0".$symbol->owner."\0".$symbol->name,
+        ));
     }
 
     public function completionContext(string $languageId, string $text, int $offset): ?DoctrineCompletionContext
@@ -493,20 +497,5 @@ final class DoctrineExtractor
         $shortName = strtolower(false === $separator ? $type : substr($type, $separator + 1));
 
         return \in_array($shortName, ['array', 'collection', 'iterable', 'mixed'], true) ? null : $type;
-    }
-
-    /** @param list<DoctrineSourceSymbol> $symbols
-     *
-     * @return list<DoctrineSourceSymbol>
-     */
-    private function unique(array $symbols): array
-    {
-        $unique = [];
-        foreach ($symbols as $symbol) {
-            $key = implode('|', [$symbol->kind->value, $symbol->owner, $symbol->name, $symbol->uri, serialize($symbol->range)]);
-            $unique[$key] = $symbol;
-        }
-
-        return array_values($unique);
     }
 }
