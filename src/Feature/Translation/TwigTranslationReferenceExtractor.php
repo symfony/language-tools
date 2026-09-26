@@ -4,8 +4,6 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
@@ -15,8 +13,6 @@ final class TwigTranslationReferenceExtractor
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TwigDocumentParser $parser,
-        private readonly TwigCallArgumentResolver $arguments,
-        private readonly TwigCommentParser $comments,
         private readonly TranslationParameterAnalyzer $parameters,
     ) {
     }
@@ -25,11 +21,10 @@ final class TwigTranslationReferenceExtractor
     public function extract(string $uri, string $text): array
     {
         $document = $this->parser->parse($text);
-        $masked = $this->comments->mask($text);
         $defaultDomain = $this->defaultDomain($document);
 
         $references = [];
-        foreach ($this->calls($document, $masked) as $call) {
+        foreach ($this->calls($document) as $call) {
             $domain = $this->domain($document, $call['domain'], $defaultDomain);
             if (null !== $domain) {
                 $references[] = $this->reference(
@@ -54,7 +49,7 @@ final class TwigTranslationReferenceExtractor
     {
         $document = $this->parser->parse($text);
         $defaultDomain = $this->defaultDomain($document);
-        foreach ($this->calls($document, $this->comments->mask($text)) as $call) {
+        foreach ($this->calls($document) as $call) {
             if ($offset >= $call['key']->startOffset && $offset <= $call['key']->endOffset) {
                 return $this->domain($document, $call['domain'], $defaultDomain);
             }
@@ -64,9 +59,21 @@ final class TwigTranslationReferenceExtractor
     }
 
     /** @return list<array{key: TwigStringLiteral, domain: ?TreeSitterNode, parameters: ?TreeSitterNode}> */
-    private function calls(TwigDocument $document, string $masked): array
+    private function calls(TwigDocument $document): array
     {
-        return [...$this->filterCalls($document, $masked), ...$this->functionCalls($document)];
+        $calls = [];
+        foreach ([...$document->filters('trans'), ...$document->functions('trans', 't')] as $call) {
+            $key = $call->argument(0, 'id', 'message')?->literal();
+            if (null !== $key) {
+                $calls[] = [
+                    'key' => $key,
+                    'domain' => $call->argument(2, 'domain')?->node,
+                    'parameters' => $call->argument(1, 'arguments', 'parameters')?->node,
+                ];
+            }
+        }
+
+        return $calls;
     }
 
     private function defaultDomain(TwigDocument $document): string
@@ -83,86 +90,6 @@ final class TwigTranslationReferenceExtractor
         }
 
         return 'messages';
-    }
-
-    /** @return list<array{key: TwigStringLiteral, domain: ?TreeSitterNode, parameters: ?TreeSitterNode}> */
-    private function filterCalls(TwigDocument $document, string $masked): array
-    {
-        $literals = [];
-        foreach (['string', 'interpolated_string'] as $type) {
-            foreach ($document->nodesOfType($type) as $node) {
-                if (null !== $literal = $document->stringLiteral($node)) {
-                    $literals[] = ['parent' => $node->parent, 'literal' => $literal];
-                }
-            }
-        }
-
-        $calls = [];
-        foreach ($document->nodesOfType('filter') as $filter) {
-            $identifier = $document->directChild($filter, 'filter_identifier');
-            if (null === $identifier || 'trans' !== $document->text($identifier)) {
-                continue;
-            }
-            $key = $this->filteredLiteral($masked, $filter, $literals);
-            if (null === $key) {
-                continue;
-            }
-            $arguments = $this->arguments->resolve($document, $filter);
-            $calls[] = [
-                'key' => $key,
-                'domain' => $arguments->get(1, 'domain'),
-                'parameters' => $arguments->get(0, 'arguments', 'parameters'),
-            ];
-        }
-
-        return $calls;
-    }
-
-    /**
-     * @param list<array{parent: int|null, literal: TwigStringLiteral}> $literals
-     */
-    private function filteredLiteral(string $source, TreeSitterNode $filter, array $literals): ?TwigStringLiteral
-    {
-        $candidate = null;
-        foreach ($literals as $literal) {
-            if ($filter->parent !== $literal['parent'] || $literal['literal']->endOffset >= $filter->startByte) {
-                continue;
-            }
-            if (null === $candidate || $literal['literal']->endOffset > $candidate->endOffset) {
-                $candidate = $literal['literal'];
-            }
-        }
-        if (null === $candidate) {
-            return null;
-        }
-        $separator = substr($source, $candidate->endOffset + 1, $filter->startByte - $candidate->endOffset - 1);
-
-        return 1 === preg_match('/^\s*\|\s*$/D', $separator) ? $candidate : null;
-    }
-
-    /** @return list<array{key: TwigStringLiteral, domain: ?TreeSitterNode, parameters: ?TreeSitterNode}> */
-    private function functionCalls(TwigDocument $document): array
-    {
-        $calls = [];
-        foreach ($document->nodesOfType('function_call') as $call) {
-            $identifier = $document->directChild($call, 'function_identifier');
-            if (null === $identifier || !\in_array($document->text($identifier), ['trans', 't'], true)) {
-                continue;
-            }
-            $arguments = $this->arguments->resolve($document, $call);
-            $keyArgument = $arguments->get(0, 'id', 'message');
-            $key = null === $keyArgument ? null : $document->soleStringLiteral($keyArgument);
-            if (null === $key) {
-                continue;
-            }
-            $calls[] = [
-                'key' => $key,
-                'domain' => $arguments->get(2, 'domain'),
-                'parameters' => $arguments->get(1, 'arguments', 'parameters'),
-            ];
-        }
-
-        return $calls;
     }
 
     private function domain(TwigDocument $document, ?TreeSitterNode $argument, string $defaultDomain): ?string

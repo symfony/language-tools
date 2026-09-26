@@ -384,6 +384,18 @@ final class TranslationExtractorTest extends TestCase
         self::assertSame(['page.title'], array_map(static fn ($reference): string => $reference->key, $references));
     }
 
+    public function testIgnoresFiltersNamedLikeTheTranslationFunction(): void
+    {
+        $references = $this->extractor()->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
+            {{ 'custom'|t }}{{ 'filtered'|trans({}, domain: 'admin') }}{{ t('function', {}, 'admin') }}
+            TWIG))->references;
+
+        self::assertSame(
+            [['filtered', 'admin'], ['function', 'admin']],
+            array_map(static fn ($reference): array => [$reference->key, $reference->domain], $references),
+        );
+    }
+
     public function testToleratesIncompleteJsonAndXliffResources(): void
     {
         $extractor = $this->extractor();
