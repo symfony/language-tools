@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Metadata;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
@@ -99,6 +100,44 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
             self::assertSame($expectedOwner, $context?->owner, $type);
         }
+    }
+
+    #[DataProvider('rejectedFormCompletionProvider')]
+    public function testOffersNoFormCompletionWhereIndexingReadsNoReference(string $call): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<PHP
+            <?php
+            namespace App\Form;
+
+            use Symfony\Component\Form\Extension\Core\Type\TextType;
+            use Symfony\Component\Form\FormBuilderInterface;
+
+            final class ArticleType
+            {
+                public function buildForm(FormBuilderInterface \$builder, object \$menu): void
+                {
+                    {$call}
+                }
+            }
+            PHP;
+        $cursor = strpos($text, '|');
+        self::assertIsInt($cursor);
+
+        self::assertNull($extractor->completionContext('php', str_replace('|', '', $text), $cursor));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function rejectedFormCompletionProvider(): iterable
+    {
+        yield 'field on an unrelated receiver' => ["\$menu->add('ti|"];
+        yield 'field on a nested builder' => ["\$builder->get('author')->add('ti|"];
+        yield 'option on an unrelated receiver' => ["\$menu->add('title', TextType::class, ['requ|"];
+        yield 'option in a nested array' => ["\$builder->add('title', TextType::class, ['attr' => ['cla|"];
+        yield 'option value' => ["\$builder->add('title', TextType::class, ['label' => 'Ti|"];
+        yield 'option in a named argument' => ["\$builder->add('title', TextType::class, options: ['requ|"];
+        yield 'option without a type' => ["\$builder->add('title', \$type, ['requ|"];
+        yield 'static form creator' => ["self::createForm(TextType::class, null, ['requ|"];
     }
 
     public function testLinksFormFieldsToDataClassProperties(): void
