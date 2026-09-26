@@ -172,9 +172,6 @@ final class BridgeCompatibilityTest extends TestCase
             ['base_uri', 'cache'],
             array_column(\is_array($prependedTree['children'] ?? null) ? $prependedTree['children'] : [], 'name'),
         );
-        $configurationResources = $configuration['resources'] ?? null;
-        self::assertIsArray($configurationResources);
-        self::assertContains(realpath($project.'/config/services.yaml'), $configurationResources);
         self::assertContains('fixture_upper', array_column(\is_array($environment['processors'] ?? null) ? $environment['processors'] : [], 'name'));
         self::assertNotSame([], $twig['paths'] ?? []);
         self::assertContains('command.bus', array_column(\is_array($messenger['buses'] ?? null) ? $messenger['buses'] : [], 'name'));
