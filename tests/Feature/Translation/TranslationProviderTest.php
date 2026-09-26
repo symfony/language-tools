@@ -530,6 +530,23 @@ final class TranslationProviderTest extends TestCase
         self::assertSame([], $phpProvider->diagnostics(['textDocument' => ['uri' => 'file:///workspace/src/Controller.php']]));
     }
 
+    public function testReadsPhpTranslationParametersOfLegacyArraysAndSpreadValues(): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        $text = <<<'PHP'
+            <?php
+            $translator->trans('article.title', array('extra' => 1));
+            $translator->trans('article.title', ['extra' => [...$nested]]);
+            PHP;
+        [$provider, , $configuration, $project] = $this->provider($uri, $text);
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
+
+        $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
+
+        self::assertIsArray($diagnostics);
+        self::assertSame(['translation.placeholders', 'translation.placeholders'], array_column($diagnostics, 'code'));
+    }
+
     public function testAcceptsWrappedIcuPlaceholderParameters(): void
     {
         $uri = 'file:///workspace/templates/showcase.html.twig';

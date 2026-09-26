@@ -65,7 +65,7 @@ final class PhpTranslationReferenceExtractor
                     $domain,
                     $uri,
                     $text,
-                    $this->parameters->php($call['parameters']),
+                    $this->parameters->php($document, $call['parameters']),
                 ),
             ];
         }

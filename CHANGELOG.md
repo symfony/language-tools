@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Answer a completion request with an empty list instead of nothing when nothing matches
+- Check the translation parameters of a call written with the legacy `array()` syntax or spreading an array inside a parameter value
 - Read Doctrine criteria fields and `EntityType` options written with the legacy `array()` syntax
 - Read form options, `data_class` and field options written with the legacy `array()` syntax, an uppercase `TRUE`, `FALSE` or `NULL`, or `self::class`
 - Honor the `includeDeclaration` flag of a references request in every integration, and report the declaration when the client omits it

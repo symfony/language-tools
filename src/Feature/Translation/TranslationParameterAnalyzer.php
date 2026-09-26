@@ -3,27 +3,22 @@
 namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Parser\Php\PhpArgument;
-use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
+use Symfony\Lsp\Parser\Php\PhpDocument;
+use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 
 final class TranslationParameterAnalyzer
 {
-    public function __construct(private readonly PhpLiteralArrayKeyParser $arrayKeys)
-    {
-    }
-
     /** @return list<string>|null */
-    public function php(?PhpArgument $argument): ?array
+    public function php(PhpDocument $document, ?PhpArgument $argument): ?array
     {
-        $expression = trim((string) $argument?->expression);
-        if (!str_starts_with($expression, '[') || !str_ends_with($expression, ']')) {
+        $array = $document->literalArray($argument);
+        if (null === $array || !$array->complete || $array->hasUnknownKeys) {
             return null;
         }
 
-        $keys = $this->arrayKeys->parse(substr($expression, 1, -1), allowNestedUnpacking: false);
-
-        return null === $keys ? null : $this->normalize(array_map(static fn ($key): string => $key->value, $keys));
+        return $this->normalize(array_map(static fn (PhpStringLiteral $key): string => $key->value, $array->keys));
     }
 
     /** @return list<string>|null */
