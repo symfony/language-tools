@@ -10,6 +10,7 @@ use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpConstantKind;
 use Symfony\Lsp\Parser\Php\PhpLexicalScopeKind;
 use Symfony\Lsp\Parser\Php\PhpLiteralArray;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayEntry;
 use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
@@ -1530,8 +1531,107 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame("[\n    'café' => nested(['inside' => true]),\n    \"line\\nkey\" => \$value,\n    value(),\n    ...\$shared,\n    \$dynamic => true,\n    'after' => true,\n]", substr($source, $outer->startOffset, $outer->endOffset - $outer->startOffset));
         self::assertInstanceOf(PhpLiteralArray::class, $legacy);
         self::assertSame(['legacy'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $legacy->keys));
-        self::assertNull($document->literalArray($document->methodCalls[2]->positionalArgument(1)));
+        self::assertTrue($outer->complete);
+        self::assertFalse($document->literalArray($document->methodCalls[2]->positionalArgument(1))?->complete);
         self::assertSame(['inside'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $document->literalArrays[1]->keys));
+    }
+
+    public function testExposesLiteralArrayEntryKeysValuesAndClassReferences(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Form;
+
+            use App\Dto\Article;
+
+            $resolver->setDefaults([
+                'data_class' => Article::class,
+                'café' => "line\nbreak",
+                'empty_string' => '',
+                'mapped' => false,
+                'missing' => null,
+                'count' => 3,
+                'nested' => ['inner' => true],
+                0 => 'first',
+                'dynamic' => $value,
+                positional(),
+            ]);
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $array = $document->literalArray($document->methodCalls[0]->positionalArgument(0));
+
+        self::assertInstanceOf(PhpLiteralArray::class, $array);
+        $entries = [];
+        foreach ($array->entries as $entry) {
+            if (null !== $entry->key) {
+                $entries[$entry->key->value] = $entry;
+            }
+        }
+
+        self::assertTrue($array->complete);
+        self::assertTrue($array->hasUnknownKeys);
+        self::assertSame(
+            ['data_class', 'café', 'empty_string', 'mapped', 'missing', 'count', 'nested', null, 'dynamic', null],
+            array_map(static fn (PhpLiteralArrayEntry $entry): ?string => $entry->key?->value, $array->entries),
+        );
+        self::assertSame('App\Dto\Article', $entries['data_class']->classReference?->className);
+        self::assertNull($entries['data_class']->stringValue);
+        $multibyte = $entries['café']->stringValue;
+        self::assertInstanceOf(PhpStringLiteral::class, $multibyte);
+        self::assertSame("line\nbreak", $multibyte->value);
+        self::assertSame('line\nbreak', substr($source, $multibyte->startOffset, $multibyte->endOffset - $multibyte->startOffset));
+        self::assertSame(PhpLiteralKind::String, $entries['café']->value?->kind);
+        self::assertSame('', $entries['empty_string']->stringValue?->value);
+        self::assertFalse($entries['mapped']->value?->scalarValue);
+        self::assertSame(PhpLiteralKind::Null, $entries['missing']->value?->kind);
+        self::assertSame(3, $entries['count']->value?->scalarValue);
+        self::assertSame(PhpLiteralKind::Array, $entries['nested']->value?->kind);
+        self::assertSame("['inner' => true]", substr($source, $entries['nested']->valueStartOffset, $entries['nested']->valueEndOffset - $entries['nested']->valueStartOffset));
+        self::assertNull($entries['dynamic']->value);
+        self::assertSame(['first', null], array_map(
+            static fn (PhpLiteralArrayEntry $entry): ?string => $entry->stringValue?->value,
+            array_values(array_filter($array->entries, static fn (PhpLiteralArrayEntry $entry): bool => null === $entry->key)),
+        ));
+    }
+
+    public function testExposesLiteralArrayEntriesOfUnterminatedArrays(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            $repository->findBy(['title' => 'Hello', 'slug' => 'he
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $array = $document->literalArray($document->methodCalls[0]->positionalArgument(0));
+
+        self::assertInstanceOf(PhpLiteralArray::class, $array);
+        self::assertFalse($array->complete);
+        self::assertFalse($array->hasUnknownKeys);
+        self::assertSame(['title', 'slug'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $array->keys));
+        self::assertSame('Hello', $array->entries[0]->stringValue?->value);
+        self::assertNull($array->entries[1]->stringValue);
+        self::assertNull($array->entries[1]->value);
+        self::assertSame("'he", substr($source, $array->entries[1]->valueStartOffset, $array->entries[1]->valueEndOffset - $array->entries[1]->valueStartOffset));
+    }
+
+    public function testKeepsLiteralArrayEntriesForSpreadAndMissingValues(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            $renderer->render('page.html.twig', [...$shared, 'title' => ]);
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+        $array = $document->literalArray($document->methodCalls[0]->positionalArgument(1));
+
+        self::assertInstanceOf(PhpLiteralArray::class, $array);
+        self::assertTrue($array->complete);
+        self::assertTrue($array->hasUnknownKeys);
+        self::assertSame(['title'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $array->keys));
+        self::assertCount(1, $array->entries);
+        self::assertNull($array->entries[0]->value);
+        self::assertSame($array->entries[0]->valueStartOffset, $array->entries[0]->valueEndOffset);
     }
 
     public function testKeepsLiteralArrayFactsOnlyForArraysPassedAsArguments(): void

@@ -70,10 +70,7 @@ final class PhpExpressionFactBuilder
 
         $literalArrays = [];
         foreach ($collection->literalArrays as $node) {
-            $array = $this->literalArray($node, $source);
-            if (null !== $array) {
-                $literalArrays[] = $array;
-            }
+            $literalArrays[] = $this->literalArray($node, $source, $classReferencesByNode);
         }
 
         return new TolerantPhpExpressionFacts($methodCalls, $objectCreations, array_values($classReferencesByNode), $literalArrays);
@@ -293,33 +290,50 @@ final class PhpExpressionFactBuilder
         return 1 === \count($arguments) && $arguments[0]->dotDotDotToken instanceof Token && null === $arguments[0]->expression;
     }
 
-    private function literalArray(ArrayCreationExpression $expression, string $source): ?PhpLiteralArray
+    /** @param array<int, PhpClassReference> $classReferencesByNode */
+    private function literalArray(ArrayCreationExpression $expression, string $source, array $classReferencesByNode): PhpLiteralArray
     {
-        if ($expression->closeParenOrBracket instanceof MissingToken) {
-            return null;
-        }
-        $keys = [];
+        $entries = [];
         $hasUnknownKeys = false;
         foreach ($this->nodes->arrayElements($expression) as $element) {
             if ($element->dotDotDot instanceof Token) {
                 $hasUnknownKeys = true;
                 continue;
             }
+            $key = null;
             if ($element->arrowToken instanceof Token) {
                 $key = $element->elementKey instanceof StringLiteral ? $this->stringLiteral($element->elementKey, $source) : null;
                 if (null === $key) {
                     $hasUnknownKeys = true;
-                } else {
-                    $keys[] = $key;
                 }
-                continue;
-            }
-            if (null !== $element->elementKey || $this->hasMissingToken($element)) {
+            } elseif (null !== $element->elementKey || $this->hasMissingToken($element)) {
                 $hasUnknownKeys = true;
             }
+            $entries[] = $this->literalArrayEntry($element, $key, $source, $classReferencesByNode);
         }
 
-        return new PhpLiteralArray($expression->getStartPosition(), $expression->getEndPosition(), $keys, $hasUnknownKeys);
+        return new PhpLiteralArray(
+            $expression->getStartPosition(),
+            $expression->getEndPosition(),
+            $entries,
+            $hasUnknownKeys,
+            !$expression->closeParenOrBracket instanceof MissingToken,
+        );
+    }
+
+    /** @param array<int, PhpClassReference> $classReferencesByNode */
+    private function literalArrayEntry(ArrayElement $element, ?PhpStringLiteral $key, string $source, array $classReferencesByNode): PhpLiteralArrayEntry
+    {
+        $value = $element->elementValue;
+
+        return new PhpLiteralArrayEntry(
+            $key,
+            $value->getStartPosition(),
+            $value->getEndPosition(),
+            $value instanceof StringLiteral ? $this->stringLiteral($value, $source) : null,
+            $this->literal($value, $source),
+            $classReferencesByNode[spl_object_id($value)] ?? null,
+        );
     }
 
     private function hasMissingToken(ArrayElement $element): bool

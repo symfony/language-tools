@@ -61,7 +61,7 @@ final class PhpRouteReferenceCandidateExtractor
             return null === $route->completeLiteral ? null : [];
         }
         $array = $document->literalArray($parameters);
-        if (null !== $parameters->name || $parameters->unpacked || null === $array || $array->hasUnknownKeys) {
+        if (null !== $parameters->name || $parameters->unpacked || null === $array || !$array->complete || $array->hasUnknownKeys) {
             return null;
         }
 
