@@ -216,6 +216,19 @@ final class TranslationProviderTest extends TestCase
         );
     }
 
+    #[DataProvider('twigTranslationFunctionProvider')]
+    public function testCompletesTwigTranslationFunctionKeys(string $text): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text, 'twig');
+        $position = $converter->toPosition($text, (int) strpos($text, 'article.ti') + \strlen('article.ti'));
+
+        self::assertSame(['article.title'], array_column($provider->complete($requests->positioned([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ])), 'label'));
+    }
+
     #[DataProvider('unrelatedTwigStringProvider')]
     public function testOffersNoTranslationCompletionsInUnrelatedTwigStrings(string $text, string $cursor): void
     {
@@ -733,6 +746,22 @@ final class TranslationProviderTest extends TestCase
         yield 'expression without the filter' => ["{{ 'article.ti' }}", 'article.ti'];
         yield 'interpolated string' => ['{{ "article.ti#{suffix}"|trans }}', 'article.ti'];
         yield 'other filter' => ["{{ 'article.ti'|upper }}", 'article.ti'];
+        yield 'trans function' => ["{{ trans('article.ti') }}", 'article.ti'];
+        yield 'trans filter parameters' => ["{{ key|trans('article.ti') }}", 'article.ti'];
+        yield 't filter' => ["{{ key | t('article.ti') }}", 'article.ti'];
+        yield 't method call' => ["{{ obj.t('article.ti') }}", 'article.ti'];
+        yield 'null-safe t method call' => ["{{ obj?.t('article.ti') }}", 'article.ti'];
+        yield 'trans method call' => ["{{ obj.trans('article.ti') }}", 'article.ti'];
+        yield 'spaced t method call' => ["{{ obj . t('article.ti') }}", 'article.ti'];
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function twigTranslationFunctionProvider(): iterable
+    {
+        yield 'output' => ["{{ t('article.ti') }}"];
+        yield 'unterminated' => ["{{ t('article.ti"];
+        yield 'operand' => ["{% if not t('article.ti') %}{% endif %}"];
+        yield 'argument' => ["{{ include('page.html.twig', {label: t('article.ti')}) }}"];
     }
 
     /** @return iterable<string, array{string}> */

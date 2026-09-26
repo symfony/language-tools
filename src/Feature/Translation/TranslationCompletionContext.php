@@ -48,7 +48,7 @@ final class TranslationCompletionContext
             return null;
         }
         if (
-            preg_match('/\b(?:trans|t)\s*\(\s*$/D', substr($before, 0, $start - 1))
+            self::followsTranslationFunction(substr($before, 0, $start - 1))
             || preg_match(self::TWIG_TRANS_FILTER[$quote], substr($text, $cursor))
         ) {
             return new self(
@@ -60,5 +60,14 @@ final class TranslationCompletionContext
         }
 
         return null;
+    }
+
+    private static function followsTranslationFunction(string $before): bool
+    {
+        if (!preg_match('/\bt\s*\(\s*$/D', $before, $match, \PREG_OFFSET_CAPTURE)) {
+            return false;
+        }
+
+        return !\in_array(substr(rtrim(substr($before, 0, $match[0][1])), -1), ['.', '|'], true);
     }
 }
