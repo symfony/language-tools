@@ -15,11 +15,13 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class TranslationProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
         private readonly DocumentContextResolver $resolver,
+        private readonly LspRequestFactory $requests,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TranslationIndexRegistry $indexes,
@@ -225,7 +227,9 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
     /** @param array<array-key, mixed> $params */
     private function resolve(array $params): ?ResolvedTranslationReference
     {
-        return $this->referenceResolver->resolve($params);
+        $request = $this->requests->positioned($params);
+
+        return null === $request ? null : $this->referenceResolver->resolve($request);
     }
 
     /** @return list<string> */

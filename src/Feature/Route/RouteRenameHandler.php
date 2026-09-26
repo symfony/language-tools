@@ -2,18 +2,17 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\RenameEditBuilder;
 use Symfony\Lsp\Feature\RenameProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\RenameRequest;
 
 final class RouteRenameHandler implements RenameProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
         private readonly LspProtocolMapper $protocol,
         private readonly RouteSymbolResolver $symbolResolver,
         private readonly RouteSourceIndexRegistry $sourceIndexes,
@@ -23,14 +22,10 @@ final class RouteRenameHandler implements RenameProviderInterface
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, placeholder: string}|null
-     */
-    public function prepare(array $params): ?array
+    /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, placeholder: string}|null */
+    public function prepare(PositionedRequest $request): ?array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -46,19 +41,15 @@ final class RouteRenameHandler implements RenameProviderInterface
         ];
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{documentChanges: list<array{textDocument: array{uri: string, version: null}, edits: list<array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string, annotationId: string}>}>, changeAnnotations: array<string, array{label: string, needsConfirmation: bool, description: string}>}|null
-     */
-    public function rename(array $params): ?array
+    /** @return array{documentChanges: list<array{textDocument: array{uri: string, version: null}, edits: list<array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, newText: string, annotationId: string}>}>, changeAnnotations: array<string, array{label: string, needsConfirmation: bool, description: string}>}|null */
+    public function rename(RenameRequest $request): ?array
     {
-        $newName = $params['newName'] ?? null;
-        if (!\is_string($newName) || '' === $newName || str_contains($newName, "'") || str_contains($newName, '"')) {
+        $newName = $request->newName;
+        if (str_contains($newName, "'") || str_contains($newName, '"')) {
             return null;
         }
 
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -96,22 +87,16 @@ final class RouteRenameHandler implements RenameProviderInterface
         ];
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{Project, RouteSymbol}|null
-     */
-    private function resolve(array $params): ?array
+    /** @return array{Project, RouteSymbol}|null */
+    private function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request
-            || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)
+        if (!$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)
             || !\in_array($request->document->languageId, ['php', 'twig', 'yaml'], true)
         ) {
             return null;
         }
 
-        $symbol = $this->symbolResolver->resolve($request->project, SourceDocument::fromDocument($request->document), $request->position);
+        $symbol = $this->symbolResolver->resolve($request->project, $request->source, $request->position);
 
         return null === $symbol ? null : [$request->project, $symbol];
     }

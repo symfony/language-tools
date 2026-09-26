@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\Route;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -37,13 +36,16 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\RenameRequest;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class RouteRenameHandlerTest extends TestCase
 {
     public function testPreparesAndRenamesStaticApplicationReferences(): void
     {
-        [$handler, $params] = $this->handler();
+        [$handler, $request] = $this->handler();
 
         self::assertSame([
             'range' => [
@@ -51,7 +53,7 @@ final class RouteRenameHandlerTest extends TestCase
                 'end' => ['line' => 5, 'character' => 40],
             ],
             'placeholder' => 'article_show',
-        ], $handler->prepare($params));
+        ], $handler->prepare($request));
 
         self::assertSame([
             'documentChanges' => [
@@ -91,7 +93,7 @@ final class RouteRenameHandlerTest extends TestCase
                     'description' => 'Dynamic route references may remain unchanged.',
                 ],
             ],
-        ], $handler->rename([...$params, 'newName' => 'article_display']));
+        ], $handler->rename(new RenameRequest($request, 'article_display')));
     }
 
     public function testRenamesFromYamlDeclaration(): void
@@ -125,11 +127,10 @@ final class RouteRenameHandlerTest extends TestCase
         $routes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
         $handler = $this->createHandler($documents, $projects, $classIndexes, $sourceIndexes, $routes);
 
-        $edit = $handler->rename([
+        $edit = $handler->rename((new ProviderRequests($documents, $projects))->rename([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => 0, 'character' => 3],
-            'newName' => 'article_display',
-        ]);
+        ], 'article_display'));
 
         self::assertIsArray($edit);
         self::assertSame(
@@ -145,17 +146,17 @@ final class RouteRenameHandlerTest extends TestCase
 
     public function testRejectsExistingRouteName(): void
     {
-        [$handler, $params] = $this->handler();
+        [$handler, $request] = $this->handler();
 
-        self::assertNull($handler->rename([...$params, 'newName' => 'homepage']));
+        self::assertNull($handler->rename(new RenameRequest($request, 'homepage')));
     }
 
     public function testRefusesPreparingRouteDeclaredOutsideTheApplication(): void
     {
-        [$handler, $params] = $this->handler('file:///workspace/vendor/acme/src/ArticleController.php');
+        [$handler, $request] = $this->handler('file:///workspace/vendor/acme/src/ArticleController.php');
 
-        self::assertNull($handler->prepare($params));
-        self::assertNull($handler->rename([...$params, 'newName' => 'article_display']));
+        self::assertNull($handler->prepare($request));
+        self::assertNull($handler->rename(new RenameRequest($request, 'article_display')));
     }
 
     public function testEmitsOneEditWhenADeclarationAndAReferenceShareARange(): void
@@ -187,11 +188,10 @@ final class RouteRenameHandlerTest extends TestCase
         $routes->forProject($project)->replace(new Route('article_show', '/article/{id}', [], [], null, null));
         $handler = $this->createHandler($documents, $projects, $classIndexes, $sourceIndexes, $routes);
 
-        $edit = $handler->rename([
+        $edit = $handler->rename((new ProviderRequests($documents, $projects))->rename([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => 5, 'character' => 31],
-            'newName' => 'article_display',
-        ]);
+        ], 'article_display'));
 
         self::assertIsArray($edit);
         self::assertSame([[
@@ -207,9 +207,7 @@ final class RouteRenameHandlerTest extends TestCase
         ]], $edit['documentChanges']);
     }
 
-    /**
-     * @return array{RouteRenameHandler, array{textDocument: array{uri: string}, position: array{line: int, character: int}}}
-     */
+    /** @return array{RouteRenameHandler, PositionedRequest} */
     private function handler(string $declarationUri = 'file:///workspace/src/ArticleController.php'): array
     {
         $uri = 'file:///workspace/src/ConsumerController.php';
@@ -253,10 +251,13 @@ final class RouteRenameHandlerTest extends TestCase
             new Route('homepage', '/', [], [], null, null),
         );
 
-        return [$this->createHandler($documents, $projects, $classIndexes, $sourceIndexes, $routes), [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => 5, 'character' => 31],
-        ]];
+        return [
+            $this->createHandler($documents, $projects, $classIndexes, $sourceIndexes, $routes),
+            (new ProviderRequests($documents, $projects))->positioned([
+                'textDocument' => ['uri' => $uri],
+                'position' => ['line' => 5, 'character' => 31],
+            ]),
+        ];
     }
 
     private function createHandler(
@@ -270,7 +271,6 @@ final class RouteRenameHandlerTest extends TestCase
         $protocol = new LspProtocolMapper();
 
         return new RouteRenameHandler(
-            new DocumentContextResolver($documents, $projects),
             $protocol,
             new RouteSymbolResolver(
                 $positionConverter,

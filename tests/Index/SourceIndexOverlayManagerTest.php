@@ -7,6 +7,8 @@ use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\Position;
+use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Index\PhpParseHealthResolver;
@@ -24,6 +26,8 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\RecordingPhpParser;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
@@ -158,7 +162,8 @@ final class SourceIndexOverlayManagerTest extends TestCase
             $edit = ['documentChanges' => [['textDocument' => ['uri' => $uri, 'version' => 1], 'edits' => []]]];
             $renameProvider = $this->createStub(RenameProviderInterface::class);
             $renameProvider->method('rename')->willReturn($edit);
-            $renames = new RenameProviderRegistry($health, [$renameProvider]);
+            $renames = new RenameProviderRegistry(new LspRequestFactory($documents, $projects, new PositionConverter()), $health, [$renameProvider]);
+            $renameParams = [...LspRequests::position($uri, new Position(0, 0)), 'newName' => 'renamed'];
             $manager->updateUri($uri);
             $provider->fail = true;
 
@@ -169,7 +174,7 @@ final class SourceIndexOverlayManagerTest extends TestCase
                 self::assertSame('Extraction failed.', $error->getMessage());
             }
             try {
-                $renames->rename([]);
+                $renames->rename($renameParams);
                 self::fail('Rename should refuse stale source ranges.');
             } catch (JsonRpcException $error) {
                 self::assertSame('Rename is unavailable while an affected open document cannot be analyzed completely.', $error->getMessage());
@@ -177,7 +182,7 @@ final class SourceIndexOverlayManagerTest extends TestCase
 
             $provider->fail = false;
             $manager->updateUri($uri);
-            self::assertSame($edit, $renames->rename([]));
+            self::assertSame($edit, $renames->rename($renameParams));
         } finally {
             $workspace->cleanup();
         }

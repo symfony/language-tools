@@ -5,11 +5,13 @@ namespace Symfony\Lsp\Feature;
 use Fabpot\JsonRpc\Exception\JsonRpcException;
 use Fabpot\JsonRpc\JsonRpcError;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class RenameProviderRegistry
 {
     /** @param iterable<RenameProviderInterface> $providers */
     public function __construct(
+        private readonly LspRequestFactory $requests,
         private readonly SourceOverlayHealthRegistry $overlayHealth,
         private readonly iterable $providers,
     ) {
@@ -22,8 +24,13 @@ final class RenameProviderRegistry
      */
     public function prepare(array $params): ?array
     {
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
         foreach ($this->providers as $provider) {
-            if (null !== $result = $provider->prepare($params)) {
+            if (null !== $result = $provider->prepare($request)) {
                 return $result;
             }
         }
@@ -38,8 +45,13 @@ final class RenameProviderRegistry
      */
     public function rename(array $params): ?array
     {
+        $request = $this->requests->rename($params);
+        if (null === $request) {
+            return null;
+        }
+
         foreach ($this->providers as $provider) {
-            if (null === $result = $provider->rename($params)) {
+            if (null === $result = $provider->rename($request)) {
                 continue;
             }
 

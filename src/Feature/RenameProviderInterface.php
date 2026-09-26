@@ -2,19 +2,14 @@
 
 namespace Symfony\Lsp\Feature;
 
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\RenameRequest;
+
 interface RenameProviderInterface
 {
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array<array-key, mixed>|null
-     */
-    public function prepare(array $params): ?array;
+    /** @return array<array-key, mixed>|null */
+    public function prepare(PositionedRequest $request): ?array;
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array<array-key, mixed>|null
-     */
-    public function rename(array $params): ?array;
+    /** @return array<array-key, mixed>|null */
+    public function rename(RenameRequest $request): ?array;
 }

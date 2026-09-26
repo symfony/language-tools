@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Feature\Translation;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -21,7 +20,9 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class TranslationRenameHandlerTest extends TestCase
 {
@@ -45,11 +46,10 @@ final class TranslationRenameHandlerTest extends TestCase
         $handler = $this->createHandler($documents, $projects, $converter, $extractor, $indexes);
         $position = $converter->toPosition($reference, strpos($reference, 'article.title') + 1);
 
-        $result = $handler->rename([
-            'textDocument' => ['uri' => $referenceUri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-            'newName' => 'article.heading',
-        ]);
+        $result = $handler->rename((new ProviderRequests($documents, $projects))->rename(
+            LspRequests::position($referenceUri, $position),
+            'article.heading',
+        ));
         self::assertIsArray($result);
         self::assertIsArray($result['documentChanges']);
         $newTexts = [];
@@ -85,11 +85,10 @@ final class TranslationRenameHandlerTest extends TestCase
         ));
         $handler = $this->createHandler($documents, $projects, $converter, $extractor, $indexes);
 
-        $result = $handler->rename([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $start->line, 'character' => $start->character + 1],
-            'newName' => 'heading',
-        ]);
+        $result = $handler->rename((new ProviderRequests($documents, $projects))->rename(
+            LspRequests::position($uri, new Position($start->line, $start->character + 1)),
+            'heading',
+        ));
 
         self::assertIsArray($result);
         self::assertSame([[
@@ -115,7 +114,7 @@ final class TranslationRenameHandlerTest extends TestCase
         $protocol = new LspProtocolMapper();
 
         return new TranslationRenameHandler(
-            new TranslationReferenceResolver(new DocumentContextResolver($documents, $projects), $converter, $extractor),
+            new TranslationReferenceResolver($converter, $extractor),
             $protocol,
             $indexes,
             ProjectPaths::resolver(),

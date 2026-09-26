@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
@@ -32,7 +31,9 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class DependencyInjectionRenameHandlerTest extends TestCase
 {
@@ -66,7 +67,6 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
             ),
         );
         $handler = new DependencyInjectionRenameHandler(
-            new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $this->extractor($converter, $yamlExtractor)),
             $sourceIndexes,
@@ -79,13 +79,11 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
             new RenameEditBuilder(new LspProtocolMapper()),
         );
         $position = $converter->toPosition($yaml, strpos($yaml, 'app.mailer') + 1);
-        $params = [
-            'textDocument' => ['uri' => $yamlUri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-        ];
+        $requests = new ProviderRequests($documents, $projects);
+        $params = LspRequests::position($yamlUri, $position);
 
-        self::assertSame('app.mailer', $handler->prepare($params)['placeholder'] ?? null);
-        $result = $handler->rename([...$params, 'newName' => 'app.primary_mailer']);
+        self::assertSame('app.mailer', $handler->prepare($requests->positioned($params))['placeholder'] ?? null);
+        $result = $handler->rename($requests->rename($params, 'app.primary_mailer'));
         self::assertIsArray($result);
         self::assertIsArray($result['documentChanges']);
 
@@ -134,7 +132,6 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
         $handler = new DependencyInjectionRenameHandler(
-            new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $this->extractor($converter, $yamlExtractor)),
             $sourceIndexes,
@@ -148,11 +145,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         );
         $position = $converter->toPosition($text, strpos($text, 'app.storage_dir') + 1);
 
-        $result = $handler->rename([
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $position->line, 'character' => $position->character],
-            'newName' => 'app.data_dir',
-        ]);
+        $result = $handler->rename((new ProviderRequests($documents, $projects))->rename(LspRequests::position($uri, $position), 'app.data_dir'));
         self::assertIsArray($result);
         self::assertIsArray($result['documentChanges']);
         self::assertIsArray($result['documentChanges'][0]);
@@ -195,7 +188,6 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         $parameterIndexes = new ParameterIndexRegistry();
         $parameterIndexes->forProject($project)->replace(true, new Parameter('runtime.parameter', null));
         $handler = new DependencyInjectionRenameHandler(
-            new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $this->extractor($converter, $yamlExtractor)),
             $sourceIndexes,
@@ -205,19 +197,14 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         );
         $servicePosition = $converter->toPosition($text, strpos($text, 'current.service') + 1);
         $parameterPosition = $converter->toPosition($text, strpos($text, 'current.parameter') + 1);
-        $serviceParams = [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $servicePosition->line, 'character' => $servicePosition->character],
-        ];
-        $parameterParams = [
-            'textDocument' => ['uri' => $uri],
-            'position' => ['line' => $parameterPosition->line, 'character' => $parameterPosition->character],
-        ];
+        $requests = new ProviderRequests($documents, $projects);
+        $serviceParams = LspRequests::position($uri, $servicePosition);
+        $parameterParams = LspRequests::position($uri, $parameterPosition);
 
-        self::assertNull($handler->rename([...$serviceParams, 'newName' => 'runtime.service']));
-        self::assertNull($handler->rename([...$serviceParams, 'newName' => 'source.service']));
-        self::assertNull($handler->rename([...$parameterParams, 'newName' => 'runtime.parameter']));
-        self::assertNull($handler->rename([...$parameterParams, 'newName' => 'source.parameter']));
+        self::assertNull($handler->rename($requests->rename($serviceParams, 'runtime.service')));
+        self::assertNull($handler->rename($requests->rename($serviceParams, 'source.service')));
+        self::assertNull($handler->rename($requests->rename($parameterParams, 'runtime.parameter')));
+        self::assertNull($handler->rename($requests->rename($parameterParams, 'source.parameter')));
     }
 
     private function extractor(PositionConverter $converter, YamlDependencyInjectionExtractor $yamlExtractor): DependencyInjectionDocumentExtractor

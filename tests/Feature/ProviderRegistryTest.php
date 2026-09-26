@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
+use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\CodeActionProviderRegistry;
@@ -53,6 +54,8 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\RenameRequest;
 use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class ProviderRegistryTest extends TestCase
@@ -247,19 +250,26 @@ final class ProviderRegistryTest extends TestCase
         $first = new StubProvider(null);
         $second = new StubProvider([['placeholder' => 'second']]);
         $third = new StubProvider([['placeholder' => 'third']]);
+        $uri = 'file:///workspace/src/Kernel.php';
+        $requests = $this->requestFactory($uri, 'php', '<?php');
+        $params = LspRequests::position($uri, new Position(0, 1));
 
         self::assertSame(
             ['placeholder' => 'second'],
-            (new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [$first, $second, $third]))->prepare([]),
+            (new RenameProviderRegistry($requests, new SourceOverlayHealthRegistry(), [$first, $second, $third]))->prepare($params),
         );
         self::assertSame(['prepare'], $first->calls);
         self::assertSame(['prepare'], $second->calls);
         self::assertSame([], $third->calls);
-        self::assertNull((new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [new StubProvider(null)]))->prepare([]));
+        self::assertNull((new RenameProviderRegistry($requests, new SourceOverlayHealthRegistry(), [new StubProvider(null)]))->prepare($params));
 
         $afterEmpty = new StubProvider([['placeholder' => 'later']]);
-        self::assertSame([], (new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [new StubProvider([[]]), $afterEmpty]))->prepare([]));
+        self::assertSame([], (new RenameProviderRegistry($requests, new SourceOverlayHealthRegistry(), [new StubProvider([[]]), $afterEmpty]))->prepare($params));
         self::assertSame([], $afterEmpty->calls);
+
+        $unasked = new StubProvider([['placeholder' => 'never']]);
+        self::assertNull((new RenameProviderRegistry($requests, new SourceOverlayHealthRegistry(), [$unasked]))->prepare(LspRequests::document($uri)));
+        self::assertSame([], $unasked->calls);
     }
 
     public function testRenameProvidersReturnTheFirstMatchIncludingAnEmptyMatch(): void
@@ -267,19 +277,36 @@ final class ProviderRegistryTest extends TestCase
         $first = new StubProvider(null);
         $second = new StubProvider([['changes' => ['second']]]);
         $third = new StubProvider([['changes' => ['third']]]);
+        $uri = 'file:///workspace/src/Kernel.php';
+        $requests = $this->requestFactory($uri, 'php', '<?php');
+        $params = [...LspRequests::position($uri, new Position(0, 1)), 'newName' => 'renamed'];
 
         self::assertSame(
             ['changes' => ['second']],
-            (new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [$first, $second, $third]))->rename([]),
+            (new RenameProviderRegistry($requests, new SourceOverlayHealthRegistry(), [$first, $second, $third]))->rename($params),
         );
         self::assertSame(['rename'], $first->calls);
         self::assertSame(['rename'], $second->calls);
         self::assertSame([], $third->calls);
-        self::assertNull((new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [new StubProvider(null)]))->rename([]));
+        self::assertNull((new RenameProviderRegistry($requests, new SourceOverlayHealthRegistry(), [new StubProvider(null)]))->rename($params));
 
         $afterEmpty = new StubProvider([['changes' => ['later']]]);
-        self::assertSame([], (new RenameProviderRegistry(new SourceOverlayHealthRegistry(), [new StubProvider([[]]), $afterEmpty]))->rename([]));
+        self::assertSame([], (new RenameProviderRegistry($requests, new SourceOverlayHealthRegistry(), [new StubProvider([[]]), $afterEmpty]))->rename($params));
         self::assertSame([], $afterEmpty->calls);
+    }
+
+    public function testRenameRefusesAnEmptyOrMissingNewNameWithoutAskingAnyProvider(): void
+    {
+        $uri = 'file:///workspace/src/Kernel.php';
+        $requests = $this->requestFactory($uri, 'php', '<?php');
+        $position = LspRequests::position($uri, new Position(0, 1));
+        $provider = new StubProvider([['changes' => ['never']]]);
+        $registry = new RenameProviderRegistry($requests, new SourceOverlayHealthRegistry(), [$provider]);
+
+        self::assertNull($registry->rename($position));
+        self::assertNull($registry->rename([...$position, 'newName' => '']));
+        self::assertNull($registry->rename([...$position, 'newName' => 42]));
+        self::assertSame([], $provider->calls);
     }
 
     public function testRenameRefusesWorkspaceEditsTargetingADegradedDocument(): void
@@ -287,6 +314,7 @@ final class ProviderRegistryTest extends TestCase
         $health = new SourceOverlayHealthRegistry();
         $project = new Project('/workspace', 'file:///workspace');
         $health->record($project, 'file:///workspace/src/Target.php', SourceParseHealth::Partial);
+        $uri = 'file:///workspace/src/Kernel.php';
         $provider = new StubProvider([[
             'documentChanges' => [[
                 'textDocument' => ['uri' => 'file:///workspace/src/Target.php', 'version' => null],
@@ -295,7 +323,7 @@ final class ProviderRegistryTest extends TestCase
         ]]);
 
         try {
-            (new RenameProviderRegistry($health, [$provider]))->rename([]);
+            (new RenameProviderRegistry($this->requestFactory($uri, 'php', '<?php'), $health, [$provider]))->rename([...LspRequests::position($uri, new Position(0, 1)), 'newName' => 'renamed']);
             self::fail('The rename should have been refused.');
         } catch (JsonRpcException $error) {
             self::assertSame('Rename is unavailable while an affected open document cannot be analyzed completely.', $error->getMessage());
@@ -310,7 +338,7 @@ final class ProviderRegistryTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, $languageId, 1, $text));
 
-        return new LspRequestFactory($documents, $projects);
+        return new LspRequestFactory($documents, $projects, new PositionConverter());
     }
 }
 
@@ -363,12 +391,12 @@ final class StubProvider implements CodeActionProviderInterface, CodeLensProvide
         return $this->result(__FUNCTION__);
     }
 
-    public function prepare(array $params): ?array
+    public function prepare(PositionedRequest $request): ?array
     {
         return $this->firstResult(__FUNCTION__);
     }
 
-    public function rename(array $params): ?array
+    public function rename(RenameRequest $request): ?array
     {
         return $this->firstResult(__FUNCTION__);
     }

@@ -2,18 +2,17 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\RenameEditBuilder;
 use Symfony\Lsp\Feature\RenameProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\RenameRequest;
 
 final class DependencyInjectionRenameHandler implements RenameProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
         private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionSymbolResolver $symbolResolver,
         private readonly DependencyInjectionSourceIndexRegistry $sourceIndexes,
@@ -23,9 +22,9 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
     ) {
     }
 
-    public function prepare(array $params): ?array
+    public function prepare(PositionedRequest $request): ?array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -41,11 +40,11 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         ];
     }
 
-    public function rename(array $params): ?array
+    public function rename(RenameRequest $request): ?array
     {
-        $newName = $params['newName'] ?? null;
-        $resolved = $this->resolve($params);
-        if (!\is_string($newName) || null === $resolved) {
+        $newName = $request->newName;
+        $resolved = $this->resolve($request);
+        if (null === $resolved) {
             return null;
         }
 
@@ -84,21 +83,13 @@ final class DependencyInjectionRenameHandler implements RenameProviderInterface
         ];
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{Project, DependencyInjectionSymbol}|null
-     */
-    private function resolve(array $params): ?array
+    /** @return array{Project, DependencyInjectionSymbol}|null */
+    private function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
+        if (!$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
             return null;
         }
-        $symbol = $this->symbolResolver->resolve(
-            SourceDocument::fromDocument($request->document),
-            $request->position,
-        );
+        $symbol = $this->symbolResolver->resolve($request->source, $request->position);
 
         return null === $symbol ? null : [$request->project, $symbol];
     }

@@ -2,30 +2,22 @@
 
 namespace Symfony\Lsp\Feature\Translation;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final readonly class TranslationReferenceResolver
 {
     public function __construct(
-        private DocumentContextResolver $documents,
         private PositionConverter $positions,
         private TranslationExtractor $extractor,
     ) {
     }
 
-    /** @param array<array-key, mixed> $params */
-    public function resolve(array $params): ?ResolvedTranslationReference
+    public function resolve(PositionedRequest $request): ?ResolvedTranslationReference
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         $text = $request->document->text;
-        $offset = $this->positions->toByteOffset($text, $request->position);
-        $facts = $this->extractor->extract(SourceDocument::fromDocument($request->document));
+        $offset = $request->offset;
+        $facts = $this->extractor->extract($request->source);
         foreach ($facts->declarations as $declaration) {
             if ($this->positions->containsByteOffset($text, $declaration->range, $offset, inclusiveEnd: true)) {
                 return new ResolvedTranslationReference(

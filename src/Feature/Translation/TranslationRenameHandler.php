@@ -6,6 +6,8 @@ use Symfony\Lsp\Feature\RenameEditBuilder;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\RenameRequest;
 
 final class TranslationRenameHandler implements RenameProviderInterface
 {
@@ -18,9 +20,9 @@ final class TranslationRenameHandler implements RenameProviderInterface
     ) {
     }
 
-    public function prepare(array $params): ?array
+    public function prepare(PositionedRequest $request): ?array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -37,11 +39,11 @@ final class TranslationRenameHandler implements RenameProviderInterface
         return ['range' => $this->protocol->range($reference->range), 'placeholder' => $reference->key];
     }
 
-    public function rename(array $params): ?array
+    public function rename(RenameRequest $request): ?array
     {
-        $newName = $params['newName'] ?? null;
-        $resolved = $this->resolve($params);
-        if (!\is_string($newName) || '' === $newName || str_contains($newName, ' ') || null === $resolved) {
+        $newName = $request->newName;
+        $resolved = $this->resolve($request);
+        if (str_contains($newName, ' ') || null === $resolved) {
             return null;
         }
 
@@ -86,10 +88,9 @@ final class TranslationRenameHandler implements RenameProviderInterface
         ];
     }
 
-    /** @param array<array-key, mixed> $params */
-    private function resolve(array $params): ?ResolvedTranslationReference
+    private function resolve(PositionedRequest $request): ?ResolvedTranslationReference
     {
-        $resolved = $this->referenceResolver->resolve($params);
+        $resolved = $this->referenceResolver->resolve($request);
         if (null === $resolved || !$this->pathResolver->isApplicationOwned($resolved->project, $resolved->reference->uri)) {
             return null;
         }
