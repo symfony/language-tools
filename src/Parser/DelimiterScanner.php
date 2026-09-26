@@ -12,11 +12,11 @@ final class DelimiterScanner
      *
      * @return list<DelimiterSegment>
      */
-    public static function split(string $text, string $separator = ',', int $baseOffset = 0, bool $phpComments = false, bool $twig = false): array
+    public static function split(string $text, string $separator = ',', int $baseOffset = 0, bool $twig = false): array
     {
         $segments = [];
         $start = 0;
-        $scan = self::scan($text, 0, \strlen($text), $separator, null, $phpComments, false, $twig);
+        $scan = self::scan($text, 0, \strlen($text), $separator, null, false, $twig);
         foreach ($scan['separators'] as $offset) {
             $segments[] = new DelimiterSegment(substr($text, $start, $offset - $start), $baseOffset + $start);
             $start = $offset + 1;
@@ -29,7 +29,7 @@ final class DelimiterScanner
     /** Offset of the first $terminator outside strings and nested delimiters. */
     public static function terminator(string $text, int $start, string $terminator, ?int $end = null, bool $twig = false): ?int
     {
-        return self::scan($text, $start, $end ?? \strlen($text), null, $terminator, false, false, $twig)['stop'];
+        return self::scan($text, $start, $end ?? \strlen($text), null, $terminator, false, $twig)['stop'];
     }
 
     /** Offset of the delimiter closing the one opened at $openOffset. */
@@ -43,7 +43,7 @@ final class DelimiterScanner
     /** The string and the delimiters left open at the end of the scanned range. */
     public static function state(string $text, int $start = 0, ?int $end = null, bool $twig = false): DelimiterState
     {
-        $scan = self::scan($text, $start, $end ?? \strlen($text), null, null, false, false, $twig);
+        $scan = self::scan($text, $start, $end ?? \strlen($text), null, null, false, $twig);
 
         return new DelimiterState($scan['open'], null === $scan['quote'] ? null : new DelimiterString($scan['quote'], $scan['content']));
     }
@@ -52,7 +52,7 @@ final class DelimiterScanner
     public static function maskStrings(string $text, bool $twig = false): string
     {
         $masked = $text;
-        foreach (self::scan($text, 0, \strlen($text), null, null, false, true, $twig)['strings'] as [$start, $end]) {
+        foreach (self::scan($text, 0, \strlen($text), null, null, true, $twig)['strings'] as [$start, $end]) {
             for ($offset = $start; $offset < $end; ++$offset) {
                 if ("\n" !== $text[$offset]) {
                     $masked[$offset] = ' ';
@@ -73,7 +73,7 @@ final class DelimiterScanner
      *     strings: list<array{int, int}>,
      * }
      */
-    private static function scan(string $text, int $start, int $end, ?string $separator, ?string $terminator, bool $phpComments, bool $collectStrings, bool $twig): array
+    private static function scan(string $text, int $start, int $end, ?string $separator, ?string $terminator, bool $collectStrings, bool $twig): array
     {
         $separators = [];
         $strings = [];
@@ -82,8 +82,6 @@ final class DelimiterScanner
         $content = 0;
         $stop = null;
         $escaped = false;
-        $lineComment = false;
-        $blockComment = false;
         $terminatorLength = null === $terminator ? 0 : \strlen($terminator);
         for ($offset = $start; $offset < $end; ++$offset) {
             $character = $text[$offset];
@@ -106,30 +104,6 @@ final class DelimiterScanner
                     ++$offset;
                 }
                 continue;
-            }
-            if ($lineComment) {
-                $lineComment = "\n" !== $character && "\r" !== $character;
-                continue;
-            }
-            if ($blockComment) {
-                if ('*' === $character && '/' === ($text[$offset + 1] ?? null)) {
-                    $blockComment = false;
-                    ++$offset;
-                }
-                continue;
-            }
-            if ($phpComments && ('/' === $character || '#' === $character)) {
-                $next = $text[$offset + 1] ?? null;
-                if ('#' === $character) {
-                    $lineComment = '[' !== $next;
-                    continue;
-                }
-                if ('/' === $next || '*' === $next) {
-                    $lineComment = '/' === $next;
-                    $blockComment = '*' === $next;
-                    ++$offset;
-                    continue;
-                }
             }
             if ("'" === $character || '"' === $character) {
                 $quote = $character;

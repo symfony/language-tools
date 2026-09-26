@@ -101,35 +101,6 @@ final class DelimiterScannerTest extends TestCase
         self::assertSame('"  #{ " " }  " ~ \'   \'', DelimiterScanner::maskStrings('"a #{ "b" } c" ~ \'#{d\'', twig: true));
     }
 
-    /** @param list<string> $expected */
-    #[DataProvider('phpCommentProvider')]
-    public function testSkipsPhpCommentsWhenAsked(string $text, array $expected): void
-    {
-        self::assertSame($expected, array_map(
-            static fn (DelimiterSegment $segment): string => $segment->text,
-            DelimiterScanner::split($text, ',', 0, true),
-        ));
-    }
-
-    /** @return iterable<string, array{string, list<string>}> */
-    public static function phpCommentProvider(): iterable
-    {
-        yield 'line comment' => ["first // one, two\n, second", ["first // one, two\n", ' second']];
-        yield 'hash comment' => ["first # one, two\n, second", ["first # one, two\n", ' second']];
-        yield 'attribute is not a comment' => ['#[Attr(1)] first, second', ['#[Attr(1)] first', ' second']];
-        yield 'block comment' => ['first /* one, two */, second', ['first /* one, two */', ' second']];
-        yield 'quote in a comment' => ["first /* it's here, really */, second", ["first /* it's here, really */", ' second']];
-        yield 'unterminated block comment' => ['first /* one, two', ['first /* one, two']];
-    }
-
-    public function testKeepsPhpCommentsWhenNotAsked(): void
-    {
-        self::assertSame(['first // one', ' two', ' second'], array_map(
-            static fn (DelimiterSegment $segment): string => $segment->text,
-            DelimiterScanner::split('first // one, two, second'),
-        ));
-    }
-
     #[DataProvider('closeProvider')]
     public function testFindsTheClosingDelimiter(string $text, ?int $expected): void
     {
