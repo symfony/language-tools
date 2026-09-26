@@ -12,12 +12,9 @@ use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpPropertyDeclaration;
-use Symfony\Lsp\Parser\Php\PhpStringLiteral;
-use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\Php\PhpTypeDeclaration;
 
 final class DoctrineExtractor
@@ -30,7 +27,6 @@ final class DoctrineExtractor
         private readonly PhpParserInterface $phpParser,
         private readonly PhpCommentParser $phpComments,
         private readonly DoctrineRepositoryReceiverResolver $repositoryReceivers,
-        private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
 
@@ -86,7 +82,7 @@ final class DoctrineExtractor
                 }
             }
         }
-        array_push($symbols, ...$this->formSymbols($document->uri, $document->text, $source, $php));
+        array_push($symbols, ...$this->formSymbols($document->uri, $document->text, $php));
         array_push($symbols, ...$this->repositorySymbols($document->uri, $document->text, $source, $php, $repositories));
 
         return new DoctrineSourceFacts($document->uri, $entities, $repositories, SourceSymbols::unique(
@@ -108,18 +104,18 @@ final class DoctrineExtractor
         }
         $source = $this->phpComments->mask($text);
 
-        return $this->entityTypeFieldContext($text, $source, $php, $cursor, $call)
+        return $this->entityTypeFieldContext($text, $php, $cursor, $call)
             ?? $this->repositoryCriteriaContext($text, $source, $php, $cursor, $call);
     }
 
-    private function entityTypeFieldContext(string $text, string $source, PhpDocument $php, PhpArgumentCursor $cursor, PhpMethodCall $call): ?DoctrineCompletionContext
+    private function entityTypeFieldContext(string $text, PhpDocument $php, PhpArgumentCursor $cursor, PhpMethodCall $call): ?DoctrineCompletionContext
     {
         $options = $this->formOptionsArgument($call);
         if (null === $options
             || $cursor->argument !== $options
-            || !\in_array($this->arrayItemKey($source, $options, $cursor), ['choice_label', 'choice_value', 'group_by'], true)
+            || !\in_array($this->arrayItemKey($php, $options, $cursor), ['choice_label', 'choice_value', 'group_by'], true)
             || 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $call->positionalArgument($this->formTypeIndex($call))?->completeClassReference?->className
-            || null === $entityClass = $this->arrayClassReference($source, $php, $options, 'class')?->className
+            || null === $entityClass = $this->arrayClassReference($php, $options, 'class')?->className
         ) {
             return null;
         }
@@ -134,14 +130,11 @@ final class DoctrineExtractor
     }
 
     /** The key whose value the cursor is typing, among the literal keys of the array the argument holds. */
-    private function arrayItemKey(string $source, PhpArgument $argument, PhpArgumentCursor $cursor): ?string
+    private function arrayItemKey(PhpDocument $php, PhpArgument $argument, PhpArgumentCursor $cursor): ?string
     {
-        $valueStartOffset = $cursor->prefixStartOffset - 1;
-        foreach ($this->arrayKeys->parseArgument($argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $key) {
-            if ($key->endOffset < $valueStartOffset
-                && 1 === preg_match('/^\s*=>\s*$/', substr($source, $key->endOffset + 1, $valueStartOffset - $key->endOffset - 1))
-            ) {
-                return $key->value;
+        foreach ($php->literalArray($argument)->entries ?? [] as $entry) {
+            if ($entry->valueStartOffset === $cursor->prefixStartOffset - 1) {
+                return $entry->key?->value;
             }
         }
 
@@ -268,7 +261,7 @@ final class DoctrineExtractor
     }
 
     /** @return list<DoctrineSourceSymbol> */
-    private function formSymbols(string $uri, string $text, string $source, PhpDocument $php): array
+    private function formSymbols(string $uri, string $text, PhpDocument $php): array
     {
         $symbols = [];
         foreach ($php->methodCalls as $call) {
@@ -276,7 +269,7 @@ final class DoctrineExtractor
             if (null === $options || 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $call->positionalArgument($this->formTypeIndex($call))?->completeClassReference?->className) {
                 continue;
             }
-            $entity = $this->arrayClassReference($source, $php, $options, 'class');
+            $entity = $this->arrayClassReference($php, $options, 'class');
             if (null === $entity) {
                 continue;
             }
@@ -289,10 +282,11 @@ final class DoctrineExtractor
                 $this->converter->toRange($text, $entity->startOffset, $entity->endOffset - $entity->startOffset),
                 false,
             );
-            foreach ($this->arrayKeys->parseArgument($options, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $key) {
-                if (!\in_array($key->value, ['choice_label', 'choice_value', 'group_by'], true)
-                    || null === ($field = $this->literalArrayStringValue($source, $key))
-                    || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $field->value)
+            foreach ($php->literalArray($options)->entries ?? [] as $entry) {
+                $field = $entry->stringValue;
+                if (!\in_array($entry->key?->value, ['choice_label', 'choice_value', 'group_by'], true)
+                    || null === $field
+                    || 1 !== preg_match(self::FIELD_PATTERN, $field->value)
                 ) {
                     continue;
                 }
@@ -332,23 +326,18 @@ final class DoctrineExtractor
             if (null === $owner) {
                 continue;
             }
-            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $call->positionalArgument(0), $owner));
+            array_push($symbols, ...$this->criteriaSymbols($uri, $text, $php, $call->positionalArgument(0), $owner));
         }
 
         return $symbols;
     }
 
     /** @return list<DoctrineSourceSymbol> */
-    private function criteriaSymbols(string $uri, string $text, PhpArgument $argument, string $owner): array
+    private function criteriaSymbols(string $uri, string $text, PhpDocument $php, PhpArgument $argument, string $owner): array
     {
-        $array = $argument->expression;
-        $offset = $argument->expressionStartOffset;
-        if (!\is_string($array) || !\is_int($offset) || !preg_match('/^\s*\[/', $array)) {
-            return [];
-        }
         $symbols = [];
-        foreach ($this->arrayKeys->parseArgument($argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $key) {
-            if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $key->value)) {
+        foreach ($php->literalArray($argument)->keys ?? [] as $key) {
+            if (1 !== preg_match(self::FIELD_PATTERN, $key->value)) {
                 continue;
             }
             $symbols[] = new DoctrineSourceSymbol(
@@ -415,66 +404,15 @@ final class DoctrineExtractor
         return $attributes;
     }
 
-    private function arrayClassReference(string $source, PhpDocument $php, PhpArgument $argument, string $key): ?PhpClassReference
+    private function arrayClassReference(PhpDocument $php, PhpArgument $argument, string $key): ?PhpClassReference
     {
-        $start = $argument->expressionStartOffset;
-        $end = $argument->expressionEndOffset;
-        if (!\is_int($start) || !\is_int($end)) {
-            return null;
-        }
-        foreach ($this->arrayKeys->parseArgument($argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $literalKey) {
-            if ($key !== $literalKey->value) {
-                continue;
-            }
-            foreach ($php->classReferences as $reference) {
-                if ($reference->startOffset < $start || $reference->endOffset > $end || $reference->startOffset <= $literalKey->endOffset) {
-                    continue;
-                }
-                if (1 === preg_match('/^\s*=>\s*$/', substr($source, $literalKey->endOffset + 1, $reference->startOffset - $literalKey->endOffset - 1))) {
-                    return $reference;
-                }
+        foreach ($php->literalArray($argument)->entries ?? [] as $entry) {
+            if ($key === $entry->key?->value && null !== $entry->classReference) {
+                return $entry->classReference;
             }
         }
 
         return null;
-    }
-
-    private function literalArrayStringValue(string $source, PhpStringLiteral $key): ?PhpStringLiteral
-    {
-        $sourceOffset = $key->endOffset + 1;
-        $prefix = '<?php ';
-        $value = null;
-        $afterArrow = false;
-        foreach (\PhpToken::tokenize($prefix.substr($source, $sourceOffset)) as $token) {
-            if ($token->is([\T_OPEN_TAG, \T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT])) {
-                continue;
-            }
-            if (!$afterArrow) {
-                if (\T_DOUBLE_ARROW !== $token->id) {
-                    return null;
-                }
-                $afterArrow = true;
-
-                continue;
-            }
-            if (null === $value) {
-                if (\T_CONSTANT_ENCAPSED_STRING !== $token->id) {
-                    return null;
-                }
-                $startOffset = $sourceOffset + $token->pos - \strlen($prefix) + 1;
-                $value = new PhpStringLiteral(
-                    PhpStringLiteralDecoder::decode($token->text[0], substr($token->text, 1, -1)),
-                    $startOffset,
-                    $startOffset + \strlen($token->text) - 2,
-                );
-
-                continue;
-            }
-
-            return \in_array($token->text, [',', ']'], true) ? $value : null;
-        }
-
-        return $value;
     }
 
     /** @param list<PhpAttribute> $attributes */

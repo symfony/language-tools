@@ -43,7 +43,6 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -265,7 +264,7 @@ final class ProviderRegistryTest extends TestCase
         $positionedSymbols = new PositionedSourceSymbolResolver($converter);
         $phpParser = new TolerantPhpParser(new Parser());
         $phpComments = new PhpCommentParser();
-        $doctrineExtractor = new DoctrineExtractor($converter, $phpParser, $phpComments, new DoctrineRepositoryReceiverResolver(), new PhpLiteralArrayKeyParser());
+        $doctrineExtractor = new DoctrineExtractor($converter, $phpParser, $phpComments, new DoctrineRepositoryReceiverResolver());
         $doctrineIndexes = new DoctrineIndexRegistry();
         $doctrineIndexes->forProject($project)->replace($doctrineExtractor->extract($source));
         $metadataExtractor = new MetadataExtractor(

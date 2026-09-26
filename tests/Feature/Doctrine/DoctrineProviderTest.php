@@ -621,6 +621,40 @@ final class DoctrineProviderTest extends TestCase
         ));
     }
 
+    public function testReadsDoctrineArraysWrittenWithLegacyArraySyntax(): void
+    {
+        $kit = new ProjectTestKit();
+        $extractor = $kit->get(DoctrineExtractor::class);
+        $text = <<<'PHP'
+            <?php
+            namespace App\Service;
+
+            use App\Entity\Product;
+            use App\Repository\ProductRepository;
+            use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+
+            function inspect(object $builder, ProductRepository $products): void
+            {
+                $builder->add('product', EntityType::class, array('class' => Product::class, 'choice_label' => 'name'));
+                $products->findBy(array('category' => null));
+            }
+            PHP;
+
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Service/Inspector.php', 'php', $text));
+
+        self::assertSame(
+            [
+                [DoctrineSymbolKind::Entity, 'App\Entity\Product'],
+                [DoctrineSymbolKind::Field, 'name'],
+                [DoctrineSymbolKind::Field, 'category'],
+            ],
+            array_map(
+                static fn ($symbol): array => [$symbol->kind, $symbol->name],
+                array_values(array_filter($facts->symbols, static fn ($symbol): bool => !$symbol->declaration)),
+            ),
+        );
+    }
+
     public function testIgnoresCommentedDoctrinePhpWhilePreservingActiveRanges(): void
     {
         $kit = new ProjectTestKit();
