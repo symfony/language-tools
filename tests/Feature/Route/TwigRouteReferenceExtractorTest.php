@@ -9,7 +9,6 @@ use Symfony\Lsp\Feature\Route\TwigRouteReferenceExtractor;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
@@ -125,7 +124,7 @@ final class TwigRouteReferenceExtractorTest extends TestCase
         return new TwigRouteReferenceExtractor(
             $converter ?? new PositionConverter(),
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()),
-            new TwigCallArgumentResolver(new TwigArgumentParser()),
+            new TwigCallArgumentResolver(),
         );
     }
 }

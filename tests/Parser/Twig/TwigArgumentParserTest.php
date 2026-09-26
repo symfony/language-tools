@@ -10,7 +10,7 @@ final class TwigArgumentParserTest extends TestCase
     public function testParsesNamedAndPositionalArguments(): void
     {
         $text = " first, second: nested(1, [2, 3]), third = 'a,b', item => item.value";
-        $arguments = (new TwigArgumentParser())->parse($text, 100);
+        $arguments = TwigArgumentParser::parse($text, 100);
 
         self::assertSame(
             ['first', 'second: nested(1, [2, 3])', "third = 'a,b'", 'item => item.value'],

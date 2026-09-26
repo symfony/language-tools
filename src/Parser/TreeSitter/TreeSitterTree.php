@@ -18,6 +18,11 @@ final class TreeSitterTree
         return $this->nodes[0];
     }
 
+    public function parent(TreeSitterNode $node): ?TreeSitterNode
+    {
+        return null === $node->parent ? null : $this->nodes[$node->parent];
+    }
+
     /** @return list<TreeSitterNode> */
     public function children(TreeSitterNode $node): array
     {

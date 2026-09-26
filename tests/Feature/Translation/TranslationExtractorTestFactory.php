@@ -14,7 +14,6 @@ use Symfony\Lsp\Feature\Translation\XliffXmlReferenceDecoder;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
@@ -35,7 +34,7 @@ final class TranslationExtractorTestFactory
         return new TranslationExtractor(
             new TranslationCatalogExtractor($converter, new UriToPathConverter(), new YamlDocumentParser($treeSitter), new PhpTranslationCatalogParser(), new TolerantXmlParser(), new XliffXmlReferenceDecoder()),
             new PhpTranslationReferenceExtractor($converter, new TolerantPhpParser(new Parser()), $parameters),
-            new TwigTranslationReferenceExtractor($converter, new TwigDocumentParser($treeSitter, $twigComments, new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser()), $twigComments, $parameters),
+            new TwigTranslationReferenceExtractor($converter, new TwigDocumentParser($treeSitter, $twigComments, new TwigDirectiveLocator()), new TwigCallArgumentResolver(), $twigComments, $parameters),
         );
     }
 }

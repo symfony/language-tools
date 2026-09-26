@@ -6,10 +6,6 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
 
 final class TwigCallArgumentResolver
 {
-    public function __construct(private readonly TwigArgumentParser $parser)
-    {
-    }
-
     public function resolve(TwigDocument $document, TreeSitterNode $call): TwigCallArguments
     {
         $container = $document->directChild($call, 'arguments');
@@ -27,7 +23,7 @@ final class TwigCallArgumentResolver
             $text = substr($text, 0, -1);
         }
 
-        $parsed = $this->parser->parse($text, $offset);
+        $parsed = TwigArgumentParser::parse($text, $offset);
         $named = [];
         foreach ($parsed as $argument) {
             if (null !== $argument->name && null !== $argument->nameOffset) {

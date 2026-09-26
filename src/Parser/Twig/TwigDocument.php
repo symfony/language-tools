@@ -11,6 +11,9 @@ final class TwigDocument
 
     private ?string $markup = null;
 
+    /** @var list<TwigCall>|null */
+    private ?array $calls = null;
+
     public function __construct(
         private readonly string $source,
         private readonly string $masked,
@@ -57,6 +60,37 @@ final class TwigDocument
                 $masked[$offset] = ' ';
             }
         }
+    }
+
+    /**
+     * Returns the function and filter calls in source order, restricted to the
+     * given names when any are given.
+     *
+     * @return list<TwigCall>
+     */
+    public function calls(string ...$names): array
+    {
+        if (null === $this->calls) {
+            $this->calls = [];
+            foreach (['function_call' => 'function_identifier', 'filter' => 'filter_identifier'] as $type => $identifierType) {
+                foreach ($this->tree->nodesOfType($type) as $node) {
+                    if (null !== $identifier = $this->directChild($node, $identifierType)) {
+                        $this->calls[] = new TwigCall($this->text($identifier), 'filter' === $type, $node, $identifier, $this);
+                    }
+                }
+            }
+            usort($this->calls, static fn (TwigCall $left, TwigCall $right): int => $left->node->startByte <=> $right->node->startByte);
+        }
+        if ([] === $names) {
+            return $this->calls;
+        }
+
+        return array_values(array_filter($this->calls, static fn (TwigCall $call): bool => \in_array($call->name, $names, true)));
+    }
+
+    public function parent(TreeSitterNode $node): ?TreeSitterNode
+    {
+        return $this->tree->parent($node);
     }
 
     /** @return list<TreeSitterNode> */

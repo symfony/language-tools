@@ -35,7 +35,6 @@ use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
@@ -249,7 +248,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $converter = new PositionConverter();
             $classIndexes = new DependencyInjectionSourceIndexRegistry();
             $phpExtractor = RouteReferenceExtractorFactory::create($converter);
-            $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser()));
+            $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver());
             $templateIndexes = new TemplateIndexRegistry($classIndexes);
             $templateIndexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration('page.html.twig', $uri, new Range(new Position(0, 0), new Position(0, 0))));
             $sourceIndexes = $this->sourceIndexes($project, $uri, $languageId, $text, $classIndexes, $phpExtractor, $twigExtractor);
@@ -301,7 +300,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $converter = new PositionConverter();
             $classIndexes = new DependencyInjectionSourceIndexRegistry();
             $phpExtractor = RouteReferenceExtractorFactory::create($converter);
-            $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser()));
+            $twigExtractor = new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver());
             $templateIndexes = new TemplateIndexRegistry($classIndexes);
             $templateIndexes->forProject($project)->replaceRuntime(true, new TemplateDeclaration('page.html.twig', $uri, new Range(new Position(0, 0), new Position(0, 0))));
             $sourceIndexes = $this->sourceIndexes($project, $uri, $languageId, $text, $classIndexes, $phpExtractor, $twigExtractor);
@@ -548,7 +547,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             ...('twig' === $languageId && $runtimeTemplate ? [new TemplateDeclaration(basename($uri), $uri, new Range(new Position(0, 0), new Position(0, 0)))] : []),
         );
         $phpExtractor = RouteReferenceExtractorFactory::create($positionConverter);
-        $twigExtractor = new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser()));
+        $twigExtractor = new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver());
         $sourceIndexes = $this->sourceIndexes($project, $uri, $languageId, $text, $classIndexes, $phpExtractor, $twigExtractor);
 
         $uriConverter = new UriToPathConverter();

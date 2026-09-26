@@ -7,10 +7,6 @@ use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 
 final class TwigCallableArgumentAnalyzer
 {
-    public function __construct(private readonly TwigArgumentParser $argumentParser)
-    {
-    }
-
     /**
      * @param string $directive Source of the directive being edited, from its opening marker to the cursor
      *
@@ -49,7 +45,7 @@ final class TwigCallableArgumentAnalyzer
             return null;
         }
         $argumentsText = substr($directive, $open->offset + 1);
-        $arguments = $this->argumentParser->parse($argumentsText, $start + $open->offset + 1);
+        $arguments = TwigArgumentParser::parse($argumentsText, $start + $open->offset + 1);
         $current = array_pop($arguments);
         if (null === $current || 1 !== preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)?$/', $current->text, $prefix)) {
             return null;

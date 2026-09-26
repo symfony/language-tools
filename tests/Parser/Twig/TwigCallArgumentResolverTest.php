@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Parser\Twig;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
@@ -26,7 +25,7 @@ final class TwigCallArgumentResolverTest extends TestCase
             $comments,
             new TwigDirectiveLocator(),
         ))->parse($source);
-        $resolver = new TwigCallArgumentResolver(new TwigArgumentParser());
+        $resolver = new TwigCallArgumentResolver();
         $calls = $document->nodesOfType('function_call');
 
         $named = $resolver->resolve($document, $calls[0]);

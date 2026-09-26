@@ -23,7 +23,6 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
@@ -61,9 +60,9 @@ class TwigCallableProviderTestCase extends TestCase
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $commentParser = new TwigCommentParser(), new TwigDirectiveLocator()),
             $converter,
             $directives = new TwigDirectiveLocator(),
-            new TwigCallArgumentResolver(new TwigArgumentParser()),
+            new TwigCallArgumentResolver(),
         );
-        $argumentAnalyzer = new TwigCallableArgumentAnalyzer(new TwigArgumentParser());
+        $argumentAnalyzer = new TwigCallableArgumentAnalyzer();
         $callableFacts = [];
         $classFacts = [];
         $declarationExtractor = new TwigCallableDeclarationExtractor($converter, $phpParser);

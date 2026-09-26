@@ -21,7 +21,6 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
@@ -272,7 +271,7 @@ final class AssetProviderTest extends TestCase
             new TwigAssetReferenceExtractor(
                 $converter,
                 new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()),
-                new TwigCallArgumentResolver(new TwigArgumentParser()),
+                new TwigCallArgumentResolver(),
             ),
             new ImportMapEntrypointExtractor($converter, new PhpCommentParser()),
             new AssetCompletionContextResolver($converter, $comments, new TwigDirectiveLocator()),
