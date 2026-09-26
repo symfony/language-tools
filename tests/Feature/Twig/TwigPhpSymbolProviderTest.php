@@ -173,7 +173,7 @@ final class TwigPhpSymbolProviderTest extends TestCase
         return new TwigPhpSymbolExtractor(
             $converter,
             new TolerantPhpParser(new Parser()),
-            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
+            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()),
             new TwigPhpSymbolDeclarationExtractor($converter),
             new TwigPhpSymbolReferenceExtractor($converter, new TwigCallArgumentResolver(new TwigArgumentParser())),
             new TwigPhpSymbolCompletionContextResolver($converter, $comments, new TwigDirectiveLocator()),

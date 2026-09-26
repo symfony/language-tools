@@ -28,6 +28,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
@@ -89,7 +90,7 @@ final class RouteDefinitionHandlerTest extends TestCase
             new RouteSymbolResolver(
                 $converter,
                 RouteReferenceExtractorFactory::create($converter),
-                new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
+                new TwigRouteReferenceExtractor($converter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser())),
                 new PhpRouteDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
                 new YamlRouteDeclarationExtractor($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
                 new UriToPathConverter(),

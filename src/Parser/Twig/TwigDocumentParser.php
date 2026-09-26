@@ -9,7 +9,7 @@ final class TwigDocumentParser
     public function __construct(
         private readonly TreeSitterParserInterface $parser,
         private readonly TwigCommentParser $commentParser,
-        private readonly TwigDirectiveLocator $directiveLocator = new TwigDirectiveLocator(),
+        private readonly TwigDirectiveLocator $directiveLocator,
     ) {
     }
 

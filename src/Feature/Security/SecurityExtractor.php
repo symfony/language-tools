@@ -42,8 +42,8 @@ final class SecurityExtractor
         private readonly PhpParserInterface $phpParser,
         private readonly TwigDocumentParser $twigParser,
         private readonly TwigCallArgumentResolver $twigArguments,
+        private readonly TwigDirectiveLocator $twigDirectives,
         private readonly ?YamlDocumentParser $yamlParser = null,
-        private readonly TwigDirectiveLocator $twigDirectives = new TwigDirectiveLocator(),
     ) {
     }
 

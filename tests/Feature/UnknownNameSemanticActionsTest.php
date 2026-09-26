@@ -53,6 +53,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -159,7 +160,7 @@ final class UnknownNameSemanticActionsTest extends TestCase
         $extractor = new TwigComponentExtractor(
             new TolerantPhpParser(new Parser()),
             new TwigComponentPhpExtractor($converter, $names),
-            new TwigComponentTemplateExtractor($converter, $names, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new TwigComponentTemplateExtractor($converter, $names, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser())),
         );
         $componentResolver = new TwigComponentResolver($resolver, new PositionedSourceSymbolResolver($converter), $indexes, $templates, $extractor);
         $diagnostic = $protocol->diagnostic($range, 1, 'twig_component.not_found', 'Unknown component.');

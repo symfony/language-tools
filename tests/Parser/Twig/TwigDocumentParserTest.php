@@ -182,6 +182,7 @@ final class TwigDocumentParserTest extends TestCase
         return new TwigDocumentParser(
             new NativeTreeSitterParser(new TreeSitterResultDecoder()),
             new TwigCommentParser(),
+            new TwigDirectiveLocator(),
         );
     }
 }

@@ -17,6 +17,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
@@ -139,7 +140,7 @@ final class TwigComponentExtractorTest extends TestCase
             new TwigComponentTemplateExtractor(
                 $converter,
                 $names,
-                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
+                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()),
                 new TwigCallArgumentResolver(new TwigArgumentParser()),
             ),
         );

@@ -11,7 +11,7 @@ final class AssetCompletionContextResolver
     public function __construct(
         private readonly PositionConverter $converter,
         private readonly TwigCommentParser $commentParser,
-        private readonly TwigDirectiveLocator $directives = new TwigDirectiveLocator(),
+        private readonly TwigDirectiveLocator $directives,
     ) {
     }
 

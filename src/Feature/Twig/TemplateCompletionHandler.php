@@ -21,7 +21,7 @@ final class TemplateCompletionHandler implements CompletionProviderInterface
         private readonly TemplateReferenceExtractor $extractor,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly CommentParserRegistry $comments,
-        private readonly TwigDirectiveLocator $directives = new TwigDirectiveLocator(),
+        private readonly TwigDirectiveLocator $directives,
     ) {
     }
 

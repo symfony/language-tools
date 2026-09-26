@@ -18,6 +18,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
@@ -261,8 +262,8 @@ final class StimulusExtractorTest extends TestCase
 
         return new StimulusExtractor(
             new StimulusControllerExtractor($converter, ProjectPaths::resolver(), $controllerNameNormalizer, new StimulusControllerSourceAnalyzer($converter)),
-            new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments), new TwigCallArgumentResolver(new TwigArgumentParser())),
-            new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer),
+            new StimulusReferenceExtractor($converter, $controllerNameNormalizer, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new StimulusCompletionContextResolver($converter, $comments, $controllerNameNormalizer, new TwigDirectiveLocator()),
             $tokenizer,
         );
     }

@@ -54,6 +54,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigTypeDeclarationParser;
 use Symfony\Lsp\Project\Project;
@@ -798,7 +799,7 @@ final class TemplateProviderTest extends TestCase
             new TwigComponentTemplateExtractor(
                 $converter,
                 $names,
-                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments),
+                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()),
                 new TwigCallArgumentResolver(new TwigArgumentParser()),
             ),
         );
@@ -1259,7 +1260,7 @@ final class TemplateProviderTest extends TestCase
         $resolver = new DocumentContextResolver($documents, $projects);
 
         return [
-            new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $classIndexes, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()])),
+            new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $classIndexes, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TwigDirectiveLocator()),
             new TemplateNavigationProvider($resolver, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes),
             $converter,
         ];
@@ -1281,7 +1282,7 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', new Range(new Position(0, 0), new Position(0, 0))),
             [],
         ));
-        $handler = new TemplateCompletionHandler(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $this->templateReferenceExtractor($converter), $classIndexes, new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]));
+        $handler = new TemplateCompletionHandler(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $this->templateReferenceExtractor($converter), $classIndexes, new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]), new TwigDirectiveLocator());
         $position = $converter->toPosition($text, \strlen($text));
 
         self::assertNull($handler->complete([
@@ -1435,7 +1436,7 @@ final class TemplateProviderTest extends TestCase
     {
         return new TemplateReferenceExtractor(
             $converter,
-            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments ?? new TwigCommentParser()),
+            new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments ?? new TwigCommentParser(), new TwigDirectiveLocator()),
             new TwigCallArgumentResolver(new TwigArgumentParser()),
             $parser ?? new TolerantPhpParser(new Parser()),
             new PhpLiteralArrayKeyParser(),

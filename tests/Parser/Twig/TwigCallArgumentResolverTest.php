@@ -8,6 +8,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
 final class TwigCallArgumentResolverTest extends TestCase
@@ -23,6 +24,7 @@ final class TwigCallArgumentResolverTest extends TestCase
         $document = (new TwigDocumentParser(
             new NativeTreeSitterParser(new TreeSitterResultDecoder()),
             $comments,
+            new TwigDirectiveLocator(),
         ))->parse($source);
         $resolver = new TwigCallArgumentResolver(new TwigArgumentParser());
         $calls = $document->nodesOfType('function_call');

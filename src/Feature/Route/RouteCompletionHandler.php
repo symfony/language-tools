@@ -22,7 +22,7 @@ final class RouteCompletionHandler implements CompletionProviderInterface
         private readonly RouteReferenceExtractor $phpReferenceExtractor,
         private readonly CommentParserRegistry $comments,
         private readonly RouteCompletionBuilder $completionBuilder,
-        private readonly TwigDirectiveLocator $directives = new TwigDirectiveLocator(),
+        private readonly TwigDirectiveLocator $directives,
     ) {
     }
 

@@ -39,6 +39,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\GlobPatternCompiler;
@@ -123,7 +124,7 @@ final class RouteSourceIndexerTest extends TestCase
                     new PhpRouteDeclarationExtractor($positionConverter, $parser),
                     new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
                     RouteReferenceExtractorFactory::create($positionConverter, $parser),
-                    new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
+                    new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser())),
                     ProjectPaths::resolver(),
                 ),
                 new DependencyInjectionSourceIndexer(
@@ -193,7 +194,7 @@ final class RouteSourceIndexerTest extends TestCase
             new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
             new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             RouteReferenceExtractorFactory::create($positionConverter),
-            new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser())),
             ProjectPaths::resolver(),
         );
         $scanner = $this->scanner($projects, $documents, [$indexer]);
@@ -254,7 +255,7 @@ final class RouteSourceIndexerTest extends TestCase
             new PhpRouteDeclarationExtractor($positionConverter, $parser),
             new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
             RouteReferenceExtractorFactory::create($positionConverter, $parser),
-            new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser()), new TwigCallArgumentResolver(new TwigArgumentParser())),
+            new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser())),
             ProjectPaths::resolver(),
         );
         $scanner = $this->scanner($projects, $documents, [

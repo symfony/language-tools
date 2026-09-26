@@ -20,6 +20,7 @@ use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -405,6 +406,7 @@ final class RouteCompletionHandlerTest extends TestCase
             RouteReferenceExtractorFactory::create($converter),
             new CommentParserRegistry(['php' => new PhpCommentParser(), 'twig' => new TwigCommentParser()]),
             new RouteCompletionBuilder(),
+            new TwigDirectiveLocator(),
         );
     }
 }

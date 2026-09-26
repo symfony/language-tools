@@ -50,6 +50,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigArgumentParser;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
+use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
@@ -770,8 +771,9 @@ PHP;
                 new YamlConfigurationParser($converter, new YamlDocumentParser($treeSitter)),
                 new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]),
                 new TolerantPhpParser(new Parser()),
-                new TwigDocumentParser($treeSitter, new TwigCommentParser()),
+                new TwigDocumentParser($treeSitter, new TwigCommentParser(), new TwigDirectiveLocator()),
                 new TwigCallArgumentResolver(new TwigArgumentParser()),
+                new TwigDirectiveLocator(),
             ),
         );
     }

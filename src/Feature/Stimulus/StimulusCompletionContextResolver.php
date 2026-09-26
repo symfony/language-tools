@@ -12,7 +12,7 @@ final class StimulusCompletionContextResolver
         private readonly PositionConverter $converter,
         private readonly TwigCommentParser $commentParser,
         private readonly StimulusControllerNameNormalizer $controllerNameNormalizer,
-        private readonly TwigDirectiveLocator $directives = new TwigDirectiveLocator(),
+        private readonly TwigDirectiveLocator $directives,
     ) {
     }
 
