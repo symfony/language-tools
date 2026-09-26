@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete translation keys inside a Twig string interpolation
 - Complete Security roles and firewalls passed as the `attribute` and `key` named arguments in Twig, and stop completing them on method calls and filters
 - Complete Stimulus controllers, actions and targets passed as named arguments or after another target name, and stop completing them on Twig method calls
 - Complete importmap entrypoints passed as the `entryPoint` named argument, and stop completing assets on Twig method calls and filters named `asset` or `importmap`

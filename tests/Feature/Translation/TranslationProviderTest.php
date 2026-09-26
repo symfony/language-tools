@@ -775,6 +775,8 @@ final class TranslationProviderTest extends TestCase
         yield 'unterminated' => ["{{ t('article.ti"];
         yield 'operand' => ["{% if not t('article.ti') %}{% endif %}"];
         yield 'argument' => ["{{ include('page.html.twig', {label: t('article.ti')}) }}"];
+        yield 'string interpolation' => ['{{ "Title: #{ t(\'article.ti\') }" }}'];
+        yield 'unterminated string interpolation' => ['{{ "Title: #{ t(\'article.ti'];
     }
 
     /** @return iterable<string, array{string}> */

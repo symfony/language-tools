@@ -38,7 +38,7 @@ final class TranslationCompletionContext
         if (null === $directive) {
             return null;
         }
-        $string = DelimiterScanner::state($before, $directive)->openString;
+        $string = DelimiterScanner::state($before, $directive, twig: true)->openString;
         if (null === $string) {
             return null;
         }
