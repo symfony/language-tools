@@ -77,6 +77,16 @@ final class RouteCompletionContextTest extends TestCase
                 $router->generate('home')|;
             }
             PHP, null];
+        yield 'concatenated route name' => [<<<'PHP'
+            <?php
+            class DemoController extends AbstractController
+            {
+                public function index(): void
+                {
+                    $this->generateUrl('article_|' . $suffix);
+                }
+            }
+            PHP, null];
         yield 'unknown receiver' => [<<<'PHP'
             <?php
             $unknown->generateUrl('article_|');

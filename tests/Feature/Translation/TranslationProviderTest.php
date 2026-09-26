@@ -816,6 +816,8 @@ final class TranslationProviderTest extends TestCase
 
             t('article.ti
             PHP];
+        yield 'concatenated key' => ["<?php \$translator->trans('article.ti' . \$suffix);"];
+        yield 'key concatenated with an open literal' => ["<?php \$translator->trans('article.ti' . 'tle"];
         yield 'unrelated translatable message' => [<<<'PHP'
             <?php
             use App\Message\TranslatableMessage;

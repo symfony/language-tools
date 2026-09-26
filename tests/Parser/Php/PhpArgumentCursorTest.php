@@ -72,6 +72,10 @@ final class PhpArgumentCursorTest extends TestCase
         yield 'interpolated literal' => ['<?php $input->getOption("out$name|', self::cursor('getOption', quote: null, prefix: '', argumentLiteral: false)];
         yield 'escaped dollar' => ['<?php $input->getOption("out\\$na|', self::cursor('getOption', quote: '"', prefix: 'out$na', raw: 'out\\$na')];
         yield 'concatenated literal' => ["<?php \$input->getOption('out' . 'pu|", self::cursor('getOption', prefix: 'pu', argumentLiteral: false)];
+        yield 'literal followed by a concatenation' => ["<?php \$input->getOption('ou|' . \$x);", self::cursor('getOption', prefix: 'ou', argumentLiteral: false)];
+        yield 'literal concatenated with an open literal' => ["<?php \$input->getOption('ou|' . 'x", self::cursor('getOption', prefix: 'ou', argumentLiteral: false)];
+        yield 'literal before a dangling operator' => ["<?php \$input->getOption('ou|' .", self::cursor('getOption', prefix: 'ou', argumentLiteral: false)];
+        yield 'literal before a later argument' => ["<?php \$translator->trans('app.ti|', [], 'admin');", self::cursor('trans', prefix: 'app.ti')];
         yield 'variable argument' => ['<?php $input->getOption($na|', self::cursor('getOption', quote: null, prefix: '', argumentLiteral: false)];
         yield 'closed literal' => ["<?php \$input->getOption('out'|);", self::cursor('getOption', quote: null, prefix: '', argumentLiteral: false)];
         yield 'static call' => ["<?php Translator::trans('app.ti|", null];

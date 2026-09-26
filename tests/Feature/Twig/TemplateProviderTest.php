@@ -1369,6 +1369,18 @@ final class TemplateProviderTest extends TestCase
         self::assertSame($expectedPrefix, $context?->prefix);
     }
 
+    public function testRecognizesNoPhpTemplateCompletionContextInAConcatenatedName(): void
+    {
+        $imports = "<?php\nuse Symfony\\Bridge\\Twig\\Attribute\\Template;\nuse Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController;\n";
+        $extractor = $this->templateReferenceExtractor(new PositionConverter());
+        foreach ([
+            $imports."class ArticleController extends AbstractController { public function show(): void { \$this->render('article/sh' . \$suffix); } }",
+            $imports."#[Template('article/sh' . self::SUFFIX)]",
+        ] as $text) {
+            self::assertNull($extractor->phpCompletionAt($text, (int) strpos($text, 'article/sh') + \strlen('article/sh')));
+        }
+    }
+
     /** @return iterable<string, array{string, ?string}> */
     public static function providePhpCompletionContexts(): iterable
     {

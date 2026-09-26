@@ -15,6 +15,7 @@ final class PhpArgumentCursor
         private readonly int $literalDepth,
         private readonly bool $literalStartsItem,
         private readonly bool $argumentIsArray,
+        private readonly bool $literalIsArgument,
     ) {
     }
 
@@ -30,8 +31,9 @@ final class PhpArgumentCursor
                 ? self::openLiteral(substr($expression, 0, $offset - $start))
                 : null;
             if (null === $literal) {
-                return new self($call, $argument, $position, $argument->name, null, '', $offset, 0, false, false);
+                return new self($call, $argument, $position, $argument->name, null, '', $offset, 0, false, false, false);
             }
+            $whole = null === $argument->stringLiteral ? self::openLiteral((string) $expression) : null;
 
             return new self(
                 $call,
@@ -44,6 +46,7 @@ final class PhpArgumentCursor
                 $literal['depth'],
                 $literal['startsItem'],
                 $literal['argumentIsArray'],
+                null !== $argument->stringLiteral || ($whole['contentStart'] ?? null) === $literal['contentStart'],
             );
         }
 
@@ -62,7 +65,7 @@ final class PhpArgumentCursor
 
     public function isArgumentLiteral(): bool
     {
-        return null !== $this->quote && 0 === $this->literalDepth && $this->literalStartsItem;
+        return null !== $this->quote && 0 === $this->literalDepth && $this->literalStartsItem && $this->literalIsArgument;
     }
 
     public function isArrayItemLiteral(): bool
