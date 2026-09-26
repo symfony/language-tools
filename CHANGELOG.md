@@ -3,17 +3,14 @@
 ## Unreleased
 
 - Stop reading a Twig `trans()` function call as a translation reference, since Symfony only defines the `trans` filter
-- Read a Twig named argument written with a colon and a sequence value, such as `importmap(entryPoint: ['app'])`
-- Complete YAML keys on the line after an unterminated flow sequence under their real parent instead of the flow sequence key
-- Keep YAML values at their real path and `when@` environment beside a malformed line, so their service and parameter references are still checked
 - Recognize Stimulus controllers, actions and targets passed to the `stimulus_*` Twig filters or as named arguments
 - Complete PHP translation placeholders from the domain the call passes instead of always the `messages` domain
 - Recognize Security roles and firewalls passed as named arguments to `is_granted()`, `logout_path()` and `logout_url()` in Twig
-- Recognize an importmap entrypoint passed as the `entryPoint` named argument in Twig
-- Keep YAML keys in their `when@` environment block when a malformed line or an unterminated flow collection precedes them
+- Recognize an importmap entrypoint passed as the `entryPoint` named argument in Twig, including a list such as `importmap(entryPoint: ['app'])`
 - Answer a completion request with an empty list instead of nothing when nothing matches
 - Check the translation parameters of a call written with the legacy `array()` syntax or spreading an array inside a parameter value
 - Read Doctrine criteria fields and `EntityType` options written with the legacy `array()` syntax
+- Stop offering route parameters already passed in a legacy `array()` call
 - Read form options, `data_class` and field options written with the legacy `array()` syntax, an uppercase `TRUE`, `FALSE` or `NULL`, or `self::class`
 - Honor the `includeDeclaration` flag of a references request in every integration, and report the declaration when the client omits it
 - Answer a definition or references request with an empty list instead of nothing when nothing matches
@@ -21,8 +18,8 @@
 - Refresh only the translation catalogs when a catalog inside a `Translations` directory changes, instead of the whole runtime index
 - Treat `%%` in an `#[Autowire]` attribute as an escaped percent sign, so a literal like `%%message%%` is no longer read as a parameter reference
 - Stop reporting an environment expression containing whitespace, such as `%env(APP URL%`, as malformed, since Symfony reads it as literal text
-- Reuse one YAML parse per document during completion
-- Keep reading YAML keys at their real path when the file contains an unterminated flow collection
+- Keep YAML keys and values at their real path and `when@` environment next to a malformed line or an unterminated flow collection, so completion and service and parameter references keep working
+- Speed up YAML completion in large files
 - Complete Security roles in an `IsGranted` attribute written next to another attribute
 - Refresh the published diagnostics after startup and after a workspace folder change
 - Reject project roots outside the workspace, including the ones an editor passes at initialization
@@ -30,6 +27,7 @@
 - Stop completing route parameter names inside a parameter value or a nested array
 - Stop completing translations on a `trans()` call of an unrelated type, a local `t()` function or an unrelated `TranslatableMessage` class
 - Complete template names in a `#[Template]` attribute only when it resolves to Symfony's attribute
+- Ignore nested arrays in the `vars` of a `#[Template]` attribute instead of reading their strings as variables
 - Stop completing Doctrine criteria fields outside the criteria array of `findBy()`, `findOneBy()` and `count()`
 - Stop completing form options inside an option value or a nested option array
 - Keep publishing the diagnostics of the other integrations when one fails in the editor, and log the failure
