@@ -18,7 +18,6 @@ use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TemplateCodeActionProvider;
-use Symfony\Lsp\Feature\Twig\TemplateCompletionContext;
 use Symfony\Lsp\Feature\Twig\TemplateCompletionHandler;
 use Symfony\Lsp\Feature\Twig\TemplateDeclaration;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
@@ -1376,7 +1375,7 @@ final class TemplateProviderTest extends TestCase
     public function testRecognizesPhpTemplateCompletionContexts(string $text, ?string $expectedPrefix): void
     {
         $converter = new PositionConverter();
-        $context = TemplateCompletionContext::create('php', $text, $converter->toPosition($text, \strlen($text)), $converter);
+        $context = $this->templateReferenceExtractor($converter)->phpCompletionAt($text, \strlen($text));
 
         self::assertSame($expectedPrefix, $context?->prefix);
     }
@@ -1384,14 +1383,21 @@ final class TemplateProviderTest extends TestCase
     /** @return iterable<string, array{string, ?string}> */
     public static function providePhpCompletionContexts(): iterable
     {
-        yield 'render call' => ["<?php \$this->render('article/sh", 'article/sh'];
-        yield 'named controller render argument' => ["<?php \$this->render(view: 'article/sh", 'article/sh'];
-        yield 'named environment render argument' => ["<?php \$twig->render(name: 'article/sh", 'article/sh'];
-        yield 'static render call' => ["<?php Controller::render('article/sh", null];
-        yield 'attribute' => ["<?php #[Template('article/sh", 'article/sh'];
-        yield 'named template argument' => ["<?php #[Template(template: 'article/sh", 'article/sh'];
+        $imports = "<?php\nuse Symfony\\Bridge\\Twig\\Attribute\\Template;\nuse Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController;\n";
+        $controller = $imports.'class ArticleController extends AbstractController { public function show(): void { ';
+
+        yield 'render call' => [$controller."\$this->render('article/sh", 'article/sh'];
+        yield 'named controller render argument' => [$controller."\$this->render(view: 'article/sh", 'article/sh'];
+        yield 'named environment render argument' => ["<?php function show(\\Twig\\Environment \$twig): string { return \$twig->render(name: 'article/sh", 'article/sh'];
+        yield 'unrelated render receiver' => ["<?php class Markdown { public function show(): string { return \$this->render('article/sh", null];
+        yield 'static render call' => [$controller."Controller::render('article/sh", null];
+        yield 'render variables' => [$controller."\$this->render('article/show.html.twig', ['ar", null];
+        yield 'attribute' => [$imports."#[Template('article/sh", 'article/sh'];
+        yield 'named template argument' => [$imports."#[Template(template: 'article/sh", 'article/sh'];
         yield 'fully qualified attribute' => ["<?php #[\\Symfony\\Bridge\\Twig\\Attribute\\Template('article/sh", 'article/sh'];
-        yield 'grouped attributes' => ["<?php #[Route('/articles'), Template('article/sh", 'article/sh'];
+        yield 'grouped attributes' => [$imports."#[Route('/articles'), Template('article/sh", 'article/sh'];
+        yield 'attribute variables' => [$imports."#[Template('article/show.html.twig', ['ar", null];
+        yield 'unqualified attribute without an import' => ["<?php #[Template('article/sh", null];
         yield 'unrelated qualified attribute' => ["<?php #[App\\Attribute\\Template('article/sh", null];
         yield 'unrelated attribute' => ["<?php #[Route('/articles/sh", null];
     }

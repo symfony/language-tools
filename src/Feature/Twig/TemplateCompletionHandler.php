@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\DocumentContextResolver;
+use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
@@ -30,20 +31,17 @@ final class TemplateCompletionHandler implements CompletionProviderInterface
         if (null === $request) {
             return null;
         }
-        $text = $this->comments->mask($request->document->languageId, $request->document->text);
-        if ('twig' === $request->document->languageId
-            && !$this->directives->insideDirective($text, $this->converter->toByteOffset($text, $request->position))
-        ) {
-            return null;
-        }
-        $context = TemplateCompletionContext::create($request->document->languageId, $text, $request->position, $this->converter);
-        if (null === $context
-            || ($context->phpRenderCall && !$this->extractor->supportsPhpRenderAt(
-                $request->document->text,
-                $this->converter->toByteOffset($request->document->text, $request->position),
+        $document = $request->document;
+        $context = match ($document->languageId) {
+            'php' => $this->extractor->phpCompletionAt(
+                $document->text,
+                $this->converter->toByteOffset($document->text, $request->position),
                 $this->classIndexes->forProject($request->project),
-            ))
-        ) {
+            ),
+            'twig' => $this->twigContext($this->comments->mask('twig', $document->text), $request->position),
+            default => null,
+        };
+        if (null === $context) {
             return null;
         }
 
@@ -53,5 +51,12 @@ final class TemplateCompletionHandler implements CompletionProviderInterface
             'detail' => $template->uri,
             'textEdit' => $this->protocol->textEdit($context->range, $template->name),
         ], $this->indexes->forProject($request->project)->matching($context->prefix));
+    }
+
+    private function twigContext(string $text, Position $position): ?TemplateCompletionContext
+    {
+        return $this->directives->insideDirective($text, $this->converter->toByteOffset($text, $position))
+            ? TemplateCompletionContext::fromTwig($text, $position, $this->converter)
+            : null;
     }
 }

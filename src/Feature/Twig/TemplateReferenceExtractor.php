@@ -6,8 +6,11 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\Php\PhpArgumentCursor;
+use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
+use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
@@ -46,27 +49,32 @@ final class TemplateReferenceExtractor
         ));
     }
 
-    public function supportsPhpRenderAt(string $source, int $offset, ?DependencyInjectionSourceIndex $classIndex = null): bool
+    /** The template name being typed at the cursor, in a call or attribute the index reads references from. */
+    public function phpCompletionAt(string $source, int $offset, ?DependencyInjectionSourceIndex $classIndex = null): ?TemplateCompletionContext
     {
         $php = $this->phpParser->parse($source);
-        $candidate = null;
-        foreach ($php->methodCalls as $call) {
-            if (!\in_array($call->method, ['render', 'renderView'], true) || $call->startOffset > $offset || $call->endOffset < $offset) {
-                continue;
-            }
-            if (null === $candidate || $call->startOffset > $candidate->startOffset) {
-                $candidate = $call;
-            }
+        $cursor = $php->argumentCursorAt($offset);
+        $call = $cursor?->call;
+        if (null === $cursor || !$cursor->isArgumentLiteral()) {
+            return null;
         }
-        if (null === $candidate) {
-            return false;
+        if ($call instanceof PhpAttribute) {
+            return self::TEMPLATE_ATTRIBUTE === $call->name && $cursor->isNamedOrPositional('template', 0)
+                ? $this->completionContext($cursor, $source, $offset)
+                : null;
         }
-        $receiver = $this->phpReferences->receiver($php, $candidate);
-        if (null === $receiver || null === $candidate->namedOrPositionalArgument($receiver['templateArgumentName'], 0)) {
-            return false;
+        if (!$call instanceof PhpMethodCall || !\in_array($call->method, ['render', 'renderView'], true)) {
+            return null;
+        }
+        $receiver = $this->phpReferences->receiver($php, $call);
+        if (null === $receiver
+            || $cursor->argument !== $call->namedOrPositionalArgument($receiver['templateArgumentName'], 0)
+            || !TemplatePhpReferenceResolver::supportsReceiver($receiver['className'], $receiver['requiredParentClassNames'], $classIndex, $php)
+        ) {
+            return null;
         }
 
-        return TemplatePhpReferenceResolver::supportsReceiver($receiver['className'], $receiver['requiredParentClassNames'], $classIndex, $php);
+        return $this->completionContext($cursor, $source, $offset);
     }
 
     /** @return list<TemplateReference> */
@@ -80,6 +88,17 @@ final class TemplateReferenceExtractor
         }
 
         return $this->phpReferences($document, $this->phpParser->parse($document->text));
+    }
+
+    private function completionContext(PhpArgumentCursor $cursor, string $source, int $offset): TemplateCompletionContext
+    {
+        return new TemplateCompletionContext(
+            $cursor->prefix,
+            new Range(
+                $this->positionConverter->toPosition($source, $cursor->prefixStartOffset),
+                $this->positionConverter->toPosition($source, $offset),
+            ),
+        );
     }
 
     /** @return list<TemplateReference> */

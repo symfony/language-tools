@@ -10,6 +10,7 @@
 - Report the same project root errors in the editor and on the command line
 - Stop completing route parameter names inside a parameter value or a nested array
 - Stop completing translations on a `trans()` call of an unrelated type, a local `t()` function or an unrelated `TranslatableMessage` class
+- Complete template names in a `#[Template]` attribute only when it resolves to Symfony's attribute
 - Keep publishing the diagnostics of the other integrations when one fails in the editor, and log the failure
 - Insert completed configuration values literally, so a value containing `$`, `}` or `\` such as `!php/enum App\Mode::FAST` is no longer mangled as a snippet
 - Publish an empty diagnostic list while a runtime index is incomplete, so stale route, template, Twig component, service and parameter diagnostics no longer stay on screen
