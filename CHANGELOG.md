@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read every target of a space-separated `stimulus_target()` value instead of one combined name
 - Complete YAML keys at the indentation of the line being typed, so a key after a nested list is completed under its real parent
 - Reload the application metadata when the configured kernel changes
 - Parse large YAML files in linear time instead of slowing down quadratically with their size

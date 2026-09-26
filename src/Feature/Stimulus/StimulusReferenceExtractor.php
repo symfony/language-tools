@@ -138,8 +138,20 @@ final class StimulusReferenceExtractor
             }
             $name = $this->controllerNameNormalizer->normalize($controller->value);
             $references[] = new StimulusReference($name, null, null, $uri, $this->range($text, $controller));
-            if (null !== $member) {
+            if (null === $member) {
+                continue;
+            }
+            if (StimulusMemberKind::Target !== $kind) {
                 $references[] = new StimulusReference($name, $kind, $member->value, $uri, $this->range($text, $member));
+                continue;
+            }
+            $unescaped = $member->raw === $member->value;
+            preg_match_all('/\S+/', $member->value, $targets, \PREG_OFFSET_CAPTURE);
+            foreach ($targets[0] as [$target, $offset]) {
+                $range = $unescaped
+                    ? $this->converter->toRange($text, $member->startOffset + $offset, \strlen($target))
+                    : $this->range($text, $member);
+                $references[] = new StimulusReference($name, $kind, $target, $uri, $range);
             }
         }
 

@@ -264,6 +264,22 @@ final class StimulusExtractorTest extends TestCase
         );
     }
 
+    public function testExtractsEverySpaceSeparatedTwigHelperTarget(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace');
+        $text = "{{ stimulus_target('chart', 'results  summary') }}";
+        $facts = $this->createExtractor()->extract($project, new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', $text));
+
+        self::assertSame(
+            [
+                ['chart', null, null, 0, 20],
+                ['chart', 'target', 'results', 0, (int) strpos($text, 'results')],
+                ['chart', 'target', 'summary', 0, (int) strpos($text, 'summary')],
+            ],
+            array_map(static fn ($reference): array => [$reference->controller, $reference->kind?->value, $reference->member, $reference->range->start->line, $reference->range->start->character], $facts->references),
+        );
+    }
+
     private function createExtractor(): StimulusExtractor
     {
         return (new ProjectTestKit())->get(StimulusExtractor::class);
