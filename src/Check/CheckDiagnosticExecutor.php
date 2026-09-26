@@ -40,7 +40,7 @@ final class CheckDiagnosticExecutor
                 $this->documents->open(new Document($file->uri, $file->languageId, 0, $analysis->preparedTexts[$file->path]));
                 $openDocuments[$file->uri] = true;
                 $excludedOverlays[$file->uri] = true;
-                $this->sourceScanner->updateOpenDocument(['textDocument' => ['uri' => $file->uri]], true, false);
+                $this->sourceScanner->updateOpenDocument($file->uri, true, false);
             }
 
             $diagnosedCount = 0;
@@ -73,11 +73,7 @@ final class CheckDiagnosticExecutor
                         $openDocuments[$file->uri] = true;
                     }
                     try {
-                        $collection = $this->diagnostics->collect(
-                            ['textDocument' => ['uri' => $file->uri]],
-                            $file->excluded,
-                            $this->profiler->enabled(),
-                        );
+                        $collection = $this->diagnostics->collect($file->uri, $file->excluded, $this->profiler->enabled());
                         if (null !== $collection) {
                             $this->profiler->recordDiagnosticProviders($file->project, $collection->providerNanoseconds);
                             $failedProviders = [];
@@ -130,7 +126,7 @@ final class CheckDiagnosticExecutor
             $canceled = true;
         } finally {
             foreach (array_keys($excludedOverlays) as $uri) {
-                $this->sourceScanner->restoreClosedDocument(['textDocument' => ['uri' => $uri]]);
+                $this->sourceScanner->restoreClosedDocument($uri);
             }
             foreach (array_keys($openDocuments) as $uri) {
                 $this->documents->close($uri);

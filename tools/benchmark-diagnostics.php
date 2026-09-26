@@ -166,7 +166,7 @@ foreach ($documents as [$uri, $languageId, $path, $relativePath]) {
         throw new RuntimeException('Unable to read the diagnostic benchmark source.');
     }
     $documentStore->open(new Document($uri, $languageId, 0, $text));
-    $collection = $collector->collect(['textDocument' => ['uri' => $uri]]);
+    $collection = $collector->collect($uri);
     $diagnosticCount += null === $collection ? 0 : count($collection->diagnostics);
     $failureCount += null === $collection ? 0 : count($collection->failures);
     if (isset($cases[$relativePath])) {

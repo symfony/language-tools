@@ -556,18 +556,18 @@ PHP;
 
         file_put_contents($firstPath, '<?php final class FirstVersion { public function value(): int { return 2; } }');
         $firstUri = 'file://'.$firstPath;
-        self::assertFalse($scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]])->requiresRuntimeRefresh());
+        self::assertFalse($scanner->refreshUri($firstUri)->requiresRuntimeRefresh());
 
         self::assertSame([$firstUri], $provider->replacements);
         self::assertCount(2, $provider->sources);
         self::assertSame(hash('sha256', '<?php final class FirstVersion { public function value(): int { return 2; } }'), $provider->sources[$firstUri]);
 
         file_put_contents($firstPath, '<?php final class NewFirstVersion { public function value(): int { return 2; } }');
-        self::assertSame(['recording'], $scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]])->domains());
+        self::assertSame(['recording'], $scanner->refreshUri($firstUri)->domains());
         self::assertSame([$firstUri, $firstUri], $provider->replacements);
 
         touch($firstPath, time() + 1);
-        self::assertFalse($scanner->refreshAfterSave(['textDocument' => ['uri' => $firstUri]])->requiresRuntimeRefresh());
+        self::assertFalse($scanner->refreshUri($firstUri)->requiresRuntimeRefresh());
         self::assertSame([$firstUri, $firstUri], $provider->replacements);
 
         $secondUri = 'file://'.$secondPath;

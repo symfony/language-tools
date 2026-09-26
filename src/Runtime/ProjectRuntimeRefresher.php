@@ -25,19 +25,6 @@ final class ProjectRuntimeRefresher
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    public function refreshAfterSave(array $params, SourceFileChange $sourceFileChange): void
-    {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return;
-        }
-
-        $this->refreshUri($textDocument['uri'], $sourceFileChange);
-    }
-
     /** @param list<string> $initializedProjects */
     public function refreshAfterRediscovery(string $uri, array $initializedProjects = []): void
     {

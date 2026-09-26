@@ -161,11 +161,11 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
         self::assertSame(['app.disk'], $indexes->forProject($project)->serviceIds());
 
         $documents->open(new Document($uri, 'yaml', 2, "services:\n    app.overlay: ~\n"));
-        $scanner->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
+        $scanner->updateOpenDocument($uri);
         self::assertSame(['app.overlay'], $indexes->forProject($project)->serviceIds());
 
         $documents->close($uri);
-        $scanner->restoreClosedDocument(['textDocument' => ['uri' => $uri]]);
+        $scanner->restoreClosedDocument($uri);
         self::assertSame(['app.disk'], $indexes->forProject($project)->serviceIds());
     }
 }

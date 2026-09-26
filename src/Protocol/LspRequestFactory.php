@@ -24,13 +24,18 @@ final class LspRequestFactory
     /** @param array<array-key, mixed> $params */
     public function document(array $params): ?DocumentRequest
     {
+        $uri = $this->uri($params);
+
+        return null === $uri ? null : $this->forUri($uri);
+    }
+
+    /** @param array<array-key, mixed> $params */
+    public function uri(array $params): ?string
+    {
         $textDocument = $params['textDocument'] ?? null;
         $uri = \is_array($textDocument) ? $textDocument['uri'] ?? null : null;
-        if (!\is_string($uri)) {
-            return null;
-        }
 
-        return $this->forUri($uri);
+        return \is_string($uri) ? $uri : null;
     }
 
     public function forUri(string $uri): ?DocumentRequest

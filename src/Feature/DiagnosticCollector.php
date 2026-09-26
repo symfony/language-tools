@@ -24,23 +24,16 @@ final class DiagnosticCollector
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    public function collect(array $params, bool $includeExcluded = false, bool $measureProviders = false): ?DetailedDiagnosticCollection
+    public function collect(string $uri, bool $includeExcluded = false, bool $measureProviders = false): ?DetailedDiagnosticCollection
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return null;
-        }
-
-        $document = $this->documents->get($textDocument['uri']);
+        $document = $this->documents->get($uri);
         if (null === $document) {
             return null;
         }
         if ($this->isExcluded($document->uri, $includeExcluded)) {
             return new DetailedDiagnosticCollection([], []);
         }
+        $params = ['textDocument' => ['uri' => $document->uri]];
 
         $diagnostics = [];
         $failures = [];

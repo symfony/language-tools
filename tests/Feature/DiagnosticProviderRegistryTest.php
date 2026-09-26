@@ -43,11 +43,10 @@ final class DiagnosticProviderRegistryTest extends TestCase
 
     public function testCollectsAndPublishesProviderDiagnosticsForProjectDocuments(): void
     {
-        [$registry, $client, $collector] = $this->registry('file:///workspace/templates/page.html.twig');
-        $params = ['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']];
+        [$registry, $client, $collector] = $this->registry($uri = 'file:///workspace/templates/page.html.twig');
 
-        $collected = $this->diagnostics($collector, $params);
-        $registry->publish($params);
+        $collected = $this->diagnostics($collector, $uri);
+        $registry->publish($uri);
 
         self::assertSame(['stub'], array_column($collected, 'code'));
         self::assertCount(1, $client->notifications);
@@ -63,7 +62,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
             new StubDiagnosticProvider(null),
         );
 
-        $registry->publish(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+        $registry->publish('file:///workspace/templates/page.html.twig');
 
         self::assertSame([], $client->notifications);
     }
@@ -75,7 +74,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
             new StubDiagnosticProvider([]),
         );
 
-        $registry->publish(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+        $registry->publish('file:///workspace/templates/page.html.twig');
 
         self::assertCount(1, $client->notifications);
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
@@ -91,7 +90,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
             new StubDiagnosticProvider([$this->diagnostic('third')], 'third-provider'),
         );
 
-        $registry->publish(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+        $registry->publish('file:///workspace/templates/page.html.twig');
         $log->close();
 
         $diagnostics = $client->notifications[0]['params']['diagnostics'] ?? null;
@@ -110,10 +109,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
             new StubDiagnosticProvider([$this->diagnostic('third')], 'third-provider'),
         );
 
-        $collection = $collector->collect(
-            ['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']],
-            measureProviders: true,
-        );
+        $collection = $collector->collect('file:///workspace/templates/page.html.twig', measureProviders: true);
 
         self::assertNotNull($collection);
         self::assertSame(['first-provider', 'broken-provider', 'malformed-provider', 'third-provider'], array_keys($collection->providerNanoseconds));
@@ -138,13 +134,11 @@ final class DiagnosticProviderRegistryTest extends TestCase
             new StubDiagnosticProvider([$this->diagnostic('security.unknown_provider')], 'security'),
             new StubDiagnosticProvider([$this->diagnostic('env.unknown_processor'), $this->diagnostic('env.malformed_chain')], 'environment'),
         );
-        $params = ['textDocument' => ['uri' => $uri]];
-
-        $registry->publish($params);
+        $registry->publish($uri);
 
         $published = $client->notifications[0]['params']['diagnostics'];
 
-        self::assertSame(['env.malformed_chain'], array_column($this->diagnostics($collector, $params), 'code'));
+        self::assertSame(['env.malformed_chain'], array_column($this->diagnostics($collector, $uri), 'code'));
         self::assertIsArray($published);
         self::assertSame(['env.malformed_chain'], array_column($published, 'code'));
     }
@@ -163,7 +157,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
                 new StubDiagnosticProvider(array_map($this->diagnostic(...), $codes)),
             );
 
-            self::assertSame($codes, array_column($this->diagnostics($collector, ['textDocument' => ['uri' => $uri]]), 'code'), $path);
+            self::assertSame($codes, array_column($this->diagnostics($collector, $uri), 'code'), $path);
         }
     }
 
@@ -178,10 +172,8 @@ final class DiagnosticProviderRegistryTest extends TestCase
             [],
             new StubDiagnosticProvider([$this->diagnostic('template.not_found', 2)], 'template'),
         );
-        $params = ['textDocument' => ['uri' => $uri]];
-
-        $registry->publish($params);
-        $detailed = $collector->collect($params);
+        $registry->publish($uri);
+        $detailed = $collector->collect($uri);
 
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
         self::assertInstanceOf(DetailedDiagnosticCollection::class, $detailed);
@@ -197,7 +189,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
             new StubDiagnosticProvider([$this->diagnostic('third')]),
         );
 
-        $registry->publish(['textDocument' => ['uri' => 'file:///workspace/templates/page.html.twig']]);
+        $registry->publish('file:///workspace/templates/page.html.twig');
 
         self::assertCount(1, $client->notifications);
         $diagnostics = $client->notifications[0]['params']['diagnostics'];
@@ -212,12 +204,10 @@ final class DiagnosticProviderRegistryTest extends TestCase
             ['tests/Fixtures/**'],
             new StubDiagnosticProvider([$this->diagnostic('stub')]),
         );
-        $params = ['textDocument' => ['uri' => 'file:///workspace/tests/Fixtures/page.html.twig']];
-
-        $registry->publish($params);
+        $registry->publish($uri = 'file:///workspace/tests/Fixtures/page.html.twig');
 
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
-        self::assertSame(['stub'], array_column($this->diagnostics($collector, $params, true), 'code'));
+        self::assertSame(['stub'], array_column($this->diagnostics($collector, $uri, true), 'code'));
     }
 
     public function testSuppressesGitignoredDocumentsEvenWhenExcludedPathsAreIncluded(): void
@@ -237,11 +227,9 @@ final class DiagnosticProviderRegistryTest extends TestCase
                 [],
                 new StubDiagnosticProvider([$this->diagnostic('stub')]),
             );
-            $params = ['textDocument' => ['uri' => $uri]];
-
-            self::assertSame([], $this->diagnostics($collector, $params));
-            self::assertSame([], $this->diagnostics($collector, $params, true));
-            $detailed = $collector->collect($params);
+            self::assertSame([], $this->diagnostics($collector, $uri));
+            self::assertSame([], $this->diagnostics($collector, $uri, true));
+            $detailed = $collector->collect($uri);
             self::assertInstanceOf(DetailedDiagnosticCollection::class, $detailed);
             self::assertSame([], $detailed->diagnostics);
         } finally {
@@ -267,7 +255,7 @@ final class DiagnosticProviderRegistryTest extends TestCase
                 $uri = $converter->toUri($root.'/'.$relativePath);
                 [$registry, $client] = $this->registryForProjectDocument($root, $uri, 'twig', '', [], new StubDiagnosticProvider([$this->diagnostic('stub')]));
 
-                $registry->publish(['textDocument' => ['uri' => $uri]]);
+                $registry->publish($uri);
 
                 self::assertCount(1, $client->notifications, $uri);
                 self::assertSame([], $client->notifications[0]['params']['diagnostics'], $uri);
@@ -357,14 +345,10 @@ final class DiagnosticProviderRegistryTest extends TestCase
         ), $client, $collector];
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return list<array<array-key, mixed>>
-     */
-    private function diagnostics(DiagnosticCollector $collector, array $params, bool $includeExcluded = false): array
+    /** @return list<array<array-key, mixed>> */
+    private function diagnostics(DiagnosticCollector $collector, string $uri, bool $includeExcluded = false): array
     {
-        return array_map(static fn ($diagnostic): array => $diagnostic->diagnostic, $collector->collect($params, $includeExcluded)->diagnostics ?? []);
+        return array_map(static fn ($diagnostic): array => $diagnostic->diagnostic, $collector->collect($uri, $includeExcluded)->diagnostics ?? []);
     }
 
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, severity: int, source: string, code: string, message: string} */

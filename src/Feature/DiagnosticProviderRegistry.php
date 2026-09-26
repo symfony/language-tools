@@ -21,18 +21,10 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    public function publish(array $params): void
+    public function publish(string $uri): void
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return;
-        }
-
-        $document = $this->documents->get($textDocument['uri']);
-        if (null === $document || null === $collection = $this->collector->collect($params)) {
+        $document = $this->documents->get($uri);
+        if (null === $document || null === $collection = $this->collector->collect($uri)) {
             return;
         }
         foreach ($collection->failures as $failure) {
@@ -54,9 +46,9 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
                 continue;
             }
             if (null === $this->projects->forDocumentUri($document->uri)) {
-                $this->clear(['textDocument' => ['uri' => $document->uri]]);
+                $this->clear($document->uri);
             } else {
-                $this->publish(['textDocument' => ['uri' => $document->uri]]);
+                $this->publish($document->uri);
             }
         }
     }
@@ -73,23 +65,15 @@ final class DiagnosticProviderRegistry implements RuntimeRefreshObserverInterfac
         foreach ($this->documents->all() as $document) {
             $documentProject = $this->projects->forDocumentUri($document->uri);
             if (null !== $documentProject && $documentProject->rootPath === $project->rootPath) {
-                $this->publish(['textDocument' => ['uri' => $document->uri]]);
+                $this->publish($document->uri);
             }
         }
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     */
-    public function clear(array $params): void
+    public function clear(string $uri): void
     {
-        $textDocument = $params['textDocument'] ?? null;
-        if (!\is_array($textDocument) || !\is_string($textDocument['uri'] ?? null)) {
-            return;
-        }
-
         $this->client->notify('textDocument/publishDiagnostics', [
-            'uri' => $textDocument['uri'],
+            'uri' => $uri,
             'diagnostics' => [],
         ]);
     }

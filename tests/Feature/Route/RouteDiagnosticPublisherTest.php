@@ -75,7 +75,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             PHP;
         [$publisher, $client] = $this->publisher($uri, $text);
 
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+        $publisher->publish($uri);
 
         self::assertSame('textDocument/publishDiagnostics', $client->notifications[0]['method']);
         self::assertSame([[
@@ -128,7 +128,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             ],
         );
 
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+        $publisher->publish($uri);
 
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
     }
@@ -156,7 +156,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             ['locale'],
         ));
 
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+        $publisher->publish($uri);
 
         $diagnostics = $client->notifications[0]['params']['diagnostics'];
         self::assertIsArray($diagnostics);
@@ -185,7 +185,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             new Route('dynamic_spread', '/{year}/{month}', [], [], null, null),
         ], 'twig');
 
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+        $publisher->publish($uri);
 
         $diagnostics = $client->notifications[0]['params']['diagnostics'];
         self::assertIsArray($diagnostics);
@@ -206,7 +206,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             new Route('incomplete', '/{_locale}/article/{id}', [], [], null, null),
         ], 'twig', contextParameters: ['_locale']);
 
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+        $publisher->publish($uri);
 
         $diagnostics = $client->notifications[0]['params']['diagnostics'];
         self::assertIsArray($diagnostics);
@@ -347,7 +347,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             languageId: 'twig',
         );
 
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+        $publisher->publish($uri);
 
         $diagnostics = $client->notifications[0]['params']['diagnostics'];
         self::assertIsArray($diagnostics);
@@ -365,7 +365,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             runtimeTemplate: false,
         );
 
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+        $publisher->publish($uri);
 
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
     }
@@ -410,7 +410,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         );
         $publisher = new DiagnosticProviderRegistry($client, $documents, $projects, $collector, new ServerLogger(null, new SensitiveDataRedactor()));
 
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+        $publisher->publish($uri);
 
         self::assertCount(1, $client->notifications);
         self::assertSame([], $client->notifications[0]['params']['diagnostics']);
@@ -430,7 +430,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
             }
             PHP);
 
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+        $publisher->publish($uri);
 
         $diagnostics = $client->notifications[0]['params']['diagnostics'];
         self::assertIsArray($diagnostics);
@@ -438,7 +438,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         self::assertSame('route.not_found', $diagnostics[0]['code'] ?? null);
 
         $routeIndexes->removeProject($project);
-        $publisher->publish(['textDocument' => ['uri' => $uri]]);
+        $publisher->publish($uri);
 
         self::assertCount(2, $client->notifications);
         self::assertSame([], $client->notifications[1]['params']['diagnostics']);
@@ -469,7 +469,7 @@ final class RouteDiagnosticPublisherTest extends TestCase
         $uri = 'file:///workspace/src/Controller.php';
         [$publisher, $client] = $this->publisher($uri, '<?php');
 
-        $publisher->clear(['textDocument' => ['uri' => $uri]]);
+        $publisher->clear($uri);
 
         self::assertSame([
             'uri' => $uri,

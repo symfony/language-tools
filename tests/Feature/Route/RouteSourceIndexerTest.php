@@ -217,13 +217,13 @@ final class RouteSourceIndexerTest extends TestCase
             #[Route('/article', name: 'article_new')]
             final class Controller {}
             PHP));
-        $scanner->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
+        $scanner->updateOpenDocument($uri);
 
         self::assertSame([], $indexes->forProject($project)->declarations('article_list'));
         self::assertCount(1, $indexes->forProject($project)->declarations('article_new'));
 
         $documents->close($uri);
-        $scanner->restoreClosedDocument(['textDocument' => ['uri' => $uri]]);
+        $scanner->restoreClosedDocument($uri);
 
         self::assertCount(1, $indexes->forProject($project)->declarations('article_list'));
         self::assertSame([], $indexes->forProject($project)->declarations('article_new'));
@@ -233,7 +233,7 @@ final class RouteSourceIndexerTest extends TestCase
             fake_route:
                 path: /not-a-route
             YAML));
-        $scanner->updateOpenDocument(['textDocument' => ['uri' => $packageUri]]);
+        $scanner->updateOpenDocument($packageUri);
 
         self::assertSame([], $indexes->forProject($project)->declarations('fake_route'));
     }
@@ -287,7 +287,7 @@ final class RouteSourceIndexerTest extends TestCase
                 }
             }
             PHP));
-        $scanner->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
+        $scanner->updateOpenDocument($uri);
 
         $documents->update($uri, 2, <<<'PHP'
             <?php
@@ -307,7 +307,7 @@ final class RouteSourceIndexerTest extends TestCase
             {
                 public function broken(
             PHP);
-        $scanner->updateOpenDocument(['textDocument' => ['uri' => $uri]]);
+        $scanner->updateOpenDocument($uri);
 
         self::assertCount(1, $indexes->forProject($project)->declarations('article_show'));
         self::assertSame([], $indexes->forProject($project)->declarations('partial_route'));

@@ -97,30 +97,14 @@ final class ApplicationSourceScanner implements ProjectStateInterface
         return null === $relativePath ? null : ($this->entries[$project->rootPath][$relativePath]['hash'] ?? null);
     }
 
-    /** @param array<array-key, mixed> $params */
-    public function updateOpenDocument(array $params, bool $includeExcluded = false, bool $trackParseHealth = true): void
+    public function updateOpenDocument(string $uri, bool $includeExcluded = false, bool $trackParseHealth = true): void
     {
-        $uri = $this->uriParameter($params);
-        if (null !== $uri) {
-            $this->overlays->updateUri($uri, $includeExcluded, $trackParseHealth);
-        }
+        $this->overlays->updateUri($uri, $includeExcluded, $trackParseHealth);
     }
 
-    /** @param array<array-key, mixed> $params */
-    public function restoreClosedDocument(array $params): void
+    public function restoreClosedDocument(string $uri): void
     {
-        $uri = $this->uriParameter($params);
-        if (null !== $uri) {
-            $this->overlays->removeUri($uri);
-        }
-    }
-
-    /** @param array<array-key, mixed> $params */
-    public function refreshAfterSave(array $params): SourceFileChange
-    {
-        $uri = $this->uriParameter($params);
-
-        return null === $uri ? SourceFileChange::untracked() : $this->refreshUri($uri);
+        $this->overlays->removeUri($uri);
     }
 
     public function refreshUri(string $uri, bool $deleted = false): SourceFileChange
@@ -371,14 +355,6 @@ final class ApplicationSourceScanner implements ProjectStateInterface
                 yield $location->relativePath => ['location' => $location, 'languageId' => $languageId];
             }
         }
-    }
-
-    /** @param array<array-key, mixed> $params */
-    private function uriParameter(array $params): ?string
-    {
-        $textDocument = $params['textDocument'] ?? null;
-
-        return \is_array($textDocument) && \is_string($textDocument['uri'] ?? null) ? $textDocument['uri'] : null;
     }
 
     private function uri(Project $project, string $relativePath): string

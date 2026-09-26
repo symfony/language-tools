@@ -21,6 +21,7 @@ use Symfony\Lsp\Feature\RenameProviderRegistry;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\IndexCommandHandler;
 use Symfony\Lsp\Project\WorkspaceConfiguration;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Runtime\ProjectRuntimeRefresher;
 
 /** @phpstan-import-type ProjectIndexCommandStatus from IndexCommandHandler */
@@ -45,6 +46,7 @@ final class LanguageServer
         private readonly RenameProviderRegistry $renameProviders,
         private readonly ProjectRuntimeRefresher $projectRuntimeRefresher,
         private readonly ApplicationSourceScanner $sourceScanner,
+        private readonly LspRequestFactory $requests,
         private readonly IndexCommandHandler $indexCommandHandler,
         private readonly ServerLogger $logger,
         private readonly WorkDoneProgressReporter $progress,
@@ -155,8 +157,11 @@ final class LanguageServer
     private function openDocument(array $params): void
     {
         $this->documentSynchronizer->open($params);
-        $this->sourceScanner->updateOpenDocument($params);
-        $this->diagnosticProviders->publish($params);
+        $uri = $this->requests->uri($params);
+        if (null !== $uri) {
+            $this->sourceScanner->updateOpenDocument($uri);
+            $this->diagnosticProviders->publish($uri);
+        }
     }
 
     /**
@@ -165,8 +170,11 @@ final class LanguageServer
     private function changeDocument(array $params): void
     {
         $this->documentSynchronizer->change($params);
-        $this->sourceScanner->updateOpenDocument($params);
-        $this->diagnosticProviders->publish($params);
+        $uri = $this->requests->uri($params);
+        if (null !== $uri) {
+            $this->sourceScanner->updateOpenDocument($uri);
+            $this->diagnosticProviders->publish($uri);
+        }
     }
 
     /**
@@ -174,9 +182,11 @@ final class LanguageServer
      */
     private function saveDocument(array $params): void
     {
-        $sourceFileChange = $this->sourceScanner->refreshAfterSave($params);
-        $this->projectRuntimeRefresher->refreshAfterSave($params, $sourceFileChange);
-        $this->diagnosticProviders->publish($params);
+        $uri = $this->requests->uri($params);
+        if (null !== $uri) {
+            $this->projectRuntimeRefresher->refreshUri($uri, $this->sourceScanner->refreshUri($uri));
+            $this->diagnosticProviders->publish($uri);
+        }
     }
 
     /**
@@ -185,8 +195,11 @@ final class LanguageServer
     private function closeDocument(array $params): void
     {
         $this->documentSynchronizer->close($params);
-        $this->sourceScanner->restoreClosedDocument($params);
-        $this->diagnosticProviders->clear($params);
+        $uri = $this->requests->uri($params);
+        if (null !== $uri) {
+            $this->sourceScanner->restoreClosedDocument($uri);
+            $this->diagnosticProviders->clear($uri);
+        }
     }
 
     /**
