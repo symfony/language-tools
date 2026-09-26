@@ -101,7 +101,7 @@ final class DoctrineExtractor
         $php = $this->phpParser->parse($text);
         $cursor = $php->argumentCursorAt($offset);
         $call = $cursor?->call;
-        if (null === $cursor || null === $cursor->quote || !$call instanceof PhpMethodCall || 1 !== preg_match(self::FIELD_PATTERN, $cursor->prefix)) {
+        if (null === $cursor || null === $cursor->quote || !$call instanceof PhpMethodCall || ('' !== $cursor->prefix && 1 !== preg_match(self::FIELD_PATTERN, $cursor->prefix))) {
             return null;
         }
         $source = $this->phpComments->mask($text);
@@ -115,6 +115,7 @@ final class DoctrineExtractor
         $options = $this->formCalls->optionsArgument($call);
         if (null === $options
             || $cursor->argument !== $options
+            || !$cursor->isArrayItemValueLiteral()
             || !\in_array($this->arrayItemKey($php, $options, $cursor), ['choice_label', 'choice_value', 'group_by'], true)
             || 'Symfony\\Bridge\\Doctrine\\Form\\Type\\EntityType' !== $this->formCalls->typeArgument($call)?->completeClassReference?->className
             || null === $entityClass = $this->arrayClassReference($php, $options, 'class')?->className

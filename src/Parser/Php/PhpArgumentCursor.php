@@ -16,6 +16,7 @@ final class PhpArgumentCursor
         private readonly bool $literalStartsItem,
         private readonly bool $argumentIsArray,
         private readonly bool $literalIsArgument,
+        private readonly bool $literalIsItem,
     ) {
     }
 
@@ -31,7 +32,7 @@ final class PhpArgumentCursor
                 ? self::openLiteral(substr($expression, 0, $offset - $start))
                 : null;
             if (null === $literal) {
-                return new self($call, $argument, $position, $argument->name, null, '', $offset, 0, false, false, false);
+                return new self($call, $argument, $position, $argument->name, null, '', $offset, 0, false, false, false, false);
             }
             $whole = null === $argument->stringLiteral ? self::openLiteral((string) $expression) : null;
 
@@ -47,6 +48,7 @@ final class PhpArgumentCursor
                 $literal['startsItem'],
                 $literal['argumentIsArray'],
                 null !== $argument->stringLiteral || ($whole['contentStart'] ?? null) === $literal['contentStart'],
+                self::literalEndsItem((string) $expression, $literal['contentStart'] - 1),
             );
         }
 
@@ -70,7 +72,35 @@ final class PhpArgumentCursor
 
     public function isArrayItemLiteral(): bool
     {
-        return null !== $this->quote && 1 === $this->literalDepth && $this->literalStartsItem && $this->argumentIsArray;
+        return null !== $this->quote && 1 === $this->literalDepth && $this->literalStartsItem && $this->argumentIsArray && $this->literalIsItem;
+    }
+
+    public function isArrayItemValueLiteral(): bool
+    {
+        return null !== $this->quote && 1 === $this->literalDepth && !$this->literalStartsItem && $this->argumentIsArray && $this->literalIsItem;
+    }
+
+    private static function literalEndsItem(string $expression, int $quoteOffset): bool
+    {
+        $prefix = \strlen('<?php ');
+        $tokens = \PhpToken::tokenize('<?php '.$expression);
+        $count = \count($tokens);
+        for ($index = 0; $index < $count && $tokens[$index]->pos - $prefix !== $quoteOffset; ++$index) {
+        }
+        if ($index === $count || \T_ENCAPSED_AND_WHITESPACE === $tokens[$index]->id) {
+            return true;
+        }
+        if ('"' === $tokens[$index]->text) {
+            for (++$index; $index < $count && '"' !== $tokens[$index]->text; ++$index) {
+            }
+            if ($index === $count) {
+                return true;
+            }
+        }
+        for (++$index; $index < $count && $tokens[$index]->is([\T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT]); ++$index) {
+        }
+
+        return $index === $count || \in_array($tokens[$index]->text, [',', ']', ')', '=>'], true);
     }
 
     /**

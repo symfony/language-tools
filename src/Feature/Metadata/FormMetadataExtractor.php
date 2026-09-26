@@ -158,7 +158,7 @@ final class FormMetadataExtractor
         $type = $this->formCalls->typeArgument($call)?->completeClassReference?->className;
         if (!$cursor->isArrayItemLiteral()
             || $cursor->argument !== $this->formCalls->optionsArgument($call)
-            || 1 !== preg_match(self::IDENTIFIER_PATTERN, $cursor->prefix)
+            || ('' !== $cursor->prefix && 1 !== preg_match(self::IDENTIFIER_PATTERN, $cursor->prefix))
             || null === $type
         ) {
             return null;

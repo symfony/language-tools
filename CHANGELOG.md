@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Complete Doctrine criteria fields, `EntityType` fields and form options before the first character is typed
+- Stop completing PHP array keys and Doctrine `EntityType` fields in a string that is concatenated with something else
 - Pick the same declaration of a duplicated Doctrine entity for lookups, completion and navigation
 - Read a form `data_class` written as a class name string
 - Keep a switched environment or kernel when unrelated settings change

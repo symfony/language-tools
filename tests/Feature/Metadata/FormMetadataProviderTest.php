@@ -71,6 +71,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame(['required'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $formUri, $formText, $firstRequired + 4));
         $builderRequired = strpos($formText, 'required', $firstRequired + 1);
         self::assertSame(['required'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $formUri, $formText, $builderRequired + 4));
+        self::assertSame(['action', 'required'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $formUri, $formText, (int) $builderRequired));
         self::assertSame(['form.unknown_option'], array_column($this->diagnostics([$formProvider], $requests, $formUri), 'code'));
         $required = strpos($formText, 'required') + 1;
         self::assertIsArray($this->hover([$formProvider], $requests, $formUri, $formText, $required));

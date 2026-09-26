@@ -483,6 +483,39 @@ final class DoctrineProviderTest extends TestCase
         yield 'criteria computed by a function' => ["\$products->findBy(strtolower('na|"];
         yield 'criteria built by compact' => ["\$products->findBy(compact('na|"];
         yield 'criteria in a ternary' => ["\$products->findBy(\$all ? ['na|"];
+        yield 'criteria cast to an array' => ["\$products->findBy((array) ['na|"];
+        yield 'concatenated criteria key' => ["\$products->findBy(['na|' . \$suffix => true]);"];
+    }
+
+    #[DataProvider('entityTypeFieldCompletionProvider')]
+    public function testCompletesEntityTypeFieldsOnlyInALoneStringValue(string $options, ?string $expectedPrefix): void
+    {
+        $text = <<<PHP
+            <?php
+            use App\Entity\Product;
+            use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+            \$builder->add('product', EntityType::class, ['class' => Product::class, {$options}
+            PHP;
+        $cursor = strpos($text, '|');
+        self::assertIsInt($cursor);
+
+        self::assertSame($expectedPrefix, $this->extractor()->completionContext('php', str_replace('|', '', $text), $cursor)?->prefix);
+    }
+
+    /** @return iterable<string, array{string, ?string}> */
+    public static function entityTypeFieldCompletionProvider(): iterable
+    {
+        yield 'unfinished value' => ["'choice_label' => 'na|", 'na'];
+        yield 'empty value' => ["'choice_label' => '|", ''];
+        yield 'closed value' => ["'choice_label' => 'na|']);", 'na'];
+        yield 'concatenated value' => ["'choice_label' => 'na|' . \$suffix]);", null];
+    }
+
+    public function testCompletesCriteriaFieldsFromAnEmptyPrefix(): void
+    {
+        $text = "<?php\nuse App\\Repository\\ProductRepository;\nfunction find(ProductRepository \$products): void {\n    \$products->findBy(['";
+
+        self::assertSame('', $this->extractor()->completionContext('php', $text, \strlen($text))?->prefix);
     }
 
     public function testScopesRepositoryCompletionToTheContainingMethod(): void
