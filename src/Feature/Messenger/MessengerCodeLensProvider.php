@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Messenger;
 
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassLocationResolver;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -14,6 +15,7 @@ final class MessengerCodeLensProvider implements CodeLensProviderInterface
         private readonly MessengerIndexRegistry $indexes,
         private readonly PhpClassDeclarationExtractor $classExtractor,
         private readonly MessengerRelationshipResolver $relationships,
+        private readonly PhpClassLocationResolver $classLocations,
     ) {
     }
 
@@ -34,7 +36,7 @@ final class MessengerCodeLensProvider implements CodeLensProviderInterface
                 }
                 $classNames = array_keys($related);
                 $count = \count($classNames);
-                $lenses[] = $this->protocol->referenceLens($class->range, \sprintf('%d Messenger handler%s', $count, 1 === $count ? '' : 's'), $class->uri, $this->relationships->classLocations($request->project, $classNames));
+                $lenses[] = $this->protocol->referenceLens($class->range, \sprintf('%d Messenger handler%s', $count, 1 === $count ? '' : 's'), $class->uri, $this->classLocations->locations($request->project, $classNames));
             } elseif ([] !== $handlers = $index->handlersByClass($class->className)) {
                 $related = [];
                 foreach ($handlers as $handler) {
@@ -42,7 +44,7 @@ final class MessengerCodeLensProvider implements CodeLensProviderInterface
                 }
                 $classNames = array_keys($related);
                 $count = \count($classNames);
-                $lenses[] = $this->protocol->referenceLens($class->range, \sprintf('Handles %d Messenger message%s', $count, 1 === $count ? '' : 's'), $class->uri, $this->relationships->classLocations($request->project, $classNames));
+                $lenses[] = $this->protocol->referenceLens($class->range, \sprintf('Handles %d Messenger message%s', $count, 1 === $count ? '' : 's'), $class->uri, $this->classLocations->locations($request->project, $classNames));
             }
         }
 

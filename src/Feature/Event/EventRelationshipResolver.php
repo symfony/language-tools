@@ -2,9 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Event;
 
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassLocationResolver;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -18,7 +18,7 @@ final class EventRelationshipResolver
         private readonly EventSourceIndexRegistry $sourceIndexes,
         private readonly EventExtractor $extractor,
         private readonly PhpClassDeclarationExtractor $classExtractor,
-        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
+        private readonly PhpClassLocationResolver $classLocations,
     ) {
     }
 
@@ -70,48 +70,12 @@ final class EventRelationshipResolver
             $classes[$listener->className] = true;
         }
 
-        return $this->classLocations($project, array_keys($classes));
+        return $this->classLocations->locations($project, array_keys($classes));
     }
 
     /** @return list<EventSourceSymbol> */
     public function sourceSymbols(Project $project, string $name): array
     {
         return $this->sourceIndexes->forProject($project)->symbols($name);
-    }
-
-    /**
-     * @param list<string> $classNames
-     *
-     * @return list<array<array-key, mixed>>
-     */
-    public function classLocations(Project $project, array $classNames): array
-    {
-        $locations = [];
-        $uniqueClasses = [];
-        foreach ($classNames as $className) {
-            $uniqueClasses[$className] = true;
-        }
-        foreach (array_keys($uniqueClasses) as $className) {
-            foreach ($this->classIndexes->forProject($project)->classDeclarations($className) as $declaration) {
-                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
-            }
-        }
-
-        return $this->uniqueLocations($locations);
-    }
-
-    /**
-     * @param list<array<array-key, mixed>> $locations
-     *
-     * @return list<array<array-key, mixed>>
-     */
-    public function uniqueLocations(array $locations): array
-    {
-        $unique = [];
-        foreach ($locations as $location) {
-            $unique[json_encode($location, \JSON_THROW_ON_ERROR)] = $location;
-        }
-
-        return array_values($unique);
     }
 }

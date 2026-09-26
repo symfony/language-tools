@@ -35,12 +35,26 @@ final class LspProtocolMapper
     {
         $locations = [];
         foreach ($symbols as $symbol) {
-            $range = $symbol->range;
-            $key = implode("\0", [$symbol->uri, $range->start->line, $range->start->character, $range->end->line, $range->end->character]);
-            $locations[$key] ??= $this->location($symbol->uri, $range);
+            $locations[] = $this->location($symbol->uri, $symbol->range);
         }
 
-        return array_values($locations);
+        return $this->uniqueLocations($locations);
+    }
+
+    /**
+     * @param iterable<array{uri: string, range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}}> $locations
+     *
+     * @return list<array{uri: string, range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}}>
+     */
+    public function uniqueLocations(iterable $locations): array
+    {
+        $unique = [];
+        foreach ($locations as $location) {
+            ['start' => $start, 'end' => $end] = $location['range'];
+            $unique[implode("\0", [$location['uri'], $start['line'], $start['character'], $end['line'], $end['character']])] ??= $location;
+        }
+
+        return array_values($unique);
     }
 
     /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */

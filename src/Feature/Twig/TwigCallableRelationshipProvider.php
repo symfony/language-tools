@@ -133,7 +133,7 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
             }
         }
 
-        return $this->unique($locations);
+        return $this->protocol->uniqueLocations($locations);
     }
 
     /** @return array{TwigCallableReference, list<TwigCallableDeclaration>, Project}|null */
@@ -178,20 +178,5 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
         );
 
         return $request->includeDeclaration ? [...$locations, ...$this->declarationLocations($project, $declarations)] : $locations;
-    }
-
-    /**
-     * @param list<array<array-key, mixed>> $locations
-     *
-     * @return list<array<array-key, mixed>>
-     */
-    private function unique(array $locations): array
-    {
-        $unique = [];
-        foreach ($locations as $location) {
-            $unique[json_encode($location, \JSON_THROW_ON_ERROR)] = $location;
-        }
-
-        return array_values($unique);
     }
 }

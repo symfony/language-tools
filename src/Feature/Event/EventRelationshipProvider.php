@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassLocationResolver;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -16,6 +17,7 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
         private readonly LspProtocolMapper $protocol,
         private readonly EventIndexRegistry $indexes,
         private readonly EventRelationshipResolver $relationships,
+        private readonly PhpClassLocationResolver $classLocations,
     ) {
     }
 
@@ -68,7 +70,7 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
                 $classes[] = $listener->className;
             }
 
-            return $this->relationships->classLocations($project, $classes);
+            return $this->classLocations->locations($project, $classes);
         }
         $eventClasses = [];
         foreach ($index->listenersByClass($class->className) as $listener) {
@@ -77,7 +79,7 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
             }
         }
 
-        return $this->relationships->classLocations($project, $eventClasses);
+        return $this->classLocations->locations($project, $eventClasses);
     }
 
     public function references(ReferencesRequest $request): array

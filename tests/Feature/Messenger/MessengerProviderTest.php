@@ -508,6 +508,39 @@ YAML;
         self::assertContains($controllerUri, $kit->targets($kit->get(MessengerRelationshipProvider::class)->references($kit->references($kit->at($messageUri, 'Foo')))));
     }
 
+    public function testNavigatesFromAHandlerToEachMessageDeclarationOnce(): void
+    {
+        $messageUri = 'file:///workspace/src/Message/Foo.php';
+        $handlerUri = 'file:///workspace/src/MessageHandler/FooHandler.php';
+        $kit = (new ProjectTestKit())
+            ->open($messageUri, "<?php\nnamespace App\\Message;\nfinal class Foo {}\n")
+            ->open($handlerUri, "<?php\nnamespace App\\MessageHandler;\nfinal class FooHandler { public function first(): void {} public function second(): void {} }\n")
+            ->index()
+            ->runtime('messenger', [
+                'buses' => [['name' => 'command.bus', 'default' => true]],
+                'transports' => [],
+                'messages' => [['class' => 'App\\Message\\Foo', 'transports' => []]],
+                'handlers' => [
+                    ['message' => 'App\\Message\\Foo', 'bus' => 'command.bus', 'service' => 'handler', 'class' => 'App\\MessageHandler\\FooHandler', 'method' => 'first', 'fromTransport' => null],
+                    ['message' => 'app\\message\\FOO', 'bus' => 'command.bus', 'service' => 'handler', 'class' => 'App\\MessageHandler\\FooHandler', 'method' => 'second', 'fromTransport' => null],
+                ],
+                'complete' => true,
+            ])
+        ;
+        $handler = $kit->at($handlerUri, 'FooHandler');
+
+        self::assertSame([$messageUri], $kit->targets($kit->get(MessengerRelationshipProvider::class)->definition($kit->positioned($handler))));
+        $lenses = $kit->get(MessengerCodeLensProvider::class)->codeLenses($kit->document($handlerUri));
+        self::assertSame(['Handles 2 Messenger messages'], $kit->titles($lenses));
+        $command = $lenses[0]['command'] ?? null;
+        self::assertIsArray($command);
+        $arguments = $command['arguments'] ?? null;
+        self::assertIsArray($arguments);
+        $locations = $arguments[2] ?? null;
+        self::assertIsArray($locations);
+        self::assertSame([$messageUri], array_column($locations, 'uri'));
+    }
+
     #[DataProvider('handlerSignatureDocumentProvider')]
     public function testDiagnosesRuntimeHandlerSignaturesFromCurrentDocument(string $indexedType, string $currentType, bool $invalid): void
     {

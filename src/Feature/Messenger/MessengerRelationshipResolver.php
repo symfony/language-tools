@@ -2,9 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Messenger;
 
-use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassLocationResolver;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -20,7 +20,7 @@ final class MessengerRelationshipResolver
         private readonly MessengerSourceIndexRegistry $sourceIndexes,
         private readonly MessengerExtractor $extractor,
         private readonly PhpClassDeclarationExtractor $classExtractor,
-        private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
+        private readonly PhpClassLocationResolver $classLocations,
     ) {
     }
 
@@ -65,23 +65,6 @@ final class MessengerRelationshipResolver
     }
 
     /**
-     * @param list<string> $classNames
-     *
-     * @return list<array<array-key, mixed>>
-     */
-    public function classLocations(Project $project, array $classNames): array
-    {
-        $locations = [];
-        foreach ($classNames as $className) {
-            foreach ($this->classIndexes->forProject($project)->classDeclarations($className) as $declaration) {
-                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
-            }
-        }
-
-        return $locations;
-    }
-
-    /**
      * @param ReferencesRequest|null $references the request when it asks for references, null when it asks for definitions
      *
      * @return list<array<array-key, mixed>>
@@ -100,7 +83,7 @@ final class MessengerRelationshipResolver
                 foreach ($this->handlersForMessage($project, $this->indexes->forProject($project), $symbol->name) as $handler) {
                     $classNames[] = $handler->className;
                 }
-                $locations = $this->classLocations($project, array_values(array_unique($classNames)));
+                $locations = $this->classLocations->locations($project, $classNames);
                 if (null !== $references) {
                     array_push($locations, ...$this->protocol->locations($references->reported($symbols)));
                 }
@@ -129,7 +112,7 @@ final class MessengerRelationshipResolver
                 $relatedClasses[$handler->message] = true;
             }
         }
-        $locations = $this->classLocations($project, array_keys($relatedClasses));
+        $locations = $this->classLocations->locations($project, array_keys($relatedClasses));
         if (null !== $references && null !== $messageClass) {
             array_push($locations, ...$this->protocol->locations($references->reported(
                 $this->sourceIndexes->forProject($project)->symbols(MessengerSymbolKind::Message, $messageClass),

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Feature\Event;
 
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Feature\DependencyInjection\PhpClassLocationResolver;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
@@ -13,7 +14,7 @@ final class EventCodeLensProvider implements CodeLensProviderInterface
         private readonly LspProtocolMapper $protocol,
         private readonly EventIndexRegistry $indexes,
         private readonly PhpClassDeclarationExtractor $classExtractor,
-        private readonly EventRelationshipResolver $relationships,
+        private readonly PhpClassLocationResolver $classLocations,
     ) {
     }
 
@@ -33,7 +34,7 @@ final class EventCodeLensProvider implements CodeLensProviderInterface
                 }
                 $classes = array_keys($related);
                 $count = \count($classes);
-                $lenses[] = $this->protocol->referenceLens($class->range, \sprintf('%d event listener%s', $count, 1 === $count ? '' : 's'), $class->uri, $this->relationships->classLocations($request->project, $classes));
+                $lenses[] = $this->protocol->referenceLens($class->range, \sprintf('%d event listener%s', $count, 1 === $count ? '' : 's'), $class->uri, $this->classLocations->locations($request->project, $classes));
                 continue;
             }
             $handled = $index->listenersByClass($class->className);
@@ -47,7 +48,7 @@ final class EventCodeLensProvider implements CodeLensProviderInterface
             $locations = [];
             foreach (array_keys($events) as $event) {
                 if (null !== $eventClass = $index->event($event)?->className) {
-                    array_push($locations, ...$this->relationships->classLocations($request->project, [$eventClass]));
+                    array_push($locations, ...$this->classLocations->locations($request->project, [$eventClass]));
                 }
             }
             $count = \count($events);
