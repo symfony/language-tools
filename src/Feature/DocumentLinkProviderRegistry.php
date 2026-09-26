@@ -2,31 +2,34 @@
 
 namespace Symfony\Lsp\Feature;
 
+use Symfony\Lsp\Protocol\LspRequestFactory;
+
 final class DocumentLinkProviderRegistry
 {
     /** @param iterable<DocumentLinkProviderInterface> $providers */
-    public function __construct(private readonly iterable $providers)
-    {
+    public function __construct(
+        private readonly LspRequestFactory $requests,
+        private readonly iterable $providers,
+    ) {
     }
 
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return list<array<array-key, mixed>>|null
+     * @return list<array<array-key, mixed>>
      */
-    public function links(array $params): ?array
+    public function links(array $params): array
     {
-        $links = [];
-        $matched = false;
-        foreach ($this->providers as $provider) {
-            $providedLinks = $provider->links($params);
-            if (null === $providedLinks) {
-                continue;
-            }
-            $matched = true;
-            array_push($links, ...$providedLinks);
+        $request = $this->requests->document($params);
+        if (null === $request) {
+            return [];
         }
 
-        return $matched ? $links : null;
+        $links = [];
+        foreach ($this->providers as $provider) {
+            array_push($links, ...$provider->links($request));
+        }
+
+        return $links;
     }
 }

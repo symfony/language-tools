@@ -33,6 +33,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class AssetProviderTest extends TestCase
 {
@@ -135,7 +136,7 @@ final class AssetProviderTest extends TestCase
         $entryParams = LspRequests::offset($usageUri, $usageText, $entryOffset);
         self::assertSame([$importMapUri], array_column($provider->definition($entryParams) ?? [], 'uri'));
         self::assertCount(2, $provider->references($entryParams) ?? []);
-        self::assertCount(2, $provider->links(LspRequests::document($usageUri)) ?? []);
+        self::assertCount(2, $provider->links((new ProviderRequests($documents, $projects))->document($usageUri)));
         $diagnostics = $provider->diagnostics(LspRequests::document($usageUri));
         self::assertIsArray($diagnostics);
         self::assertSame(['importmap.unknown_entrypoint'], array_column($diagnostics, 'code'));

@@ -108,21 +108,23 @@ final class ProviderRegistryTest extends TestCase
         self::assertSame([], (new ReferencesProviderRegistry([new StubProvider([])]))->references([]));
     }
 
-    public function testDocumentLinkProvidersAggregateInOrderAndDistinguishNoMatchFromEmptyMatch(): void
+    public function testDocumentLinkProvidersAggregateEveryLinkOfAnOpenProjectDocument(): void
     {
-        $first = new StubProvider(null);
+        $first = new StubProvider([]);
         $second = new StubProvider([['target' => 'file:///second']]);
         $third = new StubProvider([['target' => 'file:///third']]);
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $requests = $this->requestFactory($uri, 'twig', '');
 
         self::assertSame(
             [['target' => 'file:///second'], ['target' => 'file:///third']],
-            (new DocumentLinkProviderRegistry([$first, $second, $third]))->links([]),
+            (new DocumentLinkProviderRegistry($requests, [$first, $second, $third]))->links(LspRequests::document($uri)),
         );
         self::assertSame(['links'], $first->calls);
         self::assertSame(['links'], $second->calls);
         self::assertSame(['links'], $third->calls);
-        self::assertNull((new DocumentLinkProviderRegistry([new StubProvider(null)]))->links([]));
-        self::assertSame([], (new DocumentLinkProviderRegistry([new StubProvider([])]))->links([]));
+        self::assertSame([], (new DocumentLinkProviderRegistry($requests, [$first]))->links(LspRequests::document('file:///elsewhere/page.html.twig')));
+        self::assertSame(['links'], $first->calls);
     }
 
     public function testCodeActionProvidersAggregateAllMatchesAndAlwaysReturnAList(): void
@@ -346,9 +348,9 @@ final class StubProvider implements CodeActionProviderInterface, CodeLensProvide
         return $this->result(__FUNCTION__);
     }
 
-    public function links(array $params): ?array
+    public function links(DocumentRequest $request): array
     {
-        return $this->result(__FUNCTION__);
+        return $this->result(__FUNCTION__) ?? [];
     }
 
     public function hover(array $params): ?array

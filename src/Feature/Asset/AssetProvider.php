@@ -14,6 +14,7 @@ use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class AssetProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, DocumentLinkProviderInterface, HoverProviderInterface, ReferencesProviderInterface
@@ -142,17 +143,16 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         return array_map(fn (AssetSourceSymbol $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), $this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name));
     }
 
-    public function links(array $params): ?array
+    public function links(DocumentRequest $request): array
     {
-        $request = $this->resolver->resolveDocument($params);
-        if (null === $request || 'twig' !== $request->document->languageId) {
-            return null;
+        if ('twig' !== $request->document->languageId) {
+            return [];
         }
         $links = [];
-        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->symbols as $symbol) {
+        foreach ($this->extractor->extract($request->source)->symbols as $symbol) {
             $target = $this->target($request->project, $symbol);
             if (null !== $target) {
-                $links[] = ['range' => $this->protocol->range($symbol->range), 'target' => $target];
+                $links[] = $this->protocol->documentLink($symbol->range, $target);
             }
         }
 

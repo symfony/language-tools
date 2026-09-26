@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Answer a document link request with an empty list instead of nothing when a document has no link
+
 - Reuse one YAML parse per document during completion
 - Keep reading YAML keys at their real path when the file contains an unterminated flow collection
 - Complete Security roles in an `IsGranted` attribute written next to another attribute

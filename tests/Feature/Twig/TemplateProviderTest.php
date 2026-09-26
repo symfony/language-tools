@@ -62,8 +62,8 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
-use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
@@ -326,12 +326,12 @@ final class TemplateProviderTest extends TestCase
                 }
             }
             PHP;
-        [, $navigation] = $this->providers($uri, 'php', $text);
+        [, $navigation, , $requests] = $this->providers($uri, 'php', $text);
 
         self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
         self::assertSame(
             ['file:///workspace/templates/article/show.html.twig'],
-            array_column($navigation->links(['textDocument' => ['uri' => $uri]]) ?? [], 'target'),
+            array_column($navigation->links($requests->document($uri)), 'target'),
         );
     }
 
@@ -643,7 +643,7 @@ final class TemplateProviderTest extends TestCase
         self::assertIsString($hover['contents']['value'] ?? null);
         self::assertStringContainsString('Properties: `title`', $hover['contents']['value']);
         self::assertSame([], $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $usageUri]]));
-        $lenses = $codeLensProvider->codeLenses(LspRequests::forDocument($documents, $projects, $classUri));
+        $lenses = $codeLensProvider->codeLenses((new ProviderRequests($documents, $projects))->document($classUri));
         self::assertCount(1, $lenses);
         self::assertIsArray($lenses[0]['command'] ?? null);
         self::assertSame('1 Twig component usage', $lenses[0]['command']['title'] ?? null);
@@ -1029,7 +1029,7 @@ final class TemplateProviderTest extends TestCase
     {
         $uri = 'file:///workspace/src/Controller.php';
         $text = "<?php class Controller extends \\Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController { public function show(): void { \$this->render('article/show.html.twig'); } }";
-        [$completion, $navigation, $converter] = $this->providers($uri, 'php', $text);
+        [$completion, $navigation, $converter, $requests] = $this->providers($uri, 'php', $text);
         $position = $converter->toPosition($text, strpos($text, 'article/sh') + \strlen('article/sh'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
             'line' => $position->line, 'character' => $position->character,
@@ -1038,7 +1038,7 @@ final class TemplateProviderTest extends TestCase
         self::assertSame(['article/show.html.twig'], array_column($completion->complete($params) ?? [], 'label'));
         self::assertSame(
             'file:///workspace/templates/article/show.html.twig',
-            $navigation->links(['textDocument' => ['uri' => $uri]])[0]['target'] ?? null,
+            $navigation->links($requests->document($uri))[0]['target'] ?? null,
         );
     }
 
@@ -1107,7 +1107,7 @@ final class TemplateProviderTest extends TestCase
     {
         $uri = 'file:///workspace/templates/page.html.twig';
         $text = "{% extends 'article/show.html.twig' %}\n{% include 'missing.html.twig' %}";
-        [, $navigation, $converter] = $this->providers($uri, 'twig', $text);
+        [, $navigation, $converter, $requests] = $this->providers($uri, 'twig', $text);
         $position = $converter->toPosition($text, strpos($text, 'article/show') + 1);
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
             'line' => $position->line, 'character' => $position->character,
@@ -1135,7 +1135,7 @@ final class TemplateProviderTest extends TestCase
         ]) ?? [], 'label'));
 
         $text = "{{ source(name = './snippet.txt') }}";
-        [, $navigation, $converter] = $this->providers($uri, 'twig', $text);
+        [, $navigation, $converter, $requests] = $this->providers($uri, 'twig', $text);
         $position = $converter->toPosition($text, strpos($text, 'snippet') + 1);
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
             'line' => $position->line, 'character' => $position->character,
@@ -1148,7 +1148,7 @@ final class TemplateProviderTest extends TestCase
         );
         self::assertSame(
             'file:///workspace/templates/snippet.txt',
-            $navigation->links(['textDocument' => ['uri' => $uri]])[0]['target'] ?? null,
+            $navigation->links($requests->document($uri))[0]['target'] ?? null,
         );
         self::assertSame([$uri], array_column($navigation->references($params) ?? [], 'uri'));
     }
@@ -1165,7 +1165,7 @@ final class TemplateProviderTest extends TestCase
         ]) ?? []);
 
         $text = "{{ source('./@Admin/foo.html.twig') }}";
-        [, $navigation, $converter] = $this->providers($uri, 'twig', $text);
+        [, $navigation, $converter, $requests] = $this->providers($uri, 'twig', $text);
         $position = $converter->toPosition($text, strpos($text, '@Admin') + 1);
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
             'line' => $position->line, 'character' => $position->character,
@@ -1212,7 +1212,7 @@ final class TemplateProviderTest extends TestCase
         self::assertSame([], $navigation->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
 
-    /** @return array{TemplateCompletionHandler, TemplateNavigationProvider, PositionConverter} */
+    /** @return array{TemplateCompletionHandler, TemplateNavigationProvider, PositionConverter, ProviderRequests} */
     private function providers(string $uri, string $languageId, string $text, bool $indexReferences = true, bool $indexComplete = true): array
     {
         $documents = new DocumentStore();
@@ -1263,6 +1263,7 @@ final class TemplateProviderTest extends TestCase
             new TemplateCompletionHandler($resolver, $converter, new LspProtocolMapper(), $indexes, $extractor, $classIndexes, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TwigDirectiveLocator()),
             new TemplateNavigationProvider($resolver, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes),
             $converter,
+            new ProviderRequests($documents, $projects),
         ];
     }
 
@@ -1407,7 +1408,7 @@ final class TemplateProviderTest extends TestCase
     {
         $uri = 'file:///workspace/src/Controller.php';
         $text = "<?php\nuse Symfony\\Bridge\\Twig\\Attribute\\Template;\nclass Controller { #[Template('article/show.html.twig')] public function show() {} }";
-        [$completion, $navigation, $converter] = $this->providers($uri, 'php', $text);
+        [$completion, $navigation, $converter, $requests] = $this->providers($uri, 'php', $text);
         $position = $converter->toPosition($text, strpos($text, 'article/sh') + \strlen('article/sh'));
         $params = ['textDocument' => ['uri' => $uri], 'position' => [
             'line' => $position->line, 'character' => $position->character,
@@ -1416,7 +1417,7 @@ final class TemplateProviderTest extends TestCase
         self::assertSame(['article/show.html.twig'], array_column($completion->complete($params) ?? [], 'label'));
         self::assertSame(
             'file:///workspace/templates/article/show.html.twig',
-            $navigation->links(['textDocument' => ['uri' => $uri]])[0]['target'] ?? null,
+            $navigation->links($requests->document($uri))[0]['target'] ?? null,
         );
     }
 

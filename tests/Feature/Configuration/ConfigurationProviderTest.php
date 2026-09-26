@@ -38,9 +38,11 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\SavedDocumentMatcher;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ConfigurationProviderTest extends TestCase
@@ -55,7 +57,7 @@ final class ConfigurationProviderTest extends TestCase
         $params = ['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]];
 
         self::assertSame(['router'], array_column($fixture->completion->complete($params) ?? [], 'label'));
-        self::assertSame('file:///workspace/config/shared.yaml', $fixture->links->links(['textDocument' => ['uri' => $uri]])[0]['target'] ?? null);
+        self::assertSame('file:///workspace/config/shared.yaml', $fixture->links->links($fixture->document($uri))[0]['target'] ?? null);
 
         $text = "framework:\n    router:\n        utf8: maybe\n        mode: old\n        unknown: true\n    router: {}";
         $fixture->documents->update($uri, 2, $text);
@@ -1469,7 +1471,7 @@ final class ConfigurationProviderTest extends TestCase
         $text = "# resource: ignored.yaml\nimports:\n    - { resource: ../shared.yaml }\n";
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $links = $fixture->links->links(['textDocument' => ['uri' => $uri]]) ?? [];
+        $links = $fixture->links->links($fixture->document($uri));
         $resourceOffset = (int) strpos($text, '../shared.yaml');
         self::assertSame(['file:///workspace/config/shared.yaml'], array_column($links, 'target'));
         self::assertSame($this->protocolRange($fixture->converter, $text, $resourceOffset, \strlen('../shared.yaml')), $links[0]['range'] ?? null);
@@ -1528,7 +1530,7 @@ final class ConfigurationProviderTest extends TestCase
             YAML;
         $fixture->documents->open(new Document($uri, 'yaml', 1, $text));
 
-        $links = $fixture->links->links(['textDocument' => ['uri' => $uri]]) ?? [];
+        $links = $fixture->links->links($fixture->document($uri));
         $resourceOffset = (int) strpos($text, '../shared.yaml');
         self::assertSame(['file:///workspace/config/shared.yaml'], array_column($links, 'target'));
         self::assertSame($this->protocolRange($fixture->converter, $text, $resourceOffset, \strlen('../shared.yaml')), $links[0]['range'] ?? null);
@@ -1766,8 +1768,9 @@ final class ConfigurationProviderTest extends TestCase
             new ConfigurationCompletionProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
             new ConfigurationDiagnosticProvider($resolver, ProjectPaths::resolver(), $converter, $protocol, $indexes, $routeIndexes, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
-            new ConfigurationDocumentLinkProvider($resolver, $converter, $protocol, $uriConverter, $documentParser),
+            new ConfigurationDocumentLinkProvider($converter, $protocol, $uriConverter, $documentParser),
             $documents,
+            $projects,
             $converter,
         );
     }
@@ -1796,7 +1799,13 @@ final class ConfigurationProviderFixture
         public readonly ConfigurationDiagnosticProvider $diagnostics,
         public readonly ConfigurationDocumentLinkProvider $links,
         public readonly DocumentStore $documents,
+        public readonly ProjectRegistry $projects,
         public readonly PositionConverter $converter,
     ) {
+    }
+
+    public function document(string $uri): DocumentRequest
+    {
+        return (new ProviderRequests($this->documents, $this->projects))->document($uri);
     }
 }

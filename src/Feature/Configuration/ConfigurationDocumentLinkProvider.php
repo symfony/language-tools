@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Component\Filesystem\Path;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
@@ -11,12 +10,12 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Parser\Yaml\YamlScalar;
 use Symfony\Lsp\Parser\Yaml\YamlScalarStyle;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class ConfigurationDocumentLinkProvider implements DocumentLinkProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly UriToPathConverter $uriToPathConverter,
@@ -24,11 +23,10 @@ final class ConfigurationDocumentLinkProvider implements DocumentLinkProviderInt
     ) {
     }
 
-    public function links(array $params): ?array
+    public function links(DocumentRequest $request): array
     {
-        $request = $this->resolver->resolveDocument($params);
-        if (null === $request || 'yaml' !== $request->document->languageId) {
-            return null;
+        if ('yaml' !== $request->document->languageId) {
+            return [];
         }
         $documentPath = $this->uriToPathConverter->convert($request->document->uri);
         if (null === $documentPath) {
@@ -42,13 +40,13 @@ final class ConfigurationDocumentLinkProvider implements DocumentLinkProviderInt
                 continue;
             }
             $targetPath = Path::isAbsolute($resource) ? Path::canonicalize($resource) : Path::join($basePath, $resource);
-            $links[] = [
-                'range' => $this->protocol->range(new Range(
+            $links[] = $this->protocol->documentLink(
+                new Range(
                     $this->converter->toPosition($request->document->text, $scalar->contentStartByte),
                     $this->converter->toPosition($request->document->text, $scalar->contentEndByte),
-                )),
-                'target' => $this->uriToPathConverter->toUri($targetPath),
-            ];
+                ),
+                $this->uriToPathConverter->toUri($targetPath),
+            );
         }
 
         return $links;

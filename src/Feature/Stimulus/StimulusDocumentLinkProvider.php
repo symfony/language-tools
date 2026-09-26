@@ -2,16 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Stimulus;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class StimulusDocumentLinkProvider implements DocumentLinkProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
         private readonly UriToPathConverter $uriConverter,
         private readonly LspProtocolMapper $protocol,
         private readonly StimulusIndexRegistry $indexes,
@@ -20,14 +18,13 @@ final class StimulusDocumentLinkProvider implements DocumentLinkProviderInterfac
     ) {
     }
 
-    public function links(array $params): ?array
+    public function links(DocumentRequest $request): array
     {
-        $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'twig' !== $request->document->languageId) {
-            return null;
+        if ('twig' !== $request->document->languageId) {
+            return [];
         }
         $links = [];
-        foreach ($this->extractor->extract($request->project, SourceDocument::fromDocument($request->document))->references as $reference) {
+        foreach ($this->extractor->extract($request->project, $request->source)->references as $reference) {
             $locations = $this->stimulus->declarationLocations($request->project, $reference);
             $target = $locations[0]['uri'] ?? null;
             if (!\is_string($target)) {
@@ -35,7 +32,7 @@ final class StimulusDocumentLinkProvider implements DocumentLinkProviderInterfac
                 $target = null === $controller ? null : $this->uriConverter->toUri($controller->sourcePath);
             }
             if (null !== $target) {
-                $links[] = ['range' => $this->protocol->range($reference->range), 'target' => $target];
+                $links[] = $this->protocol->documentLink($reference->range, $target);
             }
         }
 

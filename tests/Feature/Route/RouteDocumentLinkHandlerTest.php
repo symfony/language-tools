@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Feature\Route;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -26,6 +25,7 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class RouteDocumentLinkHandlerTest extends TestCase
 {
@@ -46,7 +46,6 @@ final class RouteDocumentLinkHandlerTest extends TestCase
         )], []));
         $positionConverter = new PositionConverter();
         $handler = new RouteDocumentLinkHandler(
-            new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
             $sourceIndexes,
             $classIndexes,
@@ -61,6 +60,6 @@ final class RouteDocumentLinkHandlerTest extends TestCase
             ],
             'target' => 'file:///workspace/config/routes.yaml#L5',
             'tooltip' => 'Open route "article_show"',
-        ]], $handler->links(['textDocument' => ['uri' => $uri]]));
+        ]], $handler->links((new ProviderRequests($documents, $projects))->document($uri)));
     }
 }

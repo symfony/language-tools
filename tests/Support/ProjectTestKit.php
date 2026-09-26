@@ -43,6 +43,8 @@ final class ProjectTestKit
     /** @var array<string, Document> */
     private array $documents = [];
 
+    private ?ProviderRequests $providerRequests = null;
+
     public function __construct(string $rootPath = '/workspace', ?string $rootUri = null, ?string $vendorPath = 'vendor')
     {
         $this->container = TestContainer::create();
@@ -119,7 +121,7 @@ final class ProjectTestKit
     /** The typed request a document capability serves for one of the open documents. */
     public function document(string $uri): DocumentRequest
     {
-        return LspRequests::forDocument($this->get(DocumentStore::class), $this->get(ProjectRegistry::class), $uri);
+        return $this->requests()->document($uri);
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */
@@ -209,6 +211,11 @@ final class ProjectTestKit
         $value = \is_array($contents) ? $contents['value'] ?? null : null;
 
         return \is_string($value) ? $value : '';
+    }
+
+    private function requests(): ProviderRequests
+    {
+        return $this->providerRequests ??= new ProviderRequests($this->get(DocumentStore::class), $this->get(ProjectRegistry::class));
     }
 
     private function text(string $uri): string

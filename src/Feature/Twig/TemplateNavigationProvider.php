@@ -12,6 +12,7 @@ use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TemplateNavigationProvider implements DefinitionProviderInterface, DiagnosticProviderInterface, DocumentLinkProviderInterface, HoverProviderInterface, ReferencesProviderInterface
@@ -63,17 +64,13 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         return array_map(fn (TemplateReference $reference): array => $this->protocol->location($reference->uri, $reference->range), $this->indexes->forProject($project)->references($template->name));
     }
 
-    public function links(array $params): ?array
+    public function links(DocumentRequest $request): array
     {
-        $request = $this->resolver->resolveDocument($params);
-        if (null === $request) {
-            return null;
-        }
         $links = [];
-        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document), $this->classIndexes->forProject($request->project)) as $reference) {
+        foreach ($this->extractor->extract($request->source, $this->classIndexes->forProject($request->project)) as $reference) {
             $template = $this->indexes->forProject($request->project)->get($reference->name);
             if (null !== $template) {
-                $links[] = ['range' => $this->protocol->range($reference->range), 'target' => $template->uri];
+                $links[] = $this->protocol->documentLink($reference->range, $template->uri);
             }
         }
 

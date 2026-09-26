@@ -43,6 +43,14 @@ final class LspProtocolMapper
         ];
     }
 
+    /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, target: string, tooltip?: string} */
+    public function documentLink(Range $range, string $target, ?string $tooltip = null): array
+    {
+        $link = ['range' => $this->range($range), 'target' => $target];
+
+        return null === $tooltip ? $link : [...$link, 'tooltip' => $tooltip];
+    }
+
     /** @return array{contents: array{kind: string, value: string}} */
     public function markdownHover(string $value): array
     {

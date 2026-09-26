@@ -2,16 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
         private readonly LspProtocolMapper $protocol,
         private readonly RouteSourceIndexRegistry $sourceIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
@@ -20,22 +18,15 @@ final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return list<array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, target: string, tooltip: string}>|null
-     */
-    public function links(array $params): ?array
+    public function links(DocumentRequest $request): array
     {
-        $request = $this->documentContextResolver->resolveDocument($params);
-        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig'], true)) {
-            return null;
+        if (!\in_array($request->document->languageId, ['php', 'twig'], true)) {
+            return [];
         }
 
-        $document = SourceDocument::fromDocument($request->document);
         $references = 'twig' === $request->document->languageId
-            ? $this->twigReferenceExtractor->extract($document)
-            : $this->phpReferenceExtractor->extract($document, $this->classIndexes->forProject($request->project));
+            ? $this->twigReferenceExtractor->extract($request->source)
+            : $this->phpReferenceExtractor->extract($request->source, $this->classIndexes->forProject($request->project));
         $links = [];
         foreach ($references as $reference) {
             $declarations = $this->sourceIndexes->forProject($request->project)->declarations($reference->name);
@@ -44,11 +35,11 @@ final class RouteDocumentLinkHandler implements DocumentLinkProviderInterface
             }
 
             $declaration = $declarations[0];
-            $links[] = [
-                'range' => $this->protocol->range($reference->range),
-                'target' => $declaration->uri.'#L'.($declaration->range->start->line + 1),
-                'tooltip' => \sprintf('Open route "%s"', $reference->name),
-            ];
+            $links[] = $this->protocol->documentLink(
+                $reference->range,
+                $declaration->uri.'#L'.($declaration->range->start->line + 1),
+                \sprintf('Open route "%s"', $reference->name),
+            );
         }
 
         return $links;
