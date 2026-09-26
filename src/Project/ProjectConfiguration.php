@@ -8,7 +8,7 @@ final class ProjectConfiguration
 {
     public const FILE_NAME = '.symfony-lsp.json';
 
-    /** @var list<array{root: string, projectRoots: list<string>|null, settings: array<string, mixed>, projects: array<string, array<string, mixed>>}> */
+    /** @var list<array{root: string, projectRoots: list<string>|null, settings: ProjectAnalysisSettings, projects: array<string, ProjectAnalysisSettings>}> */
     private array $workspaces = [];
 
     public function __construct(
@@ -59,18 +59,16 @@ final class ProjectConfiguration
         return null;
     }
 
-    /** @return array<string, mixed> */
-    public function settings(Project $project): array
+    public function settings(Project $project): ProjectAnalysisSettings
     {
         $workspace = $this->workspaceForPath($project->rootPath);
         if (null === $workspace) {
-            return [];
+            return new ProjectAnalysisSettings();
         }
 
-        return [
-            ...$workspace['settings'],
-            ...($workspace['projects'][Path::canonicalize($project->rootPath)] ?? []),
-        ];
+        return $workspace['settings']->merge(
+            $workspace['projects'][Path::canonicalize($project->rootPath)] ?? new ProjectAnalysisSettings(),
+        );
     }
 
     /** @param list<Project> $projects */
@@ -107,7 +105,7 @@ final class ProjectConfiguration
     }
 
     /**
-     * @return array{root: string, projectRoots: list<string>|null, settings: array<string, mixed>, projects: array<string, array<string, mixed>>}|null
+     * @return array{root: string, projectRoots: list<string>|null, settings: ProjectAnalysisSettings, projects: array<string, ProjectAnalysisSettings>}|null
      */
     private function workspaceForPath(string $path): ?array
     {
@@ -122,12 +120,12 @@ final class ProjectConfiguration
     }
 
     /**
-     * @return array{root: string, projectRoots: list<string>|null, settings: array<string, mixed>, projects: array<string, array<string, mixed>>}
+     * @return array{root: string, projectRoots: list<string>|null, settings: ProjectAnalysisSettings, projects: array<string, ProjectAnalysisSettings>}
      */
     private function loadWorkspace(string $root, string $path): array
     {
         if (!is_file($path)) {
-            return ['root' => $root, 'projectRoots' => null, 'settings' => [], 'projects' => []];
+            return ['root' => $root, 'projectRoots' => null, 'settings' => new ProjectAnalysisSettings(), 'projects' => []];
         }
         if (!is_readable($path)) {
             throw new InvalidConfigurationException(\sprintf('The Symfony Language Tools configuration file "%s" is unreadable.', $path));

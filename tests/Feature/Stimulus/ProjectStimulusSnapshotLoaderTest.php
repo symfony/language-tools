@@ -11,7 +11,8 @@ use Symfony\Lsp\Feature\Stimulus\StimulusControllerSourceLoader;
 use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
+use Symfony\Lsp\Tests\Support\RuntimeSettings;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
@@ -112,8 +113,7 @@ final class ProjectStimulusSnapshotLoaderTest extends TestCase
 
     public function testMapsContainerSourcePathsToTheHost(): void
     {
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => '/app']);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(containerProjectRoot: '/app'));
         $indexes = new StimulusIndexRegistry();
         $project = new Project('/workspace', 'file:///workspace');
 

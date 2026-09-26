@@ -6,7 +6,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Console\ConsoleCommandMetadata;
 use Symfony\Lsp\Feature\Console\ConsoleIndexRegistry;
 use Symfony\Lsp\Feature\Console\ProjectConsoleSnapshotLoader;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 
@@ -15,8 +17,9 @@ final class ProjectConsoleSnapshotLoaderTest extends TestCase
     public function testLoadsCommandDefinitions(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $configuration = new RuntimeConfiguration();
-        $configuration->configureProject($project, ['containerProjectRoot' => '/app']);
+        $settings = new AnalysisSettingsRegistry();
+        $settings->configureProject($project, new ProjectAnalysisSettings(containerProjectRoot: '/app'));
+        $configuration = new RuntimeConfiguration($settings);
         $indexes = new ConsoleIndexRegistry();
         $loader = new ProjectConsoleSnapshotLoader($indexes);
         $loader->load($project, SnapshotSections::of($project, [

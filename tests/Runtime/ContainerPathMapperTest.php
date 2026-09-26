@@ -3,9 +3,12 @@
 namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\RuntimeSettings;
 
 final class ContainerPathMapperTest extends TestCase
 {
@@ -21,8 +24,7 @@ final class ContainerPathMapperTest extends TestCase
     public function testMapsProjectPathsBetweenHostAndContainer(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => '/app']);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(containerProjectRoot: '/app'));
         $mapper = new ContainerPathMapper($configuration);
 
         self::assertSame('/app', $mapper->toContainer($project, '/workspace'));
@@ -34,8 +36,7 @@ final class ContainerPathMapperTest extends TestCase
     public function testKeepsPathsOutsideTheMappedRootsUntouched(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => '/app']);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(containerProjectRoot: '/app'));
         $mapper = new ContainerPathMapper($configuration);
 
         self::assertSame('/elsewhere/tool.php', $mapper->toContainer($project, '/elsewhere/tool.php'));
@@ -47,8 +48,7 @@ final class ContainerPathMapperTest extends TestCase
     public function testMapsWindowsHostPathsToPosixContainerPaths(): void
     {
         $project = new Project('C:/Users/nath/api', 'file:///C:/Users/nath/api');
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => '/app']);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(containerProjectRoot: '/app'));
         $mapper = new ContainerPathMapper($configuration);
 
         self::assertSame('/app/var/symfony-lsp/v1/bridge.php', $mapper->toContainer($project, 'C:/Users/nath/api/var/symfony-lsp/v1/bridge.php'));
@@ -58,9 +58,8 @@ final class ContainerPathMapperTest extends TestCase
     public function testUsesTheProjectContainerProjectRootOverTheGlobalOne(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => '/app']);
-        $configuration->configureProject($project, ['containerProjectRoot' => '/srv/api']);
+        $configuration = new RuntimeConfiguration($settings = RuntimeSettings::registry(new ProjectAnalysisSettings(containerProjectRoot: '/app')));
+        $settings->configureProject($project, new ProjectAnalysisSettings(containerProjectRoot: '/srv/api'));
         $mapper = new ContainerPathMapper($configuration);
 
         self::assertSame('/srv/api/composer.json', $mapper->toContainer($project, '/workspace/composer.json'));
@@ -70,9 +69,8 @@ final class ContainerPathMapperTest extends TestCase
     public function testClearsTheGlobalContainerProjectRootForAnEmptyProjectValue(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => '/app']);
-        $configuration->configureProject($project, ['containerProjectRoot' => '']);
+        $configuration = new RuntimeConfiguration($settings = RuntimeSettings::registry(new ProjectAnalysisSettings(containerProjectRoot: '/app')));
+        $settings->configureProject($project, new ProjectAnalysisSettings(containerProjectRoot: ''));
         $mapper = new ContainerPathMapper($configuration);
 
         self::assertSame('/workspace/composer.json', $mapper->toContainer($project, '/workspace/composer.json'));
@@ -81,8 +79,9 @@ final class ContainerPathMapperTest extends TestCase
     public function testIgnoresRelativeContainerProjectRoots(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => 'app']);
+        $configuration = new RuntimeConfiguration(RuntimeSettings::registry(
+            (new AnalysisSettings())->normalizeProject(['containerProjectRoot' => 'app'], false),
+        ));
         $mapper = new ContainerPathMapper($configuration);
 
         self::assertSame('/workspace/composer.json', $mapper->toContainer($project, '/workspace/composer.json'));

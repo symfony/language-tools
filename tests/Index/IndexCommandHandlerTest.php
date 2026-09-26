@@ -20,6 +20,7 @@ use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Project\AnalysisSettings;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
@@ -65,7 +66,7 @@ final class IndexCommandHandlerTest extends TestCase
         $runtime = new RecordingRuntimeInitializer();
         $workspaceTrust = new WorkspaceTrust();
         $workspaceTrust->set($project, TrustStatus::Trusted);
-        $runtimeConfiguration = new RuntimeConfiguration();
+        $runtimeConfiguration = new RuntimeConfiguration($analysisSettings = new AnalysisSettingsRegistry());
         $handler = new IndexCommandHandler(
             $projects,
             $workspaceTrust,
@@ -73,6 +74,7 @@ final class IndexCommandHandlerTest extends TestCase
             new StatusRuntimeInitializer($runtime, $statuses, $projects),
             $statuses,
             $runtimeConfiguration,
+            $analysisSettings,
             new AnalysisSettings(),
         );
 
@@ -130,7 +132,7 @@ final class IndexCommandHandlerTest extends TestCase
         $runtime = new RecordingRuntimeInitializer();
         $workspaceTrust = new WorkspaceTrust();
         $workspaceTrust->set($project, TrustStatus::Trusted);
-        $runtimeConfiguration = new RuntimeConfiguration();
+        $runtimeConfiguration = new RuntimeConfiguration($analysisSettings = new AnalysisSettingsRegistry());
         $handler = new IndexCommandHandler(
             $projects,
             $workspaceTrust,
@@ -138,6 +140,7 @@ final class IndexCommandHandlerTest extends TestCase
             new StatusRuntimeInitializer($runtime, $statuses, $projects),
             $statuses,
             $runtimeConfiguration,
+            $analysisSettings,
             new AnalysisSettings(),
         );
 
@@ -189,6 +192,7 @@ final class IndexCommandHandlerTest extends TestCase
             new StatusRuntimeInitializer($runtime, $statuses, $projects),
             $statuses,
             new RuntimeConfiguration(),
+            new AnalysisSettingsRegistry(),
             new AnalysisSettings(),
         );
 

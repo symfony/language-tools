@@ -3,14 +3,14 @@
 namespace Symfony\Lsp\Check;
 
 use Symfony\Lsp\Project\InvalidConfigurationException;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 
 final class CheckOptions
 {
     /**
-     * @param list<string>         $selectors
-     * @param list<string>         $projectRoots
-     * @param array<string, mixed> $overrides
-     * @param list<string>|null    $blockingCodes
+     * @param list<string>      $selectors
+     * @param list<string>      $projectRoots
+     * @param list<string>|null $blockingCodes
      */
     public function __construct(
         public readonly string $format,
@@ -18,7 +18,7 @@ final class CheckOptions
         public readonly ?string $configurationPath,
         public readonly array $selectors,
         public readonly array $projectRoots,
-        public readonly array $overrides,
+        public readonly ProjectAnalysisSettings $overrides,
         public readonly ?array $blockingCodes,
         public readonly ?string $baselinePath,
         public readonly string $baselineMode,

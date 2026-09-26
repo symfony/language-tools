@@ -6,8 +6,10 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeSnapshotStore;
+use Symfony\Lsp\Tests\Support\RuntimeSettings;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class RuntimeSnapshotStoreTest extends TestCase
@@ -172,16 +174,11 @@ final class RuntimeSnapshotStoreTest extends TestCase
         );
 
         $otherProject = new Project($this->project->rootPath.'-other', 'file://'.$this->project->rootPath.'-other');
-        $phpCommand = new RuntimeConfiguration();
-        $phpCommand->configure(['phpCommand' => ['custom-php']]);
-        $containerRoot = new RuntimeConfiguration();
-        $containerRoot->configure(['containerProjectRoot' => '/app']);
-        $environment = new RuntimeConfiguration();
-        $environment->configure(['environment' => 'test']);
-        $kernel = new RuntimeConfiguration();
-        $kernel->configure(['kernel' => 'Api\Kernel']);
-        $debug = new RuntimeConfiguration();
-        $debug->configure(['debug' => false]);
+        $phpCommand = RuntimeSettings::configuration(new ProjectAnalysisSettings(phpCommand: ['custom-php']));
+        $containerRoot = RuntimeSettings::configuration(new ProjectAnalysisSettings(containerProjectRoot: '/app'));
+        $environment = RuntimeSettings::configuration(new ProjectAnalysisSettings(environment: 'test'));
+        $kernel = RuntimeSettings::configuration(new ProjectAnalysisSettings(kernel: 'Api\Kernel'));
+        $debug = RuntimeSettings::configuration(new ProjectAnalysisSettings(debug: false));
 
         foreach ([
             'project root' => [$otherProject, new RuntimeConfiguration()],

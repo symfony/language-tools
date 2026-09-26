@@ -3,10 +3,11 @@
 namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
@@ -22,16 +23,15 @@ final class ProjectSettingsTest extends TestCase
     {
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
-        $configuration = new TranslationConfigurationRegistry();
         $client = new RecordingClient([['translationDiagnostics' => true, 'environment' => 'test', 'bridgeTimeout' => 120, 'excludePaths' => ['tests/Fixtures/**']]]);
-        $runtime = new RuntimeConfiguration();
         $analysisSettings = new AnalysisSettings();
+        $registry = new AnalysisSettingsRegistry();
+        $runtime = new RuntimeConfiguration($registry);
         $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
         $settings = new ProjectSettings(
             $client,
             $projects,
-            $configuration,
-            $runtime,
+            $registry,
             new ProjectConfiguration(new UriToPathConverter(), $analysisSettings),
             $fileScope,
             $analysisSettings,
@@ -40,7 +40,7 @@ final class ProjectSettingsTest extends TestCase
 
         $settings->refresh();
 
-        self::assertTrue($configuration->missingKeyDiagnostics($project));
+        self::assertTrue($registry->forProject($project)->translationDiagnostics);
         self::assertSame('test', $runtime->environment($project));
         self::assertSame(120.0, $runtime->bridgeTimeout($project));
         self::assertTrue($fileScope->isExcluded($project, '/workspace/tests/Fixtures/Rule.php'));
@@ -50,6 +50,30 @@ final class ProjectSettingsTest extends TestCase
                 'section' => 'symfonyLsp',
             ]],
         ], $client->requests[0]['params'] ?? null);
+    }
+
+    public function testRejectsAnInvalidEditorSettingWhereItComesFromAndKeepsTheOthers(): void
+    {
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $analysisSettings = new AnalysisSettings();
+        $registry = new AnalysisSettingsRegistry();
+        $runtime = new RuntimeConfiguration($registry);
+        $settings = new ProjectSettings(
+            new RecordingClient([['environment' => "test\n", 'bridgeTimeout' => 120]]),
+            $projects,
+            $registry,
+            new ProjectConfiguration(new UriToPathConverter(), $analysisSettings),
+            new ProjectFileScopeRegistry(new GlobPatternCompiler()),
+            $analysisSettings,
+        );
+        $settings->initialize(['capabilities' => ['workspace' => ['configuration' => true]]]);
+
+        $settings->refresh();
+
+        self::assertNull($registry->forProject($project)->environment);
+        self::assertSame('dev', $runtime->environment($project));
+        self::assertSame(120.0, $runtime->bridgeTimeout($project));
     }
 
     public function testPhpCommandSettingsOverrideTheSymfonyCliDefault(): void
@@ -63,15 +87,15 @@ final class ProjectSettingsTest extends TestCase
             ], \JSON_THROW_ON_ERROR));
             $projects = new ProjectRegistry();
             $projects->replace([$project = new Project($directory, 'file://'.$directory)]);
-            $runtime = new RuntimeConfiguration(defaultPhpCommand: ['/usr/local/bin/symfony', 'php']);
             $analysisSettings = new AnalysisSettings();
+            $registry = new AnalysisSettingsRegistry();
+            $runtime = new RuntimeConfiguration($registry, defaultPhpCommand: ['/usr/local/bin/symfony', 'php']);
             $projectConfiguration = new ProjectConfiguration(new UriToPathConverter(), $analysisSettings);
             $projectConfiguration->load([['uri' => 'file://'.$directory]]);
             $settings = new ProjectSettings(
                 new RecordingClient([]),
                 $projects,
-                new TranslationConfigurationRegistry(),
-                $runtime,
+                $registry,
                 $projectConfiguration,
                 new ProjectFileScopeRegistry(new GlobPatternCompiler()),
                 $analysisSettings,
@@ -82,11 +106,12 @@ final class ProjectSettingsTest extends TestCase
             $settings->applyFileSettings();
             self::assertSame(['project-php'], $runtime->phpCommand($project));
 
-            $runtime->configure(['phpCommand' => ['initialization-php']]);
+            $registry->configureWorkspace(new ProjectAnalysisSettings(phpCommand: ['initialization-php']));
             $settings->applyFileSettings();
             self::assertSame(['initialization-php'], $runtime->phpCommand($project));
 
-            $settings->applyFileSettings(['phpCommand' => ['command-line-php']]);
+            $registry->configureWorkspace(new ProjectAnalysisSettings(phpCommand: ['command-line-php']));
+            $settings->applyFileSettings();
             self::assertSame(['command-line-php'], $runtime->phpCommand($project));
         } finally {
             $workspace->cleanup();
@@ -106,18 +131,17 @@ final class ProjectSettingsTest extends TestCase
             ], \JSON_THROW_ON_ERROR));
             $projects = new ProjectRegistry();
             $projects->replace([$project = new Project($directory, 'file://'.$directory)]);
-            $translation = new TranslationConfigurationRegistry();
-            $runtime = new RuntimeConfiguration();
-            $runtime->configure(['environment' => 'initialization']);
             $analysisSettings = new AnalysisSettings();
+            $registry = new AnalysisSettingsRegistry();
+            $registry->configureWorkspace(new ProjectAnalysisSettings(environment: 'initialization'));
+            $runtime = new RuntimeConfiguration($registry);
             $projectConfiguration = new ProjectConfiguration(new UriToPathConverter(), $analysisSettings);
             $projectConfiguration->load([['uri' => 'file://'.$directory]]);
             $fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
             $settings = new ProjectSettings(
                 new RecordingClient([['environment' => 'resource', 'translationDiagnostics' => false, 'excludePaths' => ['fixtures/**']]]),
                 $projects,
-                $translation,
-                $runtime,
+                $registry,
                 $projectConfiguration,
                 $fileScope,
                 $analysisSettings,
@@ -127,7 +151,7 @@ final class ProjectSettingsTest extends TestCase
             $settings->refresh();
 
             self::assertSame('resource', $runtime->environment($project));
-            self::assertFalse($translation->missingKeyDiagnostics($project));
+            self::assertFalse($registry->forProject($project)->translationDiagnostics);
             self::assertFalse($fileScope->isExcluded($project, $directory.'/tests/Rule.php'));
             self::assertTrue($fileScope->isExcluded($project, $directory.'/fixtures/Rule.php'));
         } finally {

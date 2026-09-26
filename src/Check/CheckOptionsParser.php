@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Check;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\InvalidConfigurationException;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 
 final class CheckOptionsParser
 {
@@ -116,8 +117,9 @@ final class CheckOptionsParser
             }
         }
 
+        $overrides = new ProjectAnalysisSettings();
         try {
-            $draft->overrides = $this->analysisSettings->normalizeProject($draft->overrides, context: 'command-line');
+            $overrides = $this->analysisSettings->normalizeProject($draft->overrides, context: 'command-line');
         } catch (InvalidConfigurationException $error) {
             $draft->error ??= $error;
         }
@@ -136,7 +138,7 @@ final class CheckOptionsParser
             $draft->configurationPath,
             $draft->selectors,
             array_values(array_unique($draft->projectRoots)),
-            $draft->overrides,
+            $overrides,
             $draft->blockingCodes,
             $draft->baselinePath,
             $draft->baselineMode,
@@ -236,11 +238,8 @@ final class CheckOptionsParser
         } catch (\JsonException) {
             throw new InvalidConfigurationException('The --php-command option must be a JSON list of command arguments.');
         }
-        $normalized = $this->analysisSettings->normalizeProject(['phpCommand' => $command], context: 'command-line');
-        /** @var non-empty-list<string> $phpCommand */
-        $phpCommand = $normalized['phpCommand'];
 
-        return $phpCommand;
+        return $this->analysisSettings->phpCommand($command, 'command-line');
     }
 
     /** @return list<string> */

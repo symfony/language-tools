@@ -24,11 +24,12 @@ use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\RuntimeSettings;
 
 final class ConfigurationCodeActionProviderTest extends TestCase
 {
@@ -46,8 +47,7 @@ final class ConfigurationCodeActionProviderTest extends TestCase
         $converter = new PositionConverter();
         $protocol = new LspProtocolMapper();
         $xmlParser = new TolerantXmlParser();
-        $runtime = new RuntimeConfiguration();
-        $runtime->configure(['environment' => 'dev']);
+        $runtime = RuntimeSettings::configuration(new ProjectAnalysisSettings(environment: 'dev'));
         $provider = new ConfigurationCodeActionProvider(
             ProjectPaths::resolver(),
             $converter,

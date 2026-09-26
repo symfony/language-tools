@@ -6,6 +6,7 @@ use Amp\Cancellation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
@@ -137,13 +138,13 @@ final class WorkspaceTrustManagerTest extends TestCase
         $trust = new WorkspaceTrust();
         $trust->set($project, TrustStatus::Trusted);
         $statuses = new ProjectIndexStatusRegistry();
-        $configuration = new RuntimeConfiguration();
+        $configuration = new RuntimeConfiguration($settings = new AnalysisSettingsRegistry());
         $runtimeInitializer = new CapturingRuntimeInitializer($statuses);
         $manager = new WorkspaceTrustManager(new RecordingClient(null), $trust, $runtimeInitializer, $statuses, $configuration, $this->registry($project));
 
         $manager->requestUnknownDecisions([$project]);
         $manager->requestUnknownDecisions([$project]);
-        $configuration->setEnvironment($project, 'test');
+        $settings->setEnvironment($project, 'test');
         $manager->requestUnknownDecisions([$project]);
         $replacement = new Project('/workspace', 'file:///workspace');
         $manager->requestUnknownDecisions([$replacement]);

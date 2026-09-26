@@ -58,12 +58,13 @@ use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Parser\Twig\TwigTypeDeclarationParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\RuntimeSettings;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
@@ -861,8 +862,7 @@ final class TemplateProviderTest extends TestCase
         mkdir($root.'/templates', 0777, true);
         file_put_contents($root.'/templates/index.html.twig', 'Hello');
         $project = new Project($root, 'file://'.$root);
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => '/app']);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(containerProjectRoot: '/app'));
         $indexes = $this->templateIndexes();
 
         try {

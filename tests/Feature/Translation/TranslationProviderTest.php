@@ -10,7 +10,6 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\ProjectDocumentReader;
 use Symfony\Lsp\Feature\Translation\TranslationCodeActionProvider;
-use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationMessage;
 use Symfony\Lsp\Feature\Translation\TranslationProvider;
@@ -21,7 +20,9 @@ use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
@@ -110,7 +111,7 @@ final class TranslationProviderTest extends TestCase
             <p>{{ 'don\'t panic'|trans }}</p>
             TWIG;
         [$provider, $converter, $configuration, $project] = $this->provider($uri, $text, 'twig');
-        $configuration->configure($project, true);
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
         $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
@@ -268,7 +269,7 @@ final class TranslationProviderTest extends TestCase
             {{ t("\x66oo") }}
             TWIG;
         [$provider, , $configuration, $project] = $this->provider($uri, $text, 'twig');
-        $configuration->configure($project, true);
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
 
@@ -302,8 +303,8 @@ final class TranslationProviderTest extends TestCase
             $extractor->extract(new SourceDocument('file://'.$translationPath, 'yaml', "existing: Existing\n")),
             $extractor->extract(new SourceDocument($uri, 'php', $text)),
         );
-        $configuration = new TranslationConfigurationRegistry();
-        $configuration->configure($project, true);
+        $configuration = new AnalysisSettingsRegistry();
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $provider = new TranslationProvider($documentResolver, new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor);
 
@@ -391,8 +392,8 @@ final class TranslationProviderTest extends TestCase
             $extractor->extract(new SourceDocument('file://'.$translationPath, 'yaml', "existing: Existing\n")),
             $extractor->extract(new SourceDocument($uri, 'php', $text)),
         );
-        $configuration = new TranslationConfigurationRegistry();
-        $configuration->configure($project, true);
+        $configuration = new AnalysisSettingsRegistry();
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $provider = new TranslationProvider($documentResolver, new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor);
 
@@ -427,7 +428,7 @@ final class TranslationProviderTest extends TestCase
         $text = "<?php \$translator->trans('missing.key');";
         [$provider, , $configuration, $project] = $this->provider($uri, $text);
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
-        $configuration->configure($project, true);
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
         self::assertSame(['translation.not_found'], array_column($provider->diagnostics(['textDocument' => ['uri' => $uri]]), 'code'));
     }
 
@@ -441,7 +442,7 @@ final class TranslationProviderTest extends TestCase
             $translator->trans('panel.title', self::PARAMETERS, 'admin');
             PHP;
         [$provider, , $configuration, $project] = $this->provider($uri, $text);
-        $configuration->configure($project, true);
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
@@ -459,7 +460,7 @@ final class TranslationProviderTest extends TestCase
             t('article.title', ['%extra%' => $extra]);
             PHP;
         [$provider, , $configuration, $project] = $this->provider($uri, $text);
-        $configuration->configure($project, true);
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
         $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
 
@@ -493,7 +494,7 @@ final class TranslationProviderTest extends TestCase
             </twig:Button>
             TWIG;
         [$provider, , $configuration, $project] = $this->provider($uri, $text, 'twig');
-        $configuration->configure($project, true);
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
@@ -510,7 +511,7 @@ final class TranslationProviderTest extends TestCase
             $translator->trans('article.title', ["%{$placeholder}%" => $name]);
             PHP;
         [$provider, , $configuration, $project] = $this->provider($uri, $text);
-        $configuration->configure($project, true);
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
@@ -624,7 +625,7 @@ final class TranslationProviderTest extends TestCase
             'php',
             $catalog,
         ]]);
-        $configuration->configure($project, true);
+        $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
     }
@@ -730,7 +731,7 @@ final class TranslationProviderTest extends TestCase
     /**
      * @param list<array{string, string, string}> $sources
      *
-     * @return array{TranslationProvider, PositionConverter, TranslationConfigurationRegistry, Project}
+     * @return array{TranslationProvider, PositionConverter, AnalysisSettingsRegistry, Project}
      */
     private function provider(string $uri, string $text, string $languageId = 'php', array $sources = []): array
     {
@@ -756,7 +757,7 @@ final class TranslationProviderTest extends TestCase
             $sourceFacts[] = $extractor->extract(new SourceDocument($sourceUri, $sourceLanguageId, $source));
         }
         $indexes->forProject($project)->replaceSources(...$sourceFacts);
-        $configuration = new TranslationConfigurationRegistry();
+        $configuration = new AnalysisSettingsRegistry();
         $documentResolver = new DocumentContextResolver($documents, $projects);
 
         return [new TranslationProvider($documentResolver, new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor), $converter, $configuration, $project];

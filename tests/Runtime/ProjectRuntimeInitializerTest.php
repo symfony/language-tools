@@ -18,6 +18,7 @@ use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Runtime\BridgeExecutionException;
 use Symfony\Lsp\Runtime\BridgeInstaller;
@@ -37,6 +38,7 @@ use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\Bridge\ProjectRuntimeInitializerFixtureBuilder;
 use Symfony\Lsp\Tests\Support\CapturingWritableStream;
+use Symfony\Lsp\Tests\Support\RuntimeSettings;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class ProjectRuntimeInitializerTest extends TestCase
@@ -100,12 +102,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $serviceIndexes = new ServiceIndexRegistry();
         $parameterIndexes = new ParameterIndexRegistry();
         $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure([
-            'phpCommand' => ['project-php', '--flag'],
-            'environment' => 'test',
-            'bridgeTimeout' => 90,
-        ]);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(
+            phpCommand: ['project-php', '--flag'],
+            environment: 'test',
+            bridgeTimeout: 90.0,
+        ));
         $statuses = new ProjectIndexStatusRegistry();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
@@ -154,8 +155,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
         $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['releaseMetadata' => false]);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(releaseMetadata: false));
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             self::snapshotLoaders(),
@@ -283,11 +283,10 @@ final class ProjectRuntimeInitializerTest extends TestCase
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
         $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure([
-            'phpCommand' => ['docker', 'compose', 'exec', '-T', 'php', 'php'],
-            'containerProjectRoot' => '/app',
-        ]);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(
+            phpCommand: ['docker', 'compose', 'exec', '-T', 'php', 'php'],
+            containerProjectRoot: '/app',
+        ));
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             self::snapshotLoaders(),
@@ -318,8 +317,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         ], \JSON_THROW_ON_ERROR), '');
         $processRunner = new CapturingProcessRunner($snapshot, $snapshot, $snapshot);
         $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['kernel' => 'Api\Kernel']);
+        $configuration = new RuntimeConfiguration($settings = RuntimeSettings::registry(new ProjectAnalysisSettings(kernel: 'Api\Kernel')));
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             self::snapshotLoaders(),
@@ -331,11 +329,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
         self::assertSame('--kernel=Api\Kernel', $processRunner->command[4]);
 
-        $configuration->setKernel($project, 'bin/apiconsole');
+        $settings->setKernel($project, 'bin/apiconsole');
         $initializer->initialize($project, RuntimeRefreshPlan::reuse());
         self::assertSame('--kernel=bin/apiconsole', $processRunner->command[4]);
 
-        $configuration->setKernel($project, null);
+        $settings->setKernel($project, null);
         $initializer->initialize($project, RuntimeRefreshPlan::reuse());
         self::assertNotContains('--kernel=bin/apiconsole', $processRunner->command);
     }
@@ -344,8 +342,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
     {
         $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['debug' => false]);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(debug: false));
         $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, '', '')),

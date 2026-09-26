@@ -15,6 +15,7 @@ use Symfony\Lsp\Check\SarifCheckReportFormat;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\InvalidConfigurationException;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 
 final class CheckOptionsParserTest extends TestCase
 {
@@ -56,13 +57,11 @@ final class CheckOptionsParserTest extends TestCase
         self::assertSame('json', $options->format);
         self::assertSame('application', $options->workspace);
         self::assertSame(['src'], $options->selectors);
-        self::assertSame([
-            'runtimeIndexing' => false,
-            'containerProjectRoot' => null,
-            'environment' => 'test',
-            'kernel' => 'Api\\Kernel',
-            'phpCommand' => ['symfony', 'php'],
-        ], $options->overrides);
+        self::assertFalse($options->overrides->runtimeIndexing);
+        self::assertSame('', $options->overrides->containerProjectRoot);
+        self::assertSame('test', $options->overrides->environment);
+        self::assertSame('Api\\Kernel', $options->overrides->kernel);
+        self::assertSame(['symfony', 'php'], $options->overrides->phpCommand);
         self::assertSame(['config.deprecated_key', 'route.not_found'], $options->blockingCodes);
         self::assertSame('diagnostics.json', $options->baselinePath);
         self::assertTrue($options->strictBaseline);
@@ -90,7 +89,7 @@ final class CheckOptionsParserTest extends TestCase
         self::assertSame('json', $options->format);
         self::assertTrue($options->help);
         self::assertSame(['--format=sarif', '--debug'], $options->selectors);
-        self::assertSame([], $options->overrides);
+        self::assertEquals(new ProjectAnalysisSettings(), $options->overrides);
     }
 
     public function testAppliesBooleanAndValueOptionsInArgumentOrder(): void
@@ -107,12 +106,10 @@ final class CheckOptionsParserTest extends TestCase
             '--source-only',
         ]);
 
-        self::assertSame([
-            'debug' => false,
-            'containerProjectRoot' => '/last',
-            'translationDiagnostics' => false,
-            'runtimeIndexing' => false,
-        ], $options->overrides);
+        self::assertFalse($options->overrides->debug);
+        self::assertSame('/last', $options->overrides->containerProjectRoot);
+        self::assertFalse($options->overrides->translationDiagnostics);
+        self::assertFalse($options->overrides->runtimeIndexing);
     }
 
     public function testAcceptsAnExplicitEmptyBlockingCodeList(): void

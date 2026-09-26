@@ -5,8 +5,10 @@ namespace Symfony\Lsp\Index;
 use Amp\Cancellation;
 use Symfony\Lsp\Feature\Configuration\StaleConfigurationValidationSnapshotException;
 use Symfony\Lsp\Project\AnalysisSettings;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\TrustStatus;
 use Symfony\Lsp\Project\WorkspaceTrust;
@@ -33,6 +35,7 @@ final class IndexCommandHandler
         private readonly RuntimeInitializerInterface $runtimeInitializer,
         private readonly ProjectIndexStatusRegistry $statuses,
         private readonly RuntimeConfiguration $configuration,
+        private readonly AnalysisSettingsRegistry $settings,
         private readonly AnalysisSettings $analysisSettings,
     ) {
     }
@@ -59,9 +62,9 @@ final class IndexCommandHandler
             foreach ($projects as $project) {
                 $cancellation?->throwIfRequested();
                 if ($switchesEnvironment) {
-                    $this->configuration->setEnvironment($project, $value);
+                    $this->settings->setEnvironment($project, $value);
                 } else {
-                    $this->configuration->setKernel($project, '' === $value ? null : $value);
+                    $this->settings->setKernel($project, '' === $value ? null : $value);
                 }
                 if ($this->configuration->runtimeIndexing($project) && TrustStatus::Trusted === $this->workspaceTrust->status($project)) {
                     $this->initializeRuntime($project, RuntimeRefreshPlan::rebuild(), $cancellation);
@@ -105,7 +108,9 @@ final class IndexCommandHandler
     /** @param array<array-key, mixed> $params */
     private function environment(array $params): ?string
     {
-        return $this->setting('environment', $this->argument($params));
+        $value = $this->argument($params);
+
+        return \is_string($value) ? $this->normalized(['environment' => $value])?->environment : null;
     }
 
     /**
@@ -116,8 +121,11 @@ final class IndexCommandHandler
     private function kernel(array $params): ?string
     {
         $kernel = $this->argument($params);
+        if ('' === $kernel) {
+            return '';
+        }
 
-        return '' === $kernel ? '' : $this->setting('kernel', $kernel);
+        return \is_string($kernel) ? $this->normalized(['kernel' => $kernel])?->kernel : null;
     }
 
     /** @param array<array-key, mixed> $params */
@@ -128,18 +136,14 @@ final class IndexCommandHandler
         return \is_array($arguments) ? ($arguments[1] ?? null) : null;
     }
 
-    private function setting(string $name, mixed $value): ?string
+    /** @param array<string, string> $setting */
+    private function normalized(array $setting): ?ProjectAnalysisSettings
     {
-        if (!\is_string($value)) {
-            return null;
-        }
         try {
-            $normalized = $this->analysisSettings->normalizeProject([$name => $value]);
+            return $this->analysisSettings->normalizeProject($setting);
         } catch (InvalidConfigurationException) {
             return null;
         }
-
-        return \is_string($normalized[$name] ?? null) ? $normalized[$name] : null;
     }
 
     /**

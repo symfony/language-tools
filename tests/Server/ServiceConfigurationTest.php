@@ -21,7 +21,6 @@ use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Feature\RenameProviderInterface;
 use Symfony\Lsp\Feature\Route\RouteSnapshotImporter;
 use Symfony\Lsp\Feature\Security\SecurityUserProviderDeclaration;
-use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Feature\Translation\TranslationParameterAnalyzer;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
@@ -33,7 +32,9 @@ use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Twig\TwigStringDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlScalarDecoder;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectStateInterface;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Project\WorkspaceTrustManager;
@@ -98,6 +99,11 @@ final class ServiceConfigurationTest extends TestCase
             self::assertFalse($container->hasDefinition($class), \sprintf('The manually constructed class "%s" is registered as a service.', $class));
         }
 
+        self::assertTrue(
+            $container->getDefinition(ProjectAnalysisSettings::class)->hasTag('container.excluded'),
+            \sprintf('The value object "%s" is not excluded from service discovery.', ProjectAnalysisSettings::class),
+        );
+
         foreach ([
             PersistentSourceIndexStore::class,
             TranslationParameterAnalyzer::class,
@@ -135,10 +141,9 @@ final class ServiceConfigurationTest extends TestCase
             PersistentSourceIndexStore::class,
             ProjectIndexStatusRegistry::class,
             PublicAssetResolver::class,
-            RuntimeConfiguration::class,
+            AnalysisSettingsRegistry::class,
             SourceOverlayHealthRegistry::class,
             RuntimeSnapshotState::class,
-            TranslationConfigurationRegistry::class,
             WorkspaceTrust::class,
             WorkspaceTrustManager::class,
         ] as $service) {

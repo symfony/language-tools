@@ -19,6 +19,7 @@ use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\BridgeInstaller;
@@ -26,12 +27,12 @@ use Symfony\Lsp\Runtime\ContainerPathMapper;
 use Symfony\Lsp\Runtime\NativeProcessRunner;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Server\Utf8StringTruncator;
+use Symfony\Lsp\Tests\Support\RuntimeSettings;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 /**
@@ -64,11 +65,10 @@ final class ContainerProjectRootBridgeTest extends TestCase
         $hostRoot = $workspace->path('host');
         symlink($containerRoot, $hostRoot);
         $project = new Project($hostRoot, 'file://'.$hostRoot);
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure([
-            'environment' => 'test',
-            'containerProjectRoot' => $containerRoot,
-        ]);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(
+            containerProjectRoot: $containerRoot,
+            environment: 'test',
+        ));
         $pathMapper = new ContainerPathMapper($configuration);
         $templateIndexes = new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry());
         $assetIndexes = new AssetIndexRegistry();

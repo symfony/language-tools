@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Project;
 
 use Symfony\Component\Filesystem\Path;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 /**
  * Discovers the Symfony projects of a workspace and keeps the registry,
@@ -13,9 +12,6 @@ final class ProjectWorkspace
 {
     /** @var list<array{uri: string, name?: string}> */
     private array $folders = [];
-
-    /** @var array<array-key, mixed> */
-    private array $settings = [];
 
     /** @var list<string> */
     private array $projectRoots = [];
@@ -28,24 +24,22 @@ final class ProjectWorkspace
         private readonly ProjectRegistry $projects,
         private readonly ProjectSettings $projectSettings,
         private readonly ProjectStateCleaner $projectStateCleaner,
-        private readonly RuntimeConfiguration $runtimeConfiguration,
+        private readonly AnalysisSettingsRegistry $analysisSettings,
         private readonly UriToPathConverter $uriToPathConverter,
     ) {
     }
 
     /**
      * @param list<array{uri: string, name?: string}> $folders
-     * @param array<array-key, mixed>                 $settings
      * @param list<string>                            $projectRoots
      */
-    public function configure(array $folders, array $settings = [], array $projectRoots = [], ?string $configurationPath = null): void
+    public function configure(array $folders, ProjectAnalysisSettings $settings = new ProjectAnalysisSettings(), array $projectRoots = [], ?string $configurationPath = null): void
     {
         $this->folders = $folders;
-        $this->settings = $settings;
         $this->projectRoots = $projectRoots;
         $this->configurationPath = $configurationPath;
         $this->loadConfiguration();
-        $this->runtimeConfiguration->configure($settings);
+        $this->analysisSettings->configureWorkspace($settings);
     }
 
     /** @return list<array{uri: string, name?: string}> */
@@ -86,7 +80,7 @@ final class ProjectWorkspace
         foreach ($this->projects->replace($projects) as $removed) {
             $this->projectStateCleaner->remove($removed);
         }
-        $this->projectSettings->applyFileSettings($this->settings);
+        $this->projectSettings->applyFileSettings();
 
         return $projects;
     }

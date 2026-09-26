@@ -3,8 +3,6 @@
 namespace Symfony\Lsp\Project;
 
 use Symfony\Lsp\Client\ClientInterface;
-use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
 
 final class ProjectSettings
 {
@@ -13,8 +11,7 @@ final class ProjectSettings
     public function __construct(
         private readonly ClientInterface $client,
         private readonly ProjectRegistry $projects,
-        private readonly TranslationConfigurationRegistry $translationConfiguration,
-        private readonly RuntimeConfiguration $runtimeConfiguration,
+        private readonly AnalysisSettingsRegistry $settings,
         private readonly ProjectConfiguration $projectConfiguration,
         private readonly ProjectFileScopeRegistry $fileScope,
         private readonly AnalysisSettings $analysisSettings,
@@ -29,12 +26,10 @@ final class ProjectSettings
         $this->configurationSupported = \is_array($workspace) && true === ($workspace['configuration'] ?? null);
     }
 
-    /** @param array<array-key, mixed> $overrides */
-    public function applyFileSettings(array $overrides = []): void
+    public function applyFileSettings(): void
     {
-        $overrides = $this->analysisSettings->normalizeProject($overrides, false);
         foreach ($this->projects->all() as $project) {
-            $this->apply($project, $overrides);
+            $this->apply($project, new ProjectAnalysisSettings());
         }
     }
 
@@ -68,18 +63,13 @@ final class ProjectSettings
         }
     }
 
-    /** @param array<string, mixed> $overrides */
-    private function apply(Project $project, array $overrides): void
+    /** The editor settings of a project win over the workspace, which wins over its checked-in configuration. */
+    private function apply(Project $project, ProjectAnalysisSettings $editorSettings): void
     {
-        $settings = [
-            ...$this->projectConfiguration->settings($project),
-            ...$this->runtimeConfiguration->initializationSettings(),
-            ...$overrides,
-        ];
-        $this->translationConfiguration->configure($project, true === ($settings['translationDiagnostics'] ?? false));
-        /** @var list<string> $excludePaths */
-        $excludePaths = $settings['excludePaths'] ?? [];
-        $this->fileScope->configure($project, $excludePaths);
-        $this->runtimeConfiguration->configureProject($project, $settings);
+        $settings = $this->projectConfiguration->settings($project)
+            ->merge($this->settings->workspace())
+            ->merge($editorSettings);
+        $this->fileScope->configure($project, $settings->excludePaths ?? []);
+        $this->settings->configureProject($project, $settings);
     }
 }

@@ -49,13 +49,12 @@ final class ProjectConfigurationTest extends TestCase
         $project = new Project($this->workspace->path('apps/admin'), 'file:///workspace/apps/admin');
 
         self::assertSame(['.', 'apps/admin'], $this->configuration->projectRoots($this->workspace->rootPath));
-        self::assertSame([
-            'environment' => 'admin',
-            'bridgeTimeout' => 90.0,
-            'releaseMetadata' => false,
-            'excludePaths' => ['tests/Fixtures/**', 'var/generated/**'],
-            'translationDiagnostics' => true,
-        ], $this->configuration->settings($project));
+        $settings = $this->configuration->settings($project);
+        self::assertSame('admin', $settings->environment);
+        self::assertSame(90.0, $settings->bridgeTimeout);
+        self::assertFalse($settings->releaseMetadata);
+        self::assertSame(['tests/Fixtures/**', 'var/generated/**'], $settings->excludePaths);
+        self::assertTrue($settings->translationDiagnostics);
         self::assertSame('apps/admin', $this->configuration->projectId($project));
         self::assertSame('apps/admin/config/services.yaml', $this->configuration->workspaceRelativePath($project, $project->rootPath.'/config/services.yaml'));
     }
@@ -78,8 +77,8 @@ final class ProjectConfigurationTest extends TestCase
         }
 
         self::assertSame(
-            ['environment' => 'test'],
-            $this->configuration->settings(new Project($this->workspace->rootPath, 'file:///workspace')),
+            'test',
+            $this->configuration->settings(new Project($this->workspace->rootPath, 'file:///workspace'))->environment,
         );
     }
 

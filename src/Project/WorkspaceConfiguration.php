@@ -13,6 +13,7 @@ final class WorkspaceConfiguration
         private readonly WorkspaceTrustManager $workspaceTrustManager,
         private readonly RuntimeConfiguration $runtimeConfiguration,
         private readonly ProjectSettings $projectSettings,
+        private readonly AnalysisSettings $analysisSettings,
         private readonly PositionConverter $positionConverter,
     ) {
     }
@@ -29,7 +30,7 @@ final class WorkspaceConfiguration
         $settings = \is_array($initializationOptions) ? $initializationOptions : [];
         $this->workspace->configure(
             $this->workspaceFolders($params),
-            $settings,
+            $this->analysisSettings->normalizeProject($settings, false),
             $this->projectRoots($settings),
         );
         $this->workspace->discover();

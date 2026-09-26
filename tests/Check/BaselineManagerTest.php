@@ -15,6 +15,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class BaselineManagerTest extends TestCase
@@ -206,7 +207,7 @@ final class BaselineManagerTest extends TestCase
             null,
             [],
             [],
-            [],
+            new ProjectAnalysisSettings(),
             null,
             'baseline.json',
             $mode,

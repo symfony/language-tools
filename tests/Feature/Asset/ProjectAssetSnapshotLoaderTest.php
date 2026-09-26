@@ -6,7 +6,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\ProjectAssetSnapshotLoader;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
+use Symfony\Lsp\Tests\Support\RuntimeSettings;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ProjectAssetSnapshotLoaderTest extends TestCase
@@ -41,8 +42,7 @@ final class ProjectAssetSnapshotLoaderTest extends TestCase
     public function testMapsContainerSourcePathsToTheHost(): void
     {
         $project = new Project('/workspace', 'file:///workspace');
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => '/app']);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(containerProjectRoot: '/app'));
         $indexes = new AssetIndexRegistry();
         (new ProjectAssetSnapshotLoader($indexes))->load($project, SnapshotSections::of($project, [
             'assetsComplete' => true,

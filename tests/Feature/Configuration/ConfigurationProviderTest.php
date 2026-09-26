@@ -36,14 +36,15 @@ use Symfony\Lsp\Parser\Xml\XmlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\SavedDocumentMatcher;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\RuntimeSettings;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class ConfigurationProviderTest extends TestCase
@@ -1615,8 +1616,7 @@ final class ConfigurationProviderTest extends TestCase
         if (null !== $validation) {
             $validations->replace($project, $validation);
         }
-        $runtimeConfiguration = new RuntimeConfiguration();
-        $runtimeConfiguration->configure(['environment' => $environment]);
+        $runtimeConfiguration = RuntimeSettings::configuration(new ProjectAnalysisSettings(environment: $environment));
         (new ProjectConfigurationSnapshotLoader($indexes))->load($project, SnapshotSections::of($project, ['bundles' => [
             [
                 'alias' => 'framework',

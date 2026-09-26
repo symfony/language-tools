@@ -3,8 +3,8 @@
 namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\InvalidConfigurationException;
@@ -17,7 +17,6 @@ use Symfony\Lsp\Project\ProjectSettings;
 use Symfony\Lsp\Project\ProjectStateCleaner;
 use Symfony\Lsp\Project\ProjectWorkspace;
 use Symfony\Lsp\Project\UriToPathConverter;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\RecordingClient;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
@@ -125,7 +124,7 @@ final class ProjectWorkspaceTest extends TestCase
         $uriToPathConverter = new UriToPathConverter();
         $analysisSettings = new AnalysisSettings();
         $projectConfiguration = new ProjectConfiguration($uriToPathConverter, $analysisSettings);
-        $runtimeConfiguration = new RuntimeConfiguration();
+        $settings = new AnalysisSettingsRegistry();
 
         return new ProjectWorkspace(
             $projectConfiguration,
@@ -134,14 +133,13 @@ final class ProjectWorkspaceTest extends TestCase
             new ProjectSettings(
                 new RecordingClient(),
                 $this->registry,
-                new TranslationConfigurationRegistry(),
-                $runtimeConfiguration,
+                $settings,
                 $projectConfiguration,
                 new ProjectFileScopeRegistry(new GlobPatternCompiler()),
                 $analysisSettings,
             ),
             new ProjectStateCleaner(null === $state ? [] : [$state]),
-            $runtimeConfiguration,
+            $settings,
             $uriToPathConverter,
         );
     }

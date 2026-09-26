@@ -19,14 +19,20 @@ final class AnalysisSettings
         'excludePaths',
     ];
 
-    /**
-     * @param array<array-key, mixed> $settings
-     *
-     * @return array<string, mixed>
-     */
-    public function normalizeProject(array $settings, bool $strict = true, string $context = 'settings'): array
+    /** @param array<array-key, mixed> $settings */
+    public function normalizeProject(array $settings, bool $strict = true, string $context = 'settings'): ProjectAnalysisSettings
     {
-        $normalized = [];
+        $phpCommand = null;
+        $containerProjectRoot = null;
+        $environment = null;
+        $kernel = null;
+        $debug = null;
+        $runtimeIndexing = null;
+        $releaseMetadata = null;
+        $bridgeTimeout = null;
+        $translationDiagnostics = null;
+        $excludePaths = null;
+
         foreach ($settings as $name => $value) {
             if (!\is_string($name) || !\in_array($name, self::PROJECT_KEYS, true)) {
                 if ($strict) {
@@ -37,14 +43,17 @@ final class AnalysisSettings
             }
 
             try {
-                $normalized[$name] = match ($name) {
-                    'phpCommand' => $this->phpCommand($value, $context),
-                    'containerProjectRoot' => $this->containerProjectRoot($value, $context),
-                    'environment' => $this->environment($value, $context),
-                    'kernel' => $this->kernel($value, $context),
-                    'debug', 'runtimeIndexing', 'releaseMetadata', 'translationDiagnostics' => $this->boolean($name, $value, $context),
-                    'bridgeTimeout' => $this->positiveNumber($name, $value, $context),
-                    'excludePaths' => $this->excludePaths($value, $context),
+                match ($name) {
+                    'phpCommand' => $phpCommand = $this->phpCommand($value, $context),
+                    'containerProjectRoot' => $containerProjectRoot = $this->containerProjectRoot($value, $context),
+                    'environment' => $environment = $this->environment($value, $context),
+                    'kernel' => $kernel = $this->kernel($value, $context),
+                    'debug' => $debug = $this->boolean($name, $value, $context),
+                    'runtimeIndexing' => $runtimeIndexing = $this->boolean($name, $value, $context),
+                    'releaseMetadata' => $releaseMetadata = $this->boolean($name, $value, $context),
+                    'translationDiagnostics' => $translationDiagnostics = $this->boolean($name, $value, $context),
+                    'bridgeTimeout' => $bridgeTimeout = $this->positiveNumber($name, $value, $context),
+                    'excludePaths' => $excludePaths = $this->excludePaths($value, $context),
                 };
             } catch (InvalidConfigurationException $error) {
                 if ($strict) {
@@ -53,13 +62,27 @@ final class AnalysisSettings
             }
         }
 
-        return $normalized;
+        return new ProjectAnalysisSettings(
+            $phpCommand,
+            $containerProjectRoot,
+            $environment,
+            $kernel,
+            $debug,
+            $runtimeIndexing,
+            $releaseMetadata,
+            $bridgeTimeout,
+            $translationDiagnostics,
+            $excludePaths,
+        );
     }
 
     /**
+     * The PHP command is also configured on its own, as the command line option
+     * and as the default the Symfony CLI provides.
+     *
      * @return non-empty-list<string>
      */
-    private function phpCommand(mixed $value, string $context): array
+    public function phpCommand(mixed $value, string $context = 'settings'): array
     {
         if (!\is_array($value) || [] === $value || !array_is_list($value)) {
             throw new InvalidConfigurationException(\sprintf('The %s option "phpCommand" must be a non-empty list of strings.', $context));
@@ -73,10 +96,11 @@ final class AnalysisSettings
         return $value;
     }
 
-    private function containerProjectRoot(mixed $value, string $context): ?string
+    /** An empty value configures no container root, which clears the one another source configured. */
+    private function containerProjectRoot(mixed $value, string $context): string
     {
         if (null === $value || '' === $value) {
-            return null;
+            return '';
         }
         if (!\is_string($value) || !Path::isAbsolute($value)) {
             throw new InvalidConfigurationException(\sprintf('The %s option "containerProjectRoot" must be an absolute path or null.', $context));

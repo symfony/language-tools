@@ -4,7 +4,8 @@ namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
+use Symfony\Lsp\Tests\Support\RuntimeSettings;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 
 final class SnapshotSectionTest extends TestCase
@@ -117,8 +118,7 @@ final class SnapshotSectionTest extends TestCase
 
     public function testMapsContainerPathsBackToTheHost(): void
     {
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => '/app']);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(containerProjectRoot: '/app'));
         $section = SnapshotSections::of($this->project(), [
             'file' => '/app/src/Entity/Book.php',
             'outside' => '/opt/other/file.php',
@@ -135,8 +135,7 @@ final class SnapshotSectionTest extends TestCase
 
     public function testMapsPathsOfNestedItemsTheSameWay(): void
     {
-        $configuration = new RuntimeConfiguration();
-        $configuration->configure(['containerProjectRoot' => '/app']);
+        $configuration = RuntimeSettings::configuration(new ProjectAnalysisSettings(containerProjectRoot: '/app'));
         $section = SnapshotSections::of($this->project(), [
             'assets' => [['sourcePath' => '/app/assets/app.js']],
         ], $configuration);

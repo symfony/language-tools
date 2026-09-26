@@ -33,10 +33,11 @@ use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectTestKit;
@@ -541,7 +542,7 @@ YAML;
             ->index()
             ->runtime('messenger', ['transports' => [['name' => 'async', 'failure' => false]], 'complete' => true])
         ;
-        $kit->get(RuntimeConfiguration::class)->configure(['environment' => $environment]);
+        $kit->get(AnalysisSettingsRegistry::class)->configureWorkspace(new ProjectAnalysisSettings(environment: $environment));
 
         self::assertSame($expectedCodes, $kit->codes($kit->get(MessengerDiagnosticProvider::class)->diagnostics(LspRequests::document($uri))));
     }

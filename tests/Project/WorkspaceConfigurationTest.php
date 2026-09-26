@@ -6,9 +6,9 @@ use Amp\Cancellation;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\InvalidConfigurationException;
@@ -54,8 +54,8 @@ final class WorkspaceConfigurationTest extends TestCase
     public function testUsesRootUriWhenWorkspaceFoldersAreAbsent(): void
     {
         $registry = new ProjectRegistry();
-        $runtimeConfiguration = new RuntimeConfiguration();
-        $configuration = $this->workspaceConfiguration($registry, $runtimeConfiguration);
+        $runtimeConfiguration = new RuntimeConfiguration($settings = new AnalysisSettingsRegistry());
+        $configuration = $this->workspaceConfiguration($registry, $settings);
 
         $configuration->initialize([
             'rootUri' => 'file://'.$this->workspace->rootPath,
@@ -85,8 +85,8 @@ final class WorkspaceConfigurationTest extends TestCase
             'runtimeIndexing' => false,
         ], \JSON_THROW_ON_ERROR));
         $registry = new ProjectRegistry();
-        $runtimeConfiguration = new RuntimeConfiguration();
-        $configuration = $this->workspaceConfiguration($registry, $runtimeConfiguration);
+        $runtimeConfiguration = new RuntimeConfiguration($settings = new AnalysisSettingsRegistry());
+        $configuration = $this->workspaceConfiguration($registry, $settings);
 
         $configuration->initialize([
             'rootUri' => 'file://'.$this->workspace->rootPath,
@@ -100,7 +100,7 @@ final class WorkspaceConfigurationTest extends TestCase
 
     public function testRejectsEveryInvalidInitializationProjectRoot(): void
     {
-        $configuration = $this->workspaceConfiguration(new ProjectRegistry(), new RuntimeConfiguration());
+        $configuration = $this->workspaceConfiguration(new ProjectRegistry(), new AnalysisSettingsRegistry());
 
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('The project root "missing" was not discovered as a Symfony project.');
@@ -113,7 +113,7 @@ final class WorkspaceConfigurationTest extends TestCase
 
     public function testRejectsInitializationProjectRootsOutsideEveryWorkspaceFolder(): void
     {
-        $configuration = $this->workspaceConfiguration(new ProjectRegistry(), new RuntimeConfiguration());
+        $configuration = $this->workspaceConfiguration(new ProjectRegistry(), new AnalysisSettingsRegistry());
         $outside = \dirname($this->workspace->rootPath);
 
         $this->expectException(InvalidConfigurationException::class);
@@ -129,7 +129,7 @@ final class WorkspaceConfigurationTest extends TestCase
     {
         $registry = new ProjectRegistry();
         $state = new RecordingProjectState();
-        $configuration = $this->workspaceConfiguration($registry, new RuntimeConfiguration(), $state);
+        $configuration = $this->workspaceConfiguration($registry, new AnalysisSettingsRegistry(), $state);
         $rootUri = 'file://'.$this->workspace->rootPath;
         $configuration->initialize(['workspaceFolders' => [['uri' => $rootUri]]]);
         $this->workspace->mkdir('nested');
@@ -154,7 +154,7 @@ final class WorkspaceConfigurationTest extends TestCase
     {
         $registry = new ProjectRegistry();
         $state = new RecordingProjectState();
-        $configuration = $this->workspaceConfiguration($registry, new RuntimeConfiguration(), $state);
+        $configuration = $this->workspaceConfiguration($registry, new AnalysisSettingsRegistry(), $state);
         $rootUri = 'file://'.$this->workspace->rootPath;
         $configuration->initialize(['workspaceFolders' => [['uri' => $rootUri]]]);
 
@@ -164,12 +164,13 @@ final class WorkspaceConfigurationTest extends TestCase
         self::assertSame([], $state->removed);
     }
 
-    private function workspaceConfiguration(ProjectRegistry $registry, RuntimeConfiguration $runtimeConfiguration, ?ProjectStateInterface $state = null): WorkspaceConfiguration
+    private function workspaceConfiguration(ProjectRegistry $registry, AnalysisSettingsRegistry $settings, ?ProjectStateInterface $state = null): WorkspaceConfiguration
     {
         $uriToPathConverter = new UriToPathConverter();
         $analysisSettings = new AnalysisSettings();
         $projectConfiguration = new ProjectConfiguration($uriToPathConverter, $analysisSettings);
-        $projectSettings = new ProjectSettings($this->client(), $registry, new TranslationConfigurationRegistry(), $runtimeConfiguration, $projectConfiguration, new ProjectFileScopeRegistry(new GlobPatternCompiler()), $analysisSettings);
+        $projectSettings = new ProjectSettings($this->client(), $registry, $settings, $projectConfiguration, new ProjectFileScopeRegistry(new GlobPatternCompiler()), $analysisSettings);
+        $runtimeConfiguration = new RuntimeConfiguration($settings);
 
         return new WorkspaceConfiguration(
             new ProjectWorkspace(
@@ -178,13 +179,14 @@ final class WorkspaceConfigurationTest extends TestCase
                 $registry,
                 $projectSettings,
                 new ProjectStateCleaner(null === $state ? [] : [$state]),
-                $runtimeConfiguration,
+                $settings,
                 $uriToPathConverter,
             ),
             $registry,
             new WorkspaceTrustManager($this->client(), new WorkspaceTrust(), $this->runtimeInitializer(), new ProjectIndexStatusRegistry(), $runtimeConfiguration, $registry),
             $runtimeConfiguration,
             $projectSettings,
+            $analysisSettings,
             new PositionConverter(),
         );
     }

@@ -14,6 +14,8 @@ use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
+use Symfony\Lsp\Project\AnalysisSettingsRegistry;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\LspRequestFactory;
 
@@ -25,7 +27,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TranslationIndexRegistry $indexes,
-        private readonly TranslationConfigurationRegistry $configuration,
+        private readonly AnalysisSettingsRegistry $settings,
         private readonly CommentParserRegistry $comments,
         private readonly TranslationReferenceResolver $referenceResolver,
         private readonly TwigDirectiveLocator $directives,
@@ -176,7 +178,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         $diagnostics = [];
         foreach ($facts instanceof TranslationSourceFacts ? $facts->references : [] as $reference) {
             if ($index->isComplete() && !\in_array($reference->domain, $index->domains(), true)) {
-                if ($this->configuration->missingKeyDiagnostics($request->project)) {
+                if ($this->missingKeyDiagnostics($request->project)) {
                     $diagnostics[] = $this->diagnostic(
                         $reference,
                         'translation.domain_not_found',
@@ -190,7 +192,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
             $messages = $index->messages($reference->domain, $reference->key);
             $declarations = $index->declarations($reference->domain, $reference->key);
             if ([] === $messages && [] === $declarations) {
-                if ($this->configuration->missingKeyDiagnostics($request->project) && $index->isComplete()) {
+                if ($this->missingKeyDiagnostics($request->project) && $index->isComplete()) {
                     $diagnostics[] = $this->diagnostic(
                         $reference,
                         'translation.not_found',
@@ -222,6 +224,11 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         }
 
         return $diagnostics;
+    }
+
+    private function missingKeyDiagnostics(Project $project): bool
+    {
+        return true === $this->settings->forProject($project)->translationDiagnostics;
     }
 
     /** @param array<array-key, mixed> $params */
