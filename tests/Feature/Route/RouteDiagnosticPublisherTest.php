@@ -176,12 +176,20 @@ final class RouteDiagnosticPublisherTest extends TestCase
             {{ path('dynamic_argument', parameters) }}
             {{ path('dynamic_key', {(parameter): value}) }}
             {{ path('dynamic_spread', { year, ...parameters}) }}
+            {{ path('dynamic_named', parameters: params) }}
+            {{ path('dynamic_sequence', parameters: [1]) }}
+            {{ path('dynamic_concatenation', parameters: x ~ y) }}
+            {{ url('dynamic_method_call', parameters: app.request.attributes.get('_route_params')) }}
             TWIG, [
             new Route('complete', '/{version}', [], [], null, null),
             new Route('incomplete', '/{year}/{month}', [], [], null, null),
             new Route('dynamic_argument', '/{id}', [], [], null, null),
             new Route('dynamic_key', '/{id}', [], [], null, null),
             new Route('dynamic_spread', '/{year}/{month}', [], [], null, null),
+            new Route('dynamic_named', '/{id}', [], [], null, null),
+            new Route('dynamic_sequence', '/{id}', [], [], null, null),
+            new Route('dynamic_concatenation', '/{id}', [], [], null, null),
+            new Route('dynamic_method_call', '/{id}', [], [], null, null),
         ], 'twig');
 
         $publisher->publish($uri);

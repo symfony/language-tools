@@ -6,6 +6,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
+use Symfony\Lsp\Parser\Twig\TwigCallArgument;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
@@ -35,7 +36,7 @@ final class TwigRouteReferenceExtractor
                     $this->positionConverter->toPosition($source->text, $route->startOffset),
                     $this->positionConverter->toPosition($source->text, $route->endOffset),
                 ),
-                providedParameters: $this->providedParameters($document, $call->argument(1, 'parameters')?->node),
+                providedParameters: $this->providedParameters($document, $call->argument(1, 'parameters')),
             );
         }
 
@@ -56,10 +57,14 @@ final class TwigRouteReferenceExtractor
     }
 
     /** @return list<string>|null */
-    private function providedParameters(TwigDocument $document, ?TreeSitterNode $argument): ?array
+    private function providedParameters(TwigDocument $document, ?TwigCallArgument $parameters): ?array
     {
-        if (null === $argument) {
+        if (null === $parameters) {
             return [];
+        }
+        $argument = $parameters->node;
+        if (null === $argument) {
+            return null;
         }
         $value = trim($document->text($argument));
         if (!str_starts_with($value, '{') || !str_ends_with($value, '}')) {
