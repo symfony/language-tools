@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 
@@ -13,7 +12,6 @@ final class TwigComponentTemplateExtractor
         private readonly PositionConverter $converter,
         private readonly TwigComponentNameResolver $names,
         private readonly TwigDocumentParser $parser,
-        private readonly TwigCallArgumentResolver $arguments,
     ) {
     }
 
@@ -53,15 +51,9 @@ final class TwigComponentTemplateExtractor
             }
         }
 
-        foreach ($document->nodesOfType('function_call') as $call) {
-            $identifier = $document->directChild($call, 'function_identifier');
-            if (null === $identifier) {
-                continue;
-            }
-            $function = $document->text($identifier);
-            if ('component' === $function) {
-                $argument = $this->arguments->resolve($document, $call)->get(0, 'name');
-                $literal = null === $argument ? null : $document->soleStringLiteral($argument);
+        foreach ($document->calls('component', 'live_action') as $call) {
+            if ('component' === $call->name) {
+                $literal = $call->argument(0, 'name')?->literal();
                 if (null !== $literal) {
                     $references[] = new TwigComponentReference(
                         $literal->value,
@@ -69,9 +61,8 @@ final class TwigComponentTemplateExtractor
                         $this->converter->toRange($text, $literal->startOffset, $literal->endOffset - $literal->startOffset),
                     );
                 }
-            } elseif ('live_action' === $function && null !== $name) {
-                $argument = $this->arguments->resolve($document, $call)->get(0, 'actionName');
-                $literal = null === $argument ? null : $document->soleStringLiteral($argument);
+            } elseif (null !== $name) {
+                $literal = $call->argument(0, 'actionName')?->literal();
                 if (null !== $literal) {
                     $action = $this->liveActionName($literal->value);
                     $offset = $literal->startOffset + (int) strrpos($literal->value, $action);

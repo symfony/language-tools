@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterNode;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocument;
 use Symfony\Lsp\Parser\Twig\TwigStringLiteral;
 
@@ -12,7 +11,6 @@ final class TwigPhpSymbolReferenceExtractor
 {
     public function __construct(
         private readonly PositionConverter $converter,
-        private readonly TwigCallArgumentResolver $arguments,
     ) {
     }
 
@@ -20,21 +18,16 @@ final class TwigPhpSymbolReferenceExtractor
     public function extract(string $uri, string $text, TwigDocument $document): array
     {
         $references = [];
-        foreach ($document->nodesOfType('function_call') as $call) {
-            $function = $document->directChild($call, 'function_identifier');
-            if (null === $function || !\in_array($name = $document->text($function), ['constant', 'enum', 'enum_cases'], true)) {
-                continue;
-            }
-            $arguments = $this->arguments->resolve($document, $call);
-            $argument = $arguments->get(0, 'constant' === $name ? 'constant' : 'enum');
-            $literal = null === $argument ? null : $document->soleStringLiteral($argument);
+        foreach ($document->calls('constant', 'enum', 'enum_cases') as $call) {
+            $name = $call->name;
+            $literal = $call->argument(0, 'constant' === $name ? 'constant' : 'enum')?->literal();
             if (null === $literal) {
                 continue;
             }
             if ('constant' === $name) {
                 $references = [...$references, ...$this->constantReferences($literal, $uri, $text)];
             } else {
-                $references = [...$references, ...$this->enumReferences($name, $literal, $call, $uri, $text)];
+                $references = [...$references, ...$this->enumReferences($name, $literal, $call->node, $uri, $text)];
             }
         }
         usort($references, static fn (TwigPhpSymbolReference $left, TwigPhpSymbolReference $right): int => [$left->range->start->line, $left->range->start->character] <=> [$right->range->start->line, $right->range->start->character]);

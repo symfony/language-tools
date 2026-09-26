@@ -13,7 +13,6 @@ use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
 final class TemplateReferenceExtractor
@@ -23,7 +22,6 @@ final class TemplateReferenceExtractor
     public function __construct(
         private readonly PositionConverter $positionConverter,
         private readonly TwigDocumentParser $twigParser,
-        private readonly TwigCallArgumentResolver $twigArguments,
         private readonly PhpParserInterface $phpParser,
         private readonly TemplatePhpReferenceResolver $phpReferences,
     ) {
@@ -163,18 +161,8 @@ final class TemplateReferenceExtractor
             }
             $references[] = $this->reference($target->value, $uri, $text, $target->startOffset, $target->endOffset);
         }
-        foreach ($document->nodesOfType('function_call') as $call) {
-            $name = $document->directChild($call, 'function_identifier');
-            if (null === $name) {
-                continue;
-            }
-            $function = $document->text($name);
-            if (!\in_array($function, ['include', 'source'], true)) {
-                continue;
-            }
-            $arguments = $this->twigArguments->resolve($document, $call);
-            $argument = $arguments->get(0, 'include' === $function ? 'template' : 'name');
-            $literal = null === $argument ? null : $document->soleStringLiteral($argument);
+        foreach ($document->calls('include', 'source') as $call) {
+            $literal = $call->argument(0, 'include' === $call->name ? 'template' : 'name')?->literal();
             if (null !== $literal) {
                 $references[] = $this->reference($literal->value, $uri, $text, $literal->startOffset, $literal->endOffset);
             }

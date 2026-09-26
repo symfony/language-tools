@@ -49,7 +49,6 @@ use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
@@ -797,7 +796,6 @@ final class TemplateProviderTest extends TestCase
                 $converter,
                 $names,
                 new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()),
-                new TwigCallArgumentResolver(),
             ),
         );
     }
@@ -1425,7 +1423,6 @@ final class TemplateProviderTest extends TestCase
         return new TemplateReferenceExtractor(
             $converter,
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments ?? new TwigCommentParser(), new TwigDirectiveLocator()),
-            new TwigCallArgumentResolver(),
             $parser ?? new TolerantPhpParser(new Parser()),
             new TemplatePhpReferenceResolver(),
         );
