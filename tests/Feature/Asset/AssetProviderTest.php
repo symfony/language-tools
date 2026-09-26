@@ -3,53 +3,16 @@
 namespace Symfony\Lsp\Tests\Feature\Asset;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Feature\Asset\Asset;
-use Symfony\Lsp\Feature\Asset\AssetCompletionContextResolver;
 use Symfony\Lsp\Feature\Asset\AssetExtractor;
-use Symfony\Lsp\Feature\Asset\AssetIndexRegistry;
 use Symfony\Lsp\Feature\Asset\AssetProvider;
-use Symfony\Lsp\Feature\Asset\AssetSourceIndexRegistry;
-use Symfony\Lsp\Feature\Asset\ImportMapEntry;
-use Symfony\Lsp\Feature\Asset\ImportMapEntrypointExtractor;
 use Symfony\Lsp\Feature\Asset\PublicAssetResolver;
-use Symfony\Lsp\Feature\Asset\TwigAssetReferenceExtractor;
-use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Twig\TwigCommentParser;
-use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
-use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Project\UriToPathConverter;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\LspRequests;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class AssetProviderTest extends TestCase
 {
     public function testProvidesAssetsAndImportmapEntrypoints(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
-        $project = new Project('/workspace', 'file:///workspace');
-        $projects = new ProjectRegistry();
-        $projects->replace([$project]);
-        $indexes = new AssetIndexRegistry();
-        $indexes->forProject($project)->replace(
-            [new Asset('images/logo.svg', '/workspace/assets/images/logo.svg', false)],
-            [
-                new ImportMapEntry('app', './assets/app.js', true, null),
-                new ImportMapEntry('stimulus', '@hotwired/stimulus', false, '3.2.2'),
-            ],
-            true,
-            true,
-        );
         $importMapUri = 'file:///workspace/importmap.php';
         $importMapText = <<<'PHP'
             <?php
@@ -71,76 +34,54 @@ final class AssetProviderTest extends TestCase
             {{ asset('legacy/logo.svg', 'legacy') }}
             {{ asset('/public/logo.svg') }}
             TWIG;
-        $sourceIndexes = new AssetSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace(
-            $extractor->extract(new SourceDocument($importMapUri, 'php', $importMapText)),
-            $extractor->extract(new SourceDocument($usageUri, 'twig', $usageText)),
-        );
-        $documents = new DocumentStore();
-        $documents->open(new Document($importMapUri, 'php', 1, $importMapText));
-        $documents->open(new Document($usageUri, 'twig', 1, $usageText));
-        $provider = new AssetProvider(
-            new PositionedSourceSymbolResolver($converter),
-            new UriToPathConverter(),
-            new LspProtocolMapper(),
-            $indexes,
-            $sourceIndexes,
-            $extractor,
-            new PublicAssetResolver(),
-        );
-        $requests = new ProviderRequests($documents, $projects);
+        $kit = (new ProjectTestKit())
+            ->open($importMapUri, $importMapText)
+            ->open($usageUri, $usageText)
+            ->index()
+            ->runtime('assets', [
+                'assetsComplete' => true,
+                'importMapComplete' => true,
+                'assets' => [['logicalPath' => 'images/logo.svg', 'sourcePath' => '/workspace/assets/images/logo.svg', 'vendor' => false]],
+                'importMap' => [
+                    ['name' => 'app', 'path' => './assets/app.js', 'entrypoint' => true, 'version' => null],
+                    ['name' => 'stimulus', 'path' => '@hotwired/stimulus', 'entrypoint' => false, 'version' => '3.2.2'],
+                ],
+            ])
+        ;
+        $provider = $kit->get(AssetProvider::class);
 
-        $assetCompletionUri = 'file:///workspace/templates/asset.html.twig';
-        $assetCompletionText = "{{ asset('images/lo";
-        $documents->open(new Document($assetCompletionUri, 'twig', 1, $assetCompletionText));
-        self::assertSame(['images/logo.svg'], $this->completionLabels($provider, $requests, $converter, $assetCompletionUri, $assetCompletionText));
+        self::assertSame(['images/logo.svg'], $this->completeAtEnd($kit, 'file:///workspace/templates/asset.html.twig', "{{ asset('images/lo"));
 
         foreach (["{{ asset(path: 'images/lo", "{{ asset(path = 'images/lo"] as $index => $namedAssetCompletionText) {
-            $namedAssetCompletionUri = 'file:///workspace/templates/named-asset-'.$index.'.html.twig';
-            $documents->open(new Document($namedAssetCompletionUri, 'twig', 1, $namedAssetCompletionText));
-            self::assertSame(['images/logo.svg'], $this->completionLabels($provider, $requests, $converter, $namedAssetCompletionUri, $namedAssetCompletionText));
+            self::assertSame(['images/logo.svg'], $this->completeAtEnd($kit, 'file:///workspace/templates/named-asset-'.$index.'.html.twig', $namedAssetCompletionText));
         }
 
-        $entryCompletionUri = 'file:///workspace/templates/entrypoint.html.twig';
-        $entryCompletionText = "{{ importmap(['ap";
-        $documents->open(new Document($entryCompletionUri, 'twig', 1, $entryCompletionText));
-        self::assertSame(['app'], $this->completionLabels($provider, $requests, $converter, $entryCompletionUri, $entryCompletionText));
+        self::assertSame(['app'], $this->completeAtEnd($kit, 'file:///workspace/templates/entrypoint.html.twig', "{{ importmap(['ap"));
 
         $commentUri = 'file:///workspace/templates/comment.html.twig';
-        $commentText = "{## {{ asset('images/lo') }} #}";
-        $documents->open(new Document($commentUri, 'twig', 1, $commentText));
-        $commentOffset = strpos($commentText, 'images/lo') + \strlen('images/lo');
-        self::assertSame([], $provider->complete($requests->positioned(LspRequests::offset($commentUri, $commentText, $commentOffset))));
+        $kit->open($commentUri, "{## {{ asset('images/lo') }} #}");
+        self::assertSame([], $provider->complete($kit->positioned($kit->after($commentUri, 'images/lo'))));
 
         $markupUri = 'file:///workspace/templates/markup.html.twig';
         $markupText = "<p>Call asset('images/lo";
-        $documents->open(new Document($markupUri, 'twig', 1, $markupText));
-        self::assertSame([], $provider->complete($requests->positioned(LspRequests::offset($markupUri, $markupText, \strlen($markupText)))));
+        $kit->open($markupUri, $markupText);
+        self::assertSame([], $provider->complete($kit->positioned($kit->offset($markupUri, \strlen($markupText)))));
 
-        $assetOffset = strpos($usageText, 'images/logo.svg') + 2;
-        $assetParams = LspRequests::offset($usageUri, $usageText, $assetOffset);
-        $assetHover = $provider->hover($requests->positioned($assetParams));
-        self::assertIsArray($assetHover);
-        self::assertIsArray($assetHover['contents'] ?? null);
-        self::assertIsString($assetHover['contents']['value'] ?? null);
-        self::assertStringContainsString('AssetMapper asset', $assetHover['contents']['value']);
-        self::assertSame(['file:///workspace/assets/images/logo.svg'], array_column($provider->definition($requests->positioned($assetParams)), 'uri'));
-        self::assertCount(1, $provider->references($requests->references($assetParams)));
+        $assetParams = $kit->offset($usageUri, strpos($usageText, 'images/logo.svg') + 2);
+        self::assertStringContainsString('AssetMapper asset', $kit->hoverText($provider->hover($kit->positioned($assetParams))));
+        self::assertSame(['file:///workspace/assets/images/logo.svg'], $kit->targets($provider->definition($kit->positioned($assetParams))));
+        self::assertCount(1, $provider->references($kit->references($assetParams)));
 
-        $entryOffset = strpos($usageText, "'app'") + 2;
-        $entryParams = LspRequests::offset($usageUri, $usageText, $entryOffset);
-        self::assertSame([$importMapUri], array_column($provider->definition($requests->positioned($entryParams)), 'uri'));
-        self::assertCount(2, $provider->references($requests->references($entryParams)));
-        self::assertCount(2, $provider->links($requests->document($usageUri)));
-        $diagnostics = $provider->diagnostics($requests->document($usageUri));
-        self::assertIsArray($diagnostics);
-        self::assertSame(['importmap.unknown_entrypoint'], array_column($diagnostics, 'code'));
+        $entryParams = $kit->offset($usageUri, strpos($usageText, "'app'") + 2);
+        self::assertSame([$importMapUri], $kit->targets($provider->definition($kit->positioned($entryParams))));
+        self::assertCount(2, $provider->references($kit->references($entryParams)));
+        self::assertCount(2, $provider->links($kit->document($usageUri)));
+        self::assertSame(['importmap.unknown_entrypoint'], $kit->codes($provider->diagnostics($kit->document($usageUri))));
     }
 
     public function testExtractsStaticTwigAssetArgumentsConservatively(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
 
         $facts = $extractor->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
             {# {{ asset(path: 'commented.js') }} #}
@@ -164,8 +105,7 @@ final class AssetProviderTest extends TestCase
 
     public function testExtractsStaticTwigImportmapEntrypointsConservatively(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
 
         $facts = $extractor->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', <<<'TWIG'
             {# {{ importmap('commented') }} #}
@@ -189,22 +129,11 @@ final class AssetProviderTest extends TestCase
 
     public function testDecodesEscapedTwigAssetPaths(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
 
         $facts = $extractor->extract(new SourceDocument('file:///workspace/templates/page.html.twig', 'twig', "{{ asset('it\\'s.js') }}"));
 
         self::assertSame(["it's.js"], array_map(static fn ($symbol): string => $symbol->name, $facts->symbols));
-    }
-
-    /** @return list<string> */
-    private function completionLabels(AssetProvider $provider, ProviderRequests $requests, PositionConverter $converter, string $uri, string $text): array
-    {
-        $position = $converter->toPosition($text, \strlen($text));
-        /** @var list<string> $labels */
-        $labels = array_column($provider->complete($requests->positioned(LspRequests::position($uri, $position))), 'label');
-
-        return $labels;
     }
 
     public function testFallsBackToPublicFilesWithoutAssetMapper(): void
@@ -213,46 +142,25 @@ final class AssetProviderTest extends TestCase
         mkdir($root.'/public/css', 0o777, true);
         file_put_contents($root.'/public/css/app.css', 'body {}');
         try {
-            $converter = new PositionConverter();
-            $extractor = $this->createExtractor($converter);
             $rootUri = 'file://'.$root;
-            $project = new Project($root, $rootUri);
-            $projects = new ProjectRegistry();
-            $projects->replace([$project]);
             $uri = $rootUri.'/templates/layout.html.twig';
             $text = "<link href=\"{{ asset('css/app.css') }}\">\n{{ asset('css/missing.css') }}\n";
-            $documents = new DocumentStore();
-            $documents->open(new Document($uri, 'twig', 1, $text));
-            $publicAssets = new PublicAssetResolver();
-            $provider = new AssetProvider(
-                new PositionedSourceSymbolResolver($converter),
-                new UriToPathConverter(),
-                new LspProtocolMapper(),
-                new AssetIndexRegistry(),
-                new AssetSourceIndexRegistry(),
-                $extractor,
-                $publicAssets,
-            );
-            $requests = new ProviderRequests($documents, $projects);
+            $kit = (new ProjectTestKit($root))->open($uri, $text);
+            $provider = $kit->get(AssetProvider::class);
 
-            $params = LspRequests::offset($uri, $text, strpos($text, 'css/app.css') + 2);
-            $hover = $provider->hover($requests->positioned($params));
-            self::assertIsArray($hover);
-            self::assertIsArray($hover['contents'] ?? null);
-            self::assertIsString($hover['contents']['value'] ?? null);
-            self::assertStringContainsString('Public asset', $hover['contents']['value']);
-            self::assertSame(['file://'.$root.'/public/css/app.css'], array_column($provider->definition($requests->positioned($params)), 'uri'));
-            self::assertSame([], $provider->definition($requests->positioned(LspRequests::offset($uri, $text, strpos($text, 'css/missing.css') + 2))));
+            $params = $kit->offset($uri, strpos($text, 'css/app.css') + 2);
+            self::assertStringContainsString('Public asset', $kit->hoverText($provider->hover($kit->positioned($params))));
+            self::assertSame(['file://'.$root.'/public/css/app.css'], $kit->targets($provider->definition($kit->positioned($params))));
+            self::assertSame([], $provider->definition($kit->positioned($kit->offset($uri, strpos($text, 'css/missing.css') + 2))));
 
             $completionUri = $rootUri.'/templates/completion.html.twig';
             $completionText = "{{ asset('css/";
-            $documents->open(new Document($completionUri, 'twig', 1, $completionText));
-            self::assertSame(['css/app.css'], $this->completionLabels($provider, $requests, $converter, $completionUri, $completionText));
+            self::assertSame(['css/app.css'], $this->completeAtEnd($kit, $completionUri, $completionText));
 
             unlink($root.'/public/css/app.css');
             file_put_contents($root.'/public/css/admin.css', 'body {}');
-            $publicAssets->removeProject($project);
-            self::assertSame(['css/admin.css'], $this->completionLabels($provider, $requests, $converter, $completionUri, $completionText));
+            $kit->get(PublicAssetResolver::class)->removeProject($kit->project());
+            self::assertSame(['css/admin.css'], $this->completeAtEnd($kit, $completionUri, $completionText));
         } finally {
             @unlink($root.'/public/css/app.css');
             @unlink($root.'/public/css/admin.css');
@@ -262,18 +170,16 @@ final class AssetProviderTest extends TestCase
         }
     }
 
-    private function createExtractor(PositionConverter $converter): AssetExtractor
+    /** @return list<mixed> */
+    private function completeAtEnd(ProjectTestKit $kit, string $uri, string $text): array
     {
-        $comments = new TwigCommentParser();
+        $kit->open($uri, $text);
 
-        return new AssetExtractor(
-            new UriToPathConverter(),
-            new TwigAssetReferenceExtractor(
-                $converter,
-                new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments, new TwigDirectiveLocator()),
-            ),
-            new ImportMapEntrypointExtractor($converter, new PhpCommentParser()),
-            new AssetCompletionContextResolver($converter, $comments, new TwigDirectiveLocator()),
-        );
+        return $kit->labels($kit->get(AssetProvider::class)->complete($kit->positioned($kit->offset($uri, \strlen($text)))));
+    }
+
+    private function extractor(): AssetExtractor
+    {
+        return (new ProjectTestKit())->get(AssetExtractor::class);
     }
 }
