@@ -14,6 +14,7 @@ final class XmlDependencyInjectionExtractor
 
     public function __construct(
         private readonly PositionConverter $positionConverter,
+        private readonly ParameterExpressionScanner $parameterExpressions,
         private readonly XmlParserInterface $parser = new TolerantXmlParser(),
     ) {
     }
@@ -159,21 +160,16 @@ final class XmlDependencyInjectionExtractor
     /** @return list<DependencyInjectionReference> */
     private function parameterReferences(string $uri, string $text, string $value, int $valueOffset): array
     {
-        preg_match_all('/%%|%([^%\s"<>]+)%/', $value, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $references = [];
-        foreach ($matches as $match) {
-            if (!isset($match[1])) {
-                continue;
-            }
-            [$name, $offset] = $match[1];
-            if (str_starts_with($name, 'env(')) {
+        foreach ($this->parameterExpressions->scan($value, $valueOffset) as $parameter) {
+            if (str_starts_with($parameter->name, 'env(')) {
                 continue;
             }
             $references[] = new DependencyInjectionReference(
                 DependencyInjectionSymbolKind::Parameter,
-                $name,
+                $parameter->name,
                 $uri,
-                $this->positionConverter->toRange($text, $valueOffset + $offset, \strlen($name)),
+                $this->positionConverter->toRange($text, $parameter->nameStartOffset, \strlen($parameter->name)),
             );
         }
 

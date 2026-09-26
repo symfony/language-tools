@@ -23,6 +23,7 @@ use Symfony\Lsp\Feature\Configuration\ProjectConfigurationSnapshotLoader;
 use Symfony\Lsp\Feature\Configuration\XmlConfigurationAnalyzer;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\Configuration\YamlIndentationAnalyzer;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
@@ -1755,7 +1756,7 @@ final class ConfigurationProviderTest extends TestCase
         $php = new PhpConfigurationAnalyzer(new TolerantPhpParser(new Parser()), $phpComments);
         $xml = new XmlConfigurationAnalyzer($xmlParser, $xmlComments);
         $yaml = new YamlConfigurationParser($converter, $documentParser);
-        $values = new ConfigurationValueValidator($environmentIndexes, new EnvironmentExpressionParser());
+        $values = new ConfigurationValueValidator($environmentIndexes, new EnvironmentExpressionParser(new ParameterExpressionScanner()));
         $validationReconciler = new ConfigurationValidationReconciler(
             $validations,
             new SavedDocumentMatcher(ProjectPaths::resolver()),

@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
@@ -75,10 +76,10 @@ final class DependencyInjectionDocumentExtractorTest extends TestCase
             new YamlDependencyInjectionExtractor(
                 new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
                 new YamlDependencyInjectionDeclarationExtractor($converter),
-                new YamlDependencyInjectionReferenceExtractor($converter),
+                new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
             ),
-            new XmlDependencyInjectionExtractor($converter),
-            new PhpAutowireReferenceExtractor($converter, $parser),
+            new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
+            new PhpAutowireReferenceExtractor($converter, $parser, new ParameterExpressionScanner()),
             new PhpClassDeclarationExtractor($converter, $parser),
         );
     }

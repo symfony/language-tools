@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Environment;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
@@ -15,7 +16,8 @@ final class EnvironmentExtractor
         private readonly UriToPathConverter $uriToPathConverter,
         private readonly CommentParserRegistry $comments,
         private readonly YamlDocumentParser $yamlParser,
-        private readonly EnvironmentExpressionParser $expressionParser = new EnvironmentExpressionParser(),
+        private readonly EnvironmentExpressionParser $expressionParser,
+        private readonly ParameterExpressionScanner $parameterExpressions,
     ) {
     }
 
@@ -62,14 +64,13 @@ final class EnvironmentExtractor
     /** @return list<MalformedEnvironmentExpression> */
     private function malformedExpressions(string $text, string $source, int $baseOffset = 0): array
     {
-        preg_match_all('/%%|(%env\([^\)\r\n]*%)|%[^%\s]*+%/', $source, $matches, \PREG_OFFSET_CAPTURE);
         $expressions = [];
-        foreach ($matches[1] as [$expression, $offset]) {
-            if (0 > $offset) {
+        foreach ($this->parameterExpressions->scan($source, $baseOffset) as $parameter) {
+            if (!str_starts_with($parameter->name, 'env(') || str_contains($parameter->name, ')')) {
                 continue;
             }
             $expressions[] = new MalformedEnvironmentExpression(
-                $this->converter->toRange($text, $baseOffset + $offset, \strlen($expression)),
+                $this->converter->toRange($text, $parameter->startOffset(), \strlen($parameter->text())),
             );
         }
 

@@ -200,7 +200,7 @@ return static function (ContainerConfigurator $container): void {
         }
         $services->load(
             'Symfony\\Lsp\\Feature\\'.$feature.'\\',
-            '../src/Feature/'.$feature.'/*{Provider,Handler,Extractor,Indexer,Registry,Resolver,Loader,Publisher,Parser,Validator,Builder,Classifier,Analyzer,Reconciler,Lookup}.php',
+            '../src/Feature/'.$feature.'/*{Provider,Handler,Extractor,Indexer,Registry,Resolver,Loader,Publisher,Parser,Validator,Builder,Classifier,Analyzer,Reconciler,Lookup,Scanner}.php',
         );
     }
 

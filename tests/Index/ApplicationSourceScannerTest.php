@@ -16,6 +16,8 @@ use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
+use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentExtractor;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentSourceIndexer;
@@ -402,7 +404,7 @@ PHP;
         $indexes = new EnvironmentIndexRegistry();
         $this->scanner(new EnvironmentSourceIndexer(
             $indexes,
-            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser(new TolerantXmlParser())]), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser(new TolerantXmlParser())]), new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())), new EnvironmentExpressionParser(new ParameterExpressionScanner()), new ParameterExpressionScanner()),
         ))->indexAll();
 
         self::assertSame(['APP_SECRET'], $indexes->forProject($this->project)->names());

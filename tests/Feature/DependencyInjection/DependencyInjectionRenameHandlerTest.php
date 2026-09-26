@@ -14,6 +14,7 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
 use Symfony\Lsp\Feature\DependencyInjection\Parameter;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
@@ -55,9 +56,9 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         $yamlExtractor = new YamlDependencyInjectionExtractor(
             new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
             new YamlDependencyInjectionDeclarationExtractor($converter),
-            new YamlDependencyInjectionReferenceExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
         );
-        $autowireExtractor = new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()));
+        $autowireExtractor = new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new ParameterExpressionScanner());
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace(
             $yamlExtractor->extract($yamlUri, $yaml),
@@ -127,7 +128,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         $yamlExtractor = new YamlDependencyInjectionExtractor(
             new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
             new YamlDependencyInjectionDeclarationExtractor($converter),
-            new YamlDependencyInjectionReferenceExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
         );
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
@@ -176,7 +177,7 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
         $yamlExtractor = new YamlDependencyInjectionExtractor(
             new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
             new YamlDependencyInjectionDeclarationExtractor($converter),
-            new YamlDependencyInjectionReferenceExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
         );
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));
@@ -213,8 +214,8 @@ final class DependencyInjectionRenameHandlerTest extends TestCase
 
         return new DependencyInjectionDocumentExtractor(
             $yamlExtractor,
-            new XmlDependencyInjectionExtractor($converter),
-            new PhpAutowireReferenceExtractor($converter, $parser),
+            new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
+            new PhpAutowireReferenceExtractor($converter, $parser, new ParameterExpressionScanner()),
             new PhpClassDeclarationExtractor($converter, $parser),
         );
     }

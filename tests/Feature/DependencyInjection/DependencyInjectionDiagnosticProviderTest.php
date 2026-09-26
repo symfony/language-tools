@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDiagnosticProvider;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\Parameter;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
@@ -103,7 +104,7 @@ final class DependencyInjectionDiagnosticProviderTest extends TestCase
         $yamlExtractor = new YamlDependencyInjectionExtractor(
             new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
             new YamlDependencyInjectionDeclarationExtractor($converter),
-            new YamlDependencyInjectionReferenceExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
         );
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($yamlExtractor->extract($uri, $text));

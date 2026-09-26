@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexer;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
@@ -132,10 +133,10 @@ final class RouteSourceIndexerTest extends TestCase
                     new YamlDependencyInjectionExtractor(
                         new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
                         new YamlDependencyInjectionDeclarationExtractor($positionConverter),
-                        new YamlDependencyInjectionReferenceExtractor($positionConverter),
+                        new YamlDependencyInjectionReferenceExtractor($positionConverter, new ParameterExpressionScanner()),
                     ),
-                    new XmlDependencyInjectionExtractor($positionConverter),
-                    new PhpAutowireReferenceExtractor($positionConverter, $parser),
+                    new XmlDependencyInjectionExtractor($positionConverter, new ParameterExpressionScanner()),
+                    new PhpAutowireReferenceExtractor($positionConverter, $parser, new ParameterExpressionScanner()),
                     new PhpClassDeclarationExtractor($positionConverter, $parser),
                 ),
             ],
@@ -265,10 +266,10 @@ final class RouteSourceIndexerTest extends TestCase
                 new YamlDependencyInjectionExtractor(
                     new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
                     new YamlDependencyInjectionDeclarationExtractor($positionConverter),
-                    new YamlDependencyInjectionReferenceExtractor($positionConverter),
+                    new YamlDependencyInjectionReferenceExtractor($positionConverter, new ParameterExpressionScanner()),
                 ),
-                new XmlDependencyInjectionExtractor($positionConverter),
-                new PhpAutowireReferenceExtractor($positionConverter, $parser),
+                new XmlDependencyInjectionExtractor($positionConverter, new ParameterExpressionScanner()),
+                new PhpAutowireReferenceExtractor($positionConverter, $parser, new ParameterExpressionScanner()),
                 new PhpClassDeclarationExtractor($positionConverter, $parser),
             ),
         ]);

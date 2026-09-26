@@ -11,6 +11,7 @@ final class YamlDependencyInjectionReferenceExtractor
 {
     public function __construct(
         private readonly PositionConverter $positionConverter,
+        private readonly ParameterExpressionScanner $parameterExpressions,
     ) {
     }
 
@@ -117,19 +118,14 @@ final class YamlDependencyInjectionReferenceExtractor
     /** @return list<DependencyInjectionReference> */
     private function parameterReferences(string $uri, string $text, string $line, int $lineOffset, ?string $environment): array
     {
-        preg_match_all('/%%|%([^%\s]+)%/', $line, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
         $references = [];
-        foreach ($matches as $match) {
-            if (!isset($match[1])) {
-                continue;
-            }
-            [$name, $offset] = $match[1];
-            if (!str_starts_with($name, 'env(')) {
+        foreach ($this->parameterExpressions->scan($line, $lineOffset) as $parameter) {
+            if (!str_starts_with($parameter->name, 'env(')) {
                 $references[] = new DependencyInjectionReference(
                     DependencyInjectionSymbolKind::Parameter,
-                    $name,
+                    $parameter->name,
                     $uri,
-                    $this->positionConverter->toRange($text, $lineOffset + $offset, \strlen($name)),
+                    $this->positionConverter->toRange($text, $parameter->nameStartOffset, \strlen($parameter->name)),
                     environment: $environment,
                 );
             }

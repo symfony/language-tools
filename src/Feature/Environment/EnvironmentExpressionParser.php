@@ -2,8 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Environment;
 
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
+
 final class EnvironmentExpressionParser
 {
+    public function __construct(private readonly ParameterExpressionScanner $parameterExpressions)
+    {
+    }
+
     public function parse(string $expression, int $sourceOffset = 0): ?EnvironmentExpression
     {
         if (1 !== preg_match('/\A%env\(([^)%]+)\)%\z/', $expression, $match)) {
@@ -28,10 +34,9 @@ final class EnvironmentExpressionParser
     /** @return list<EnvironmentExpression> */
     public function parseAll(string $source, int $sourceOffset = 0): array
     {
-        preg_match_all('/%%|%[^%\s]*+%/', $source, $matches, \PREG_OFFSET_CAPTURE);
         $expressions = [];
-        foreach ($matches[0] as [$expression, $offset]) {
-            $parsed = '%%' === $expression ? null : $this->parse($expression, $sourceOffset + $offset);
+        foreach ($this->parameterExpressions->scan($source, $sourceOffset) as $parameter) {
+            $parsed = $this->parse($parameter->text(), $parameter->startOffset());
             if (null !== $parsed) {
                 $expressions[] = $parsed;
             }

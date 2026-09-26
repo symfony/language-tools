@@ -15,6 +15,7 @@ use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolResolver;
 use Symfony\Lsp\Feature\DependencyInjection\Parameter;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
@@ -54,13 +55,13 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
         $yamlExtractor = new YamlDependencyInjectionExtractor(
             new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
             new YamlDependencyInjectionDeclarationExtractor($converter),
-            new YamlDependencyInjectionReferenceExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
         );
         $phpParser = new TolerantPhpParser(new Parser());
         $extractor = new DependencyInjectionDocumentExtractor(
             $yamlExtractor,
-            new XmlDependencyInjectionExtractor($converter),
-            new PhpAutowireReferenceExtractor($converter, $phpParser),
+            new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
+            new PhpAutowireReferenceExtractor($converter, $phpParser, new ParameterExpressionScanner()),
             new PhpClassDeclarationExtractor($converter, $phpParser),
         );
         $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
@@ -139,13 +140,13 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
         $yamlExtractor = new YamlDependencyInjectionExtractor(
             new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
             new YamlDependencyInjectionDeclarationExtractor($converter),
-            new YamlDependencyInjectionReferenceExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
         );
         $phpParser = new TolerantPhpParser(new Parser());
         $extractor = new DependencyInjectionDocumentExtractor(
             $yamlExtractor,
-            new XmlDependencyInjectionExtractor($converter),
-            new PhpAutowireReferenceExtractor($converter, $phpParser),
+            new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
+            new PhpAutowireReferenceExtractor($converter, $phpParser, new ParameterExpressionScanner()),
             new PhpClassDeclarationExtractor($converter, $phpParser),
         );
         $parsedDeclaration = $yamlExtractor->extract($uri, $text)->services[0];

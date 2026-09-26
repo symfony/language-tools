@@ -4,6 +4,8 @@
 
 - Answer a document link request with an empty list instead of nothing when a document has no link
 - Refresh only the translation catalogs when a catalog inside a `Translations` directory changes, instead of the whole runtime index
+- Treat `%%` in an `#[Autowire]` attribute as an escaped percent sign, so a literal like `%%message%%` is no longer read as a parameter reference
+- Stop reporting an environment expression containing whitespace, such as `%env(APP URL%`, as malformed, since Symfony reads it as literal text
 - Reuse one YAML parse per document during completion
 - Keep reading YAML keys at their real path when the file contains an unterminated flow collection
 - Complete Security roles in an `IsGranted` attribute written next to another attribute

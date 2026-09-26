@@ -9,8 +9,10 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\Environment\EnvironmentCompletionProvider;
 use Symfony\Lsp\Feature\Environment\EnvironmentDiagnosticProvider;
+use Symfony\Lsp\Feature\Environment\EnvironmentExpressionParser;
 use Symfony\Lsp\Feature\Environment\EnvironmentExtractor;
 use Symfony\Lsp\Feature\Environment\EnvironmentIndexRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentProcessorChainValidator;
@@ -34,7 +36,7 @@ final class EnvironmentProviderTest extends TestCase
 {
     public function testIndexesNamesAndReferencesWithoutValues(): void
     {
-        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]), $this->yamlParser());
+        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]), $this->yamlParser(), new EnvironmentExpressionParser(new ParameterExpressionScanner()), new ParameterExpressionScanner());
         $facts = $extractor->extract(new SourceDocument('file:///workspace/.env', 'dotenv', "APP_SECRET=CANARY_SECRET_VALUE\nAPP_URL=https://example.com\nEMPTY=\nCHILD=\${APP_URL:-\${FALLBACK_URL}}/\$EMPTY\nPARTIAL=\${UNFINISHED\nESCAPED=\\\$IGNORED\n"));
 
         self::assertSame(['APP_SECRET', 'APP_URL', 'EMPTY', 'CHILD', 'PARTIAL', 'ESCAPED'], array_map(static fn ($item): string => $item->name, $facts->declarations));
@@ -57,7 +59,7 @@ final class EnvironmentProviderTest extends TestCase
         $converter = new PositionConverter();
         $comments = new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]);
         $yamlParser = $this->yamlParser();
-        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $comments, $yamlParser);
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $comments, $yamlParser, new EnvironmentExpressionParser(new ParameterExpressionScanner()), new ParameterExpressionScanner());
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources(
             $extractor->extract(new SourceDocument('file:///workspace/.env', 'dotenv', "PARTIAL_ENV=value\n")),
@@ -125,7 +127,7 @@ final class EnvironmentProviderTest extends TestCase
         $converter = new PositionConverter();
         $comments = new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]);
         $yamlParser = $this->yamlParser();
-        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $comments, $yamlParser);
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $comments, $yamlParser, new EnvironmentExpressionParser(new ParameterExpressionScanner()), new ParameterExpressionScanner());
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources($extractor->extract(new SourceDocument('file:///workspace/.env', 'dotenv', "APP_URL=CANARY_SECRET_VALUE\n")), $extractor->extract(new SourceDocument($uri, 'yaml', $text)));
         $indexes->forProject($project)->replaceProcessors(['custom' => 'string', 'json' => 'array']);
@@ -168,7 +170,7 @@ final class EnvironmentProviderTest extends TestCase
         $converter = new PositionConverter();
         $comments = new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]);
         $yamlParser = $this->yamlParser();
-        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $comments, $yamlParser);
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $comments, $yamlParser, new EnvironmentExpressionParser(new ParameterExpressionScanner()), new ParameterExpressionScanner());
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources(
             $extractor->extract(new SourceDocument('file:///workspace/.env', 'dotenv', "APP_URL=value\n")),
@@ -237,7 +239,7 @@ final class EnvironmentProviderTest extends TestCase
         $converter = new PositionConverter();
         $comments = new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]);
         $yamlParser = $this->yamlParser();
-        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $comments, $yamlParser);
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), $comments, $yamlParser, new EnvironmentExpressionParser(new ParameterExpressionScanner()), new ParameterExpressionScanner());
         $indexes = new EnvironmentIndexRegistry();
         $indexes->forProject($project)->replaceSources($extractor->extract(new SourceDocument('file:///workspace/.env', 'dotenv', "APP_URL=value\n")));
         [$completionProvider, , $diagnosticProvider] = $this->providers($documents, $projects, $converter, $indexes, $extractor, $comments, $yamlParser);
@@ -253,7 +255,7 @@ final class EnvironmentProviderTest extends TestCase
 
     public function testIgnoresEnvironmentReferencesInPhpComments(): void
     {
-        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]), $this->yamlParser());
+        $extractor = new EnvironmentExtractor(new PositionConverter(), new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]), $this->yamlParser(), new EnvironmentExpressionParser(new ParameterExpressionScanner()), new ParameterExpressionScanner());
 
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Kernel.php', 'php', <<<'PHP'
             <?php
@@ -268,13 +270,14 @@ final class EnvironmentProviderTest extends TestCase
     public function testTreatsDoubledPercentSignsAsEscapes(): void
     {
         $converter = new PositionConverter();
-        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]), $this->yamlParser());
+        $extractor = new EnvironmentExtractor($converter, new UriToPathConverter(), new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser(), 'xml' => new XmlCommentParser()]), $this->yamlParser(), new EnvironmentExpressionParser(new ParameterExpressionScanner()), new ParameterExpressionScanner());
         $php = <<<'PHP'
             <?php
             $container->setParameter('mautic.url', sprintf('%%env(%sresolve:MAUTIC_%s)%%', $type, strtoupper($key)));
             $escaped = '%%env(ESCAPED_ENV)%%';
             $chained = '%kernel.project_dir%%env(LIVE_ENV)%';
             $broken = '100%% %env(BROKEN_ENV%';
+            $spaced = '%env(SPACED ENV%';
             PHP;
 
         $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Kernel.php', 'php', $php));

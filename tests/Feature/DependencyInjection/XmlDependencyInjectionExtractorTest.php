@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolKind;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
 use Symfony\Lsp\Parser\Xml\TolerantXmlParser;
 use Symfony\Lsp\Tests\Support\RecordingXmlParser;
@@ -155,7 +156,7 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
     public function testDoesNotParseXmlWithoutTheServicesSchemaMarker(): void
     {
         $parser = new RecordingXmlParser();
-        $extractor = new XmlDependencyInjectionExtractor(new PositionConverter(), $parser);
+        $extractor = new XmlDependencyInjectionExtractor(new PositionConverter(), new ParameterExpressionScanner(), $parser);
 
         self::assertNull($extractor->extract('file:///workspace/phpunit.xml', '<phpunit colors="true"/>'));
         self::assertSame(0, \count($parser->sources));
@@ -191,6 +192,6 @@ final class XmlDependencyInjectionExtractorTest extends TestCase
 
     private function extractor(): XmlDependencyInjectionExtractor
     {
-        return new XmlDependencyInjectionExtractor(new PositionConverter(), new TolerantXmlParser());
+        return new XmlDependencyInjectionExtractor(new PositionConverter(), new ParameterExpressionScanner(), new TolerantXmlParser());
     }
 }

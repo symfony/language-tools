@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -34,7 +35,7 @@ final class PhpAutowireReferenceExtractorTest extends TestCase
             }
             PHP;
         $converter = new PositionConverter();
-        $references = (new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())))->extract(
+        $references = (new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new ParameterExpressionScanner()))->extract(
             'file:///workspace/src/Controller/DemoController.php',
             $text,
         );
@@ -59,6 +60,30 @@ final class PhpAutowireReferenceExtractorTest extends TestCase
         );
     }
 
+    public function testIgnoresEscapedPercentSigns(): void
+    {
+        $text = <<<'PHP'
+            <?php
+            use Symfony\Component\DependencyInjection\Attribute\Autowire;
+
+            final class Report
+            {
+                public function __construct(
+                    #[Autowire('%%not_a_parameter%% %app.api_key%')]
+                    string $template,
+                ) {
+                }
+            }
+            PHP;
+
+        $references = (new PhpAutowireReferenceExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new ParameterExpressionScanner()))->extract(
+            'file:///workspace/src/Report.php',
+            $text,
+        );
+
+        self::assertSame(['app.api_key'], array_map(static fn ($reference): string => $reference->name, $references));
+    }
+
     public function testDecodesEscapedServiceIdsWithSourceRanges(): void
     {
         $text = <<<'PHP'
@@ -75,7 +100,7 @@ final class PhpAutowireReferenceExtractorTest extends TestCase
             }
             PHP;
 
-        $references = (new PhpAutowireReferenceExtractor(new PositionConverter(), new TolerantPhpParser(new Parser())))->extract(
+        $references = (new PhpAutowireReferenceExtractor(new PositionConverter(), new TolerantPhpParser(new Parser()), new ParameterExpressionScanner()))->extract(
             'file:///workspace/src/Mailer.php',
             $text,
         );

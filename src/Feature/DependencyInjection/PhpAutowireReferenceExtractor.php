@@ -11,6 +11,7 @@ final class PhpAutowireReferenceExtractor
     public function __construct(
         private readonly PositionConverter $positionConverter,
         private readonly PhpParserInterface $parser,
+        private readonly ParameterExpressionScanner $parameterExpressions,
     ) {
     }
 
@@ -60,18 +61,17 @@ final class PhpAutowireReferenceExtractor
                     continue;
                 }
 
-                preg_match_all('/%([^%\s]+)%/', $this->raw($text, $literal->startOffset, $literal->endOffset), $parameters, \PREG_OFFSET_CAPTURE);
-                foreach ($parameters[1] as [$rawParameter, $offset]) {
-                    $offset += $literal->startOffset;
-                    if (str_starts_with($rawParameter, 'env(') || \in_array($offset, $namedParameterOffsets, true)) {
+                $raw = $this->raw($text, $literal->startOffset, $literal->endOffset);
+                foreach ($this->parameterExpressions->scan($raw, $literal->startOffset) as $parameter) {
+                    if (str_starts_with($parameter->name, 'env(') || \in_array($parameter->nameStartOffset, $namedParameterOffsets, true)) {
                         continue;
                     }
 
                     $references[] = new DependencyInjectionReference(
                         DependencyInjectionSymbolKind::Parameter,
-                        PhpStringLiteralDecoder::decode($text[$literal->startOffset - 1], $rawParameter),
+                        PhpStringLiteralDecoder::decode($text[$literal->startOffset - 1], $parameter->name),
                         $uri,
-                        $this->positionConverter->toRange($text, $offset, \strlen($rawParameter)),
+                        $this->positionConverter->toRange($text, $parameter->nameStartOffset, \strlen($parameter->name)),
                     );
                 }
             }

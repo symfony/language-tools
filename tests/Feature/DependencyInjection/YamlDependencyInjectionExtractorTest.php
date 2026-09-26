@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\YamlDependencyInjectionReferenceExtractor;
@@ -315,7 +316,7 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
         return new YamlDependencyInjectionExtractor(
             new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
             new YamlDependencyInjectionDeclarationExtractor($converter),
-            new YamlDependencyInjectionReferenceExtractor($converter),
+            new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
         );
     }
 

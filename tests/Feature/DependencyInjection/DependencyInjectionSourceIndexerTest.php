@@ -11,6 +11,7 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexer;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolKind;
+use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireReferenceExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\XmlDependencyInjectionExtractor;
@@ -70,10 +71,10 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new YamlDependencyInjectionExtractor(
                 new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
                 new YamlDependencyInjectionDeclarationExtractor($converter),
-                new YamlDependencyInjectionReferenceExtractor($converter),
+                new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
             ),
-            new XmlDependencyInjectionExtractor($converter),
-            new PhpAutowireReferenceExtractor($converter, $parser),
+            new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
+            new PhpAutowireReferenceExtractor($converter, $parser, new ParameterExpressionScanner()),
             new PhpClassDeclarationExtractor($converter, $parser),
         );
         $uri = 'file://'.$this->temporaryDirectory.'/src/Service.php';
@@ -127,10 +128,10 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
             new YamlDependencyInjectionExtractor(
                 new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
                 new YamlDependencyInjectionDeclarationExtractor($converter),
-                new YamlDependencyInjectionReferenceExtractor($converter),
+                new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
             ),
-            new XmlDependencyInjectionExtractor($converter),
-            new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser())),
+            new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
+            new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new ParameterExpressionScanner()),
             new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
         )]);
         $health = new SourceOverlayHealthRegistry();
