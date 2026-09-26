@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read a form `data_class` written as a class name string
 - Keep a switched environment or kernel when unrelated settings change
 - Refuse to rename a translation key to a name with quotes, backslashes, whitespace or other characters its literals can't hold as written
 - Read every target of a space-separated `stimulus_target()` value instead of one combined name

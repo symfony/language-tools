@@ -551,6 +551,43 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame(['title'], $kit->labels($kit->get(MetadataCompletionProvider::class)->complete($kit->positioned($kit->after($formUri, "add('ti")))));
     }
 
+    public function testLinksFormFieldsToDataClassesWrittenAsStrings(): void
+    {
+        $dtoUri = 'file:///workspace/src/Dto/Article.php';
+        $kit = (new ProjectTestKit())->open($dtoUri, "<?php\nnamespace App\\Dto;\n\nfinal class Article\n{\n    public string \$title;\n}\n");
+        foreach ([
+            'file:///workspace/src/Form/DefaultsType.php' => "\$resolver->setDefaults(['data_class' => 'App\\Dto\\Article']);",
+            'file:///workspace/src/Form/DefaultType.php' => "\$resolver->setDefault('data_class', '\\App\\Dto\\Article');",
+        ] as $uri => $configure) {
+            $kit->open($uri, <<<PHP
+                <?php
+                namespace App\\Form;
+
+                use Symfony\\Component\\Form\\AbstractType;
+                use Symfony\\Component\\Form\\FormBuilderInterface;
+                use Symfony\\Component\\OptionsResolver\\OptionsResolver;
+
+                final class ArticleType extends AbstractType
+                {
+                    public function buildForm(FormBuilderInterface \$builder, array \$options): void
+                    {
+                        \$builder->add('title');
+                    }
+
+                    public function configureOptions(OptionsResolver \$resolver): void
+                    {
+                        {$configure}
+                    }
+                }
+                PHP);
+        }
+        $kit->index();
+        $relationshipProvider = $kit->get(MetadataRelationshipProvider::class);
+
+        self::assertSame([$dtoUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside('file:///workspace/src/Form/DefaultsType.php', "'title'")))));
+        self::assertSame([$dtoUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside('file:///workspace/src/Form/DefaultType.php', "'title'")))));
+    }
+
     public function testResolvesSelfDataClassReferencesButNotLateBoundOnes(): void
     {
         $extractor = $this->extractor();

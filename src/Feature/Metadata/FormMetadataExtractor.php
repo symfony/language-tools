@@ -60,13 +60,15 @@ final class FormMetadataExtractor
                         continue;
                     }
                     $reference = $entries['data_class']->classReference;
+                    $string = $entries['data_class']->stringValue;
                 } else {
                     if ('data_class' !== $call->positionalArgument(0)?->stringLiteral?->value) {
                         continue;
                     }
                     $reference = $call->positionalArgument(1)?->completeClassReference;
+                    $string = $call->positionalArgument(1)?->stringLiteral;
                 }
-                $dataClass = $this->earlyBoundClassName($source, $reference);
+                $dataClass = null === $reference ? $this->literalClassName($string) : $this->earlyBoundClassName($source, $reference);
             }
             if (null !== $dataClass) {
                 $classes[ClassNameKey::from($method->className)] = new FormDataClass($method->className, $dataClass);
@@ -273,6 +275,15 @@ final class FormMetadataExtractor
         }
 
         return null;
+    }
+
+    private function literalClassName(?PhpStringLiteral $literal): ?string
+    {
+        if (null === $literal || 1 !== preg_match('/^\\\\?([A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*(?:\\\\[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*)*)$/', $literal->value, $match)) {
+            return null;
+        }
+
+        return $match[1];
     }
 
     /** Late static binding hides the class the option resolves to, so only `self`, `parent` and named classes count. */
