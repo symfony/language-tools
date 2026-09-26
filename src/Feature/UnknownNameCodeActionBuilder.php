@@ -4,12 +4,46 @@ namespace Symfony\Lsp\Feature;
 
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\RangedSourceSymbolInterface;
+use Symfony\Lsp\Protocol\CodeActionRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class UnknownNameCodeActionBuilder
 {
     public function __construct(private readonly LspProtocolMapper $protocol)
     {
+    }
+
+    /**
+     * Suggests close existing names for the symbol an unknown name diagnostic
+     * reports, taken from the symbols of the document at the same range.
+     *
+     * @template TSymbol of RangedSourceSymbolInterface
+     *
+     * @param list<string>                                                $codes
+     * @param iterable<TSymbol>                                           $symbols
+     * @param callable(TSymbol, string): ?array{string, iterable<string>} $replaceable the name to replace and the names to suggest, or null when the diagnostic does not report that symbol
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    public function actions(CodeActionRequest $request, array $codes, iterable $symbols, callable $replaceable): array
+    {
+        $actions = [];
+        foreach ($request->diagnostics(...$codes) as $diagnostic) {
+            foreach ($symbols as $symbol) {
+                if (!$symbol->range->equals($diagnostic->range)) {
+                    continue;
+                }
+                $replacement = $replaceable($symbol, $diagnostic->code);
+                if (null !== $replacement) {
+                    array_push($actions, ...$this->replacements($request->document, $diagnostic->diagnostic, $symbol->range, $replacement[0], $replacement[1]));
+                }
+
+                break;
+            }
+        }
+
+        return $actions;
     }
 
     /**
@@ -48,16 +82,12 @@ final class UnknownNameCodeActionBuilder
             foreach ($additionalRanges as $additionalRange) {
                 $edits[] = $this->protocol->textEdit($additionalRange, $candidate);
             }
-            $actions[] = [
-                'title' => \sprintf('Replace with "%s"', $candidate),
-                'kind' => 'quickfix',
-                'diagnostics' => [$diagnostic],
-                'isPreferred' => $preferred && [] === $actions,
-                'edit' => ['documentChanges' => [[
-                    'textDocument' => ['uri' => $document->uri, 'version' => $document->version],
-                    'edits' => $edits,
-                ]]],
-            ];
+            $actions[] = $this->protocol->quickFix(
+                \sprintf('Replace with "%s"', $candidate),
+                $diagnostic,
+                [$this->protocol->textDocumentEdit($document->uri, $document->version, $edits)],
+                $preferred && [] === $actions,
+            );
         }
 
         return $actions;

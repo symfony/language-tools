@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\RangedSourceSymbolInterface;
 
-final class TranslationReference
+final class TranslationReference implements RangedSourceSymbolInterface
 {
     /** @param list<string>|null $placeholders null when the parameters are dynamic and unknown */
     public function __construct(

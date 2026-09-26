@@ -54,6 +54,7 @@ use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 use Symfony\Lsp\Tests\Support\RecordingClient;
 
 final class RouteDiagnosticPublisherTest extends TestCase
@@ -255,15 +256,10 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $diagnosticProvider = new RouteDiagnosticPublisher(new DocumentContextResolver($documents, $projects), new LspProtocolMapper(), $indexes, $sourceIndexes, $templateIndexes);
             $diagnostics = $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $provider = new RouteCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
+            $provider = new RouteCodeActionProvider($converter, new LspProtocolMapper(), $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
 
-            $actions = $provider->actions([
-                'textDocument' => ['uri' => $uri],
-                'range' => $diagnostics[0]['range'],
-                'context' => ['diagnostics' => $diagnostics],
-            ]);
+            $actions = $provider->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
 
-            self::assertIsArray($actions);
             self::assertCount(1, $actions);
             $action = $actions[0];
             self::assertSame('Add missing route parameter', $action['title'] ?? null);
@@ -313,14 +309,10 @@ final class RouteDiagnosticPublisherTest extends TestCase
             $diagnostics = (new RouteDiagnosticPublisher($resolver, $protocol, $indexes, $sourceIndexes, $templateIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
             self::assertSame('route.not_found', $diagnostics[0]['code'] ?? null);
-            $actions = (new RouteCodeActionProvider($resolver, $converter, $protocol, $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
-                'textDocument' => ['uri' => $uri],
-                'range' => $diagnostics[0]['range'],
-                'context' => ['diagnostics' => $diagnostics],
-            ]);
+            $actions = (new RouteCodeActionProvider($converter, $protocol, $indexes, $classIndexes, $phpExtractor, $twigExtractor, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
 
-            self::assertSame($expected, array_column($actions ?? [], 'title'));
-            foreach ($actions ?? [] as $action) {
+            self::assertSame($expected, array_column($actions, 'title'));
+            foreach ($actions as $action) {
                 self::assertSame([
                     'title' => 'Replace with "blog_index_paginated"',
                     'kind' => 'quickfix',

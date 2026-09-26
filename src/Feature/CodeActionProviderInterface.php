@@ -2,12 +2,10 @@
 
 namespace Symfony\Lsp\Feature;
 
+use Symfony\Lsp\Protocol\CodeActionRequest;
+
 interface CodeActionProviderInterface
 {
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return list<array<array-key, mixed>>|null
-     */
-    public function actions(array $params): ?array;
+    /** @return list<array<array-key, mixed>> */
+    public function actions(CodeActionRequest $request): array;
 }

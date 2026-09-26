@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\RangedSourceSymbolInterface;
 
-final class StimulusReference
+final class StimulusReference implements RangedSourceSymbolInterface
 {
     public function __construct(
         public readonly string $controller,

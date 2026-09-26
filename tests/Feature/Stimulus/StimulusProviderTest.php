@@ -62,11 +62,10 @@ final class StimulusProviderTest extends TestCase
         $stimulus = new StimulusResolver($resolver, $converter, $protocol, $indexes, $sources, $extractor);
         $diagnostics = (new StimulusDiagnosticProvider($resolver, $protocol, $indexes, $sources, $stimulus))->diagnostics(LspRequests::document($uri));
         self::assertIsArray($diagnostics);
-        $actions = (new StimulusCodeActionProvider($resolver, $protocol, $indexes, $sources, $stimulus, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
-            'textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => $diagnostics],
-        ]);
+        $actions = (new StimulusCodeActionProvider($indexes, $sources, $stimulus, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))
+            ->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
 
-        self::assertSame(['Replace with "search"'], array_column($actions ?? [], 'title'));
+        self::assertSame(['Replace with "search"'], array_column($actions, 'title'));
         self::assertSame(['documentChanges' => [[
             'textDocument' => ['uri' => $uri, 'version' => 2],
             'edits' => [['range' => $diagnostics[0]['range'], 'newText' => 'search']],

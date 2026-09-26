@@ -6,7 +6,6 @@ use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Configuration\ConfigurationCodeActionProvider;
@@ -29,6 +28,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class ConfigurationCodeActionProviderTest extends TestCase
 {
@@ -49,10 +49,8 @@ final class ConfigurationCodeActionProviderTest extends TestCase
         $runtime = new RuntimeConfiguration();
         $runtime->configure(['environment' => 'dev']);
         $provider = new ConfigurationCodeActionProvider(
-            new DocumentContextResolver($documents, $projects),
             ProjectPaths::resolver(),
             $converter,
-            $protocol,
             $index,
             new RouteIndexRegistry(),
             $runtime,
@@ -63,10 +61,10 @@ final class ConfigurationCodeActionProviderTest extends TestCase
         );
         $start = (int) strpos($text, $diagnosed);
         $diagnostic = $protocol->diagnostic($converter->toRange($text, $start, \strlen($diagnosed)), 1, 'config.unknown_key', 'Unknown configuration key.');
-        $actions = $provider->actions(['textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => [$diagnostic]]]);
+        $actions = $provider->actions((new ProviderRequests($documents, $projects))->codeAction($uri, [$diagnostic]));
 
         if (!$suggestion) {
-            self::assertSame([], $actions ?? []);
+            self::assertSame([], $actions);
 
             return;
         }

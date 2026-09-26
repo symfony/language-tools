@@ -2,17 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
 use Symfony\Lsp\Project\ProjectPathResolver;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\CodeActionRequest;
 
 final class TwigComponentCodeActionProvider implements CodeActionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
-        private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TemplateIndexRegistry $templates,
         private readonly TwigComponentResolver $components,
@@ -21,14 +18,10 @@ final class TwigComponentCodeActionProvider implements CodeActionProviderInterfa
     ) {
     }
 
-    public function actions(array $params): ?array
+    public function actions(CodeActionRequest $request): array
     {
-        $request = $this->documents->resolveDocument($params);
-        $context = $params['context'] ?? null;
-        if (null === $request || !\is_array($context) || 'twig' !== $request->document->languageId
-            || !$this->paths->isApplicationOwned($request->project, $request->document->uri)
-        ) {
-            return null;
+        if ('twig' !== $request->document->languageId || !$this->paths->isApplicationOwned($request->project, $request->document->uri)) {
+            return [];
         }
         $index = $this->indexes->forProject($request->project);
         if (!$index->hasScannedSources() || !$index->isRuntimeComplete() || !$index->isRuntimeEnabled()
@@ -38,29 +31,26 @@ final class TwigComponentCodeActionProvider implements CodeActionProviderInterfa
         }
         $facts = $index->factsForUri($request->document->uri);
         $names = null;
-        $actions = [];
-        foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
-            if (!\is_array($diagnostic) || 'twig_component.not_found' !== ($diagnostic['code'] ?? null) || !\is_array($diagnostic['range'] ?? null)) {
-                continue;
-            }
-            foreach ($facts instanceof TwigComponentSourceFacts ? $facts->references : [] as $reference) {
-                if (!$this->protocol->sameRange($reference->range, $diagnostic['range'])
-                    || null !== $index->get($reference->name)
+
+        return $this->unknownNames->actions(
+            $request,
+            ['twig_component.not_found'],
+            $facts instanceof TwigComponentSourceFacts ? $facts->references : [],
+            function (TwigComponentReference $reference) use ($request, $index, &$names): ?array {
+                if (null !== $index->get($reference->name)
                     || $index->hasRuntimeName($reference->name)
                     || $this->components->anonymousTemplateExists($request->project, $reference->name)
                 ) {
-                    continue;
+                    return null;
                 }
                 $names ??= [
                     ...$index->runtimeNames(),
                     ...array_map(static fn (TwigComponent $component): string => $component->name, $index->components()),
                     ...$this->components->anonymousComponentNames($request->project),
                 ];
-                array_push($actions, ...$this->unknownNames->replacements($request->document, $diagnostic, $reference->range, $reference->name, $names));
-                break;
-            }
-        }
 
-        return $actions;
+                return [$reference->name, $names];
+            },
+        );
     }
 }

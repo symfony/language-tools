@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Support;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\CodeActionRequest;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
@@ -34,6 +35,21 @@ final class ProviderRequests
     {
         return $this->factory->positioned($params)
             ?? throw new \InvalidArgumentException('The request does not point at an open document of a project.');
+    }
+
+    /**
+     * @param list<array<array-key, mixed>> $diagnostics
+     * @param list<string>|null             $only
+     */
+    public function codeAction(string $uri, array $diagnostics = [], ?array $only = null): CodeActionRequest
+    {
+        $context = ['diagnostics' => $diagnostics];
+        if (null !== $only) {
+            $context['only'] = $only;
+        }
+
+        return $this->factory->codeAction([...LspRequests::document($uri), 'context' => $context])
+            ?? throw new \InvalidArgumentException(\sprintf('The document "%s" is not open in a project.', $uri));
     }
 
     /** @param array<array-key, mixed> $params */

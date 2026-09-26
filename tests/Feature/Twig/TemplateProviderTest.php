@@ -930,15 +930,10 @@ final class TemplateProviderTest extends TestCase
         $navigation = new TemplateNavigationProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $extractor, $indexes, $classIndexes);
         $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
-        $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, new UriToPathConverter(), ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes, new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
+        $provider = new TemplateCodeActionProvider($extractor, $indexes, new UriToPathConverter(), ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes, new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
 
-        $actions = $provider->actions([
-            'textDocument' => ['uri' => $uri],
-            'range' => $diagnostics[0]['range'],
-            'context' => ['diagnostics' => $diagnostics],
-        ]);
+        $actions = $provider->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
 
-        self::assertIsArray($actions);
         self::assertCount(1, $actions);
         $action = $actions[0];
         self::assertSame('Create template "missing.html.twig"', $action['title'] ?? null);
@@ -969,13 +964,10 @@ final class TemplateProviderTest extends TestCase
         $protocol = new LspProtocolMapper();
         $diagnostics = (new TemplateNavigationProvider($resolver, new PositionedSourceSymbolResolver($converter), $protocol, $extractor, $indexes, $classIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
-        $actions = (new TemplateCodeActionProvider($resolver, $extractor, $indexes, new UriToPathConverter(), ProjectPaths::resolver(), $protocol, $classIndexes, new UnknownNameCodeActionBuilder($protocol)))->actions([
-            'textDocument' => ['uri' => $uri],
-            'context' => ['diagnostics' => $diagnostics],
-        ]);
+        $actions = (new TemplateCodeActionProvider($extractor, $indexes, new UriToPathConverter(), ProjectPaths::resolver(), $protocol, $classIndexes, new UnknownNameCodeActionBuilder($protocol)))->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
 
-        self::assertSame(['Replace with "article/show.html.twig"', 'Create template "artcle/show.html.twig"'], array_column($actions ?? [], 'title'));
-        self::assertSame([true, false], array_column($actions ?? [], 'isPreferred'));
+        self::assertSame(['Replace with "article/show.html.twig"', 'Create template "artcle/show.html.twig"'], array_column($actions, 'title'));
+        self::assertSame([true, false], array_column($actions, 'isPreferred'));
         self::assertSame(['documentChanges' => [[
             'textDocument' => ['uri' => $uri, 'version' => 3],
             'edits' => [['range' => $diagnostics[0]['range'], 'newText' => 'article/show.html.twig']],
@@ -1013,13 +1005,9 @@ final class TemplateProviderTest extends TestCase
         try {
             $diagnostics = $navigation->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
-            $provider = new TemplateCodeActionProvider(new DocumentContextResolver($documents, $projects), $extractor, $indexes, $converter, ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes, new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
+            $provider = new TemplateCodeActionProvider($extractor, $indexes, $converter, ProjectPaths::resolver(), new LspProtocolMapper(), $classIndexes, new UnknownNameCodeActionBuilder(new LspProtocolMapper()));
 
-            self::assertSame([], $provider->actions([
-                'textDocument' => ['uri' => $uri],
-                'range' => $diagnostics[0]['range'],
-                'context' => ['diagnostics' => $diagnostics],
-            ]));
+            self::assertSame([], $provider->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics)));
         } finally {
             (new Filesystem())->remove($directory);
         }

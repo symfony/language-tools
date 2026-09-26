@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Protocol;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectRegistry;
 
@@ -50,19 +51,40 @@ final class LspRequestFactory
     public function positioned(array $params): ?PositionedRequest
     {
         $request = $this->document($params);
-        $position = $params['position'] ?? null;
-        if (null === $request || !\is_array($position)) {
+        $position = $this->boundary($params['position'] ?? null);
+
+        return null === $request || null === $position
+            ? null
+            : new PositionedRequest($request, $position, $this->positions->toByteOffset($request->document->text, $position));
+    }
+
+    /** @param array<array-key, mixed> $params */
+    public function codeAction(array $params): ?CodeActionRequest
+    {
+        $request = $this->document($params);
+        if (null === $request) {
             return null;
         }
-        $line = $position['line'] ?? null;
-        $character = $position['character'] ?? null;
-        if (!\is_int($line) || !\is_int($character) || $line < 0 || $character < 0) {
+        $context = $params['context'] ?? null;
+        if (!\is_array($context)) {
             return null;
         }
 
-        $position = new Position($line, $character);
+        $diagnostics = [];
+        foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
+            $code = \is_array($diagnostic) ? $diagnostic['code'] ?? null : null;
+            $range = \is_array($diagnostic) ? $this->range($diagnostic['range'] ?? null) : null;
+            if (\is_array($diagnostic) && \is_string($code) && null !== $range) {
+                $diagnostics[] = new CodeActionDiagnostic($code, $range, $diagnostic);
+            }
+        }
+        $only = $context['only'] ?? null;
 
-        return new PositionedRequest($request, $position, $this->positions->toByteOffset($request->document->text, $position));
+        return new CodeActionRequest(
+            $request,
+            $diagnostics,
+            \is_array($only) ? array_values(array_filter($only, \is_string(...))) : null,
+        );
     }
 
     /** @param array<array-key, mixed> $params */
@@ -72,5 +94,27 @@ final class LspRequestFactory
         $request = $this->positioned($params);
 
         return !\is_string($newName) || '' === $newName || null === $request ? null : new RenameRequest($request, $newName);
+    }
+
+    private function range(mixed $range): ?Range
+    {
+        if (!\is_array($range)) {
+            return null;
+        }
+        $start = $this->boundary($range['start'] ?? null);
+        $end = $this->boundary($range['end'] ?? null);
+
+        return null === $start || null === $end ? null : new Range($start, $end);
+    }
+
+    private function boundary(mixed $position): ?Position
+    {
+        if (!\is_array($position)) {
+            return null;
+        }
+        $line = $position['line'] ?? null;
+        $character = $position['character'] ?? null;
+
+        return !\is_int($line) || !\is_int($character) || $line < 0 || $character < 0 ? null : new Position($line, $character);
     }
 }

@@ -60,6 +60,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class UnknownNameSemanticActionsTest extends TestCase
 {
@@ -67,7 +68,7 @@ final class UnknownNameSemanticActionsTest extends TestCase
     {
         $uri = 'file:///workspace/config/packages/messenger.yaml';
         $text = "bus: command.bu\ntransport: asyn\n";
-        [$document, $resolver, $project, $converter, $protocol] = $this->context($uri, 'yaml', $text);
+        [$document, $resolver, $project, $converter, $protocol, $requests] = $this->context($uri, 'yaml', $text);
         $busRange = $converter->toRange($text, (int) strpos($text, 'command.bu'), \strlen('command.bu'));
         $transportRange = $converter->toRange($text, (int) strpos($text, 'asyn'), \strlen('asyn'));
         $indexes = new MessengerIndexRegistry();
@@ -81,22 +82,22 @@ final class UnknownNameSemanticActionsTest extends TestCase
             $protocol->diagnostic($busRange, 1, 'messenger.unknown_bus', 'Unknown bus.'),
             $protocol->diagnostic($transportRange, 1, 'messenger.unknown_transport', 'Unknown transport.'),
         ];
-        $provider = new MessengerCodeActionProvider($resolver, $protocol, $indexes, $sources, EnvironmentScopes::resolver(), ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol));
+        $provider = new MessengerCodeActionProvider($indexes, $sources, EnvironmentScopes::resolver(), ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol));
 
-        $actions = $provider->actions(['textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => $diagnostics]]);
+        $actions = $provider->actions($requests->codeAction($uri, $diagnostics));
 
-        self::assertSame(['Replace with "command.bus"', 'Replace with "async"'], array_column($actions ?? [], 'title'));
-        $this->assertEdits($actions ?? [], $diagnostics, ['command.bus', 'async'], $uri);
-        self::assertSame([], $provider->actions(['textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => [$protocol->diagnostic($busRange, 1, 'messenger.unknown_transport', 'Wrong kind.')]]]));
+        self::assertSame(['Replace with "command.bus"', 'Replace with "async"'], array_column($actions, 'title'));
+        $this->assertEdits($actions, $diagnostics, ['command.bus', 'async'], $uri);
+        self::assertSame([], $provider->actions($requests->codeAction($uri, [$protocol->diagnostic($busRange, 1, 'messenger.unknown_transport', 'Wrong kind.')])));
         $indexes->forProject($project)->replace([new MessengerBus('command.bus', true)], [new MessengerTransport('async', false)], [], [], false);
-        self::assertSame([], $provider->actions(['textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => $diagnostics]]));
+        self::assertSame([], $provider->actions($requests->codeAction($uri, $diagnostics)));
     }
 
     public function testSecuritySuggestionsIncludeSourceDeclarationsAndStayInKind(): void
     {
         $uri = 'file:///workspace/config/packages/security.yaml';
         $text = "firewall: main_are\nprovider: userz\n";
-        [, $resolver, $project, $converter, $protocol] = $this->context($uri, 'yaml', $text);
+        [, $resolver, $project, $converter, $protocol, $requests] = $this->context($uri, 'yaml', $text);
         $firewallRange = $converter->toRange($text, (int) strpos($text, 'main_are'), \strlen('main_are'));
         $providerRange = $converter->toRange($text, (int) strpos($text, 'userz'), \strlen('userz'));
         $indexes = new SecurityIndexRegistry();
@@ -110,19 +111,17 @@ final class UnknownNameSemanticActionsTest extends TestCase
             $protocol->diagnostic($firewallRange, 1, 'security.unknown_firewall', 'Unknown firewall.'),
             $protocol->diagnostic($providerRange, 1, 'security.unknown_provider', 'Unknown provider.'),
         ];
-        $actions = (new SecurityCodeActionProvider($resolver, $protocol, $indexes, $sources, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
-            'textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => $diagnostics],
-        ]);
+        $actions = (new SecurityCodeActionProvider($indexes, $sources, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions($requests->codeAction($uri, $diagnostics));
 
-        self::assertSame(['Replace with "main_area"', 'Replace with "users"'], array_column($actions ?? [], 'title'));
-        $this->assertEdits($actions ?? [], $diagnostics, ['main_area', 'users'], $uri);
+        self::assertSame(['Replace with "main_area"', 'Replace with "users"'], array_column($actions, 'title'));
+        $this->assertEdits($actions, $diagnostics, ['main_area', 'users'], $uri);
     }
 
     public function testOptionsUseOnlyTheirOwningTypeOrConstraint(): void
     {
         $uri = 'file:///workspace/src/Form.php';
         $text = "<?php ['requird' => true, 'messag' => 'invalid'];";
-        [, $resolver, $project, $converter, $protocol] = $this->context($uri, 'php', $text);
+        [, $resolver, $project, $converter, $protocol, $requests] = $this->context($uri, 'php', $text);
         $formRange = $converter->toRange($text, (int) strpos($text, 'requird'), \strlen('requird'));
         $constraintRange = $converter->toRange($text, (int) strpos($text, 'messag'), \strlen('messag'));
         $indexes = new MetadataIndexRegistry();
@@ -133,23 +132,19 @@ final class UnknownNameSemanticActionsTest extends TestCase
             $protocol->diagnostic($formRange, 1, 'form.unknown_option', 'Unknown option.'),
             $protocol->diagnostic($constraintRange, 1, 'validation.unknown_constraint_option', 'Unknown constraint option.'),
         ];
-        $actions = (new MetadataCodeActionProvider($resolver, $protocol, $indexes, $sources, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
-            'textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => $diagnostics],
-        ]);
+        $actions = (new MetadataCodeActionProvider($indexes, $sources, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions($requests->codeAction($uri, $diagnostics));
 
-        self::assertSame(['Replace with "required"', 'Replace with "message"'], array_column($actions ?? [], 'title'));
-        $this->assertEdits($actions ?? [], $diagnostics, ['required', 'message'], $uri);
+        self::assertSame(['Replace with "required"', 'Replace with "message"'], array_column($actions, 'title'));
+        $this->assertEdits($actions, $diagnostics, ['required', 'message'], $uri);
         $indexes->forProject($project)->replace([new FormType('App\\Form\\EventType', 'event', ['required'], [])], [new ValidationConstraint('NotBlank', 'App\\NotBlank', ['message'])], false, false);
-        self::assertSame([], (new MetadataCodeActionProvider($resolver, $protocol, $indexes, $sources, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
-            'textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => $diagnostics],
-        ]));
+        self::assertSame([], (new MetadataCodeActionProvider($indexes, $sources, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions($requests->codeAction($uri, $diagnostics)));
     }
 
     public function testTwigComponentSuggestionsUseEffectiveNames(): void
     {
         $uri = 'file:///workspace/templates/page.html.twig';
         $text = '<twig:UserCrad />';
-        [, $resolver, $project, $converter, $protocol] = $this->context($uri, 'twig', $text);
+        [, $resolver, $project, $converter, $protocol, $requests] = $this->context($uri, 'twig', $text);
         $range = $converter->toRange($text, (int) strpos($text, 'UserCrad'), \strlen('UserCrad'));
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true, true, ['UserCard'], 'components');
@@ -164,25 +159,19 @@ final class UnknownNameSemanticActionsTest extends TestCase
         );
         $componentResolver = new TwigComponentResolver($resolver, new PositionedSourceSymbolResolver($converter), $indexes, $templates, $extractor);
         $diagnostic = $protocol->diagnostic($range, 1, 'twig_component.not_found', 'Unknown component.');
-        $actions = (new TwigComponentCodeActionProvider($resolver, $protocol, $indexes, $templates, $componentResolver, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
-            'textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => [$diagnostic]],
-        ]);
+        $actions = (new TwigComponentCodeActionProvider($indexes, $templates, $componentResolver, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions($requests->codeAction($uri, [$diagnostic]));
 
-        self::assertSame(['Replace with "UserCard"'], array_column($actions ?? [], 'title'));
-        $this->assertEdits($actions ?? [], [$diagnostic], ['UserCard'], $uri, false);
+        self::assertSame(['Replace with "UserCard"'], array_column($actions, 'title'));
+        $this->assertEdits($actions, [$diagnostic], ['UserCard'], $uri, false);
         $indexes->forProject($project)->replaceRuntime(true, true, [], 'components');
         $templates->forProject($project)->replaceRuntime(true, new TemplateDeclaration('components/UserCard.html.twig', 'file:///workspace/templates/components/UserCard.html.twig', $range));
-        $anonymousActions = (new TwigComponentCodeActionProvider($resolver, $protocol, $indexes, $templates, $componentResolver, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
-            'textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => [$diagnostic]],
-        ]);
-        $this->assertEdits($anonymousActions ?? [], [$diagnostic], ['UserCard'], $uri, false);
+        $anonymousActions = (new TwigComponentCodeActionProvider($indexes, $templates, $componentResolver, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions($requests->codeAction($uri, [$diagnostic]));
+        $this->assertEdits($anonymousActions, [$diagnostic], ['UserCard'], $uri, false);
         $indexes->forProject($project)->replaceRuntime(false, true, ['UserCard'], 'components');
-        self::assertSame([], (new TwigComponentCodeActionProvider($resolver, $protocol, $indexes, $templates, $componentResolver, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions([
-            'textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => [$diagnostic]],
-        ]));
+        self::assertSame([], (new TwigComponentCodeActionProvider($indexes, $templates, $componentResolver, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions($requests->codeAction($uri, [$diagnostic])));
     }
 
-    /** @return array{Document, DocumentContextResolver, Project, PositionConverter, LspProtocolMapper} */
+    /** @return array{Document, DocumentContextResolver, Project, PositionConverter, LspProtocolMapper, ProviderRequests} */
     private function context(string $uri, string $language, string $text): array
     {
         $document = new Document($uri, $language, 4, $text);
@@ -191,7 +180,14 @@ final class UnknownNameSemanticActionsTest extends TestCase
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
 
-        return [$document, new DocumentContextResolver($documents, $projects), $project, new PositionConverter(), new LspProtocolMapper()];
+        return [
+            $document,
+            new DocumentContextResolver($documents, $projects),
+            $project,
+            new PositionConverter(),
+            new LspProtocolMapper(),
+            new ProviderRequests($documents, $projects),
+        ];
     }
 
     /**

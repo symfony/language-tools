@@ -9,6 +9,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\CodeActionRequest;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
@@ -122,6 +123,17 @@ final class ProjectTestKit
     public function document(string $uri): DocumentRequest
     {
         return $this->requests()->document($uri);
+    }
+
+    /**
+     * The typed request the code action capability serves for the diagnostics
+     * the client reports back.
+     *
+     * @param list<array<array-key, mixed>> $diagnostics
+     */
+    public function codeAction(string $uri, array $diagnostics = []): CodeActionRequest
+    {
+        return $this->requests()->codeAction($uri, $diagnostics);
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */

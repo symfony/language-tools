@@ -2,11 +2,15 @@
 
 namespace Symfony\Lsp\Feature;
 
+use Symfony\Lsp\Protocol\LspRequestFactory;
+
 final class CodeActionProviderRegistry
 {
     /** @param iterable<CodeActionProviderInterface> $providers */
-    public function __construct(private readonly iterable $providers)
-    {
+    public function __construct(
+        private readonly LspRequestFactory $requests,
+        private readonly iterable $providers,
+    ) {
     }
 
     /**
@@ -16,12 +20,14 @@ final class CodeActionProviderRegistry
      */
     public function actions(array $params): array
     {
+        $request = $this->requests->codeAction($params);
+        if (null === $request) {
+            return [];
+        }
+
         $actions = [];
         foreach ($this->providers as $provider) {
-            $provided = $provider->actions($params);
-            if (null !== $provided) {
-                array_push($actions, ...$provided);
-            }
+            array_push($actions, ...$provider->actions($request));
         }
 
         return $actions;

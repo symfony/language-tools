@@ -4,21 +4,19 @@ namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\ProjectDocumentReader;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\CodeActionRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TranslationCodeActionProvider implements CodeActionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TranslationExtractor $extractor,
@@ -30,35 +28,26 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
     ) {
     }
 
-    public function actions(array $params): ?array
+    public function actions(CodeActionRequest $request): array
     {
-        $request = $this->documentContextResolver->resolveDocument($params);
-        $context = $params['context'] ?? null;
-        if (null === $request || !\is_array($context) || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
-            return null;
+        if (!$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
+            return [];
         }
 
-        $references = $this->extractor->extract(SourceDocument::fromDocument($request->document))->references;
+        $references = $this->extractor->extract($request->source)->references;
+        $index = $this->indexes->forProject($request->project);
         $actions = [];
-        foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
-            if (!\is_array($diagnostic) || 'translation.not_found' !== ($diagnostic['code'] ?? null)) {
-                continue;
-            }
-            $range = $diagnostic['range'] ?? null;
-            if (!\is_array($range)) {
-                continue;
-            }
+        foreach ($request->diagnostics('translation.not_found') as $diagnostic) {
             foreach ($references as $reference) {
-                if (!$this->protocol->sameRange($reference->range, $range)
-                    || [] !== $this->indexes->forProject($request->project)->declarations($reference->domain, $reference->key)
-                    || [] !== $this->indexes->forProject($request->project)->messages($reference->domain, $reference->key)
+                if (!$reference->range->equals($diagnostic->range)
+                    || [] !== $index->declarations($reference->domain, $reference->key)
+                    || [] !== $index->messages($reference->domain, $reference->key)
                 ) {
                     continue;
                 }
-                $index = $this->indexes->forProject($request->project);
                 $replacements = $index->isComplete() ? $this->unknownNames->replacements(
                     $request->document,
-                    $diagnostic,
+                    $diagnostic->diagnostic,
                     $reference->range,
                     $reference->key,
                     $index->keys($reference->domain, ''),
@@ -76,16 +65,12 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
                 $position = $this->converter->toPosition($target->text, \strlen($target->text));
                 $escapedKey = str_replace("'", "''", $reference->key);
                 $newText = ('' === $target->text || str_ends_with($target->text, "\n") ? '' : "\n")."'{$escapedKey}': '{$escapedKey}'\n";
-                $actions[] = [
-                    'title' => \sprintf('Add translation "%s" to %s', $reference->key, basename($targetPath)),
-                    'kind' => 'quickfix',
-                    'diagnostics' => [$diagnostic],
-                    'isPreferred' => [] === $replacements,
-                    'edit' => ['documentChanges' => [[
-                        'textDocument' => ['uri' => $targetUri, 'version' => $target->version],
-                        'edits' => [$this->protocol->textEdit(new Range($position, $position), $newText)],
-                    ]]],
-                ];
+                $actions[] = $this->protocol->quickFix(
+                    \sprintf('Add translation "%s" to %s', $reference->key, basename($targetPath)),
+                    $diagnostic->diagnostic,
+                    [$this->protocol->textDocumentEdit($targetUri, $target->version, [$this->protocol->textEdit(new Range($position, $position), $newText)])],
+                    [] === $replacements,
+                );
                 break;
             }
         }

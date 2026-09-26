@@ -3,19 +3,17 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Component\Filesystem\Path;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Protocol\CodeActionRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class TemplateCodeActionProvider implements CodeActionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
         private readonly TemplateReferenceExtractor $extractor,
         private readonly TemplateIndexRegistry $indexes,
         private readonly UriToPathConverter $uriToPathConverter,
@@ -26,34 +24,23 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
     ) {
     }
 
-    public function actions(array $params): ?array
+    public function actions(CodeActionRequest $request): array
     {
-        $request = $this->documentContextResolver->resolveDocument($params);
-        $context = $params['context'] ?? null;
-        if (null === $request || !\is_array($context) || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
-            return null;
+        if (!$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
+            return [];
         }
 
-        $references = $this->extractor->extract(SourceDocument::fromDocument($request->document), $this->classIndexes->forProject($request->project));
+        $references = $this->extractor->extract($request->source, $this->classIndexes->forProject($request->project));
+        $index = $this->indexes->forProject($request->project);
         $actions = [];
-        foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
-            if (!\is_array($diagnostic) || 'template.not_found' !== ($diagnostic['code'] ?? null)) {
-                continue;
-            }
-            $range = $diagnostic['range'] ?? null;
-            if (!\is_array($range)) {
-                continue;
-            }
+        foreach ($request->diagnostics('template.not_found') as $diagnostic) {
             foreach ($references as $reference) {
-                if (!$this->protocol->sameRange($reference->range, $range)
-                    || null !== $this->indexes->forProject($request->project)->get($reference->name)
-                ) {
+                if (!$reference->range->equals($diagnostic->range) || null !== $index->get($reference->name)) {
                     continue;
                 }
-                $index = $this->indexes->forProject($request->project);
                 $replacements = $index->isComplete() ? $this->unknownNames->replacements(
                     $request->document,
-                    $diagnostic,
+                    $diagnostic->diagnostic,
                     $reference->range,
                     $reference->name,
                     array_map(static fn (TemplateDeclaration $template): string => $template->name, $index->matching('')),
@@ -67,16 +54,12 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
                 if (!$this->pathResolver->isApplicationOwned($request->project, $uri)) {
                     continue;
                 }
-                $actions[] = [
-                    'title' => \sprintf('Create template "%s"', $reference->name),
-                    'kind' => 'quickfix',
-                    'diagnostics' => [$diagnostic],
-                    'isPreferred' => [] === $replacements,
-                    'edit' => ['documentChanges' => [[
-                        'kind' => 'create',
-                        'uri' => $uri,
-                    ]]],
-                ];
+                $actions[] = $this->protocol->quickFix(
+                    \sprintf('Create template "%s"', $reference->name),
+                    $diagnostic->diagnostic,
+                    [['kind' => 'create', 'uri' => $uri]],
+                    [] === $replacements,
+                );
                 break;
             }
         }

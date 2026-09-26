@@ -10,6 +10,7 @@ use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\CodeActionProviderRegistry;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
@@ -50,6 +51,7 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\CodeActionRequest;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\LspRequestFactory;
@@ -129,20 +131,47 @@ final class ProviderRegistryTest extends TestCase
         self::assertSame(['links'], $first->calls);
     }
 
-    public function testCodeActionProvidersAggregateAllMatchesAndAlwaysReturnAList(): void
+    public function testCodeActionProvidersAggregateEveryActionOfAnOpenProjectDocument(): void
     {
-        $first = new StubProvider(null);
+        $first = new StubProvider([]);
         $second = new StubProvider([['title' => 'second']]);
         $third = new StubProvider([['title' => 'third']]);
+        $uri = 'file:///workspace/src/Kernel.php';
+        $requests = $this->requestFactory($uri, 'php', '<?php');
+        $params = [...LspRequests::document($uri), 'context' => ['diagnostics' => []]];
 
         self::assertSame(
             [['title' => 'second'], ['title' => 'third']],
-            (new CodeActionProviderRegistry([$first, $second, $third]))->actions([]),
+            (new CodeActionProviderRegistry($requests, [$first, $second, $third]))->actions($params),
         );
         self::assertSame(['actions'], $first->calls);
         self::assertSame(['actions'], $second->calls);
         self::assertSame(['actions'], $third->calls);
-        self::assertSame([], (new CodeActionProviderRegistry([new StubProvider(null)]))->actions([]));
+        self::assertSame([], (new CodeActionProviderRegistry($requests, [$first]))->actions(LspRequests::document($uri)));
+        self::assertSame(['actions'], $first->calls);
+    }
+
+    public function testCodeActionRequestsKeepOnlyTheDiagnosticsAProviderCanMatch(): void
+    {
+        $uri = 'file:///workspace/src/Kernel.php';
+        $range = ['start' => ['line' => 1, 'character' => 2], 'end' => ['line' => 1, 'character' => 6]];
+        $reported = ['range' => $range, 'code' => 'route.not_found', 'message' => 'Unknown route.'];
+        $request = $this->requestFactory($uri, 'php', '<?php')->codeAction([
+            ...LspRequests::document($uri),
+            'context' => ['diagnostics' => [
+                $reported,
+                ['range' => $range, 'message' => 'Reported by another server.'],
+                ['code' => 'template.not_found', 'message' => 'Without a range.'],
+                'not a diagnostic',
+            ], 'only' => ['quickfix', 42]],
+        ]);
+
+        self::assertNotNull($request);
+        self::assertSame(['quickfix'], $request->only);
+        self::assertSame([$reported], array_column($request->diagnostics(), 'diagnostic'));
+        self::assertSame([$reported], array_column($request->diagnostics('route.not_found'), 'diagnostic'));
+        self::assertSame([], $request->diagnostics('template.not_found'));
+        self::assertTrue($request->diagnostics()[0]->range->equals(new Range(new Position(1, 2), new Position(1, 6))));
     }
 
     public function testCodeLensProvidersAggregateEveryLensOfAnOpenProjectDocument(): void
@@ -355,9 +384,9 @@ final class StubProvider implements CodeActionProviderInterface, CodeLensProvide
         $this->result = $result;
     }
 
-    public function actions(array $params): ?array
+    public function actions(CodeActionRequest $request): array
     {
-        return $this->result(__FUNCTION__);
+        return $this->result(__FUNCTION__) ?? [];
     }
 
     public function codeLenses(DocumentRequest $request): array

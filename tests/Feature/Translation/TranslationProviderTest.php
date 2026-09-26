@@ -27,6 +27,7 @@ use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class TranslationProviderTest extends TestCase
 {
@@ -310,13 +311,8 @@ final class TranslationProviderTest extends TestCase
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
             $pathResolver = ProjectPaths::resolver();
-            $actions = (new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver), new UnknownNameCodeActionBuilder(new LspProtocolMapper())))->actions([
-                'textDocument' => ['uri' => $uri],
-                'range' => $diagnostics[0]['range'],
-                'context' => ['diagnostics' => $diagnostics],
-            ]);
+            $actions = (new TranslationCodeActionProvider($converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver), new UnknownNameCodeActionBuilder(new LspProtocolMapper())))->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
 
-            self::assertIsArray($actions);
             self::assertCount(1, $actions);
             $action = $actions[0];
             self::assertSame('Add translation "missing.key" to messages.en.yaml', $action['title'] ?? null);
@@ -360,17 +356,17 @@ final class TranslationProviderTest extends TestCase
         $protocol = new LspProtocolMapper();
         $diagnostic = $protocol->diagnostic($reference->range, 1, 'translation.not_found', 'Missing translation.');
         $paths = ProjectPaths::resolver();
-        $actionProvider = new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, $protocol, $extractor, $indexes, new UriToPathConverter(), $paths, new ProjectDocumentReader($documents, $paths), new UnknownNameCodeActionBuilder($protocol));
-        $params = ['textDocument' => ['uri' => $uri], 'context' => ['diagnostics' => [$diagnostic]]];
-        $actions = $actionProvider->actions($params);
+        $actionProvider = new TranslationCodeActionProvider($converter, $protocol, $extractor, $indexes, new UriToPathConverter(), $paths, new ProjectDocumentReader($documents, $paths), new UnknownNameCodeActionBuilder($protocol));
+        $request = (new ProviderRequests($documents, $projects))->codeAction($uri, [$diagnostic]);
+        $actions = $actionProvider->actions($request);
 
-        self::assertSame(['Replace with "news.latest"'], array_column($actions ?? [], 'title'));
+        self::assertSame(['Replace with "news.latest"'], array_column($actions, 'title'));
         self::assertSame(['documentChanges' => [[
             'textDocument' => ['uri' => $uri, 'version' => 2],
             'edits' => [['range' => $diagnostic['range'], 'newText' => 'news.latest']],
         ]]], $actions[0]['edit'] ?? null);
         $indexes->forProject($project)->replaceRuntime(true, new TranslationMessage('news.lates', 'messages', 'en', 'Already present'));
-        self::assertSame([], $actionProvider->actions($params));
+        self::assertSame([], $actionProvider->actions($request));
     }
 
     public function testComputesTheInsertionPointFromTheOpenUnsavedTranslationTarget(): void
@@ -404,13 +400,8 @@ final class TranslationProviderTest extends TestCase
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
             self::assertIsArray($diagnostics);
             $pathResolver = ProjectPaths::resolver();
-            $actions = (new TranslationCodeActionProvider(new DocumentContextResolver($documents, $projects), $converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver), new UnknownNameCodeActionBuilder(new LspProtocolMapper())))->actions([
-                'textDocument' => ['uri' => $uri],
-                'range' => $diagnostics[0]['range'],
-                'context' => ['diagnostics' => $diagnostics],
-            ]);
+            $actions = (new TranslationCodeActionProvider($converter, new LspProtocolMapper(), $extractor, $indexes, new UriToPathConverter(), $pathResolver, new ProjectDocumentReader($documents, $pathResolver), new UnknownNameCodeActionBuilder(new LspProtocolMapper())))->actions((new ProviderRequests($documents, $projects))->codeAction($uri, $diagnostics));
 
-            self::assertIsArray($actions);
             self::assertCount(1, $actions);
             self::assertIsArray($actions[0]['edit'] ?? null);
             self::assertIsArray($actions[0]['edit']['documentChanges'] ?? null);

@@ -43,6 +43,33 @@ final class LspProtocolMapper
         ];
     }
 
+    /**
+     * @param array<array-key, mixed>       $diagnostic
+     * @param list<array<array-key, mixed>> $documentChanges
+     *
+     * @return array{title: string, kind: string, diagnostics: list<array<array-key, mixed>>, isPreferred: bool, edit: array{documentChanges: list<array<array-key, mixed>>}}
+     */
+    public function quickFix(string $title, array $diagnostic, array $documentChanges, bool $isPreferred = false): array
+    {
+        return [
+            'title' => $title,
+            'kind' => 'quickfix',
+            'diagnostics' => [$diagnostic],
+            'isPreferred' => $isPreferred,
+            'edit' => ['documentChanges' => $documentChanges],
+        ];
+    }
+
+    /**
+     * @param list<array<array-key, mixed>> $edits
+     *
+     * @return array{textDocument: array{uri: string, version: int|null}, edits: list<array<array-key, mixed>>}
+     */
+    public function textDocumentEdit(string $uri, ?int $version, array $edits): array
+    {
+        return ['textDocument' => ['uri' => $uri, 'version' => $version], 'edits' => $edits];
+    }
+
     /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, target: string, tooltip?: string} */
     public function documentLink(Range $range, string $target, ?string $tooltip = null): array
     {

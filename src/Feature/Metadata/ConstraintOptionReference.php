@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\RangedSourceSymbolInterface;
 
-final class ConstraintOptionReference
+final class ConstraintOptionReference implements RangedSourceSymbolInterface
 {
     public function __construct(
         public readonly string $constraint,

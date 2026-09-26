@@ -3,20 +3,18 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CodeActionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\UnknownNameCodeActionBuilder;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\ProjectPathResolver;
+use Symfony\Lsp\Protocol\CodeActionRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class RouteCodeActionProvider implements CodeActionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly RouteIndexRegistry $indexes,
@@ -28,46 +26,29 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
     ) {
     }
 
-    public function actions(array $params): ?array
+    public function actions(CodeActionRequest $request): array
     {
-        $request = $this->documentContextResolver->resolveDocument($params);
-        $context = $params['context'] ?? null;
-        if (null === $request
-            || !\is_array($context)
-            || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)
+        if (!$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)
             || !\in_array($request->document->languageId, ['php', 'twig'], true)
         ) {
-            return null;
+            return [];
         }
-        $document = SourceDocument::fromDocument($request->document);
         $references = 'twig' === $request->document->languageId
-            ? $this->twigExtractor->extract($document)
-            : $this->phpExtractor->extract($document, $this->classIndexes->forProject($request->project));
-        $actions = [];
-        foreach (\is_array($context['diagnostics'] ?? null) ? $context['diagnostics'] : [] as $diagnostic) {
-            if (!\is_array($diagnostic) || !\in_array($diagnostic['code'] ?? null, ['route.not_found', 'route.missing_parameters'], true)) {
-                continue;
-            }
-            $range = $diagnostic['range'] ?? null;
-            if (!\is_array($range)) {
-                continue;
-            }
+            ? $this->twigExtractor->extract($request->source)
+            : $this->phpExtractor->extract($request->source, $this->classIndexes->forProject($request->project));
+        $routeIndex = $this->indexes->forProject($request->project);
+        $actions = $this->unknownNames->actions(
+            $request,
+            ['route.not_found'],
+            $references,
+            static fn (RouteReference $reference): ?array => $routeIndex->isComplete() && null === $routeIndex->get($reference->name)
+                ? [$reference->name, array_map(static fn (Route $route): string => $route->name, $routeIndex->matching(''))]
+                : null,
+        );
+        foreach ($request->diagnostics('route.missing_parameters') as $diagnostic) {
             foreach ($references as $reference) {
-                if (!$this->protocol->sameRange($reference->range, $range)) {
+                if (!$reference->range->equals($diagnostic->range)) {
                     continue;
-                }
-                $routeIndex = $this->indexes->forProject($request->project);
-                if ('route.not_found' === $diagnostic['code']) {
-                    if ($routeIndex->isComplete() && null === $routeIndex->get($reference->name)) {
-                        array_push($actions, ...$this->unknownNames->replacements(
-                            $request->document,
-                            $diagnostic,
-                            $reference->range,
-                            $reference->name,
-                            array_map(static fn (Route $route): string => $route->name, $routeIndex->matching('')),
-                        ));
-                    }
-                    break;
                 }
                 $route = $routeIndex->get($reference->name);
                 if (null === $route || null === $reference->providedParameters) {
@@ -78,16 +59,12 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
                 if (null === $edit) {
                     continue;
                 }
-                $actions[] = [
-                    'title' => 1 === \count($missing) ? 'Add missing route parameter' : 'Add missing route parameters',
-                    'kind' => 'quickfix',
-                    'diagnostics' => [$diagnostic],
-                    'isPreferred' => true,
-                    'edit' => ['documentChanges' => [[
-                        'textDocument' => ['uri' => $request->document->uri, 'version' => $request->document->version],
-                        'edits' => [$edit],
-                    ]]],
-                ];
+                $actions[] = $this->protocol->quickFix(
+                    1 === \count($missing) ? 'Add missing route parameter' : 'Add missing route parameters',
+                    $diagnostic->diagnostic,
+                    [$this->protocol->textDocumentEdit($request->document->uri, $request->document->version, [$edit])],
+                    true,
+                );
                 break;
             }
         }

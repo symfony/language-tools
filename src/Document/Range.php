@@ -10,6 +10,14 @@ final class Range
     ) {
     }
 
+    public function equals(self $other): bool
+    {
+        return $this->start->line === $other->start->line
+            && $this->start->character === $other->start->character
+            && $this->end->line === $other->end->line
+            && $this->end->character === $other->end->character;
+    }
+
     public function containsPosition(Position $position): bool
     {
         $atOrAfterStart = $position->line > $this->start->line
