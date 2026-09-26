@@ -7,7 +7,14 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Lsp\Feature\Console\ConsoleSourceIndex;
+use Symfony\Lsp\Feature\Twig\TwigCallableKind;
+use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndex;
+use Symfony\Lsp\Index\AbstractProjectIndexRegistry;
+use Symfony\Lsp\Index\AbstractSourceFactsIndex;
+use Symfony\Lsp\Index\AbstractSourceIndexer;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\SourceFactsInterface;
 use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Project\Project;
@@ -17,7 +24,62 @@ use Symfony\Lsp\Server\ContainerFactory;
 final class SourceIndexProviderContractTest extends TestCase
 {
     #[DataProvider('providerNameProvider')]
-    public function testPersistedFactsSurviveTheirPayloadCodec(string $name): void
+    public function testRestoredPayloadsRebuildTheIndexedLookups(string $name): void
+    {
+        [$indexed, $restored] = self::roundTrip($name);
+
+        self::assertEquals(self::lookups($indexed), self::lookups($restored));
+    }
+
+    public function testRestoredConsoleIndexResolvesCommandDefinitions(): void
+    {
+        [, $restored] = self::roundTrip('console');
+
+        self::assertInstanceOf(ConsoleSourceIndex::class, $restored);
+        $definition = $restored->definition('App\\Command\\ReportCommand');
+        self::assertSame(['format'], $definition->arguments);
+        self::assertSame(['dry-run'], $definition->options);
+        self::assertTrue($definition->command);
+        self::assertTrue($definition->complete);
+    }
+
+    public function testRestoredTwigCallableIndexKeepsDeclarationOptions(): void
+    {
+        [, $restored] = self::roundTrip('twig_callable');
+
+        self::assertInstanceOf(TwigCallableSourceIndex::class, $restored);
+        $declarations = $restored->declarations(TwigCallableKind::Function, 'article_title');
+        self::assertCount(1, $declarations);
+        self::assertSame('title', $declarations[0]->method);
+        self::assertTrue($declarations[0]->needsContext);
+        self::assertTrue($declarations[0]->variadic);
+        self::assertTrue($declarations[0]->optionsKnown);
+
+        $attributes = $restored->declarations(TwigCallableKind::Function, 'article_excerpt');
+        self::assertCount(1, $attributes);
+        self::assertSame('excerpt', $attributes[0]->method);
+        self::assertTrue($attributes[0]->needsCharset);
+        self::assertTrue($attributes[0]->needsContext);
+        self::assertTrue($attributes[0]->needsIsSandboxed);
+        self::assertTrue($attributes[0]->variadic);
+        self::assertTrue($attributes[0]->optionsKnown);
+    }
+
+    public function testEveryRuntimeRefreshDomainIsARegisteredProviderName(): void
+    {
+        self::assertSame([], array_diff(array_keys(RuntimeRefreshPlanner::DOMAIN_SECTIONS), array_keys(self::providers())));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function providerNameProvider(): iterable
+    {
+        foreach (array_keys(self::providers()) as $name) {
+            yield $name => [$name];
+        }
+    }
+
+    /** @return array{AbstractSourceFactsIndex<SourceFactsInterface>, AbstractSourceFactsIndex<SourceFactsInterface>} */
+    private static function roundTrip(string $name): array
     {
         $providers = self::providers();
         $provider = $providers[$name];
@@ -39,6 +101,7 @@ final class SourceIndexProviderContractTest extends TestCase
             $decoded[] = $restored;
         }
         $provider->finish($project);
+        $indexed = self::detachIndex($provider, $project);
 
         self::assertNotSame([], $decoded, \sprintf('No fixture source exercises the "%s" provider.', $name));
 
@@ -47,19 +110,39 @@ final class SourceIndexProviderContractTest extends TestCase
             $provider->restore($project, $facts);
         }
         $provider->finish($project);
+
+        return [$indexed, self::detachIndex($provider, $project)];
     }
 
-    public function testEveryRuntimeRefreshDomainIsARegisteredProviderName(): void
+    /** @return AbstractSourceFactsIndex<SourceFactsInterface> */
+    private static function detachIndex(SourceIndexProviderInterface $provider, Project $project): AbstractSourceFactsIndex
     {
-        self::assertSame([], array_diff(array_keys(RuntimeRefreshPlanner::DOMAIN_SECTIONS), array_keys(self::providers())));
+        $indexes = (new \ReflectionProperty(AbstractSourceIndexer::class, 'indexes'))->getValue($provider);
+        self::assertInstanceOf(AbstractProjectIndexRegistry::class, $indexes);
+        $index = $indexes->forProject($project);
+        self::assertInstanceOf(AbstractSourceFactsIndex::class, $index);
+        self::assertTrue($index->hasScannedSources());
+        (new \ReflectionMethod(AbstractSourceFactsIndex::class, 'derive'))->invoke($index);
+        $indexes->removeProject($project);
+
+        return $index;
     }
 
-    /** @return iterable<string, array{string}> */
-    public static function providerNameProvider(): iterable
+    /**
+     * Leaves out the stored facts: empty facts are indexed but never persisted.
+     *
+     * @param AbstractSourceFactsIndex<SourceFactsInterface> $index
+     *
+     * @return array<string, mixed>
+     */
+    private static function lookups(AbstractSourceFactsIndex $index): array
     {
-        foreach (array_keys(self::providers()) as $name) {
-            yield $name => [$name];
+        $lookups = [];
+        foreach ((new \ReflectionObject($index))->getProperties() as $property) {
+            $lookups[$property->getName()] = $property->getValue($index);
         }
+
+        return $lookups;
     }
 
     /** @return array<string, SourceIndexProviderInterface> */
@@ -198,6 +281,7 @@ final class SourceIndexProviderContractTest extends TestCase
                 <?php
                 namespace App\Twig;
 
+                use Twig\Attribute\AsTwigFunction;
                 use Twig\Extension\AbstractExtension;
                 use Twig\TwigFilter;
                 use Twig\TwigFunction;
@@ -206,7 +290,7 @@ final class SourceIndexProviderContractTest extends TestCase
                 {
                     public function getFunctions(): array
                     {
-                        return [new TwigFunction('article_title', $this->title(...))];
+                        return [new TwigFunction('article_title', $this->title(...), ['needs_context' => true, 'is_variadic' => true])];
                     }
 
                     public function getFilters(): array
@@ -214,14 +298,20 @@ final class SourceIndexProviderContractTest extends TestCase
                         return [new TwigFilter('shorten', $this->shorten(...))];
                     }
 
-                    public function title(string $slug): string
+                    public function title(array $context, string ...$slugs): string
                     {
-                        return $slug;
+                        return implode(' ', $slugs);
                     }
 
                     public function shorten(string $text, int $length = 10): string
                     {
                         return substr($text, 0, $length);
+                    }
+
+                    #[AsTwigFunction('article_excerpt', needsCharset: true, needsContext: true, needsIsSandboxed: true)]
+                    public function excerpt(string $charset, array $context, bool $isSandboxed, string ...$paragraphs): string
+                    {
+                        return implode('', $paragraphs);
                     }
                 }
                 PHP),
