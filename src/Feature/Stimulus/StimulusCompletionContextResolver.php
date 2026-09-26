@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Stimulus;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Parser\Twig\TwigCallSyntax;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 
@@ -26,16 +27,23 @@ final class StimulusCompletionContextResolver
         if (!$this->directives->insideDirective($masked, $offset)) {
             return $this->attributeContext($before, $text, $offset);
         }
-        if (preg_match('/\bstimulus_(?:action|target)\s*\(\s*([\'"])([^\'"]+)\1\s*,\s*([\'"])([^\'"]*)$/s', $before, $match)) {
+        if (preg_match('/\bstimulus_(action|target)\s*\(\s*(?:controllerName\s*[:=]\s*)?([\'"])([^\'"]+)\2\s*,\s*(?:(?:actionName|targetNames)\s*[:=]\s*)?([\'"])([^\'"]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)
+            && !TwigCallSyntax::isMethodCall($before, $match[1][1] - \strlen('stimulus_'))
+        ) {
+            $kind = 'action' === $match[1][0] ? StimulusMemberKind::Action : StimulusMemberKind::Target;
+            $prefix = StimulusMemberKind::Target === $kind ? (string) preg_replace('/^.*\s/s', '', $match[5][0]) : $match[5][0];
+
             return new StimulusCompletionContext(
-                str_contains($match[0], 'stimulus_action') ? StimulusMemberKind::Action : StimulusMemberKind::Target,
-                $this->controllerNameNormalizer->normalize($match[2]),
-                $match[4],
-                $this->converter->toRange($text, $offset - \strlen($match[4]), \strlen($match[4])),
+                $kind,
+                $this->controllerNameNormalizer->normalize($match[3][0]),
+                $prefix,
+                $this->converter->toRange($text, $offset - \strlen($prefix), \strlen($prefix)),
             );
         }
-        if (preg_match('/\bstimulus_(?:controller|action|target)\s*\(\s*([\'"])([^\'"]*)$/s', $before, $match)) {
-            return new StimulusCompletionContext(null, null, $this->controllerNameNormalizer->normalize($match[2]), $this->converter->toRange($text, $offset - \strlen($match[2]), \strlen($match[2])));
+        if (preg_match('/\b(stimulus_(?:controller|action|target))\s*\(\s*(?:controllerName\s*[:=]\s*)?([\'"])([^\'"]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)
+            && !TwigCallSyntax::isMethodCall($before, $match[1][1])
+        ) {
+            return new StimulusCompletionContext(null, null, $this->controllerNameNormalizer->normalize($match[3][0]), $this->converter->toRange($text, $offset - \strlen($match[3][0]), \strlen($match[3][0])));
         }
 
         return null;

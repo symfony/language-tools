@@ -118,6 +118,12 @@ final class StimulusProviderTest extends TestCase
         self::assertSame(['results'], $this->completeAtEnd($kit, 'file:///workspace/templates/target_completion.html.twig', '<input data-search-target="res'));
         self::assertSame(['onChange'], $this->completeAtEnd($kit, 'file:///workspace/templates/package_action_completion.html.twig', "{{ stimulus_action('@symfony/ux-autocomplete/autocomplete', 'on"));
         self::assertSame(['field'], $this->completeAtEnd($kit, 'file:///workspace/templates/package_target_completion.html.twig', "{{ stimulus_target('symfony/ux-autocomplete/autocomplete', 'fi"));
+        self::assertSame(['search'], $this->completeAtEnd($kit, 'file:///workspace/templates/named_controller_completion.html.twig', "{{ stimulus_controller(controllerName: 'sea"));
+        self::assertSame(['open'], $this->completeAtEnd($kit, 'file:///workspace/templates/named_action_completion.html.twig', "{{ stimulus_action('search', actionName: 'op"));
+        self::assertSame(['results'], $this->completeAtEnd($kit, 'file:///workspace/templates/named_target_completion.html.twig', "{{ stimulus_target(controllerName: 'search', targetNames: 'res"));
+        self::assertSame(['results'], $this->completeAtEnd($kit, 'file:///workspace/templates/second_target_completion.html.twig', "{{ stimulus_target('search', 'input res"));
+        self::assertSame(['open'], $this->completeAtEnd($kit, 'file:///workspace/templates/filter_action_completion.html.twig', "{{ attributes|stimulus_action('search', 'op"));
+        self::assertSame([], $this->completeAtEnd($kit, 'file:///workspace/templates/method_completion.html.twig', "{{ helpers.stimulus_controller('sea"));
         $quotedAttributeUri = 'file:///workspace/templates/quoted_attribute.html.twig';
         $quotedAttributeText = '{% set markup = \'<button data-action="click->search#op';
         $kit->open($quotedAttributeUri, $quotedAttributeText);
