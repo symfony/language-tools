@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Tool\Dogfood;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\ComposerSetup;
 use Symfony\Lsp\Tools\Dogfood\ProcessResult;
 use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
@@ -12,38 +13,38 @@ use Symfony\Lsp\Tools\Dogfood\SetupException;
 
 final class ComposerSetupTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-dogfood-'.bin2hex(random_bytes(8)));
-        (new Filesystem())->mkdir($this->directory);
+        $this->workspace = new TestWorkspace('symfony-lsp-dogfood-');
+        (new Filesystem())->mkdir($this->workspace->rootPath);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testInstallsThePinnedDependencySet(): void
     {
-        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'composer.lock'), '{}');
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
 
-        (new ComposerSetup($processes))->setUp($this->configuration(), $this->directory);
+        (new ComposerSetup($processes))->setUp($this->configuration(), $this->workspace->rootPath);
 
         self::assertCount(1, $processes->calls);
         self::assertSame(['composer', 'install', '--no-interaction', '--no-progress'], $processes->calls[0]['command']);
-        self::assertSame($this->directory, $processes->calls[0]['directory']);
+        self::assertSame($this->workspace->rootPath, $processes->calls[0]['directory']);
         self::assertSame(['COMPOSER_NO_INTERACTION' => '1'], $processes->calls[0]['environment']);
     }
 
     public function testPassesConfiguredEnvironmentVariablesToComposer(): void
     {
-        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'composer.lock'), '{}');
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
 
-        (new ComposerSetup($processes))->setUp($this->configuration(environmentVariables: ['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app']), $this->directory);
+        (new ComposerSetup($processes))->setUp($this->configuration(environmentVariables: ['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app']), $this->workspace->rootPath);
 
         self::assertSame([
             'DATABASE_URL' => 'mysql://root@127.0.0.1:9/app',
@@ -53,63 +54,63 @@ final class ComposerSetupTest extends TestCase
 
     public function testSkipsScriptsWhenDisabled(): void
     {
-        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'composer.lock'), '{}');
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
 
-        (new ComposerSetup($processes, scripts: false))->setUp($this->configuration(), $this->directory);
+        (new ComposerSetup($processes, scripts: false))->setUp($this->configuration(), $this->workspace->rootPath);
 
         self::assertSame(['composer', 'install', '--no-interaction', '--no-progress', '--no-scripts'], $processes->calls[0]['command']);
     }
 
     public function testSourceOnlyModeCannotRunApplicationComposerScripts(): void
     {
-        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'composer.lock'), '{}');
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
         $configuration = new ProjectConfiguration('acme', 'https://example.com/app.git', str_repeat('a', 40), null, 'dev', 'composer', false, 120, analysisMode: 'source-only');
 
-        (new ComposerSetup($processes))->setUp($configuration, $this->directory);
+        (new ComposerSetup($processes))->setUp($configuration, $this->workspace->rootPath);
 
         self::assertSame(['composer', 'install', '--no-interaction', '--no-progress', '--no-scripts'], $processes->calls[0]['command']);
     }
 
     public function testCopiesThePinnedLockFileWhenTheProjectCommitsNone(): void
     {
-        file_put_contents(Path::join($this->directory, 'pinned.lock'), '{"pinned": true}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'pinned.lock'), '{"pinned": true}');
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
 
-        (new ComposerSetup($processes))->setUp($this->configuration(Path::join($this->directory, 'pinned.lock')), $this->directory);
+        (new ComposerSetup($processes))->setUp($this->configuration(Path::join($this->workspace->rootPath, 'pinned.lock')), $this->workspace->rootPath);
 
-        self::assertSame('{"pinned": true}', file_get_contents(Path::join($this->directory, 'composer.lock')));
+        self::assertSame('{"pinned": true}', file_get_contents(Path::join($this->workspace->rootPath, 'composer.lock')));
     }
 
     public function testKeepsTheUpstreamLockFileWhenPresent(): void
     {
-        file_put_contents(Path::join($this->directory, 'composer.lock'), '{"upstream": true}');
-        file_put_contents(Path::join($this->directory, 'pinned.lock'), '{"pinned": true}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'composer.lock'), '{"upstream": true}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'pinned.lock'), '{"pinned": true}');
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '', '', false));
 
-        (new ComposerSetup($processes))->setUp($this->configuration(Path::join($this->directory, 'pinned.lock')), $this->directory);
+        (new ComposerSetup($processes))->setUp($this->configuration(Path::join($this->workspace->rootPath, 'pinned.lock')), $this->workspace->rootPath);
 
-        self::assertSame('{"upstream": true}', file_get_contents(Path::join($this->directory, 'composer.lock')));
+        self::assertSame('{"upstream": true}', file_get_contents(Path::join($this->workspace->rootPath, 'composer.lock')));
     }
 
     public function testAllowsConfiguredPluginsAndRestoresTheManifest(): void
     {
-        file_put_contents(Path::join($this->directory, 'composer.json'), '{"name": "acme/app"}');
-        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'composer.json'), '{"name": "acme/app"}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'composer.lock'), '{}');
         $processes = new FakeProcessRunner(function (array $command): ProcessResult {
             if ('config' === $command[1]) {
-                file_put_contents(Path::join($this->directory, 'composer.json'), '{"name": "acme/app", "config": {"allow-plugins": true}}');
+                file_put_contents(Path::join($this->workspace->rootPath, 'composer.json'), '{"name": "acme/app", "config": {"allow-plugins": true}}');
             }
 
             return new ProcessResult(0, '', '', false);
         });
 
-        (new ComposerSetup($processes))->setUp($this->configuration(allowPlugins: ['contao/manager-plugin']), $this->directory);
+        (new ComposerSetup($processes))->setUp($this->configuration(allowPlugins: ['contao/manager-plugin']), $this->workspace->rootPath);
 
         self::assertSame(['composer', 'config', '--no-plugins', '--no-interaction', 'allow-plugins.contao/manager-plugin', 'true'], $processes->calls[0]['command']);
         self::assertSame(['composer', 'install', '--no-interaction', '--no-progress'], $processes->calls[1]['command']);
-        self::assertSame('{"name": "acme/app"}', file_get_contents(Path::join($this->directory, 'composer.json')));
+        self::assertSame('{"name": "acme/app"}', file_get_contents(Path::join($this->workspace->rootPath, 'composer.json')));
     }
 
     public function testRejectsProjectsWithoutALockFile(): void
@@ -119,27 +120,27 @@ final class ComposerSetupTest extends TestCase
         $this->expectException(SetupException::class);
         $this->expectExceptionMessage('not reproducible');
 
-        (new ComposerSetup($processes))->setUp($this->configuration(), $this->directory);
+        (new ComposerSetup($processes))->setUp($this->configuration(), $this->workspace->rootPath);
     }
 
     public function testReportsInstallationFailures(): void
     {
-        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'composer.lock'), '{}');
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(2, '', 'Your requirements could not be resolved.', false));
 
         $this->expectException(SetupException::class);
         $this->expectExceptionMessage('Composer install failed for "acme" (exit code 2)');
 
-        (new ComposerSetup($processes))->setUp($this->configuration(), $this->directory);
+        (new ComposerSetup($processes))->setUp($this->configuration(), $this->workspace->rootPath);
     }
 
     public function testDoesNotExposeCredentialBearingDownloadErrors(): void
     {
-        file_put_contents(Path::join($this->directory, 'composer.lock'), '{}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'composer.lock'), '{}');
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(2, 'private value', 'Download failed: https://example.com/package.zip?token=credential-canary', false));
 
         try {
-            (new ComposerSetup($processes))->setUp($this->configuration(), $this->directory);
+            (new ComposerSetup($processes))->setUp($this->configuration(), $this->workspace->rootPath);
             self::fail('The failed install must fail setup.');
         } catch (SetupException $error) {
             self::assertStringContainsString('exit code 2', $error->getMessage());

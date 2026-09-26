@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Index;
 use Fabpot\JsonRpc\Exception\JsonRpcException;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Feature\RenameProviderInterface;
@@ -33,9 +32,10 @@ final class SourceIndexOverlayManagerTest extends TestCase
 {
     public function testBroadcastsEligibleOverlaysAndRemovesIneligibleOnes(): void
     {
-        $root = sys_get_temp_dir().'/symfony-lsp-overlay-'.bin2hex(random_bytes(8));
-        mkdir($root.'/src', 0777, true);
-        mkdir($root.'/vendor', 0777, true);
+        $workspace = new TestWorkspace('symfony-lsp-overlay-');
+        $root = $workspace->rootPath;
+        $workspace->mkdir('src');
+        $workspace->mkdir('vendor');
 
         try {
             $projects = new ProjectRegistry();
@@ -68,14 +68,15 @@ final class SourceIndexOverlayManagerTest extends TestCase
             self::assertSame($project, $manager->locateUri($sourceUri)?->project);
             self::assertNull($manager->locateUri($vendorUri));
         } finally {
-            (new Filesystem())->remove($root);
+            $workspace->cleanup();
         }
     }
 
     public function testTracksPartialPhpHealthAndClearsItOnExclusionAndClose(): void
     {
-        $root = sys_get_temp_dir().'/symfony-lsp-overlay-health-'.bin2hex(random_bytes(8));
-        mkdir($root.'/src', 0777, true);
+        $workspace = new TestWorkspace('symfony-lsp-overlay-health-');
+        $root = $workspace->rootPath;
+        $workspace->mkdir('src');
 
         try {
             $projects = new ProjectRegistry();
@@ -127,7 +128,7 @@ final class SourceIndexOverlayManagerTest extends TestCase
             $manager->removeUri($uri);
             self::assertFalse($health->isDegraded($uri));
         } finally {
-            (new Filesystem())->remove($root);
+            $workspace->cleanup();
         }
     }
 

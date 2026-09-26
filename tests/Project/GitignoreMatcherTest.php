@@ -3,33 +3,32 @@
 namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\GitignoreMatcher;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class GitignoreMatcherTest extends TestCase
 {
-    private string $temporaryDirectory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
-        mkdir($this->temporaryDirectory);
+        $this->workspace = new TestWorkspace('symfony-lsp-');
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->temporaryDirectory);
+        $this->workspace->cleanup();
     }
 
     public function testMatchesRootGitignorePatterns(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "*.log\ntmp/\n");
-        mkdir($this->temporaryDirectory.'/tmp/phpstan', 0777, true);
+        $this->workspace->write('.gitignore', "*.log\ntmp/\n");
+        $this->workspace->mkdir('tmp/phpstan');
         $matcher = new GitignoreMatcher();
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/debug.log'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/tmp/phpstan/cache.php'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Controller.php'));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('debug.log')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('tmp/phpstan/cache.php')));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/Controller.php')));
     }
 
     public function testMatchesPathsBelowASymlinkedRoot(): void
@@ -37,12 +36,12 @@ final class GitignoreMatcherTest extends TestCase
         if ('Windows' === \PHP_OS_FAMILY) {
             self::markTestSkipped('Directory symlinks are not supported in this environment.');
         }
-        mkdir($this->temporaryDirectory.'/project/var', 0777, true);
-        file_put_contents($this->temporaryDirectory.'/project/.gitignore', "var/\n");
-        if (!symlink($this->temporaryDirectory.'/project', $this->temporaryDirectory.'/link')) {
+        $this->workspace->mkdir('project/var');
+        $this->workspace->write('project/.gitignore', "var/\n");
+        if (!symlink($this->workspace->path('project'), $this->workspace->path('link'))) {
             self::markTestSkipped('Unable to create a directory symlink in this environment.');
         }
-        $root = $this->temporaryDirectory.'/link';
+        $root = $this->workspace->path('link');
         $matcher = new GitignoreMatcher();
 
         self::assertTrue($matcher->isIgnored($root, $root.'/var/cache.php'));
@@ -51,175 +50,175 @@ final class GitignoreMatcherTest extends TestCase
 
     public function testMatchesGitignoreFilesAboveTheProjectRoot(): void
     {
-        mkdir($this->temporaryDirectory.'/.git');
-        mkdir($this->temporaryDirectory.'/app/tmp', 0777, true);
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "app/tmp/\n");
+        $this->workspace->mkdir('.git');
+        $this->workspace->mkdir('app/tmp');
+        $this->workspace->write('.gitignore', "app/tmp/\n");
         $matcher = new GitignoreMatcher();
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory.'/app', $this->temporaryDirectory.'/app/tmp/cache.php'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory.'/app', $this->temporaryDirectory.'/app/src/Controller.php'));
+        self::assertTrue($matcher->isIgnored($this->workspace->path('app'), $this->workspace->path('app/tmp/cache.php')));
+        self::assertFalse($matcher->isIgnored($this->workspace->path('app'), $this->workspace->path('app/src/Controller.php')));
     }
 
     public function testRefreshesResultsWhenAGitignoreFileChanges(): void
     {
-        mkdir($this->temporaryDirectory.'/tmp');
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "tmp/\n");
+        $this->workspace->mkdir('tmp');
+        $this->workspace->write('.gitignore', "tmp/\n");
         $matcher = new GitignoreMatcher();
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/tmp/cache.php'));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('tmp/cache.php')));
 
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "*.log\n");
+        $this->workspace->write('.gitignore', "*.log\n");
 
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/tmp/cache.php'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/tmp/app.log'));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('tmp/cache.php')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('tmp/app.log')));
     }
 
     public function testRefreshesResultsWhenANestedGitignoreFileChanges(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "*.php\n");
-        mkdir($this->temporaryDirectory.'/src');
-        file_put_contents($this->temporaryDirectory.'/src/.gitignore', "!Kernel.php\n");
+        $this->workspace->write('.gitignore', "*.php\n");
+        $this->workspace->mkdir('src');
+        $this->workspace->write('src/.gitignore', "!Kernel.php\n");
         $matcher = new GitignoreMatcher();
 
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/Kernel.php')));
 
-        file_put_contents($this->temporaryDirectory.'/src/.gitignore', "!Controller.php\n");
+        $this->workspace->write('src/.gitignore', "!Controller.php\n");
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Controller.php'));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/Kernel.php')));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/Controller.php')));
     }
 
     public function testRefreshesResultsWhenAGitignoreFileAppearsOrDisappears(): void
     {
-        mkdir($this->temporaryDirectory.'/src');
+        $this->workspace->mkdir('src');
         $matcher = new GitignoreMatcher();
 
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/Kernel.php')));
 
-        file_put_contents($this->temporaryDirectory.'/src/.gitignore', "Kernel.php\n");
+        $this->workspace->write('src/.gitignore', "Kernel.php\n");
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/Kernel.php')));
 
-        unlink($this->temporaryDirectory.'/src/.gitignore');
+        unlink($this->workspace->path('src/.gitignore'));
 
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/Kernel.php')));
     }
 
     public function testReincludesEverythingBelowADirectoryRestoredByANegatedPattern(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "custom/*\n!custom/static-plugins/\n");
-        mkdir($this->temporaryDirectory.'/custom/static-plugins/Demo/src', 0777, true);
-        mkdir($this->temporaryDirectory.'/custom/plugins', 0777, true);
+        $this->workspace->write('.gitignore', "custom/*\n!custom/static-plugins/\n");
+        $this->workspace->mkdir('custom/static-plugins/Demo/src');
+        $this->workspace->mkdir('custom/plugins');
         $matcher = new GitignoreMatcher();
 
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/custom/static-plugins/Demo/composer.json'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/custom/static-plugins/Demo/src/Theme.php'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/custom/plugins/Legacy.php'));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('custom/static-plugins/Demo/composer.json')));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('custom/static-plugins/Demo/src/Theme.php')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('custom/plugins/Legacy.php')));
     }
 
     public function testKeepsFilesIgnoredWhenTheirParentDirectoryItselfIsExcluded(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "custom/\n!custom/static-plugins/\n");
-        mkdir($this->temporaryDirectory.'/custom/static-plugins/Demo', 0777, true);
+        $this->workspace->write('.gitignore', "custom/\n!custom/static-plugins/\n");
+        $this->workspace->mkdir('custom/static-plugins/Demo');
         $matcher = new GitignoreMatcher();
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/custom/static-plugins/Demo/composer.json'));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('custom/static-plugins/Demo/composer.json')));
     }
 
     public function testFilterKeepsFilesRestoredByANegatedPattern(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "custom/*\n!custom/static-plugins/\n");
-        mkdir($this->temporaryDirectory.'/custom/static-plugins/Demo', 0777, true);
-        mkdir($this->temporaryDirectory.'/custom/plugins', 0777, true);
+        $this->workspace->write('.gitignore', "custom/*\n!custom/static-plugins/\n");
+        $this->workspace->mkdir('custom/static-plugins/Demo');
+        $this->workspace->mkdir('custom/plugins');
         $matcher = new GitignoreMatcher();
 
         $files = [
-            $this->temporaryDirectory.'/custom/static-plugins/Demo/composer.json',
-            $this->temporaryDirectory.'/custom/plugins/composer.json',
+            $this->workspace->path('custom/static-plugins/Demo/composer.json'),
+            $this->workspace->path('custom/plugins/composer.json'),
         ];
 
         self::assertSame(
-            [$this->temporaryDirectory.'/custom/static-plugins/Demo/composer.json'],
-            iterator_to_array($matcher->filter($files, $this->temporaryDirectory), false),
+            [$this->workspace->path('custom/static-plugins/Demo/composer.json')],
+            iterator_to_array($matcher->filter($files, $this->workspace->rootPath), false),
         );
     }
 
     public function testAppliesTheLastMatchingPattern(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "*.log\n!important.log\n*.tmp.log\n");
+        $this->workspace->write('.gitignore', "*.log\n!important.log\n*.tmp.log\n");
         $matcher = new GitignoreMatcher();
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/debug.log'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/important.log'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/build.tmp.log'));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('debug.log')));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('important.log')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('build.tmp.log')));
     }
 
     public function testNestedGitignoreFilesOverrideTheRootOnes(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "*.php\n");
-        mkdir($this->temporaryDirectory.'/src');
-        file_put_contents($this->temporaryDirectory.'/src/.gitignore', "!Kernel.php\n");
+        $this->workspace->write('.gitignore', "*.php\n");
+        $this->workspace->mkdir('src');
+        $this->workspace->write('src/.gitignore', "!Kernel.php\n");
         $matcher = new GitignoreMatcher();
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/Foo.php'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Foo.php'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/Kernel.php'));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('Foo.php')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/Foo.php')));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/Kernel.php')));
     }
 
     public function testAnchorsPatternsContainingASlash(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "/build\nsrc/cache\ncache\n");
+        $this->workspace->write('.gitignore', "/build\nsrc/cache\ncache\n");
         $matcher = new GitignoreMatcher();
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/build/app.php'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/build/app.php'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/cache/app.php'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/var/deep/cache/app.php'));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('build/app.php')));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/build/app.php')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/cache/app.php')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('var/deep/cache/app.php')));
     }
 
     public function testOnlyMatchesDirectoriesForPatternsEndingWithASlash(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "cache/\n");
-        mkdir($this->temporaryDirectory.'/var/cache', 0777, true);
-        touch($this->temporaryDirectory.'/cache');
+        $this->workspace->write('.gitignore', "cache/\n");
+        $this->workspace->mkdir('var/cache');
+        touch($this->workspace->path('cache'));
         $matcher = new GitignoreMatcher();
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/var/cache/app.php'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/cache'));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('var/cache/app.php')));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('cache')));
     }
 
     public function testSupportsWildcardsAndCharacterClasses(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "assets/**\n**/generated\nconfig[0-9].yaml\nlog?.txt\n");
-        mkdir($this->temporaryDirectory.'/assets/build', 0777, true);
-        mkdir($this->temporaryDirectory.'/src/deep/generated', 0777, true);
+        $this->workspace->write('.gitignore', "assets/**\n**/generated\nconfig[0-9].yaml\nlog?.txt\n");
+        $this->workspace->mkdir('assets/build');
+        $this->workspace->mkdir('src/deep/generated');
         $matcher = new GitignoreMatcher();
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/assets/build/app.js'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/assets'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/src/deep/generated/Dto.php'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/config1.yaml'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/config12.yaml'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/loga.txt'));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('assets/build/app.js')));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('assets')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('src/deep/generated/Dto.php')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('config1.yaml')));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('config12.yaml')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('loga.txt')));
     }
 
     public function testSkipsCommentsAndHonorsEscapedPrefixes(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "# a comment\n\\#hash.txt\n\\!bang.txt\n");
+        $this->workspace->write('.gitignore', "# a comment\n\\#hash.txt\n\\!bang.txt\n");
         $matcher = new GitignoreMatcher();
 
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/a.txt'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/#hash.txt'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/!bang.txt'));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('a.txt')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('#hash.txt')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('!bang.txt')));
     }
 
     public function testIgnoresUnescapedTrailingWhitespace(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "trailing.txt   \nescaped.txt\\ \n");
+        $this->workspace->write('.gitignore', "trailing.txt   \nescaped.txt\\ \n");
         $matcher = new GitignoreMatcher();
 
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/trailing.txt'));
-        self::assertFalse($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/escaped.txt'));
-        self::assertTrue($matcher->isIgnored($this->temporaryDirectory, $this->temporaryDirectory.'/escaped.txt '));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('trailing.txt')));
+        self::assertFalse($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('escaped.txt')));
+        self::assertTrue($matcher->isIgnored($this->workspace->rootPath, $this->workspace->path('escaped.txt ')));
     }
 }

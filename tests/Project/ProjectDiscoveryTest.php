@@ -3,95 +3,94 @@
 namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectDiscovery;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class ProjectDiscoveryTest extends TestCase
 {
-    private string $temporaryDirectory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
-        mkdir($this->temporaryDirectory);
+        $this->workspace = new TestWorkspace('symfony-lsp-');
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->temporaryDirectory);
+        $this->workspace->cleanup();
     }
 
     public function testDiscoversFrameworkBundleProjects(): void
     {
-        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+        $this->workspace->write('composer.json', json_encode([
             'type' => 'project',
             'require' => ['symfony/framework-bundle' => '^7.4'],
         ], \JSON_THROW_ON_ERROR));
-        $uri = 'file://'.$this->temporaryDirectory;
+        $uri = 'file://'.$this->workspace->rootPath;
 
         $projects = (new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()))->discover([
             ['uri' => $uri, 'name' => 'application'],
         ]);
 
         self::assertCount(1, $projects);
-        self::assertSame($this->temporaryDirectory, $projects[0]->rootPath);
+        self::assertSame($this->workspace->rootPath, $projects[0]->rootPath);
         self::assertSame($uri, $projects[0]->rootUri);
     }
 
     public function testDiscoversNestedAndExplicitProjectRoots(): void
     {
-        mkdir($this->temporaryDirectory.'/.hidden', 0777, true);
-        mkdir($this->temporaryDirectory.'/apps/admin', 0777, true);
-        mkdir($this->temporaryDirectory.'/apps/ignored', 0777, true);
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "/vendor/\n");
-        mkdir($this->temporaryDirectory.'/vendor/package', 0777, true);
+        $this->workspace->mkdir('.hidden');
+        $this->workspace->mkdir('apps/admin');
+        $this->workspace->mkdir('apps/ignored');
+        $this->workspace->write('.gitignore', "/vendor/\n");
+        $this->workspace->mkdir('vendor/package');
         foreach (['.hidden', 'apps/admin', 'apps/ignored', 'vendor/package'] as $path) {
-            file_put_contents($this->temporaryDirectory.'/'.$path.'/composer.json', json_encode([
+            $this->workspace->write($path.'/composer.json', json_encode([
                 'type' => 'project',
                 'require' => ['symfony/framework-bundle' => '^8.0'],
             ], \JSON_THROW_ON_ERROR));
         }
         $discovery = new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher());
-        $workspace = [['uri' => 'file://'.$this->temporaryDirectory]];
+        $workspace = [['uri' => 'file://'.$this->workspace->rootPath]];
 
         $projects = $discovery->discover($workspace);
         self::assertSame([
-            $this->temporaryDirectory.'/.hidden',
-            $this->temporaryDirectory.'/apps/admin',
-            $this->temporaryDirectory.'/apps/ignored',
+            $this->workspace->path('.hidden'),
+            $this->workspace->path('apps/admin'),
+            $this->workspace->path('apps/ignored'),
         ], array_map(static fn (Project $project): string => $project->rootPath, $projects));
 
-        file_put_contents($this->temporaryDirectory.'/apps/admin/composer.json', json_encode([
+        $this->workspace->write('apps/admin/composer.json', json_encode([
             'require' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
-        $projects = $discovery->discover($workspace, [$this->temporaryDirectory.'/apps/admin']);
+        $projects = $discovery->discover($workspace, [$this->workspace->path('apps/admin')]);
         self::assertCount(1, $projects);
-        self::assertSame($this->temporaryDirectory.'/apps/admin', $projects[0]->rootPath);
+        self::assertSame($this->workspace->path('apps/admin'), $projects[0]->rootPath);
     }
 
     public function testSkipsProjectsInstalledInTheDeclaredComposerVendorDirectory(): void
     {
-        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+        $this->workspace->write('composer.json', json_encode([
             'type' => 'project',
             'config' => ['vendor-dir' => 'libraries'],
             'require' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
-        mkdir($this->temporaryDirectory.'/libraries/package', 0777, true);
-        file_put_contents($this->temporaryDirectory.'/libraries/package/composer.json', json_encode([
+        $this->workspace->mkdir('libraries/package');
+        $this->workspace->write('libraries/package/composer.json', json_encode([
             'type' => 'project',
             'require' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
 
         $projects = (new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()))->discover([
-            ['uri' => 'file://'.$this->temporaryDirectory],
+            ['uri' => 'file://'.$this->workspace->rootPath],
         ]);
 
         self::assertSame(
-            [$this->temporaryDirectory],
+            [$this->workspace->rootPath],
             array_map(static fn (Project $project): string => $project->rootPath, $projects),
         );
         self::assertSame('libraries', $projects[0]->vendorPath);
@@ -99,28 +98,28 @@ final class ProjectDiscoveryTest extends TestCase
 
     public function testSkipsGitignoredProjectsUnlessExplicitlyConfigured(): void
     {
-        mkdir($this->temporaryDirectory.'/.git');
-        mkdir($this->temporaryDirectory.'/ignored/app', 0777, true);
-        mkdir($this->temporaryDirectory.'/apps/admin', 0777, true);
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "/ignored/\n");
+        $this->workspace->mkdir('.git');
+        $this->workspace->mkdir('ignored/app');
+        $this->workspace->mkdir('apps/admin');
+        $this->workspace->write('.gitignore', "/ignored/\n");
         foreach (['ignored/app', 'apps/admin'] as $path) {
-            file_put_contents($this->temporaryDirectory.'/'.$path.'/composer.json', json_encode([
+            $this->workspace->write($path.'/composer.json', json_encode([
                 'type' => 'project',
                 'require' => ['symfony/framework-bundle' => '^8.0'],
             ], \JSON_THROW_ON_ERROR));
         }
         $discovery = new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher());
-        $workspace = [['uri' => 'file://'.$this->temporaryDirectory]];
+        $workspace = [['uri' => 'file://'.$this->workspace->rootPath]];
 
         $projects = $discovery->discover($workspace);
         self::assertSame(
-            [$this->temporaryDirectory.'/apps/admin'],
+            [$this->workspace->path('apps/admin')],
             array_map(static fn (Project $project): string => $project->rootPath, $projects),
         );
 
-        $projects = $discovery->discover($workspace, [$this->temporaryDirectory.'/ignored/app']);
+        $projects = $discovery->discover($workspace, [$this->workspace->path('ignored/app')]);
         self::assertCount(1, $projects);
-        self::assertSame($this->temporaryDirectory.'/ignored/app', $projects[0]->rootPath);
+        self::assertSame($this->workspace->path('ignored/app'), $projects[0]->rootPath);
     }
 
     public function testDiscoversProjectsAroundUnreadableDirectories(): void
@@ -129,39 +128,39 @@ final class ProjectDiscoveryTest extends TestCase
             self::markTestSkipped('Directory permissions are not enforced in this environment.');
         }
 
-        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+        $this->workspace->write('composer.json', json_encode([
             'type' => 'project',
             'require' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
-        mkdir($this->temporaryDirectory.'/volumes/mysql', 0777, true);
-        chmod($this->temporaryDirectory.'/volumes/mysql', 0000);
+        $this->workspace->mkdir('volumes/mysql');
+        chmod($this->workspace->path('volumes/mysql'), 0000);
 
         try {
             $projects = (new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()))->discover([
-                ['uri' => 'file://'.$this->temporaryDirectory],
+                ['uri' => 'file://'.$this->workspace->rootPath],
             ]);
         } finally {
-            chmod($this->temporaryDirectory.'/volumes/mysql', 0755);
+            chmod($this->workspace->path('volumes/mysql'), 0755);
         }
 
         self::assertCount(1, $projects);
-        self::assertSame($this->temporaryDirectory, $projects[0]->rootPath);
+        self::assertSame($this->workspace->rootPath, $projects[0]->rootPath);
     }
 
     public function testDiscoversLegacyApplicationsWithAConsoleMarker(): void
     {
-        mkdir($this->temporaryDirectory.'/bin');
-        file_put_contents($this->temporaryDirectory.'/bin/console', '');
-        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+        $this->workspace->mkdir('bin');
+        $this->workspace->write('bin/console', '');
+        $this->workspace->write('composer.json', json_encode([
             'require' => ['symfony/framework-bundle' => '^7.4'],
         ], \JSON_THROW_ON_ERROR));
 
         $projects = (new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()))->discover([
-            ['uri' => 'file://'.$this->temporaryDirectory],
+            ['uri' => 'file://'.$this->workspace->rootPath],
         ]);
 
         self::assertCount(1, $projects);
-        self::assertSame($this->temporaryDirectory, $projects[0]->rootPath);
+        self::assertSame($this->workspace->rootPath, $projects[0]->rootPath);
     }
 
     public function testSelectsMostSpecificProjectForDocument(): void
@@ -178,17 +177,17 @@ final class ProjectDiscoveryTest extends TestCase
 
     public function testDiscoversDistributionApplicationsWithATransitiveFrameworkBundle(): void
     {
-        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+        $this->workspace->write('composer.json', json_encode([
             'type' => 'project',
             'require' => ['contao/manager-bundle' => '5.3.*'],
         ], \JSON_THROW_ON_ERROR));
-        file_put_contents($this->temporaryDirectory.'/composer.lock', json_encode([
+        $this->workspace->write('composer.lock', json_encode([
             'packages' => [
                 ['name' => 'contao/manager-bundle', 'version' => '5.3.49'],
                 ['name' => 'symfony/framework-bundle', 'version' => 'v6.4.43'],
             ],
         ], \JSON_THROW_ON_ERROR));
-        $uri = 'file://'.$this->temporaryDirectory;
+        $uri = 'file://'.$this->workspace->rootPath;
 
         $projects = (new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()))->discover([
             ['uri' => $uri, 'name' => 'application'],
@@ -199,11 +198,11 @@ final class ProjectDiscoveryTest extends TestCase
 
     public function testIgnoresApplicationsWithoutTheFrameworkBundleInTheLock(): void
     {
-        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+        $this->workspace->write('composer.json', json_encode([
             'type' => 'project',
             'require' => ['laravel/framework' => '^12.0'],
         ], \JSON_THROW_ON_ERROR));
-        file_put_contents($this->temporaryDirectory.'/composer.lock', json_encode([
+        $this->workspace->write('composer.lock', json_encode([
             'packages' => [
                 ['name' => 'laravel/framework', 'version' => 'v12.1.0'],
                 ['name' => 'symfony/console', 'version' => 'v7.4.1'],
@@ -211,49 +210,49 @@ final class ProjectDiscoveryTest extends TestCase
         ], \JSON_THROW_ON_ERROR));
 
         self::assertSame([], (new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()))->discover([
-            ['uri' => 'file://'.$this->temporaryDirectory],
+            ['uri' => 'file://'.$this->workspace->rootPath],
         ]));
     }
 
     public function testIgnoresNonFrameworkProjectsAndInvalidComposerFiles(): void
     {
-        file_put_contents($this->temporaryDirectory.'/composer.json', '{');
+        $this->workspace->write('composer.json', '{');
         $discovery = new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher());
 
         self::assertSame([], $discovery->discover([
-            ['uri' => 'file://'.$this->temporaryDirectory],
+            ['uri' => 'file://'.$this->workspace->rootPath],
         ]));
 
-        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+        $this->workspace->write('composer.json', json_encode([
             'type' => 'project',
             'require' => ['symfony/console' => '^7.4'],
         ], \JSON_THROW_ON_ERROR));
 
         self::assertSame([], $discovery->discover([
-            ['uri' => 'file://'.$this->temporaryDirectory],
+            ['uri' => 'file://'.$this->workspace->rootPath],
         ]));
     }
 
     public function testIgnoresComposerPackages(): void
     {
         $discovery = new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher());
-        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+        $this->workspace->write('composer.json', json_encode([
             'name' => 'symfony/example-bundle',
             'type' => 'symfony-bundle',
             'require' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
 
         self::assertSame([], $discovery->discover([
-            ['uri' => 'file://'.$this->temporaryDirectory],
+            ['uri' => 'file://'.$this->workspace->rootPath],
         ]));
 
-        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+        $this->workspace->write('composer.json', json_encode([
             'type' => 'project',
             'require-dev' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
 
         self::assertSame([], $discovery->discover([
-            ['uri' => 'file://'.$this->temporaryDirectory],
+            ['uri' => 'file://'.$this->workspace->rootPath],
         ]));
     }
 }

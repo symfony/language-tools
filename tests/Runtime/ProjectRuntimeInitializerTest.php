@@ -38,10 +38,11 @@ use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\Bridge\ProjectRuntimeInitializerFixtureBuilder;
 use Symfony\Lsp\Tests\Support\CapturingWritableStream;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class ProjectRuntimeInitializerTest extends TestCase
 {
-    private string $temporaryDirectory;
+    private TestWorkspace $workspace;
 
     private static function projects(Project ...$projects): ProjectRegistry
     {
@@ -58,18 +59,17 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
-        mkdir($this->temporaryDirectory);
+        $this->workspace = new TestWorkspace('symfony-lsp-');
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->temporaryDirectory);
+        $this->workspace->cleanup();
     }
 
     public function testExecutesBridgeAndLoadsRoutes(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
@@ -100,7 +100,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $indexes = new RouteIndexRegistry();
         $serviceIndexes = new ServiceIndexRegistry();
         $parameterIndexes = new ParameterIndexRegistry();
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $configuration = new RuntimeConfiguration();
         $configuration->configure([
             'phpCommand' => ['project-php', '--flag'],
@@ -134,7 +134,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('--error-details=1', $processRunner->command[8]);
         self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[9]);
         self::assertMatchesRegularExpression('{^--release-metadata-cache=.+/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[10]);
-        self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
+        self::assertSame($this->workspace->rootPath, $processRunner->workingDirectory);
         self::assertSame(90.0, $processRunner->timeout);
         self::assertSame([
             'scope' => 'full',
@@ -148,13 +148,13 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testCanDisableReleaseMetadataAccess(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['releaseMetadata' => false]);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
@@ -175,13 +175,13 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testRequestsBridgeErrorDetailsInVerboseMode(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $logger = new ServerLogger(null, new SensitiveDataRedactor());
         $logger->configure('verbose');
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
@@ -198,17 +198,17 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testLogsSectionWarningsInVerboseModeOnly(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $payload = json_encode([
             'schemaVersion' => 1,
             'sections' => [
                 'twig' => ['complete' => false, 'paths' => [], 'warnings' => ['The debug:twig command is unavailable.', 42]],
-                'assets' => ['assetsComplete' => false, 'warnings' => [\sprintf('Asset path not found: %s/assets', $this->temporaryDirectory)]],
+                'assets' => ['assetsComplete' => false, 'warnings' => [\sprintf('Asset path not found: %s/assets', $this->workspace->rootPath)]],
                 'routes' => ['complete' => true, 'items' => [], 'warnings' => []],
             ],
         ], \JSON_THROW_ON_ERROR);
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $silent = new CapturingWritableStream();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, $payload, '')),
@@ -242,9 +242,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testNeverLoadsMetadataForAProjectRemovedWhileTheBridgeRan(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $registry = self::projects($project);
         $processRunner = new RemovingProcessRunner($registry, new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
@@ -277,13 +277,13 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testMapsBridgeArgumentsToTheContainerProjectRoot(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $configuration = new RuntimeConfiguration();
         $configuration->configure([
             'phpCommand' => ['docker', 'compose', 'exec', '-T', 'php', 'php'],
@@ -305,20 +305,20 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('--project=/app', $processRunner->command[7]);
         self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[13]);
         self::assertMatchesRegularExpression('{^--release-metadata-cache=/app/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[14]);
-        self::assertSame($this->temporaryDirectory, $processRunner->workingDirectory);
-        self::assertFileExists($this->temporaryDirectory.substr($processRunner->command[6], \strlen('/app')));
+        self::assertSame($this->workspace->rootPath, $processRunner->workingDirectory);
+        self::assertFileExists($this->workspace->rootPath.substr($processRunner->command[6], \strlen('/app')));
     }
 
     public function testPassesTheConfiguredKernelToTheBridge(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $snapshot = new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), '');
         $processRunner = new CapturingProcessRunner($snapshot, $snapshot, $snapshot);
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['kernel' => 'Api\Kernel']);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
@@ -343,11 +343,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testRejectsRuntimeIndexingWithoutDebugMode(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $configuration = new RuntimeConfiguration();
         $configuration->configure(['debug' => false]);
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, '', '')),
             self::snapshotLoaders(),
@@ -363,9 +363,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testReportsSymfonyBranchesRejectedByReleaseMetadata(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
@@ -385,14 +385,14 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testAcceptsIntermediateSymfonyBranchesWithoutAnUnsupportedMarker(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(new ProcessResult(0, json_encode([
             'schemaVersion' => 1,
             'project' => ['symfonyBranch' => '8.0'],
             'sections' => [],
         ], \JSON_THROW_ON_ERROR), ''));
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             self::snapshotLoaders(),
@@ -407,12 +407,12 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testRebuildsTheDebugContainerWhenRequiredByThePlan(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(
             new ProcessResult(0, json_encode(['schemaVersion' => 1, 'sections' => []], \JSON_THROW_ON_ERROR), ''),
         );
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
             self::snapshotLoaders(),
@@ -433,7 +433,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testRefreshesOnlyPlannedSectionsAgainstTheExistingContainer(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $processRunner = new CapturingProcessRunner(
             new ProcessResult(0, json_encode([
@@ -448,7 +448,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
                 ],
             ], \JSON_THROW_ON_ERROR), ''),
         );
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $statuses = new ProjectIndexStatusRegistry();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             $processRunner,
@@ -478,11 +478,11 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testLoadsAvailableSectionsBeforeReportingSectionErrors(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $serviceIndexes = new ServiceIndexRegistry();
         $routeIndexes = new RouteIndexRegistry();
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
                 'schemaVersion' => 1,
@@ -532,9 +532,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testRestoresOnlyFailedSectionsAfterAPartialBridgeError(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $projects = self::projects($project);
         $configuration = new RuntimeConfiguration();
         $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
@@ -600,9 +600,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testRejectsStaleConfigurationValidationResults(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $projects = self::projects($project);
         $configuration = new RuntimeConfiguration();
         $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
@@ -647,9 +647,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testLoadsConfigurationValidationBeforeReportingRuntimeFailure(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $validations = new ConfigurationValidationRegistry();
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(0, json_encode([
@@ -680,9 +680,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testRestoresPersistedMetadataWhenTheInitialBridgeExecutionFails(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $projects = self::projects($project);
         $configuration = new RuntimeConfiguration();
         $firstIndexes = new RouteIndexRegistry();
@@ -740,9 +740,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testKeepsTheActiveSnapshotWhenARefreshFails(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $projects = self::projects($project);
         $configuration = new RuntimeConfiguration();
         $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
@@ -778,9 +778,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testKeepsCurrentConfigurationFailureWithRestoredMetadata(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $projects = self::projects($project);
         $configuration = new RuntimeConfiguration();
         $bridgeInstaller = new BridgeInstaller($source, 'test', new Filesystem());
@@ -834,7 +834,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testLoadsCompleteSnapshotWhenBridgeExitsAfterReturningIt(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $payload = json_encode([
             'schemaVersion' => 1,
@@ -843,7 +843,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             ],
         ], \JSON_THROW_ON_ERROR);
         $indexes = new RouteIndexRegistry();
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $output = new CapturingWritableStream();
         $logger = new ServerLogger($output, new SensitiveDataRedactor());
         $logger->configure('verbose');
@@ -867,9 +867,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testRejectsFailedBridgeExecutionWithoutExposingErrorOutput(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(1, '', "CANARY_SECRET_RUNTIME_OUTPUT\n")),
             self::snapshotLoaders(
@@ -889,7 +889,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testLoadsTheSnapshotWhenStrayOutputSurroundsThePayload(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
         $payload = json_encode([
             'schemaVersion' => 1,
@@ -898,7 +898,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             ],
         ], \JSON_THROW_ON_ERROR);
         $indexes = new RouteIndexRegistry();
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(
                 0,
@@ -917,9 +917,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
     public function testRejectsMissingPayloadWithoutExposingErrorOutput(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
+        $source = $this->workspace->path('source.php');
         file_put_contents($source, '<?php');
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
             new CapturingProcessRunner(new ProcessResult(
                 0,

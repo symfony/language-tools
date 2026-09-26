@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationException;
 use Symfony\Lsp\Tools\Dogfood\ScenarioLocator;
 
@@ -33,11 +34,11 @@ final class ScenarioLocatorTest extends TestCase
 
         TWIG;
 
-    private string $root;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->root = Path::join(sys_get_temp_dir(), 'symfony-lsp-locator-'.bin2hex(random_bytes(8)));
+        $this->workspace = new TestWorkspace('symfony-lsp-locator-');
         $this->write('src/Controller/BlogController.php', self::CONTROLLER);
         $this->write('src/Duplicate.php', "<?php\n// TODO\n// TODO\n");
         $this->write('templates/blog/index.html.twig', self::TEMPLATE);
@@ -51,12 +52,12 @@ final class ScenarioLocatorTest extends TestCase
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->root);
+        $this->workspace->cleanup();
     }
 
     public function testLocatesAnAnchorWithTheDefaultOffset(): void
     {
-        $document = (new ScenarioLocator())->locate($this->root, [
+        $document = (new ScenarioLocator())->locate($this->workspace->rootPath, [
             'id' => 'route.hover',
             'file' => 'src/Controller/BlogController.php',
             'anchor' => "redirectToRoute('blog_index'",
@@ -75,7 +76,7 @@ final class ScenarioLocatorTest extends TestCase
 
     public function testLocatesAnOffsetInsideTheAnchor(): void
     {
-        $document = (new ScenarioLocator())->locate($this->root, [
+        $document = (new ScenarioLocator())->locate($this->workspace->rootPath, [
             'file' => 'src/Controller/BlogController.php',
             'anchor' => "redirectToRoute('blog_index'",
             'offset' => 17,
@@ -89,7 +90,7 @@ final class ScenarioLocatorTest extends TestCase
 
     public function testCountsPositionsInUtf16CodeUnits(): void
     {
-        $document = (new ScenarioLocator())->locate($this->root, [
+        $document = (new ScenarioLocator())->locate($this->workspace->rootPath, [
             'file' => 'templates/blog/index.html.twig',
             'anchor' => "'blog_index'",
         ]);
@@ -101,7 +102,7 @@ final class ScenarioLocatorTest extends TestCase
 
     public function testLocatesAnOffsetInsideAMultibyteAnchor(): void
     {
-        $document = (new ScenarioLocator())->locate($this->root, [
+        $document = (new ScenarioLocator())->locate($this->workspace->rootPath, [
             'file' => 'templates/blog/index.html.twig',
             'anchor' => "'héros 🎉'",
             'offset' => 8,
@@ -113,7 +114,7 @@ final class ScenarioLocatorTest extends TestCase
 
     public function testAcceptsAnOffsetAtTheEndOfTheAnchor(): void
     {
-        $document = (new ScenarioLocator())->locate($this->root, [
+        $document = (new ScenarioLocator())->locate($this->workspace->rootPath, [
             'file' => 'config/services.yaml',
             'anchor' => 'autowire',
             'offset' => 8,
@@ -128,7 +129,7 @@ final class ScenarioLocatorTest extends TestCase
     {
         $this->write('config/eof.yaml', 'framework: true');
 
-        $document = (new ScenarioLocator())->locate($this->root, [
+        $document = (new ScenarioLocator())->locate($this->workspace->rootPath, [
             'file' => 'config/eof.yaml',
             'anchor' => 'true',
             'offset' => 4,
@@ -143,7 +144,7 @@ final class ScenarioLocatorTest extends TestCase
     {
         $this->write('config/windows.yaml', "framework:\r\n    secret: '%env(APP_SECRET)%'\r\n");
 
-        $document = (new ScenarioLocator())->locate($this->root, [
+        $document = (new ScenarioLocator())->locate($this->workspace->rootPath, [
             'file' => 'config/windows.yaml',
             'anchor' => 'APP_SECRET',
         ]);
@@ -158,7 +159,7 @@ final class ScenarioLocatorTest extends TestCase
         $uri = 'file://'.$this->realPath('src/Controller/BlogController.php');
         $overlay = str_replace('blog_index', 'blog_missing', self::CONTROLLER);
 
-        $document = $locator->locate($this->root, [
+        $document = $locator->locate($this->workspace->rootPath, [
             'file' => 'src/Controller/BlogController.php',
             'anchor' => "redirectToRoute('blog_missing'",
         ], [$uri => $overlay]);
@@ -169,7 +170,7 @@ final class ScenarioLocatorTest extends TestCase
 
     public function testIgnoresOverlaysOfOtherDocuments(): void
     {
-        $document = (new ScenarioLocator())->locate($this->root, [
+        $document = (new ScenarioLocator())->locate($this->workspace->rootPath, [
             'file' => 'src/Controller/BlogController.php',
             'anchor' => "redirectToRoute('blog_index'",
         ], ['file:///elsewhere/Other.php' => 'overlay']);
@@ -179,9 +180,9 @@ final class ScenarioLocatorTest extends TestCase
 
     public function testResolvesSymlinkedFilesToTheirCanonicalPath(): void
     {
-        symlink($this->realPath('src/Controller/BlogController.php'), Path::join($this->root, 'src/Alias.php'));
+        symlink($this->realPath('src/Controller/BlogController.php'), Path::join($this->workspace->rootPath, 'src/Alias.php'));
 
-        $document = (new ScenarioLocator())->locate($this->root, [
+        $document = (new ScenarioLocator())->locate($this->workspace->rootPath, [
             'file' => 'src/Alias.php',
             'anchor' => "redirectToRoute('blog_index'",
         ]);
@@ -194,13 +195,13 @@ final class ScenarioLocatorTest extends TestCase
     {
         $outside = Path::join(sys_get_temp_dir(), 'symfony-lsp-outside-'.bin2hex(random_bytes(8)).'.php');
         file_put_contents($outside, "<?php\n// TODO\n");
-        symlink($outside, Path::join($this->root, 'src/Escape.php'));
+        symlink($outside, Path::join($this->workspace->rootPath, 'src/Escape.php'));
 
         try {
             $this->expectException(ConfigurationException::class);
             $this->expectExceptionMessage('resolves outside of');
 
-            (new ScenarioLocator())->locate($this->root, ['file' => 'src/Escape.php', 'anchor' => 'TODO']);
+            (new ScenarioLocator())->locate($this->workspace->rootPath, ['file' => 'src/Escape.php', 'anchor' => 'TODO']);
         } finally {
             unlink($outside);
         }
@@ -208,12 +209,12 @@ final class ScenarioLocatorTest extends TestCase
 
     public function testRejectsSymlinksIntoExcludedDirectories(): void
     {
-        symlink($this->realPath('vendor/acme/package/src/Thing.php'), Path::join($this->root, 'src/Vendored.php'));
+        symlink($this->realPath('vendor/acme/package/src/Thing.php'), Path::join($this->workspace->rootPath, 'src/Vendored.php'));
 
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('excluded directory "vendor"');
 
-        (new ScenarioLocator())->locate($this->root, ['file' => 'src/Vendored.php', 'anchor' => 'TODO']);
+        (new ScenarioLocator())->locate($this->workspace->rootPath, ['file' => 'src/Vendored.php', 'anchor' => 'TODO']);
     }
 
     public function testRejectsAMissingProjectRoot(): void
@@ -221,7 +222,7 @@ final class ScenarioLocatorTest extends TestCase
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('does not exist');
 
-        (new ScenarioLocator())->locate(Path::join($this->root, 'missing'), [
+        (new ScenarioLocator())->locate(Path::join($this->workspace->rootPath, 'missing'), [
             'file' => 'src/Controller/BlogController.php',
             'anchor' => 'TODO',
         ]);
@@ -234,7 +235,7 @@ final class ScenarioLocatorTest extends TestCase
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('is not valid UTF-8');
 
-        (new ScenarioLocator())->locate($this->root, ['file' => 'src/Binary.php', 'anchor' => 'TODO']);
+        (new ScenarioLocator())->locate($this->workspace->rootPath, ['file' => 'src/Binary.php', 'anchor' => 'TODO']);
     }
 
     #[DataProvider('languageProvider')]
@@ -242,7 +243,7 @@ final class ScenarioLocatorTest extends TestCase
     {
         $this->write($file, "anchor\n");
 
-        $document = (new ScenarioLocator())->locate($this->root, ['file' => $file, 'anchor' => 'anchor']);
+        $document = (new ScenarioLocator())->locate($this->workspace->rootPath, ['file' => $file, 'anchor' => 'anchor']);
 
         self::assertSame($languageId, $document->languageId);
     }
@@ -278,7 +279,7 @@ final class ScenarioLocatorTest extends TestCase
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage($message);
 
-        (new ScenarioLocator())->locate($this->root, $scenario);
+        (new ScenarioLocator())->locate($this->workspace->rootPath, $scenario);
     }
 
     /**
@@ -315,13 +316,13 @@ final class ScenarioLocatorTest extends TestCase
 
     private function write(string $file, string $contents): void
     {
-        $path = Path::join($this->root, $file);
+        $path = Path::join($this->workspace->rootPath, $file);
         (new Filesystem())->mkdir(\dirname($path));
         file_put_contents($path, $contents);
     }
 
     private function realPath(string $file): string
     {
-        return (string) realpath(Path::join($this->root, $file));
+        return (string) realpath(Path::join($this->workspace->rootPath, $file));
     }
 }

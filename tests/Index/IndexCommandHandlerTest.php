@@ -37,28 +37,28 @@ use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class IndexCommandHandlerTest extends TestCase
 {
-    private string $temporaryDirectory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
-        mkdir($this->temporaryDirectory);
+        $this->workspace = new TestWorkspace('symfony-lsp-');
     }
 
     protected function tearDown(): void
     {
-        @rmdir($this->temporaryDirectory);
+        $this->workspace->cleanup();
     }
 
     public function testManuallyRefreshesSourceAndTrustedRuntimeIndexes(): void
     {
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project(
-            $this->temporaryDirectory,
-            'file://'.$this->temporaryDirectory,
+            $this->workspace->rootPath,
+            'file://'.$this->workspace->rootPath,
         )]);
         $statuses = new ProjectIndexStatusRegistry();
         $sourceScanner = $this->scanner($projects, $statuses);
@@ -81,9 +81,9 @@ final class IndexCommandHandlerTest extends TestCase
             'arguments' => [$project->rootUri],
         ]);
 
-        self::assertSame([$this->temporaryDirectory], $runtime->projects);
+        self::assertSame([$this->workspace->rootPath], $runtime->projects);
         self::assertSame([[
-            'root' => $this->temporaryDirectory,
+            'root' => $this->workspace->rootPath,
             'source' => ['state' => 'ready'],
             'runtime' => ['state' => 'ready'],
             'environment' => 'dev',
@@ -123,8 +123,8 @@ final class IndexCommandHandlerTest extends TestCase
     {
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project(
-            $this->temporaryDirectory,
-            'file://'.$this->temporaryDirectory,
+            $this->workspace->rootPath,
+            'file://'.$this->workspace->rootPath,
         )]);
         $statuses = new ProjectIndexStatusRegistry();
         $runtime = new RecordingRuntimeInitializer();
@@ -174,8 +174,8 @@ final class IndexCommandHandlerTest extends TestCase
     {
         $projects = new ProjectRegistry();
         $projects->replace([$project = new Project(
-            $this->temporaryDirectory,
-            'file://'.$this->temporaryDirectory,
+            $this->workspace->rootPath,
+            'file://'.$this->workspace->rootPath,
         )]);
         $statuses = new ProjectIndexStatusRegistry();
         $sourceScanner = $this->scanner($projects, $statuses);
@@ -197,7 +197,7 @@ final class IndexCommandHandlerTest extends TestCase
             'arguments' => [$project->rootUri],
         ]);
 
-        self::assertSame([$this->temporaryDirectory, $this->temporaryDirectory], $runtime->projects);
+        self::assertSame([$this->workspace->rootPath, $this->workspace->rootPath], $runtime->projects);
         self::assertSame('ready', $result[0]['runtime']['state'] ?? null);
     }
 

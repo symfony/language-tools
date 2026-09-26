@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\ComposerSetup;
 use Symfony\Lsp\Tools\Dogfood\DiagnosticCheckHarness;
 use Symfony\Lsp\Tools\Dogfood\HarnessInterface;
@@ -22,7 +23,7 @@ use function Amp\delay;
 
 final class MatrixCommandTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
     private string $checkout;
     private string $output;
 
@@ -40,9 +41,9 @@ final class MatrixCommandTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-dogfood-'.bin2hex(random_bytes(8)));
-        $this->checkout = Path::join($this->directory, 'checkout');
-        $this->output = Path::join($this->directory, 'output');
+        $this->workspace = new TestWorkspace('symfony-lsp-dogfood-');
+        $this->checkout = Path::join($this->workspace->rootPath, 'checkout');
+        $this->output = Path::join($this->workspace->rootPath, 'output');
         $this->diagnosticReport = [
             'schemaVersion' => 1,
             'complete' => true,
@@ -65,7 +66,7 @@ final class MatrixCommandTest extends TestCase
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testRunsColdAndWarmAndRecordsArtifacts(): void
@@ -533,7 +534,7 @@ final class MatrixCommandTest extends TestCase
     /** @param 'runtime'|'source-only' $analysisMode */
     private function configuration(?string $directory = null, string $name = 'acme', string $analysisMode = 'runtime'): ProjectConfiguration
     {
-        $manifest = $this->directory.'/'.$name.'.scenarios.json';
+        $manifest = $this->workspace->path($name.'.scenarios.json');
         file_put_contents($manifest, json_encode([
             'version' => 1, 'revision' => str_repeat('a', 40), 'diagnostics' => [],
             'scenarios' => [

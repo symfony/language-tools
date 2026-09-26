@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Tests\Tool\Dogfood;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationException;
 use Symfony\Lsp\Tools\Dogfood\ProcessResult;
 use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
@@ -13,24 +13,24 @@ use Symfony\Lsp\Tools\Dogfood\ServerHarness;
 
 final class ServerHarnessTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-server-harness-'.bin2hex(random_bytes(8)));
-        (new Filesystem())->mkdir($this->directory);
+        $this->workspace = new TestWorkspace('symfony-lsp-server-harness-');
+        (new Filesystem())->mkdir($this->workspace->rootPath);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     /** @param array<string, mixed> $scenario */
     #[DataProvider('scenarioBudgetProvider')]
     public function testBudgetsOnlyDeclaredChecksAndEditingBarriers(array $scenario, float $expectedTimeout): void
     {
-        $manifest = $this->directory.'/scenarios.json';
+        $manifest = $this->workspace->path('scenarios.json');
         file_put_contents($manifest, json_encode([
             'version' => 1, 'revision' => str_repeat('a', 40), 'scenarios' => [$scenario], 'diagnostics' => [],
         ], \JSON_THROW_ON_ERROR));
@@ -42,7 +42,7 @@ final class ServerHarnessTest extends TestCase
             scenarioFile: $manifest,
         );
 
-        $result = (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->directory);
+        $result = (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->workspace->rootPath);
 
         self::assertSame($expectedTimeout, $processes->calls[0]['timeout']);
         self::assertContains('--scenarios='.$manifest, $processes->calls[0]['command']);
@@ -70,7 +70,7 @@ final class ServerHarnessTest extends TestCase
     #[DataProvider('analysisModeProvider')]
     public function testForwardsTheRequestedAnalysisMode(string $analysisMode, bool $expectedSourceOnly): void
     {
-        $manifest = $this->directory.'/scenarios.json';
+        $manifest = $this->workspace->path('scenarios.json');
         file_put_contents($manifest, json_encode([
             'version' => 1, 'revision' => str_repeat('a', 40), 'diagnostics' => [],
             'scenarios' => [['id' => 'route.twig', 'file' => 'templates/index.html.twig', 'anchor' => 'home', 'expect' => ['completion' => ['includes' => ['home']]]]],
@@ -82,10 +82,10 @@ final class ServerHarnessTest extends TestCase
             analysisMode: $analysisMode,
         );
 
-        (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->directory);
+        (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->workspace->rootPath);
 
         self::assertSame($expectedSourceOnly, \in_array('--source-only', $processes->calls[0]['command'], true));
-        self::assertSame(['/bin/symfony-lsp', $this->directory], \array_slice($processes->calls[0]['command'], -2));
+        self::assertSame(['/bin/symfony-lsp', $this->workspace->rootPath], \array_slice($processes->calls[0]['command'], -2));
     }
 
     /** @return iterable<string, array{'runtime'|'source-only', bool}> */
@@ -98,7 +98,7 @@ final class ServerHarnessTest extends TestCase
     #[DataProvider('kernelProvider')]
     public function testForwardsOnlyExplicitKernels(?string $kernel): void
     {
-        $manifest = $this->directory.'/scenarios.json';
+        $manifest = $this->workspace->path('scenarios.json');
         file_put_contents($manifest, json_encode([
             'version' => 1, 'revision' => str_repeat('a', 40), 'diagnostics' => [],
             'scenarios' => [['id' => 'route.twig', 'file' => 'templates/index.html.twig', 'anchor' => 'home', 'expect' => ['completion' => ['includes' => ['home']]]]],
@@ -110,7 +110,7 @@ final class ServerHarnessTest extends TestCase
             kernel: $kernel,
         );
 
-        (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->directory);
+        (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->workspace->rootPath);
 
         self::assertSame(null === $kernel ? [] : ['--kernel='.$kernel], array_values(array_filter(
             $processes->calls[0]['command'], static fn (string $argument): bool => str_starts_with($argument, '--kernel='),
@@ -129,10 +129,10 @@ final class ServerHarnessTest extends TestCase
     public function testMissingManifestNeverStartsTheProcess(): void
     {
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(0, '{}', '', false));
-        $configuration = new ProjectConfiguration('application', 'https://example.com/application.git', str_repeat('a', 40), null, 'dev', 'composer', false, 20, scenarioFile: $this->directory.'/missing.json');
+        $configuration = new ProjectConfiguration('application', 'https://example.com/application.git', str_repeat('a', 40), null, 'dev', 'composer', false, 20, scenarioFile: $this->workspace->path('missing.json'));
 
         try {
-            (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->directory);
+            (new ServerHarness($processes, '/tools/dogfood-server', '/bin/symfony-lsp'))->run($configuration, $this->workspace->rootPath);
             self::fail('A manifest is required before starting a server.');
         } catch (ConfigurationException) {
             self::assertSame([], $processes->calls);

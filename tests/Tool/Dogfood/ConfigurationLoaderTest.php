@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationException;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationLoader;
 
@@ -13,17 +14,17 @@ final class ConfigurationLoaderTest extends TestCase
 {
     private const REVISION = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-    private string $directory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-dogfood-'.bin2hex(random_bytes(8)));
-        (new Filesystem())->mkdir($this->directory);
+        $this->workspace = new TestWorkspace('symfony-lsp-dogfood-');
+        (new Filesystem())->mkdir($this->workspace->rootPath);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testLoadsMinimalConfigurationWithDefaults(): void
@@ -38,7 +39,7 @@ final class ConfigurationLoaderTest extends TestCase
             'coldRunCpuBudget' => 35,
         ]);
 
-        $configurations = (new ConfigurationLoader())->load([$this->directory], ['composer']);
+        $configurations = (new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer']);
 
         self::assertCount(1, $configurations);
         $configuration = $configurations[0];
@@ -56,14 +57,14 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertSame(20, $configuration->checkCpuBudget);
         self::assertSame(35, $configuration->coldRunCpuBudget);
         self::assertSame('runtime', $configuration->analysisMode);
-        self::assertSame($this->directory.'/scenarios/kimai.json', $configuration->scenarioFile);
+        self::assertSame($this->workspace->path('scenarios/kimai.json'), $configuration->scenarioFile);
     }
 
     public function testLoadsAnExplicitSourceOnlyAnalysisMode(): void
     {
         $this->write('coreshop.json', array_merge($this->valid(), ['analysisMode' => 'source-only']));
 
-        self::assertSame('source-only', (new ConfigurationLoader())->load([$this->directory], ['composer'])[0]->analysisMode);
+        self::assertSame('source-only', (new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer'])[0]->analysisMode);
     }
 
     #[DataProvider('kernelProvider')]
@@ -71,7 +72,7 @@ final class ConfigurationLoaderTest extends TestCase
     {
         $this->write('application.json', $this->valid() + ['kernel' => $kernel]);
 
-        self::assertSame($kernel, (new ConfigurationLoader())->load([$this->directory], ['composer'])[0]->kernel);
+        self::assertSame($kernel, (new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer'])[0]->kernel);
     }
 
     /** @return iterable<string, array{string}> */
@@ -88,11 +89,11 @@ final class ConfigurationLoaderTest extends TestCase
 
     public function testRejectsAnExplicitNullKernel(): void
     {
-        file_put_contents($this->directory.'/app.json', json_encode($this->valid() + ['kernel' => null], \JSON_THROW_ON_ERROR));
+        $this->workspace->write('app.json', json_encode($this->valid() + ['kernel' => null], \JSON_THROW_ON_ERROR));
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('"kernel"');
 
-        (new ConfigurationLoader())->load([$this->directory], ['composer']);
+        (new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer']);
     }
 
     public function testLoadsFullConfiguration(): void
@@ -116,7 +117,7 @@ final class ConfigurationLoaderTest extends TestCase
             'allowPlugins' => ['contao/manager-plugin'],
         ]);
 
-        $configuration = (new ConfigurationLoader())->load([$this->directory], ['composer'])[0];
+        $configuration = (new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer'])[0];
 
         self::assertSame('twig.symfony.com', $configuration->name);
         self::assertSame('twig.symfony.com', $configuration->directory);
@@ -130,25 +131,25 @@ final class ConfigurationLoaderTest extends TestCase
         self::assertSame(20, $configuration->requestTimeout);
         self::assertSame(10, $configuration->checkCpuBudget);
         self::assertSame(15, $configuration->coldRunCpuBudget);
-        self::assertSame($this->directory.'/scenarios/twig.symfony.com.json', $configuration->scenarioFile);
+        self::assertSame($this->workspace->path('scenarios/twig.symfony.com.json'), $configuration->scenarioFile);
         self::assertSame(['contao/manager-plugin'], $configuration->allowPlugins);
     }
 
     public function testDiscoversAPinnedLockFileNextToTheConfiguration(): void
     {
         $this->write('kimai.json', $this->valid());
-        file_put_contents(Path::join($this->directory, 'kimai.lock'), '{}');
+        file_put_contents(Path::join($this->workspace->rootPath, 'kimai.lock'), '{}');
 
-        $configuration = (new ConfigurationLoader())->load([$this->directory], ['composer'])[0];
+        $configuration = (new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer'])[0];
 
-        self::assertSame(Path::join($this->directory, 'kimai.lock'), $configuration->lockFile);
+        self::assertSame(Path::join($this->workspace->rootPath, 'kimai.lock'), $configuration->lockFile);
     }
 
     public function testHasNoLockFileWithoutASibling(): void
     {
         $this->write('kimai.json', $this->valid());
 
-        self::assertNull((new ConfigurationLoader())->load([$this->directory], ['composer'])[0]->lockFile);
+        self::assertNull((new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer'])[0]->lockFile);
     }
 
     public function testSortsProjectsByName(): void
@@ -156,14 +157,14 @@ final class ConfigurationLoaderTest extends TestCase
         $this->write('zebra.json', $this->valid());
         $this->write('alpha.json', $this->valid());
 
-        $configurations = (new ConfigurationLoader())->load([$this->directory], ['composer']);
+        $configurations = (new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer']);
 
         self::assertSame(['alpha', 'zebra'], array_column($configurations, 'name'));
     }
 
     public function testRejectsDuplicateProjectsAcrossDirectories(): void
     {
-        $other = Path::join($this->directory, 'other');
+        $other = Path::join($this->workspace->rootPath, 'other');
         (new Filesystem())->mkdir($other);
         $this->write('kimai.json', $this->valid());
         $this->write('other/kimai.json', $this->valid());
@@ -171,7 +172,7 @@ final class ConfigurationLoaderTest extends TestCase
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('Duplicate project "kimai"');
 
-        (new ConfigurationLoader())->load([$this->directory, $other], ['composer']);
+        (new ConfigurationLoader())->load([$this->workspace->rootPath, $other], ['composer']);
     }
 
     public function testRejectsMissingDirectory(): void
@@ -179,25 +180,25 @@ final class ConfigurationLoaderTest extends TestCase
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('does not exist');
 
-        (new ConfigurationLoader())->load([Path::join($this->directory, 'missing')], ['composer']);
+        (new ConfigurationLoader())->load([Path::join($this->workspace->rootPath, 'missing')], ['composer']);
     }
 
     public function testRejectsAnExplicitNullAnalysisMode(): void
     {
-        file_put_contents($this->directory.'/app.json', json_encode($this->valid() + ['analysisMode' => null], \JSON_THROW_ON_ERROR));
+        $this->workspace->write('app.json', json_encode($this->valid() + ['analysisMode' => null], \JSON_THROW_ON_ERROR));
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('analysisMode');
-        (new ConfigurationLoader())->load([$this->directory], ['composer']);
+        (new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer']);
     }
 
     public function testRejectsInvalidJson(): void
     {
-        file_put_contents(Path::join($this->directory, 'kimai.json'), '{');
+        file_put_contents(Path::join($this->workspace->rootPath, 'kimai.json'), '{');
 
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('Invalid JSON');
 
-        (new ConfigurationLoader())->load([$this->directory], ['composer']);
+        (new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer']);
     }
 
     /**
@@ -211,7 +212,7 @@ final class ConfigurationLoaderTest extends TestCase
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage($message);
 
-        (new ConfigurationLoader())->load([$this->directory], ['composer']);
+        (new ConfigurationLoader())->load([$this->workspace->rootPath], ['composer']);
     }
 
     /**
@@ -297,6 +298,6 @@ final class ConfigurationLoaderTest extends TestCase
      */
     private function write(string $name, array $data): void
     {
-        file_put_contents(Path::join($this->directory, $name), json_encode(array_filter($data, static fn ($value): bool => null !== $value), \JSON_THROW_ON_ERROR));
+        file_put_contents(Path::join($this->workspace->rootPath, $name), json_encode(array_filter($data, static fn ($value): bool => null !== $value), \JSON_THROW_ON_ERROR));
     }
 }

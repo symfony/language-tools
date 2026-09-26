@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\DiagnosticCheckHarness;
 use Symfony\Lsp\Tools\Dogfood\DiagnosticCheckResult;
 use Symfony\Lsp\Tools\Dogfood\ProcessResult;
@@ -13,18 +14,18 @@ use Symfony\Lsp\Tools\Dogfood\ProjectConfiguration;
 
 final class DiagnosticCheckHarnessTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
     private FakeProcessRunner $processes;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-diagnostic-check-'.bin2hex(random_bytes(8)));
-        (new Filesystem())->mkdir($this->directory);
+        $this->workspace = new TestWorkspace('symfony-lsp-diagnostic-check-');
+        (new Filesystem())->mkdir($this->workspace->rootPath);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testRunsTheCheckOnceInTheApplicationRoot(): void
@@ -39,12 +40,12 @@ final class DiagnosticCheckHarnessTest extends TestCase
             '--profile',
             '--verbose',
             '--runtime-indexing',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--environment=prod',
             '--bridge-timeout=120',
             '--timeout=300',
         ], $this->processes->calls[0]['command']);
-        self::assertSame($this->directory, $this->processes->calls[0]['directory']);
+        self::assertSame($this->workspace->rootPath, $this->processes->calls[0]['directory']);
         self::assertSame(310.0, $this->processes->calls[0]['timeout']);
         self::assertSame(['DATABASE_URL' => 'mysql://root@127.0.0.1:9/app'], $this->processes->calls[0]['environment']);
         self::assertTrue($result->ok());
@@ -155,7 +156,7 @@ final class DiagnosticCheckHarnessTest extends TestCase
         $serialized = json_encode($result->toArray(), \JSON_THROW_ON_ERROR);
         self::assertStringNotContainsString('s3cr3t_admin', $serialized);
         self::assertArrayNotHasKey('message', $result->diagnostics[0]);
-        self::assertStringNotContainsString($this->directory, $serialized);
+        self::assertStringNotContainsString($this->workspace->rootPath, $serialized);
     }
 
     public function testDetectsChangedDiagnosticWordingWithoutPublishingIt(): void
@@ -378,7 +379,7 @@ final class DiagnosticCheckHarnessTest extends TestCase
         $this->processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult($exitCode, $standardOutput, 'Runtime bridge took 1.2s.', $timedOut, 1300.0, 987.6));
         $harness = new DiagnosticCheckHarness($this->processes, '/bin/symfony-lsp');
 
-        return $harness->run($configuration ?? self::configuration(), $applicationRoot ?? $this->directory);
+        return $harness->run($configuration ?? self::configuration(), $applicationRoot ?? $this->workspace->rootPath);
     }
 
     /** @param array{indexTimeout?: int, analysisMode?: 'runtime'|'source-only', kernel?: string|null} $overrides */

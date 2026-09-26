@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Tests\Index;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
 use Symfony\Lsp\Index\SourceDocument;
@@ -16,13 +15,15 @@ use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class SourceIndexFileProcessorTest extends TestCase
 {
     public function testSharesSourceProcessingBetweenFullAndIncrementalIndexing(): void
     {
-        $root = sys_get_temp_dir().'/symfony-lsp-processor-'.bin2hex(random_bytes(8));
-        mkdir($root.'/src', 0777, true);
+        $workspace = new TestWorkspace('symfony-lsp-processor-');
+        $root = $workspace->rootPath;
+        $workspace->mkdir('src');
         $path = $root.'/src/Service.php';
         $project = new Project($root, 'file://'.$root);
         $store = new InMemorySourceIndexStore();
@@ -47,7 +48,7 @@ final class SourceIndexFileProcessorTest extends TestCase
             self::assertNotNull($declarationChange);
             self::assertSame(['processor'], $declarationChange->change->domains());
         } finally {
-            (new Filesystem())->remove($root);
+            $workspace->cleanup();
         }
     }
 }

@@ -5,12 +5,12 @@ namespace Symfony\Lsp\Tests\Check;
 use Amp\Process\Process;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Check\CheckCommand;
 use Symfony\Lsp\Runtime\PartialRuntimeMetadataException;
 use Symfony\Lsp\Runtime\UnsupportedSymfonyVersionException;
 use Symfony\Lsp\Server\ServerVersion;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 use function Amp\async;
 use function Amp\ByteStream\buffer;
@@ -36,25 +36,25 @@ use function Amp\Future\await;
  */
 final class CheckExecutableTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir().'/symfony-lsp-check-'.bin2hex(random_bytes(6));
-        mkdir($this->directory.'/config', 0777, true);
-        file_put_contents($this->directory.'/composer.json', json_encode([
+        $this->workspace = new TestWorkspace('symfony-lsp-check-');
+        $this->workspace->mkdir('config');
+        $this->workspace->write('composer.json', json_encode([
             'type' => 'project',
             'require' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
-        file_put_contents($this->directory.'/config/services.yaml', "parameters:\n    broken: '%env(APP_SECRET%'\n");
-        file_put_contents($this->directory.'/releases.json', json_encode([
+        $this->workspace->write('config/services.yaml', "parameters:\n    broken: '%env(APP_SECRET%'\n");
+        $this->workspace->write('releases.json', json_encode([
             'supported_versions' => ['8.0'],
         ], \JSON_THROW_ON_ERROR));
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testUsesApplicationSpecificExitStatuses(): void
@@ -89,13 +89,13 @@ final class CheckExecutableTest extends TestCase
             self::markTestSkipped('The source executable integration requires Unix executable scripts.');
         }
 
-        $marker = $this->directory.'/symfony-cli-command.json';
-        $symfonyCli = $this->directory.'/symfony';
+        $marker = $this->workspace->path('symfony-cli-command.json');
+        $symfonyCli = $this->workspace->path('symfony');
         file_put_contents($symfonyCli, "#!/usr/bin/env php\n<?php\nfile_put_contents(".var_export($marker, true).", json_encode(array_slice(\$argv, 1), JSON_THROW_ON_ERROR));\nexit(1);\n");
         chmod($symfonyCli, 0700);
 
         $result = $this->execute(
-            ['check', '--format=json', '--workspace='.$this->directory],
+            ['check', '--format=json', '--workspace='.$this->workspace->rootPath],
             ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli],
         );
         /** @var list<string> $command */
@@ -112,13 +112,13 @@ final class CheckExecutableTest extends TestCase
             self::markTestSkipped('The source executable integration requires Unix executable scripts.');
         }
 
-        file_put_contents($this->directory.'/config/services_test.yaml', <<<'YAML'
+        $this->workspace->write('config/services_test.yaml', <<<'YAML'
             services:
                 app.test_client:
                     arguments:
                         $parameters: '%test.client.parameters%'
             YAML);
-        $symfonyCli = $this->directory.'/environment-bridge';
+        $symfonyCli = $this->workspace->path('environment-bridge');
         file_put_contents($symfonyCli, <<<'PHP'
             #!/usr/bin/env php
             <?php
@@ -151,13 +151,13 @@ final class CheckExecutableTest extends TestCase
         $dev = $this->execute([
             'check',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             'config/services_test.yaml',
         ], $environment);
         $test = $this->execute([
             'check',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--environment=test',
             'config/services_test.yaml',
         ], $environment);
@@ -174,8 +174,8 @@ final class CheckExecutableTest extends TestCase
             self::markTestSkipped('The source executable integration requires Unix executable scripts.');
         }
 
-        mkdir($this->directory.'/config/packages/test', 0777, true);
-        file_put_contents($this->directory.'/config/packages/test/security.yaml', <<<'YAML'
+        $this->workspace->mkdir('config/packages/test');
+        $this->workspace->write('config/packages/test/security.yaml', <<<'YAML'
             security:
                 firewalls:
                     main:
@@ -183,11 +183,11 @@ final class CheckExecutableTest extends TestCase
                     api:
                         provider: missing_users
             YAML);
-        file_put_contents($this->directory.'/config/packages/test/framework_extra.yaml', <<<'YAML'
+        $this->workspace->write('config/packages/test/framework_extra.yaml', <<<'YAML'
             framework:
                 default_locale: '%env(test_only_processor:APP_LOCALE)%'
             YAML);
-        $symfonyCli = $this->directory.'/environment-bridge';
+        $symfonyCli = $this->workspace->path('environment-bridge');
         file_put_contents($symfonyCli, <<<'PHP'
             #!/usr/bin/env php
             <?php
@@ -224,13 +224,13 @@ final class CheckExecutableTest extends TestCase
         $dev = $this->execute([
             'check',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             ...$selectors,
         ], $environment);
         $test = $this->execute([
             'check',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--environment=test',
             ...$selectors,
         ], $environment);
@@ -245,7 +245,7 @@ final class CheckExecutableTest extends TestCase
 
     public function testReportsSavedFileDiagnosticsWithoutAnLspClient(): void
     {
-        $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory, 'config/**/*.yaml']);
+        $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->workspace->rootPath, 'config/**/*.yaml']);
         $report = $this->decodeReport($result['stdout']);
 
         self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $result['exitCode'], $result['stderr']);
@@ -262,7 +262,7 @@ final class CheckExecutableTest extends TestCase
     public function testNumbersRepeatedIdenticalDiagnosticsOnceForBaselinesAndReports(): void
     {
         file_put_contents(
-            $this->directory.'/config/services.yaml',
+            $this->workspace->path('config/services.yaml'),
             "parameters:\n    first: '%env(APP_SECRET%'\n    second: '%env(APP_SECRET%'\n",
         );
 
@@ -270,7 +270,7 @@ final class CheckExecutableTest extends TestCase
             'check',
             '--source-only',
             '--format=gitlab',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             'config/services.yaml',
         ]);
         /** @var list<GitLabIssue> $issues */
@@ -280,13 +280,13 @@ final class CheckExecutableTest extends TestCase
             'check',
             '--source-only',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--baseline=baseline.json',
             '--generate-baseline',
             'config/services.yaml',
         ]);
         /** @var array{diagnostics: list<array{fingerprint: string, occurrence: int}>} $baseline */
-        $baseline = json_decode((string) file_get_contents($this->directory.'/baseline.json'), true, flags: \JSON_THROW_ON_ERROR);
+        $baseline = json_decode((string) file_get_contents($this->workspace->path('baseline.json')), true, flags: \JSON_THROW_ON_ERROR);
 
         self::assertSame(CheckCommand::EXIT_SUCCESS, $generated['exitCode'], $generated['stderr']);
         self::assertSame([1, 2], array_column($baseline['diagnostics'], 'occurrence'));
@@ -302,7 +302,7 @@ final class CheckExecutableTest extends TestCase
             '--profile',
             '--source-only',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             'config/services.yaml',
         ]);
         $report = $this->decodeReport($result['stdout']);
@@ -338,7 +338,7 @@ final class CheckExecutableTest extends TestCase
             'check',
             '--profile',
             '--source-only',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             'config/services.yaml',
         ]);
         self::assertStringNotContainsString('Timing profile:', $human['stdout']);
@@ -347,7 +347,7 @@ final class CheckExecutableTest extends TestCase
 
     public function testRendersSarifForDiagnosticsAndCodeLists(): void
     {
-        $result = $this->execute(['check', '--source-only', '--format=sarif', '--workspace='.$this->directory, 'config/services.yaml']);
+        $result = $this->execute(['check', '--source-only', '--format=sarif', '--workspace='.$this->workspace->rootPath, 'config/services.yaml']);
         /** @var SarifReport $sarif */
         $sarif = json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR);
         $codes = $this->execute(['check', '--format=sarif', '--list-codes']);
@@ -369,7 +369,7 @@ final class CheckExecutableTest extends TestCase
 
     public function testRendersGitLabCodeQualityReports(): void
     {
-        $result = $this->execute(['check', '--source-only', '--format=gitlab', '--workspace='.$this->directory, 'config/services.yaml']);
+        $result = $this->execute(['check', '--source-only', '--format=gitlab', '--workspace='.$this->workspace->rootPath, 'config/services.yaml']);
         /** @var list<GitLabIssue> $report */
         $report = json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR);
 
@@ -386,14 +386,14 @@ final class CheckExecutableTest extends TestCase
 
     public function testExcludesConfiguredPathsUnlessTheyAreExplicitlySelected(): void
     {
-        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+        $this->workspace->write('.symfony-lsp.json', json_encode([
             'version' => 1,
             'excludePaths' => ['config/**'],
         ], \JSON_THROW_ON_ERROR));
 
-        $default = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory]);
+        $default = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->workspace->rootPath]);
         $defaultReport = $this->decodeReport($default['stdout']);
-        $explicit = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory, 'config/services.yaml']);
+        $explicit = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->workspace->rootPath, 'config/services.yaml']);
         $explicitReport = $this->decodeReport($explicit['stdout']);
 
         self::assertSame(CheckCommand::EXIT_SUCCESS, $default['exitCode'], $default['stderr']);
@@ -408,7 +408,7 @@ final class CheckExecutableTest extends TestCase
             'check',
             '--source-only',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--fail-on=config.deprecated_key',
         ]);
         $report = $this->decodeReport($result['stdout']);
@@ -420,7 +420,7 @@ final class CheckExecutableTest extends TestCase
 
     public function testCommandLineSettingsOverrideCheckedInSettings(): void
     {
-        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+        $this->workspace->write('.symfony-lsp.json', json_encode([
             'version' => 1,
             'environment' => 'prod',
             'runtimeIndexing' => false,
@@ -429,7 +429,7 @@ final class CheckExecutableTest extends TestCase
         $result = $this->execute([
             'check',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--environment=test',
         ]);
         $report = $this->decodeReport($result['stdout']);
@@ -441,9 +441,9 @@ final class CheckExecutableTest extends TestCase
 
     public function testReportsVendorConfigurationFailuresAndIncompleteAnalysis(): void
     {
-        file_put_contents($this->directory.'/config/services.yaml', "parameters:\n    valid: value\n");
-        mkdir($this->directory.'/vendor');
-        file_put_contents($this->directory.'/vendor/autoload.php', <<<'PHP'
+        $this->workspace->write('config/services.yaml', "parameters:\n    valid: value\n");
+        $this->workspace->mkdir('vendor');
+        $this->workspace->write('vendor/autoload.php', <<<'PHP'
             <?php
             namespace Composer;
             final class InstalledVersions
@@ -465,7 +465,7 @@ final class CheckExecutableTest extends TestCase
             }
             PHP);
 
-        $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory, 'config/services.yaml']);
+        $result = $this->execute(['check', '--format=json', '--workspace='.$this->workspace->rootPath, 'config/services.yaml']);
         $report = $this->decodeReport($result['stdout']);
 
         self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
@@ -479,9 +479,9 @@ final class CheckExecutableTest extends TestCase
 
     public function testKeepsUnmappableVendorConfigurationFailuresAtProjectLevel(): void
     {
-        file_put_contents($this->directory.'/config/services.yaml', "parameters:\n    valid: value\n");
-        mkdir($this->directory.'/vendor');
-        file_put_contents($this->directory.'/vendor/autoload.php', <<<'PHP'
+        $this->workspace->write('config/services.yaml', "parameters:\n    valid: value\n");
+        $this->workspace->mkdir('vendor');
+        $this->workspace->write('vendor/autoload.php', <<<'PHP'
             <?php
             namespace Composer;
             final class InstalledVersions
@@ -502,7 +502,7 @@ final class CheckExecutableTest extends TestCase
             }
             PHP);
 
-        $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory, 'config/services.yaml']);
+        $result = $this->execute(['check', '--format=json', '--workspace='.$this->workspace->rootPath, 'config/services.yaml']);
         $report = $this->decodeReport($result['stdout']);
 
         self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
@@ -515,12 +515,12 @@ final class CheckExecutableTest extends TestCase
 
     public function testReportsUnsupportedSymfonyVersions(): void
     {
-        file_put_contents($this->directory.'/composer.json', json_encode([
+        $this->workspace->write('composer.json', json_encode([
             'type' => 'project',
             'require' => ['symfony/framework-bundle' => '^5.4'],
         ], \JSON_THROW_ON_ERROR));
-        mkdir($this->directory.'/vendor');
-        file_put_contents($this->directory.'/vendor/autoload.php', <<<'PHP'
+        $this->workspace->mkdir('vendor');
+        $this->workspace->write('vendor/autoload.php', <<<'PHP'
             <?php
             namespace Composer;
             final class InstalledVersions
@@ -529,7 +529,7 @@ final class CheckExecutableTest extends TestCase
             }
             PHP);
 
-        $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory]);
+        $result = $this->execute(['check', '--format=json', '--workspace='.$this->workspace->rootPath]);
         $report = $this->decodeReport($result['stdout']);
 
         self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
@@ -544,8 +544,8 @@ final class CheckExecutableTest extends TestCase
             self::markTestSkipped('The source executable integration requires Unix executable scripts.');
         }
 
-        mkdir($this->directory.'/src');
-        file_put_contents($this->directory.'/src/ArticleController.php', <<<'PHP'
+        $this->workspace->mkdir('src');
+        $this->workspace->write('src/ArticleController.php', <<<'PHP'
             <?php
             namespace App\Controller;
 
@@ -589,12 +589,12 @@ final class CheckExecutableTest extends TestCase
                 ]]],
             ]],
         ];
-        $symfonyCli = $this->directory.'/partial-runtime';
+        $symfonyCli = $this->workspace->path('partial-runtime');
         file_put_contents($symfonyCli, "#!/usr/bin/env php\n<?php\nfwrite(STDOUT, json_encode(".var_export($snapshot, true).", JSON_THROW_ON_ERROR).\"\\n\");\n");
         chmod($symfonyCli, 0700);
 
         $result = $this->execute(
-            ['check', '--format=json', '--workspace='.$this->directory, 'src/ArticleController.php'],
+            ['check', '--format=json', '--workspace='.$this->workspace->rootPath, 'src/ArticleController.php'],
             ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli],
         );
         $report = $this->decodeReport($result['stdout']);
@@ -611,7 +611,7 @@ final class CheckExecutableTest extends TestCase
         self::assertSame(1, $report['summary']['blocking']);
 
         $verbose = $this->execute(
-            ['check', '-vvv', '--format=json', '--workspace='.$this->directory, 'src/ArticleController.php'],
+            ['check', '-vvv', '--format=json', '--workspace='.$this->workspace->rootPath, 'src/ArticleController.php'],
             ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli],
         );
         $verboseReport = $this->decodeReport($verbose['stdout']);
@@ -638,8 +638,8 @@ final class CheckExecutableTest extends TestCase
             self::markTestSkipped('The source executable integration requires Unix executable scripts.');
         }
 
-        mkdir($this->directory.'/src');
-        file_put_contents($this->directory.'/src/ArticleController.php', <<<'PHP'
+        $this->workspace->mkdir('src');
+        $this->workspace->write('src/ArticleController.php', <<<'PHP'
             <?php
             namespace App\Controller;
 
@@ -667,16 +667,16 @@ final class CheckExecutableTest extends TestCase
                 ],
             ],
         ];
-        $symfonyCli = $this->directory.'/partial-runtime-baseline';
+        $symfonyCli = $this->workspace->path('partial-runtime-baseline');
         file_put_contents($symfonyCli, "#!/usr/bin/env php\n<?php\nfwrite(STDOUT, json_encode(".var_export($snapshot, true).", JSON_THROW_ON_ERROR).\"\\n\");\n");
         chmod($symfonyCli, 0700);
         $environment = ['SYMFONY_LSP_SYMFONY_CLI' => $symfonyCli];
-        $baselinePath = $this->directory.'/baseline.json';
+        $baselinePath = $this->workspace->path('baseline.json');
 
         $created = $this->execute([
             'check',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--baseline=baseline.json',
             '--generate-baseline',
             'src/ArticleController.php',
@@ -699,7 +699,7 @@ final class CheckExecutableTest extends TestCase
         $partial = $this->execute([
             'check',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--baseline=baseline.json',
             '--strict-baseline',
             'src/ArticleController.php',
@@ -717,7 +717,7 @@ final class CheckExecutableTest extends TestCase
         $gitLab = $this->execute([
             'check',
             '--format=gitlab',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--baseline=baseline.json',
             '--strict-baseline',
             'src/ArticleController.php',
@@ -728,7 +728,7 @@ final class CheckExecutableTest extends TestCase
         $refreshed = $this->execute([
             'check',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--baseline=baseline.json',
             '--refresh-baseline',
             'src/ArticleController.php',
@@ -738,11 +738,11 @@ final class CheckExecutableTest extends TestCase
         self::assertSame('matched', $refreshedReport['diagnostics'][0]['baseline']);
         self::assertSame($baselineContents, file_get_contents($baselinePath));
 
-        $generatedPath = $this->directory.'/partial-baseline.json';
+        $generatedPath = $this->workspace->path('partial-baseline.json');
         $generated = $this->execute([
             'check',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--baseline=partial-baseline.json',
             '--generate-baseline',
             'src/ArticleController.php',
@@ -753,7 +753,7 @@ final class CheckExecutableTest extends TestCase
 
     public function testDoesNotReportACleanResultWhenRuntimeIndexingFails(): void
     {
-        $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory]);
+        $result = $this->execute(['check', '--format=json', '--workspace='.$this->workspace->rootPath]);
         $report = $this->decodeReport($result['stdout']);
 
         self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
@@ -765,12 +765,12 @@ final class CheckExecutableTest extends TestCase
 
     public function testDoesNotOverlayExplicitExcludedFilesAfterOperationalRuntimeFailure(): void
     {
-        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+        $this->workspace->write('.symfony-lsp.json', json_encode([
             'version' => 1,
             'excludePaths' => ['config/**'],
         ], \JSON_THROW_ON_ERROR));
-        mkdir($this->directory.'/vendor');
-        file_put_contents($this->directory.'/vendor/autoload.php', <<<'PHP'
+        $this->workspace->mkdir('vendor');
+        $this->workspace->write('vendor/autoload.php', <<<'PHP'
             <?php
             namespace Composer;
             final class InstalledVersions
@@ -786,7 +786,7 @@ final class CheckExecutableTest extends TestCase
             }
             PHP);
 
-        $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory, 'config/services.yaml']);
+        $result = $this->execute(['check', '--format=json', '--workspace='.$this->workspace->rootPath, 'config/services.yaml']);
         $report = $this->decodeReport($result['stdout']);
 
         self::assertSame(CheckCommand::EXIT_OPERATIONAL, $result['exitCode']);
@@ -799,12 +799,12 @@ final class CheckExecutableTest extends TestCase
 
     public function testBaselineCreationMatchingAndStrictStaleEnforcement(): void
     {
-        $baseline = $this->directory.'/baseline.json';
+        $baseline = $this->workspace->path('baseline.json');
         $create = $this->execute([
             'check',
             '--source-only',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--baseline=baseline.json',
             '--generate-baseline',
         ]);
@@ -817,7 +817,7 @@ final class CheckExecutableTest extends TestCase
             'check',
             '--source-only',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--baseline=baseline.json',
         ]);
         self::assertSame(0, $matched['exitCode'], $matched['stderr']);
@@ -827,18 +827,18 @@ final class CheckExecutableTest extends TestCase
             'check',
             '--source-only',
             '--format=gitlab',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--baseline=baseline.json',
         ]);
         self::assertSame(0, $gitLab['exitCode'], $gitLab['stderr']);
         self::assertSame([], json_decode($gitLab['stdout'], true, flags: \JSON_THROW_ON_ERROR));
 
-        file_put_contents($this->directory.'/config/services.yaml', "parameters:\n    # @symfony-lsp-ignore env.malformed_chain (intentional malformed expression)\n    broken: '%env(APP_SECRET%'\n");
+        $this->workspace->write('config/services.yaml', "parameters:\n    # @symfony-lsp-ignore env.malformed_chain (intentional malformed expression)\n    broken: '%env(APP_SECRET%'\n");
         $strict = $this->execute([
             'check',
             '--source-only',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--baseline=baseline.json',
             '--strict-baseline',
         ]);
@@ -852,7 +852,7 @@ final class CheckExecutableTest extends TestCase
 
     public function testRejectsUnreadableApplicationDirectories(): void
     {
-        $directory = $this->directory.'/blocked';
+        $directory = $this->workspace->path('blocked');
         mkdir($directory);
         chmod($directory, 0000);
         try {
@@ -860,7 +860,7 @@ final class CheckExecutableTest extends TestCase
                 self::markTestSkipped('The platform cannot make the directory unreadable.');
             }
 
-            $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory]);
+            $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->workspace->rootPath]);
             $report = $this->decodeReport($result['stdout']);
 
             self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
@@ -873,19 +873,19 @@ final class CheckExecutableTest extends TestCase
 
     public function testExplicitSelectionIgnoresUnrelatedExcludedSymlinks(): void
     {
-        $external = $this->directory.'-external.php';
+        $external = $this->workspace->rootPath.'-external.php';
         file_put_contents($external, '<?php');
-        mkdir($this->directory.'/fixtures');
+        $this->workspace->mkdir('fixtures');
         try {
-            if (!@symlink($external, $this->directory.'/fixtures/external.php')) {
+            if (!@symlink($external, $this->workspace->path('fixtures/external.php'))) {
                 self::markTestSkipped('The platform cannot create file symlinks.');
             }
-            file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+            $this->workspace->write('.symfony-lsp.json', json_encode([
                 'version' => 1,
                 'excludePaths' => ['fixtures/**'],
             ], \JSON_THROW_ON_ERROR));
 
-            $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory, 'config/services.yaml']);
+            $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->workspace->rootPath, 'config/services.yaml']);
             $report = $this->decodeReport($result['stdout']);
 
             self::assertSame(CheckCommand::EXIT_DIAGNOSTICS, $result['exitCode'], $result['stderr']);
@@ -897,14 +897,14 @@ final class CheckExecutableTest extends TestCase
 
     public function testRejectsApplicationSymlinksThatResolveOutsideTheProject(): void
     {
-        $external = $this->directory.'-external.php';
+        $external = $this->workspace->rootPath.'-external.php';
         file_put_contents($external, '<?php');
         try {
-            if (!@symlink($external, $this->directory.'/config/external.php')) {
+            if (!@symlink($external, $this->workspace->path('config/external.php'))) {
                 self::markTestSkipped('The platform cannot create file symlinks.');
             }
 
-            $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->directory]);
+            $result = $this->execute(['check', '--source-only', '--format=json', '--workspace='.$this->workspace->rootPath]);
             $report = $this->decodeReport($result['stdout']);
 
             self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
@@ -922,7 +922,7 @@ final class CheckExecutableTest extends TestCase
             '--profile',
             '--source-only',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--timeout=0.000001',
         ]);
         $report = $this->decodeReport($result['stdout']);
@@ -940,13 +940,13 @@ final class CheckExecutableTest extends TestCase
             self::markTestSkipped('The source executable integration requires Unix signals.');
         }
         for ($index = 0; $index < 256; ++$index) {
-            file_put_contents(\sprintf('%s/config/service_%03d.yaml', $this->directory, $index), "parameters:\n    value: '%env(APP_SECRET%\'\n");
+            file_put_contents(\sprintf('%s/config/service_%03d.yaml', $this->workspace->rootPath, $index), "parameters:\n    value: '%env(APP_SECRET%\'\n");
         }
 
-        $process = $this->start(['check', '--source-only', '--format=json', '--workspace='.$this->directory]);
+        $process = $this->start(['check', '--source-only', '--format=json', '--workspace='.$this->workspace->rootPath]);
         $deadline = microtime(true) + 10;
         do {
-            $indexFiles = glob($this->directory.'/var/symfony-lsp/*/index/source.jsonl.tmp') ?: [];
+            $indexFiles = glob($this->workspace->path('var/symfony-lsp/*/index/source.jsonl.tmp')) ?: [];
             if ([] !== $indexFiles) {
                 break;
             }
@@ -969,7 +969,7 @@ final class CheckExecutableTest extends TestCase
         $result = $this->execute([
             'check',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--config=missing.json',
         ]);
         $report = $this->decodeReport($result['stdout']);
@@ -985,7 +985,7 @@ final class CheckExecutableTest extends TestCase
             'check',
             '--source-only',
             '--format=json',
-            '--workspace='.$this->directory,
+            '--workspace='.$this->workspace->rootPath,
             '--project-root=.',
             '--project-root=missing',
         ]);
@@ -998,7 +998,7 @@ final class CheckExecutableTest extends TestCase
 
     public function testKeepsSarifValidForInvocationFailures(): void
     {
-        $result = $this->execute(['check', '--format=sarif', '--workspace='.$this->directory, 'missing.php']);
+        $result = $this->execute(['check', '--format=sarif', '--workspace='.$this->workspace->rootPath, 'missing.php']);
         /** @var SarifReport $sarif */
         $sarif = json_decode($result['stdout'], true, flags: \JSON_THROW_ON_ERROR);
         self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
@@ -1010,7 +1010,7 @@ final class CheckExecutableTest extends TestCase
 
     public function testKeepsJsonValidForInvocationFailures(): void
     {
-        $result = $this->execute(['check', '--format=json', '--workspace='.$this->directory, 'missing.php']);
+        $result = $this->execute(['check', '--format=json', '--workspace='.$this->workspace->rootPath, 'missing.php']);
         $report = $this->decodeReport($result['stdout']);
 
         self::assertSame(CheckCommand::EXIT_INVOCATION, $result['exitCode']);
@@ -1119,7 +1119,7 @@ final class CheckExecutableTest extends TestCase
             workingDirectory: $root,
             environment: [
                 ...$inheritedEnvironment,
-                'SYMFONY_LSP_RELEASE_METADATA_URL' => $this->directory.'/releases.json',
+                'SYMFONY_LSP_RELEASE_METADATA_URL' => $this->workspace->path('releases.json'),
                 ...$environment,
             ],
             options: ['bypass_shell' => true],

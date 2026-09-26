@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Check;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Check\CheckFileSelector;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\GlobPatternCompiler;
@@ -15,29 +14,29 @@ use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class CheckFileSelectorTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
     private CheckFileSelector $selector;
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir().'/symfony-lsp-check-selector-'.bin2hex(random_bytes(6));
-        mkdir($this->directory.'/src/Admin', 0777, true);
-        mkdir($this->directory.'/templates/admin', 0777, true);
-        file_put_contents($this->directory.'/page.twig', '');
-        file_put_contents($this->directory.'/src/Controller.php', '<?php');
-        file_put_contents($this->directory.'/src/Admin/Controller.php', '<?php');
-        file_put_contents($this->directory.'/src/Admin/view.twig', '');
-        file_put_contents($this->directory.'/templates/page.twig', '');
-        file_put_contents($this->directory.'/templates/admin/page.twig', '');
+        $this->workspace = new TestWorkspace('symfony-lsp-check-selector-');
+        $this->workspace->mkdir('project/src/Admin', 'project/templates/admin');
+        $this->workspace->write('project/page.twig', '');
+        $this->workspace->write('project/src/Controller.php', '<?php');
+        $this->workspace->write('project/src/Admin/Controller.php', '<?php');
+        $this->workspace->write('project/src/Admin/view.twig', '');
+        $this->workspace->write('project/templates/page.twig', '');
+        $this->workspace->write('project/templates/admin/page.twig', '');
 
         $uriToPathConverter = new UriToPathConverter();
         $projectConfiguration = new ProjectConfiguration($uriToPathConverter, new AnalysisSettings());
-        $projectConfiguration->load([['uri' => $uriToPathConverter->toUri($this->directory)]]);
+        $projectConfiguration->load([['uri' => $uriToPathConverter->toUri($this->root())]]);
         $projects = new ProjectRegistry();
-        $projects->replace([new Project($this->directory, $uriToPathConverter->toUri($this->directory))]);
+        $projects->replace([new Project($this->root(), $uriToPathConverter->toUri($this->root()))]);
         $globPatterns = new GlobPatternCompiler();
         $this->selector = new CheckFileSelector(
             $projects,
@@ -51,7 +50,12 @@ final class CheckFileSelectorTest extends TestCase
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove([$this->directory, $this->directory.'-outside.php']);
+        $this->workspace->cleanup();
+    }
+
+    private function root(): string
+    {
+        return $this->workspace->path('project');
     }
 
     public function testRejectsASelectedFileResolvingOutsideTheProject(): void
@@ -59,15 +63,15 @@ final class CheckFileSelectorTest extends TestCase
         if ('Windows' === \PHP_OS_FAMILY || !\function_exists('symlink')) {
             self::markTestSkipped('File symlinks are not supported in this environment.');
         }
-        file_put_contents($this->directory.'-outside.php', '<?php');
-        if (!symlink($this->directory.'-outside.php', $this->directory.'/src/Linked.php')) {
+        $outside = $this->workspace->write('outside/Service.php', '<?php');
+        if (!symlink($outside, $this->workspace->path('project/src/Linked.php'))) {
             self::markTestSkipped('Unable to create a file symlink in this environment.');
         }
 
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('The application file "src/Linked.php" resolves outside its Symfony project.');
 
-        $this->selector->select($this->directory, ['src/Linked*.php']);
+        $this->selector->select($this->root(), ['src/Linked*.php']);
     }
 
     /**
@@ -76,7 +80,7 @@ final class CheckFileSelectorTest extends TestCase
     #[DataProvider('patterns')]
     public function testMatchesSingleSegmentAndRecursivePatterns(string $pattern, array $expected): void
     {
-        self::assertSame($expected, array_column($this->selector->select($this->directory, [$pattern]), 'workspacePath'));
+        self::assertSame($expected, array_column($this->selector->select($this->root(), [$pattern]), 'workspacePath'));
     }
 
     /** @return iterable<string, array{string, list<string>}> */
@@ -102,19 +106,18 @@ final class CheckFileSelectorTest extends TestCase
 
     public function testSelectsApplicationFilesInDirectoriesNamedLikeDependencyDirectories(): void
     {
-        mkdir($this->directory.'/templates/vendor', 0777, true);
-        mkdir($this->directory.'/vendor/acme', 0777, true);
-        file_put_contents($this->directory.'/templates/vendor/show.html.twig', '');
-        file_put_contents($this->directory.'/vendor/acme/Thing.php', '<?php');
+        $this->workspace->mkdir('project/templates/vendor', 'project/vendor/acme');
+        $this->workspace->write('project/templates/vendor/show.html.twig', '');
+        $this->workspace->write('project/vendor/acme/Thing.php', '<?php');
 
         self::assertSame(
             ['templates/vendor/show.html.twig'],
-            array_column($this->selector->select($this->directory, ['templates/vendor/show.html.twig']), 'workspacePath'),
+            array_column($this->selector->select($this->root(), ['templates/vendor/show.html.twig']), 'workspacePath'),
         );
 
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('The selected file "vendor/acme/Thing.php" is in a directory Composer, npm or Git owns.');
 
-        $this->selector->select($this->directory, ['vendor/acme/Thing.php']);
+        $this->selector->select($this->root(), ['vendor/acme/Thing.php']);
     }
 }

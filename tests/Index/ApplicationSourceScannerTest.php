@@ -64,6 +64,7 @@ use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
 use Symfony\Lsp\Tests\Support\NullProgressReporter;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 use function Amp\async;
 use function Amp\delay;
@@ -71,16 +72,16 @@ use function Amp\Future\await;
 
 final class ApplicationSourceScannerTest extends TestCase
 {
-    private string $temporaryDirectory;
+    private TestWorkspace $workspace;
     private Project $project;
     private ProjectRegistry $projects;
     private ProjectFileScopeRegistry $fileScope;
 
     protected function setUp(): void
     {
-        $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
-        mkdir($this->temporaryDirectory.'/src', 0777, true);
-        $this->project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $this->workspace = new TestWorkspace('symfony-lsp-');
+        $this->workspace->mkdir('src');
+        $this->project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
         $this->projects = new ProjectRegistry();
         $this->projects->replace([$this->project]);
         $this->fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
@@ -88,17 +89,17 @@ final class ApplicationSourceScannerTest extends TestCase
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->temporaryDirectory);
+        $this->workspace->cleanup();
     }
 
     public function testIndexesNestedProjectFilesOnlyForTheirMostSpecificProject(): void
     {
-        mkdir($this->temporaryDirectory.'/nested/src', 0777, true);
-        file_put_contents($this->temporaryDirectory.'/src/Parent.php', '<?php final class ParentClass {}');
-        file_put_contents($this->temporaryDirectory.'/nested/src/Child.php', '<?php final class ChildClass {}');
+        $this->workspace->mkdir('nested/src');
+        $this->workspace->write('src/Parent.php', '<?php final class ParentClass {}');
+        $this->workspace->write('nested/src/Child.php', '<?php final class ChildClass {}');
         $child = new Project(
-            $this->temporaryDirectory.'/nested',
-            'file://'.$this->temporaryDirectory.'/nested',
+            $this->workspace->path('nested'),
+            'file://'.$this->workspace->path('nested'),
         );
         $this->projects->replace([$this->project, $child]);
         $provider = new RecordingSourceIndexProvider();
@@ -110,9 +111,9 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testBuildsSourceUrisFromTheProjectRootUri(): void
     {
-        $this->project = new Project($this->temporaryDirectory, 'file://localhost'.$this->temporaryDirectory);
+        $this->project = new Project($this->workspace->rootPath, 'file://localhost'.$this->workspace->rootPath);
         $this->projects->replace([$this->project]);
-        file_put_contents($this->temporaryDirectory.'/src/Named Service.php', '<?php final class NamedService {}');
+        $this->workspace->write('src/Named Service.php', '<?php final class NamedService {}');
         $provider = new RecordingSourceIndexProvider();
 
         $this->scanner($provider)->indexAll();
@@ -122,7 +123,7 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testExcludesConfiguredPathsFromPersistentSourceIndexing(): void
     {
-        file_put_contents($path = $this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        file_put_contents($path = $this->workspace->path('src/Controller.php'), '<?php final class Controller {}');
         $provider = new RecordingSourceIndexProvider();
         $scanner = $this->scanner($provider);
         $scanner->indexAll();
@@ -136,14 +137,14 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testRestoresPersistentFactsAndRebuildsCorruptedEntries(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
         $firstProvider = new RecordingSourceIndexProvider();
         $this->scanner($firstProvider)->indexAll();
 
         self::assertSame(1, $firstProvider->extractions);
         self::assertSame(0, $firstProvider->restores);
 
-        $cachePath = $this->temporaryDirectory.'/var/symfony-lsp/test/index/source.jsonl';
+        $cachePath = $this->workspace->path('var/symfony-lsp/test/index/source.jsonl');
         $this->rewriteCacheRecord($cachePath, 'src/Controller.php', static function (array $record): array {
             unset($record['runtimeStructure']);
 
@@ -191,9 +192,9 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testRebuildsMalformedProviderPayloadTypes(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
         $this->scanner(new RecordingSourceIndexProvider())->indexAll();
-        $cachePath = $this->temporaryDirectory.'/var/symfony-lsp/test/index/source.jsonl';
+        $cachePath = $this->workspace->path('var/symfony-lsp/test/index/source.jsonl');
         $this->rewriteCacheRecord($cachePath, 'src/Controller.php', static function (array $record): array {
             $providers = $record['providers'];
             \assert(\is_array($providers));
@@ -223,7 +224,7 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testLogsSourceIndexFailuresWithoutExposingDetailsInStatus(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
         $statuses = new ProjectIndexStatusRegistry();
         $log = new WritableBuffer();
         $logger = new ServerLogger($log, new SensitiveDataRedactor());
@@ -245,7 +246,7 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testWarmFullScanUsesTheScanScopedReader(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
         $store = new RandomAccessTrackingSourceIndexStore();
         $this->scannerWithStore($store, [new RecordingSourceIndexProvider()])->indexAll();
         $provider = new RecordingSourceIndexProvider();
@@ -259,7 +260,7 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testReindexesSameSizeContentSavedWithTheCachedModificationTime(): void
     {
-        $path = $this->temporaryDirectory.'/.env';
+        $path = $this->workspace->path('.env');
         $modifiedAt = 1_700_000_000;
         file_put_contents($path, "FIRST=1\n");
         touch($path, $modifiedAt);
@@ -280,12 +281,12 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testStoresEmptyFactsAsMarkersAndSkipsTheirRestores(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Empty.php', '<?php final class Empty1 {}');
-        file_put_contents($this->temporaryDirectory.'/src/Full.php', '<?php final class Full {}');
+        $this->workspace->write('src/Empty.php', '<?php final class Empty1 {}');
+        $this->workspace->write('src/Full.php', '<?php final class Full {}');
         $firstProvider = new ObjectFactsSourceIndexProvider(['src/Full.php']);
         $this->scanner($firstProvider)->indexAll();
 
-        $cache = (string) file_get_contents($this->temporaryDirectory.'/var/symfony-lsp/test/index/source.jsonl');
+        $cache = (string) file_get_contents($this->workspace->path('var/symfony-lsp/test/index/source.jsonl'));
         self::assertStringContainsString('"objectFacts":""', $cache);
         self::assertSame(2, $firstProvider->extractions);
 
@@ -294,12 +295,12 @@ final class ApplicationSourceScannerTest extends TestCase
 
         self::assertSame(0, $secondProvider->extractions);
         self::assertSame(1, $secondProvider->restores);
-        self::assertSame(['file://'.$this->temporaryDirectory.'/src/Full.php'], $secondProvider->restoredUris);
+        self::assertSame(['file://'.$this->workspace->path('src/Full.php')], $secondProvider->restoredUris);
     }
 
     public function testReportsContentOnlyChangesWhenEmptyFactsGainNoRuntimeDeclarations(): void
     {
-        $path = $this->temporaryDirectory.'/src/Empty.php';
+        $path = $this->workspace->path('src/Empty.php');
         file_put_contents($path, '<?php final class Empty1 {}');
         $provider = new ObjectFactsSourceIndexProvider([]);
         $scanner = $this->scanner($provider);
@@ -312,7 +313,7 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testReportsChangesLimitedToRouteFacts(): void
     {
-        $path = $this->temporaryDirectory.'/src/Controller.php';
+        $path = $this->workspace->path('src/Controller.php');
         file_put_contents($path, '<?php final class FirstController {}');
         $scanner = $this->scanner(new RecordingSourceIndexProvider('routes'));
         $scanner->indexAll();
@@ -324,7 +325,7 @@ final class ApplicationSourceScannerTest extends TestCase
 
     public function testReportsEveryChangedSourceDomain(): void
     {
-        $path = $this->temporaryDirectory.'/src/Service.php';
+        $path = $this->workspace->path('src/Service.php');
         file_put_contents($path, '<?php final class FirstService {}');
         $scanner = $this->scanner(
             new RecordingSourceIndexProvider('events'),
@@ -340,7 +341,7 @@ final class ApplicationSourceScannerTest extends TestCase
     #[DataProvider('referenceChangeProvider')]
     public function testReportsOnlyRuntimeRelevantReferenceChanges(string $relativePath, bool $requiresRuntimeRefresh): void
     {
-        $path = $this->temporaryDirectory.'/'.$relativePath;
+        $path = $this->workspace->path($relativePath);
         if (!is_dir(\dirname($path))) {
             mkdir(\dirname($path), 0777, true);
         }
@@ -370,7 +371,7 @@ PHP;
 
     public function testKeepsConfigurationReferenceChangesForRuntimePlanning(): void
     {
-        $path = $this->temporaryDirectory.'/config/packages/security.yaml';
+        $path = $this->workspace->path('config/packages/security.yaml');
         mkdir(\dirname($path), 0777, true);
         file_put_contents($path, "security:\n  access_control:\n    - { path: ^/admin, roles: ROLE_ADMIN }\n");
         $scanner = $this->scanner($this->securityIndexer());
@@ -385,7 +386,7 @@ PHP;
     {
         $scanner = $this->scanner(new RecordingSourceIndexProvider('routes'));
         $scanner->indexAll();
-        $path = $this->temporaryDirectory.'/src/NewController.php';
+        $path = $this->workspace->path('src/NewController.php');
         file_put_contents($path, '<?php final class NewController {}');
 
         $change = $scanner->refreshUri('file://'.$path);
@@ -396,7 +397,7 @@ PHP;
 
     public function testPersistentFactsNeverContainEnvironmentValues(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.env', "APP_SECRET=canary-value\n");
+        $this->workspace->write('.env', "APP_SECRET=canary-value\n");
         $indexes = new EnvironmentIndexRegistry();
         $this->scanner(new EnvironmentSourceIndexer(
             $indexes,
@@ -404,21 +405,21 @@ PHP;
         ))->indexAll();
 
         self::assertSame(['APP_SECRET'], $indexes->forProject($this->project)->names());
-        $cache = (string) file_get_contents($this->temporaryDirectory.'/var/symfony-lsp/test/index/source.jsonl');
+        $cache = (string) file_get_contents($this->workspace->path('var/symfony-lsp/test/index/source.jsonl'));
         self::assertStringNotContainsString('canary-value', $cache);
     }
 
     public function testSkipsPackageManagerLockFiles(): void
     {
-        file_put_contents($this->temporaryDirectory.'/composer.json', '{}');
-        file_put_contents($this->temporaryDirectory.'/package-lock.json', '{}');
-        file_put_contents($this->temporaryDirectory.'/npm-shrinkwrap.json', '{}');
-        file_put_contents($this->temporaryDirectory.'/pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
+        $this->workspace->write('composer.json', '{}');
+        $this->workspace->write('package-lock.json', '{}');
+        $this->workspace->write('npm-shrinkwrap.json', '{}');
+        $this->workspace->write('pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
         $provider = new RecordingSourceIndexProvider();
 
         $this->scanner($provider)->indexAll();
 
-        $rootUri = 'file://'.$this->temporaryDirectory;
+        $rootUri = 'file://'.$this->workspace->rootPath;
         self::assertArrayHasKey($rootUri.'/composer.json', $provider->sources);
         self::assertArrayNotHasKey($rootUri.'/package-lock.json', $provider->sources);
         self::assertArrayNotHasKey($rootUri.'/npm-shrinkwrap.json', $provider->sources);
@@ -427,18 +428,18 @@ PHP;
 
     public function testHonorsGitignoreWhileKeepingDotenvFiles(): void
     {
-        mkdir($this->temporaryDirectory.'/.git');
-        mkdir($this->temporaryDirectory.'/tmp/phpstan', 0777, true);
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "/tmp/\n/.env.local\n");
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
-        file_put_contents($this->temporaryDirectory.'/tmp/phpstan/cache.php', '<?php return [];');
-        file_put_contents($this->temporaryDirectory.'/.env.local', "APP_DEBUG=1\n");
+        $this->workspace->mkdir('.git');
+        $this->workspace->mkdir('tmp/phpstan');
+        $this->workspace->write('.gitignore', "/tmp/\n/.env.local\n");
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('tmp/phpstan/cache.php', '<?php return [];');
+        $this->workspace->write('.env.local', "APP_DEBUG=1\n");
         $provider = new RecordingSourceIndexProvider();
         $scanner = $this->scanner($provider);
 
         $scanner->indexAll();
 
-        $rootUri = 'file://'.$this->temporaryDirectory;
+        $rootUri = 'file://'.$this->workspace->rootPath;
         self::assertArrayHasKey($rootUri.'/src/Controller.php', $provider->sources);
         self::assertArrayHasKey($rootUri.'/.env.local', $provider->sources);
         self::assertArrayNotHasKey($rootUri.'/tmp/phpstan/cache.php', $provider->sources);
@@ -446,15 +447,15 @@ PHP;
 
     public function testLeavesSavedGitignoredFilesOutOfTheIndex(): void
     {
-        mkdir($this->temporaryDirectory.'/.git');
-        mkdir($this->temporaryDirectory.'/tmp');
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "/tmp/\n");
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->mkdir('.git');
+        $this->workspace->mkdir('tmp');
+        $this->workspace->write('.gitignore', "/tmp/\n");
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
         $provider = new RecordingSourceIndexProvider();
         $scanner = $this->scanner($provider);
         $scanner->indexAll();
 
-        $path = $this->temporaryDirectory.'/tmp/cache.php';
+        $path = $this->workspace->path('tmp/cache.php');
         file_put_contents($path, '<?php return [];');
         $change = $scanner->refreshUri('file://'.$path);
 
@@ -465,14 +466,14 @@ PHP;
 
     public function testRemovesPreviouslyIndexedFilesWhenTheyBecomeGitignored(): void
     {
-        mkdir($this->temporaryDirectory.'/.git');
-        $path = $this->temporaryDirectory.'/src/Controller.php';
+        $this->workspace->mkdir('.git');
+        $path = $this->workspace->path('src/Controller.php');
         $uri = 'file://'.$path;
         file_put_contents($path, '<?php final class Controller {}');
         $provider = new RecordingSourceIndexProvider();
         $scanner = $this->scanner($provider);
         $scanner->indexAll();
-        file_put_contents($this->temporaryDirectory.'/.gitignore', "/src/Controller.php\n");
+        $this->workspace->write('.gitignore', "/src/Controller.php\n");
 
         $change = $scanner->refreshUri($uri);
 
@@ -487,24 +488,24 @@ PHP;
             self::markTestSkipped('Directory permissions are not enforced in this environment.');
         }
 
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
-        mkdir($this->temporaryDirectory.'/volumes/mysql', 0777, true);
-        chmod($this->temporaryDirectory.'/volumes/mysql', 0000);
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->mkdir('volumes/mysql');
+        chmod($this->workspace->path('volumes/mysql'), 0000);
         $provider = new RecordingSourceIndexProvider();
 
         try {
             $this->scanner($provider)->indexAll();
         } finally {
-            chmod($this->temporaryDirectory.'/volumes/mysql', 0755);
+            chmod($this->workspace->path('volumes/mysql'), 0755);
         }
 
         self::assertSame(1, $provider->extractions);
-        self::assertFileExists($this->temporaryDirectory.'/var/symfony-lsp/test/index/source.jsonl');
+        self::assertFileExists($this->workspace->path('var/symfony-lsp/test/index/source.jsonl'));
     }
 
     public function testRestoresCycleCollectionAfterScanning(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
 
         gc_enable();
         $this->scanner(new RecordingSourceIndexProvider())->indexAll();
@@ -514,7 +515,7 @@ PHP;
 
     public function testRestoresCycleCollectionAfterCancellation(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
         $cancellation = new DeferredCancellation();
         $cancellation->cancel();
 
@@ -530,7 +531,7 @@ PHP;
 
     public function testLeavesDisabledCycleCollectionUntouched(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
 
         gc_disable();
         try {
@@ -543,8 +544,8 @@ PHP;
 
     public function testUpdatesAndDeletesIndividualFiles(): void
     {
-        $firstPath = $this->temporaryDirectory.'/src/First.php';
-        $secondPath = $this->temporaryDirectory.'/src/Second.php';
+        $firstPath = $this->workspace->path('src/First.php');
+        $secondPath = $this->workspace->path('src/Second.php');
         file_put_contents($firstPath, '<?php final class FirstVersion { public function value(): int { return 1; } }');
         file_put_contents($secondPath, '<?php final class Second {}');
         $provider = new RecordingSourceIndexProvider();
@@ -579,27 +580,27 @@ PHP;
     public function testAnIncrementalSaveSurvivesAConcurrentFullScan(): void
     {
         for ($i = 0; $i < 80; ++$i) {
-            file_put_contents(\sprintf('%s/src/File%02d.php', $this->temporaryDirectory, $i), \sprintf('<?php final class File%02d {}', $i));
+            file_put_contents(\sprintf('%s/src/File%02d.php', $this->workspace->rootPath, $i), \sprintf('<?php final class File%02d {}', $i));
         }
         $provider = new GenerationalSourceIndexProvider();
         $scanner = $this->scanner($provider);
         $scan = async(fn () => $scanner->refreshProject($this->project));
         delay(0);
-        self::assertNotSame([], $provider->staged[$this->temporaryDirectory] ?? []);
+        self::assertNotSame([], $provider->staged[$this->workspace->rootPath] ?? []);
 
-        $uri = (string) array_key_first($provider->staged[$this->temporaryDirectory]);
+        $uri = (string) array_key_first($provider->staged[$this->workspace->rootPath]);
         file_put_contents(substr($uri, \strlen('file://')), '<?php final class Saved {}');
         $refresh = async(static fn () => $scanner->refreshUri($uri));
         await([$scan, $refresh]);
 
-        self::assertSame(hash('sha256', '<?php final class Saved {}'), $provider->committed[$this->temporaryDirectory][$uri]);
+        self::assertSame(hash('sha256', '<?php final class Saved {}'), $provider->committed[$this->workspace->rootPath][$uri]);
         self::assertFalse($scanner->refreshUri($uri)->requiresRuntimeRefresh());
     }
 
     public function testANewFullScanSupersedesTheActiveScan(): void
     {
         for ($i = 0; $i < 80; ++$i) {
-            file_put_contents(\sprintf('%s/src/File%02d.php', $this->temporaryDirectory, $i), \sprintf('<?php final class File%02d {}', $i));
+            file_put_contents(\sprintf('%s/src/File%02d.php', $this->workspace->rootPath, $i), \sprintf('<?php final class File%02d {}', $i));
         }
         $provider = new GenerationalSourceIndexProvider();
         $scanner = $this->scanner($provider);
@@ -614,18 +615,18 @@ PHP;
         }
         $second->await();
 
-        self::assertCount(80, $provider->committed[$this->temporaryDirectory]);
+        self::assertCount(80, $provider->committed[$this->workspace->rootPath]);
     }
 
     public function testIndexAllContinuesWithOtherProjectsWhenAScanIsSuperseded(): void
     {
-        $secondRoot = $this->temporaryDirectory.'-second';
+        $secondRoot = $this->workspace->rootPath.'-second';
         mkdir($secondRoot.'/src', 0777, true);
 
         try {
             $this->projects->replace([$this->project, new Project($secondRoot, 'file://'.$secondRoot)]);
             for ($i = 0; $i < 80; ++$i) {
-                file_put_contents(\sprintf('%s/src/File%02d.php', $this->temporaryDirectory, $i), \sprintf('<?php final class File%02d {}', $i));
+                file_put_contents(\sprintf('%s/src/File%02d.php', $this->workspace->rootPath, $i), \sprintf('<?php final class File%02d {}', $i));
             }
             file_put_contents($secondRoot.'/src/Other.php', '<?php final class Other {}');
             $provider = new GenerationalSourceIndexProvider();
@@ -635,7 +636,7 @@ PHP;
             $supersede = async(fn () => $scanner->refreshProject($this->project));
             await([$indexAll, $supersede]);
 
-            self::assertCount(80, $provider->committed[$this->temporaryDirectory]);
+            self::assertCount(80, $provider->committed[$this->workspace->rootPath]);
             self::assertCount(1, $provider->committed[$secondRoot]);
         } finally {
             (new Filesystem())->remove($secondRoot);
@@ -644,9 +645,9 @@ PHP;
 
     public function testChecksCancellationBeforeWaitingForTheSourceLock(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
         $mutex = new LocalKeyedMutex();
-        $lock = $mutex->acquire("source\0".$this->temporaryDirectory);
+        $lock = $mutex->acquire("source\0".$this->workspace->rootPath);
         $provider = new RecordingSourceIndexProvider();
         $scanner = $this->scannerWithMutex($mutex, new DocumentStore(), $provider);
         $cancellation = new DeferredCancellation();
@@ -664,9 +665,9 @@ PHP;
 
     public function testChecksCancellationAfterWaitingForTheSourceLock(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
         $mutex = new LocalKeyedMutex();
-        $lock = $mutex->acquire("source\0".$this->temporaryDirectory);
+        $lock = $mutex->acquire("source\0".$this->workspace->rootPath);
         $provider = new RecordingSourceIndexProvider();
         $scanner = $this->scannerWithMutex($mutex, new DocumentStore(), $provider);
         $cancellation = new DeferredCancellation();
@@ -687,7 +688,7 @@ PHP;
     public function testRemovalCancelsTheActiveScanAndReleasesProjectEntries(): void
     {
         for ($i = 0; $i < 80; ++$i) {
-            file_put_contents(\sprintf('%s/src/File%02d.php', $this->temporaryDirectory, $i), \sprintf('<?php final class File%02d {}', $i));
+            file_put_contents(\sprintf('%s/src/File%02d.php', $this->workspace->rootPath, $i), \sprintf('<?php final class File%02d {}', $i));
         }
         $provider = new GenerationalSourceIndexProvider();
         $scanner = $this->scanner($provider);
@@ -703,17 +704,17 @@ PHP;
         } catch (CancelledException) {
         }
 
-        self::assertArrayNotHasKey($this->temporaryDirectory, $provider->committed);
-        $scanner->refreshUri('file://'.$this->temporaryDirectory.'/src/File00.php');
-        self::assertArrayNotHasKey($this->temporaryDirectory, $provider->committed);
+        self::assertArrayNotHasKey($this->workspace->rootPath, $provider->committed);
+        $scanner->refreshUri('file://'.$this->workspace->path('src/File00.php'));
+        self::assertArrayNotHasKey($this->workspace->rootPath, $provider->committed);
     }
 
     public function testARefreshWaitingForTheLockIgnoresARemovedProject(): void
     {
-        $path = $this->temporaryDirectory.'/src/Controller.php';
+        $path = $this->workspace->path('src/Controller.php');
         file_put_contents($path, '<?php final class Controller {}');
         $mutex = new LocalKeyedMutex();
-        $lock = $mutex->acquire("source\0".$this->temporaryDirectory);
+        $lock = $mutex->acquire("source\0".$this->workspace->rootPath);
         $provider = new RecordingSourceIndexProvider();
         $scanner = $this->scannerWithMutex($mutex, new DocumentStore(), $provider);
         $refresh = async(static fn () => $scanner->refreshUri('file://'.$path));
@@ -729,9 +730,9 @@ PHP;
 
     public function testAFullScanIgnoresTheRuntimeInitializerLock(): void
     {
-        file_put_contents($this->temporaryDirectory.'/src/Controller.php', '<?php final class Controller {}');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
         $mutex = new LocalKeyedMutex();
-        $runtimeLock = $mutex->acquire("runtime\0".$this->temporaryDirectory);
+        $runtimeLock = $mutex->acquire("runtime\0".$this->workspace->rootPath);
         $provider = new RecordingSourceIndexProvider();
 
         $this->scannerWithMutex($mutex, new DocumentStore(), $provider)->indexAll();

@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\ConfigurationException;
 use Symfony\Lsp\Tools\Dogfood\ScenarioManifestLoader;
 
@@ -13,17 +14,17 @@ final class ScenarioManifestLoaderTest extends TestCase
 {
     private const REVISION = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-    private string $directory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-scenarios-'.bin2hex(random_bytes(8)));
-        (new Filesystem())->mkdir($this->directory);
+        $this->workspace = new TestWorkspace('symfony-lsp-scenarios-');
+        (new Filesystem())->mkdir($this->workspace->rootPath);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testLoadsMinimalManifest(): void
@@ -131,12 +132,12 @@ final class ScenarioManifestLoaderTest extends TestCase
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('does not exist');
 
-        (new ScenarioManifestLoader())->load(Path::join($this->directory, 'missing.json'));
+        (new ScenarioManifestLoader())->load(Path::join($this->workspace->rootPath, 'missing.json'));
     }
 
     public function testRejectsInvalidJson(): void
     {
-        $path = Path::join($this->directory, 'symfony-demo.json');
+        $path = Path::join($this->workspace->rootPath, 'symfony-demo.json');
         file_put_contents($path, '{');
 
         $this->expectException(ConfigurationException::class);
@@ -379,7 +380,7 @@ final class ScenarioManifestLoaderTest extends TestCase
      */
     private function write(array $data): string
     {
-        $path = Path::join($this->directory, 'symfony-demo.json');
+        $path = Path::join($this->workspace->rootPath, 'symfony-demo.json');
         file_put_contents($path, json_encode($data, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES));
 
         return $path;

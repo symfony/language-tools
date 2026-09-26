@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Tool\Dogfood;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\GitProvisioner;
 use Symfony\Lsp\Tools\Dogfood\NativeProcessRunner;
 use Symfony\Lsp\Tools\Dogfood\ProcessResult;
@@ -13,15 +14,15 @@ use Symfony\Lsp\Tools\Dogfood\ProvisioningException;
 
 final class GitProvisionerTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
     private string $origin;
     private NativeProcessRunner $processes;
     private GitProvisioner $provisioner;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-dogfood-'.bin2hex(random_bytes(8)));
-        $this->origin = Path::join($this->directory, 'origin');
+        $this->workspace = new TestWorkspace('symfony-lsp-dogfood-');
+        $this->origin = Path::join($this->workspace->rootPath, 'origin');
         (new Filesystem())->mkdir($this->origin);
         $this->processes = new NativeProcessRunner();
         $this->git(['init', '--initial-branch=main'], $this->origin);
@@ -30,14 +31,14 @@ final class GitProvisionerTest extends TestCase
         $this->provisioner = new GitProvisioner(
             $this->processes,
             new Filesystem(),
-            Path::join($this->directory, 'mirrors'),
-            Path::join($this->directory, 'checkouts'),
+            Path::join($this->workspace->rootPath, 'mirrors'),
+            Path::join($this->workspace->rootPath, 'checkouts'),
         );
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testProvisionsCleanCheckoutAtPinnedRevision(): void
@@ -80,7 +81,7 @@ final class GitProvisionerTest extends TestCase
     {
         $first = $this->commit('composer.json', '{"name": "first/app"}');
         $this->provisioner->provision($this->configuration($first));
-        $secondOrigin = Path::join($this->directory, 'second-origin');
+        $secondOrigin = Path::join($this->workspace->rootPath, 'second-origin');
         (new Filesystem())->mkdir($secondOrigin);
         $this->git(['init', '--initial-branch=main'], $secondOrigin);
         $this->git(['config', 'user.email', 'dogfood@example.com'], $secondOrigin);
@@ -106,7 +107,7 @@ final class GitProvisionerTest extends TestCase
     public function testDoesNotExposeGitAuthenticationErrors(): void
     {
         $processes = new FakeProcessRunner(static fn (): ProcessResult => new ProcessResult(128, '', 'Authentication failed for https://example.com/repository?token=credential-canary', false));
-        $provisioner = new GitProvisioner($processes, new Filesystem(), $this->directory.'/failed-mirrors', $this->directory.'/failed-checkouts');
+        $provisioner = new GitProvisioner($processes, new Filesystem(), $this->workspace->path('failed-mirrors'), $this->workspace->path('failed-checkouts'));
 
         try {
             $provisioner->provision($this->configuration(str_repeat('a', 40)));

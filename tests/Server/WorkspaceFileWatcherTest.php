@@ -3,33 +3,33 @@
 namespace Symfony\Lsp\Tests\Server;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Server\WorkspaceFileWatcher;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\RecordingClient;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class WorkspaceFileWatcherTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
     private ProjectRegistry $projects;
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir().'/symfony-lsp-watch-'.bin2hex(random_bytes(6));
+        $this->workspace = new TestWorkspace('symfony-lsp-watch-');
         foreach (['src', 'custom-package', 'var', 'vendor'] as $directory) {
-            mkdir($this->directory.'/'.$directory, 0777, true);
+            $this->workspace->mkdir($directory);
         }
-        file_put_contents($this->directory.'/.gitignore', "/var/\n");
+        $this->workspace->write('.gitignore', "/var/\n");
         $this->projects = new ProjectRegistry();
-        $this->projects->replace([new Project($this->directory, 'file:///workspace')]);
+        $this->projects->replace([new Project($this->workspace->rootPath, 'file:///workspace')]);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testRegistersApplicationDirectoriesForRelativePatternClients(): void
@@ -74,11 +74,11 @@ final class WorkspaceFileWatcherTest extends TestCase
     public function testDetectsNewTopLevelSourceDirectories(): void
     {
         $watcher = new WorkspaceFileWatcher(new RecordingClient(), $this->projects, new UriToPathConverter(), ProjectPaths::policy());
-        mkdir($this->directory.'/module');
+        $this->workspace->mkdir('module');
 
-        self::assertTrue($watcher->requiresRefreshForChange('file://'.$this->directory.'/module', 1));
-        self::assertFalse($watcher->requiresRefreshForChange('file://'.$this->directory.'/vendor', 1));
-        self::assertFalse($watcher->requiresRefreshForChange('file://'.$this->directory.'/module', 2));
+        self::assertTrue($watcher->requiresRefreshForChange('file://'.$this->workspace->path('module'), 1));
+        self::assertFalse($watcher->requiresRefreshForChange('file://'.$this->workspace->path('vendor'), 1));
+        self::assertFalse($watcher->requiresRefreshForChange('file://'.$this->workspace->path('module'), 2));
     }
 
     public function testFallsBackToWorkspaceGlobsWithoutRelativePatternSupport(): void

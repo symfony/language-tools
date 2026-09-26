@@ -4,33 +4,33 @@ namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectConfiguration;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class ProjectConfigurationTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
     private ProjectConfiguration $configuration;
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir().'/symfony-lsp-config-'.bin2hex(random_bytes(6));
-        mkdir($this->directory.'/apps/admin', 0777, true);
+        $this->workspace = new TestWorkspace('symfony-lsp-config-');
+        $this->workspace->mkdir('apps/admin');
         $this->configuration = new ProjectConfiguration(new UriToPathConverter(), new AnalysisSettings());
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testLoadsWorkspaceDefaultsAndProjectOverrides(): void
     {
-        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+        $this->workspace->write('.symfony-lsp.json', json_encode([
             'version' => 1,
             'projectRoots' => ['.', 'apps/admin'],
             'environment' => 'prod',
@@ -45,10 +45,10 @@ final class ProjectConfigurationTest extends TestCase
                 ],
             ],
         ], \JSON_THROW_ON_ERROR));
-        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
-        $project = new Project($this->directory.'/apps/admin', 'file:///workspace/apps/admin');
+        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->workspace->rootPath)]]);
+        $project = new Project($this->workspace->path('apps/admin'), 'file:///workspace/apps/admin');
 
-        self::assertSame(['.', 'apps/admin'], $this->configuration->projectRoots($this->directory));
+        self::assertSame(['.', 'apps/admin'], $this->configuration->projectRoots($this->workspace->rootPath));
         self::assertSame([
             'environment' => 'admin',
             'bridgeTimeout' => 90.0,
@@ -62,12 +62,12 @@ final class ProjectConfigurationTest extends TestCase
 
     public function testKeepsTheLastValidConfigurationWhenReloadFails(): void
     {
-        $path = $this->directory.'/.symfony-lsp.json';
+        $path = $this->workspace->path('.symfony-lsp.json');
         file_put_contents($path, json_encode([
             'version' => 1,
             'environment' => 'test',
         ], \JSON_THROW_ON_ERROR));
-        $workspace = [['uri' => (new UriToPathConverter())->toUri($this->directory)]];
+        $workspace = [['uri' => (new UriToPathConverter())->toUri($this->workspace->rootPath)]];
         $this->configuration->load($workspace);
         file_put_contents($path, '{');
 
@@ -79,19 +79,19 @@ final class ProjectConfigurationTest extends TestCase
 
         self::assertSame(
             ['environment' => 'test'],
-            $this->configuration->settings(new Project($this->directory, 'file:///workspace')),
+            $this->configuration->settings(new Project($this->workspace->rootPath, 'file:///workspace')),
         );
     }
 
     public function testRejectsProjectOverridesThatDoNotMatchDiscoveredProjects(): void
     {
-        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+        $this->workspace->write('.symfony-lsp.json', json_encode([
             'version' => 1,
             'projects' => [
                 'apps/admin' => ['environment' => 'admin'],
             ],
         ], \JSON_THROW_ON_ERROR));
-        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
+        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->workspace->rootPath)]]);
 
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('apps/admin');
@@ -101,7 +101,7 @@ final class ProjectConfigurationTest extends TestCase
 
     public function testRejectsExcludePathsOutsideProjects(): void
     {
-        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+        $this->workspace->write('.symfony-lsp.json', json_encode([
             'version' => 1,
             'excludePaths' => ['../outside/**'],
         ], \JSON_THROW_ON_ERROR));
@@ -109,12 +109,12 @@ final class ProjectConfigurationTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('inside each Symfony project');
 
-        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
+        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->workspace->rootPath)]]);
     }
 
     public function testRejectsUnknownAndInvalidOptions(): void
     {
-        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+        $this->workspace->write('.symfony-lsp.json', json_encode([
             'version' => 1,
             'bridgeTimeout' => 0,
         ], \JSON_THROW_ON_ERROR));
@@ -122,13 +122,13 @@ final class ProjectConfigurationTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('bridgeTimeout');
 
-        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
+        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->workspace->rootPath)]]);
     }
 
     #[DataProvider('escapingKernels')]
     public function testRejectsKernelEntryPointsThatLeaveTheProject(string $kernel, string $message): void
     {
-        file_put_contents($this->directory.'/.symfony-lsp.json', json_encode([
+        $this->workspace->write('.symfony-lsp.json', json_encode([
             'version' => 1,
             'kernel' => $kernel,
         ], \JSON_THROW_ON_ERROR));
@@ -136,7 +136,7 @@ final class ProjectConfigurationTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage($message);
 
-        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->directory)]]);
+        $this->configuration->load([['uri' => (new UriToPathConverter())->toUri($this->workspace->rootPath)]]);
     }
 
     /** @return iterable<string, array{string, string}> */

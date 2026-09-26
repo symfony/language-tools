@@ -8,24 +8,25 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeSnapshotStore;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class RuntimeSnapshotStoreTest extends TestCase
 {
-    private string $temporaryDirectory;
+    private TestWorkspace $workspace;
     private string $bridge;
     private Project $project;
 
     protected function setUp(): void
     {
-        $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-runtime-store-'.bin2hex(random_bytes(8));
-        $this->bridge = $this->temporaryDirectory.'/bridge/bridge.php';
-        $this->project = new Project($this->temporaryDirectory.'/project', 'file://'.$this->temporaryDirectory.'/project');
+        $this->workspace = new TestWorkspace('symfony-lsp-runtime-store-');
+        $this->bridge = $this->workspace->path('bridge/bridge.php');
+        $this->project = new Project($this->workspace->path('project'), 'file://'.$this->workspace->path('project'));
         mkdir(\dirname($this->bridge), 0777, true);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->temporaryDirectory);
+        $this->workspace->cleanup();
     }
 
     public function testSavesAndLoadsAcrossStoreInstances(): void

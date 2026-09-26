@@ -4,32 +4,32 @@ namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class ProjectPathPolicyTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir().'/symfony-lsp-policy-'.bin2hex(random_bytes(6));
+        $this->workspace = new TestWorkspace('symfony-lsp-policy-');
         foreach (['assets/vendor', 'node_modules', 'src/var', 'templates/vendor', 'var/cache', 'vendor/acme'] as $path) {
-            mkdir($this->directory.'/'.$path, 0777, true);
+            $this->workspace->mkdir($path);
         }
-        file_put_contents($this->directory.'/.gitignore', "/var/cache/\n/vendor/\n/assets/vendor/\n*.log\n");
+        $this->workspace->write('.gitignore', "/var/cache/\n/vendor/\n/assets/vendor/\n*.log\n");
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     #[DataProvider('paths')]
     public function testExcludesToolOwnedAndIgnoredPathsOnly(string $relativePath, bool $excluded): void
     {
-        self::assertSame($excluded, ProjectPaths::policy()->isExcluded($this->project(), $this->directory.'/'.$relativePath));
+        self::assertSame($excluded, ProjectPaths::policy()->isExcluded($this->project(), $this->workspace->path($relativePath)));
     }
 
     /** @return iterable<string, array{string, bool}> */
@@ -49,26 +49,26 @@ final class ProjectPathPolicyTest extends TestCase
 
     public function testKeepsProjectRootDotenvFilesTheProjectIgnores(): void
     {
-        file_put_contents($this->directory.'/.gitignore', "/.env.local\n");
+        $this->workspace->write('.gitignore', "/.env.local\n");
 
-        self::assertFalse(ProjectPaths::policy()->isExcluded($this->project(), $this->directory.'/.env.local'));
+        self::assertFalse(ProjectPaths::policy()->isExcluded($this->project(), $this->workspace->path('.env.local')));
     }
 
     public function testExcludesTheDeclaredComposerInstallationDirectory(): void
     {
-        $project = new Project($this->directory, 'file://'.$this->directory, 'libraries');
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath, 'libraries');
 
-        self::assertTrue(ProjectPaths::policy()->isToolOwned($project, $this->directory.'/libraries/acme/Thing.php'));
-        self::assertFalse(ProjectPaths::policy()->isToolOwned($project, $this->directory.'/vendor/acme/Thing.php'));
+        self::assertTrue(ProjectPaths::policy()->isToolOwned($project, $this->workspace->path('libraries/acme/Thing.php')));
+        self::assertFalse(ProjectPaths::policy()->isToolOwned($project, $this->workspace->path('vendor/acme/Thing.php')));
     }
 
     public function testIgnoresPathsOutsideTheProject(): void
     {
-        self::assertFalse(ProjectPaths::policy()->isExcluded($this->project(), \dirname($this->directory).'/elsewhere/vendor/Thing.php'));
+        self::assertFalse(ProjectPaths::policy()->isExcluded($this->project(), \dirname($this->workspace->rootPath).'/elsewhere/vendor/Thing.php'));
     }
 
     private function project(): Project
     {
-        return new Project($this->directory, 'file://'.$this->directory);
+        return new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
     }
 }

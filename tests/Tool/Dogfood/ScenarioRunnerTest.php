@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Tool\Dogfood;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\ContentLengthProcessClient;
 use Symfony\Lsp\Tools\Dogfood\ProtocolValidator;
 use Symfony\Lsp\Tools\Dogfood\ResponseAssertions;
@@ -37,14 +38,14 @@ final class ScenarioRunnerTest extends TestCase
 
         PHP;
 
-    private string $directory;
+    private TestWorkspace $workspace;
     private string $project;
     private ?ContentLengthProcessClient $client = null;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-scenario-runner-'.bin2hex(random_bytes(8)));
-        $this->project = Path::join($this->directory, 'project');
+        $this->workspace = new TestWorkspace('symfony-lsp-scenario-runner-');
+        $this->project = Path::join($this->workspace->rootPath, 'project');
         $filesystem = new Filesystem();
         $filesystem->dumpFile(Path::join($this->project, 'src/Controller/HelloController.php'), self::CONTROLLER);
         $filesystem->dumpFile(Path::join($this->project, 'translations/messages.en.xlf'), <<<'XML'
@@ -67,12 +68,12 @@ final class ScenarioRunnerTest extends TestCase
     {
         $this->client?->terminate();
         $this->client = null;
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testReportsWrongButNonEmptyResultsAsFailures(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'textDocument/completion', 'result' => [['label' => 'other/template.html.twig']]],
         ]]);
         $report = $this->execute($server, [$this->scenario([
@@ -91,7 +92,7 @@ final class ScenarioRunnerTest extends TestCase
 
     public function testReportsAbsentAnchorsWithoutOpeningTheDocument(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, []);
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, []);
         $report = $this->execute($server, [$this->scenario([
             'anchor' => 'this anchor drifted away',
             'offset' => 0,
@@ -116,7 +117,7 @@ final class ScenarioRunnerTest extends TestCase
 
     public function testSendsOnlyTheExpectedMethods(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]],
             ['method' => 'textDocument/hover', 'result' => ['contents' => ['kind' => 'markdown', 'value' => 'The hello template.']]],
         ]]);
@@ -142,7 +143,7 @@ final class ScenarioRunnerTest extends TestCase
 
     public function testFailsWhenDiagnosticsAreNotPublishedForTheCurrentVersion(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, [
             'publishVersion' => 99,
             'diagnostics' => [['contains' => 'hello/index.html.twig', 'items' => [['code' => 'twig.missing_template', 'find' => 'hello/index.html.twig']]]],
         ]);
@@ -159,7 +160,7 @@ final class ScenarioRunnerTest extends TestCase
 
     public function testChecksPublishedDiagnosticBoundsEvenWhenTheProjectionMatches(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['diagnostics' => [[
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['diagnostics' => [[
             'contains' => 'hello/index.html.twig',
             'items' => [[
                 'code' => 'template.not_found',
@@ -177,7 +178,7 @@ final class ScenarioRunnerTest extends TestCase
 
     public function testAssertsTheDiagnosticsOfTheEditedVersion(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, [
             'diagnostics' => [['contains' => 'hello/missing.html.twig', 'items' => [['code' => 'twig.missing_template', 'find' => 'hello/missing.html.twig']]]],
         ]);
         $report = $this->execute($server, [$this->scenario([
@@ -200,7 +201,7 @@ final class ScenarioRunnerTest extends TestCase
 
     public function testAppliesACodeActionAndRollsTheDocumentBack(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, [
             'diagnostics' => [['contains' => 'hello/missing.html.twig', 'items' => [['code' => 'twig.missing_template', 'find' => 'hello/missing.html.twig']]]],
             'responses' => [[
                 'method' => 'textDocument/codeAction',
@@ -238,7 +239,7 @@ final class ScenarioRunnerTest extends TestCase
 
     public function testRestoresTheDocumentWhenTheCodeActionCannotBeApplied(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, [
             'rootUri' => 'file://'.str_replace('%2F', '/', rawurlencode((string) realpath($this->project))),
             'diagnostics' => [['contains' => 'hello/missing.html.twig', 'items' => [['code' => 'twig.missing_template', 'find' => 'hello/missing.html.twig']]]],
             'responses' => [[
@@ -278,7 +279,7 @@ final class ScenarioRunnerTest extends TestCase
 
     public function testOpensTranslationsWithTheXmlLanguageId(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'textDocument/definition', 'result' => []],
         ]]);
         $report = $this->execute($server, [[
@@ -295,7 +296,7 @@ final class ScenarioRunnerTest extends TestCase
 
     public function testReportsEveryScenarioAfterTheServerStops(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]],
             ['method' => 'textDocument/hover', 'exit' => true],
         ]]);
@@ -320,7 +321,7 @@ final class ScenarioRunnerTest extends TestCase
 
     public function testReportsRequestErrorsWithoutStoppingTheRun(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'textDocument/completion', 'error' => ['code' => -32603, 'message' => 'Completion exploded.']],
             ['method' => 'textDocument/hover', 'result' => ['contents' => ['kind' => 'markdown', 'value' => 'Hello template.']]],
         ]]);
@@ -386,7 +387,7 @@ final class ScenarioRunnerTest extends TestCase
      */
     private function manifest(array $scenarios): ScenarioManifest
     {
-        $path = Path::join($this->directory, 'scenarios.json');
+        $path = Path::join($this->workspace->rootPath, 'scenarios.json');
         (new Filesystem())->dumpFile($path, json_encode([
             'version' => 1,
             'revision' => str_repeat('a', 40),

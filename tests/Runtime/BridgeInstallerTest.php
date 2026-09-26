@@ -6,31 +6,31 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\BridgeInstaller;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class BridgeInstallerTest extends TestCase
 {
-    private string $temporaryDirectory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
-        mkdir($this->temporaryDirectory);
+        $this->workspace = new TestWorkspace('symfony-lsp-');
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->temporaryDirectory);
+        $this->workspace->cleanup();
     }
 
     public function testAcceptsAnEquivalentConcurrentInstallation(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
-        $module = $this->temporaryDirectory.'/bridge/sections/routes.php';
+        $source = $this->workspace->path('source.php');
+        $module = $this->workspace->path('bridge/sections/routes.php');
         mkdir(\dirname($module), 0777, true);
         file_put_contents($source, "<?php require __DIR__.'/bridge/sections/routes.php';");
         file_put_contents($module, '<?php function routes(): array { return []; }');
         $installer = new BridgeInstaller($source, 'test', new ConcurrentBridgeFilesystem());
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
 
         $bridge = $installer->install($project);
 
@@ -40,13 +40,13 @@ final class BridgeInstallerTest extends TestCase
 
     public function testInstallsBridgeBundleAtomicallyInsideProject(): void
     {
-        $source = $this->temporaryDirectory.'/source.php';
-        $module = $this->temporaryDirectory.'/bridge/sections/routes.php';
+        $source = $this->workspace->path('source.php');
+        $module = $this->workspace->path('bridge/sections/routes.php');
         mkdir(\dirname($module), 0777, true);
         file_put_contents($source, "<?php require __DIR__.'/bridge/sections/routes.php';");
         file_put_contents($module, '<?php function routes(): array { return []; }');
         $installer = new BridgeInstaller($source, 'test', new Filesystem());
-        $project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
 
         $first = $installer->install($project);
         $second = $installer->install($project);

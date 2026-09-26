@@ -31,6 +31,7 @@ use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Server\Utf8StringTruncator;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 /**
  * Simulates a Docker bind mount without Docker: the host project root is a
@@ -58,7 +59,8 @@ final class ContainerProjectRootBridgeTest extends TestCase
             self::markTestSkipped('The runtime fixture dependencies are not installed.');
         }
 
-        $hostRoot = sys_get_temp_dir().'/symfony-lsp-host-'.bin2hex(random_bytes(8));
+        $workspace = new TestWorkspace('symfony-lsp-host-');
+        $hostRoot = $workspace->path('host');
         symlink($containerRoot, $hostRoot);
         $project = new Project($hostRoot, 'file://'.$hostRoot);
         $configuration = new RuntimeConfiguration();
@@ -103,7 +105,7 @@ final class ContainerProjectRootBridgeTest extends TestCase
             self::assertStringStartsWith($hostRoot.'/', $controller->sourcePath);
         } finally {
             (new Filesystem())->remove($containerRoot.'/var/symfony-lsp/container-test');
-            unlink($hostRoot);
+            $workspace->cleanup();
         }
     }
 }

@@ -5,22 +5,23 @@ namespace Symfony\Lsp\Tests\Tool\Dogfood;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\NativeProcessRunner;
 use Symfony\Lsp\Tools\Dogfood\ProcessInterruptedException;
 
 final class NativeProcessRunnerTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-dogfood-process-'.bin2hex(random_bytes(8)));
-        (new Filesystem())->mkdir($this->directory);
+        $this->workspace = new TestWorkspace('symfony-lsp-dogfood-process-');
+        (new Filesystem())->mkdir($this->workspace->rootPath);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testOverridesTheInheritedEnvironment(): void
@@ -77,7 +78,7 @@ final class NativeProcessRunnerTest extends TestCase
             self::markTestSkipped('Process group assertions require POSIX process control.');
         }
 
-        $lockPath = Path::join($this->directory, 'timeout.lock');
+        $lockPath = Path::join($this->workspace->rootPath, 'timeout.lock');
         $result = (new NativeProcessRunner())->run([
             \PHP_BINARY,
             '-r',
@@ -107,7 +108,7 @@ final class NativeProcessRunnerTest extends TestCase
             self::markTestSkipped('Signal assertions require POSIX process control.');
         }
 
-        $lockPath = Path::join($this->directory, 'interrupt.lock');
+        $lockPath = Path::join($this->workspace->rootPath, 'interrupt.lock');
         try {
             (new NativeProcessRunner())->run([
                 \PHP_BINARY,

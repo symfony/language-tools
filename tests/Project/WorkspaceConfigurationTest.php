@@ -29,16 +29,16 @@ use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Tests\Support\RecordingClient;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class WorkspaceConfigurationTest extends TestCase
 {
-    private string $temporaryDirectory;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
-        mkdir($this->temporaryDirectory);
-        file_put_contents($this->temporaryDirectory.'/composer.json', json_encode([
+        $this->workspace = new TestWorkspace('symfony-lsp-');
+        $this->workspace->write('composer.json', json_encode([
             'type' => 'project',
             'require' => ['symfony/framework-bundle' => '^8.0'],
         ], \JSON_THROW_ON_ERROR));
@@ -46,9 +46,9 @@ final class WorkspaceConfigurationTest extends TestCase
 
     protected function tearDown(): void
     {
-        @unlink($this->temporaryDirectory.'/.symfony-lsp.json');
-        @unlink($this->temporaryDirectory.'/composer.json');
-        @rmdir($this->temporaryDirectory);
+        @unlink($this->workspace->path('.symfony-lsp.json'));
+        @unlink($this->workspace->path('composer.json'));
+        $this->workspace->cleanup();
     }
 
     public function testUsesRootUriWhenWorkspaceFoldersAreAbsent(): void
@@ -58,7 +58,7 @@ final class WorkspaceConfigurationTest extends TestCase
         $configuration = $this->workspaceConfiguration($registry, $runtimeConfiguration);
 
         $configuration->initialize([
-            'rootUri' => 'file://'.$this->temporaryDirectory,
+            'rootUri' => 'file://'.$this->workspace->rootPath,
             'capabilities' => ['general' => ['positionEncodings' => ['utf-8', 'utf-16']]],
             'initializationOptions' => [
                 'phpCommand' => ['symfony', 'php'],
@@ -79,7 +79,7 @@ final class WorkspaceConfigurationTest extends TestCase
 
     public function testLoadsCheckedInAnalysisSettingsBeforeTrustResolution(): void
     {
-        file_put_contents($this->temporaryDirectory.'/.symfony-lsp.json', json_encode([
+        $this->workspace->write('.symfony-lsp.json', json_encode([
             'version' => 1,
             'environment' => 'test',
             'runtimeIndexing' => false,
@@ -89,7 +89,7 @@ final class WorkspaceConfigurationTest extends TestCase
         $configuration = $this->workspaceConfiguration($registry, $runtimeConfiguration);
 
         $configuration->initialize([
-            'rootUri' => 'file://'.$this->temporaryDirectory,
+            'rootUri' => 'file://'.$this->workspace->rootPath,
             'initializationOptions' => ['workspaceTrust' => true],
         ]);
 
@@ -106,7 +106,7 @@ final class WorkspaceConfigurationTest extends TestCase
         $this->expectExceptionMessage('The project root "missing" was not discovered as a Symfony project.');
 
         $configuration->initialize([
-            'rootUri' => 'file://'.$this->temporaryDirectory,
+            'rootUri' => 'file://'.$this->workspace->rootPath,
             'initializationOptions' => ['projectRoots' => ['.', 'missing']],
         ]);
     }
@@ -114,13 +114,13 @@ final class WorkspaceConfigurationTest extends TestCase
     public function testRejectsInitializationProjectRootsOutsideEveryWorkspaceFolder(): void
     {
         $configuration = $this->workspaceConfiguration(new ProjectRegistry(), new RuntimeConfiguration());
-        $outside = \dirname($this->temporaryDirectory);
+        $outside = \dirname($this->workspace->rootPath);
 
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage(\sprintf('The project root "%s" is outside the workspace.', $outside));
 
         $configuration->initialize([
-            'rootUri' => 'file://'.$this->temporaryDirectory,
+            'rootUri' => 'file://'.$this->workspace->rootPath,
             'initializationOptions' => ['projectRoots' => [$outside]],
         ]);
     }
@@ -130,10 +130,10 @@ final class WorkspaceConfigurationTest extends TestCase
         $registry = new ProjectRegistry();
         $state = new RecordingProjectState();
         $configuration = $this->workspaceConfiguration($registry, new RuntimeConfiguration(), $state);
-        $rootUri = 'file://'.$this->temporaryDirectory;
+        $rootUri = 'file://'.$this->workspace->rootPath;
         $configuration->initialize(['workspaceFolders' => [['uri' => $rootUri]]]);
-        mkdir($this->temporaryDirectory.'/nested');
-        file_put_contents($this->temporaryDirectory.'/nested/composer.json', json_encode([
+        $this->workspace->mkdir('nested');
+        $this->workspace->write('nested/composer.json', json_encode([
             'type' => 'project',
             'require' => ['symfony/framework-bundle' => '^8.1'],
         ], \JSON_THROW_ON_ERROR));
@@ -144,10 +144,10 @@ final class WorkspaceConfigurationTest extends TestCase
         ]);
 
         self::assertCount(1, $registry->all());
-        self::assertSame($this->temporaryDirectory.'/nested', $registry->all()[0]->rootPath);
-        self::assertSame([$this->temporaryDirectory], $state->removed);
-        unlink($this->temporaryDirectory.'/nested/composer.json');
-        rmdir($this->temporaryDirectory.'/nested');
+        self::assertSame($this->workspace->path('nested'), $registry->all()[0]->rootPath);
+        self::assertSame([$this->workspace->rootPath], $state->removed);
+        unlink($this->workspace->path('nested/composer.json'));
+        rmdir($this->workspace->path('nested'));
     }
 
     public function testRediscoveringTheSameRootDoesNotReleaseProjectState(): void
@@ -155,7 +155,7 @@ final class WorkspaceConfigurationTest extends TestCase
         $registry = new ProjectRegistry();
         $state = new RecordingProjectState();
         $configuration = $this->workspaceConfiguration($registry, new RuntimeConfiguration(), $state);
-        $rootUri = 'file://'.$this->temporaryDirectory;
+        $rootUri = 'file://'.$this->workspace->rootPath;
         $configuration->initialize(['workspaceFolders' => [['uri' => $rootUri]]]);
 
         $configuration->rediscoverProjects();

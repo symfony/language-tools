@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 use Symfony\Lsp\Tools\Dogfood\NativeProcessRunner;
 use Symfony\Lsp\Tools\Dogfood\ProcessResult;
 use Symfony\Lsp\Tools\Dogfood\ScenarioRunner;
@@ -32,24 +33,24 @@ final class DogfoodServerTest extends TestCase
 
         PHP;
 
-    private string $directory;
+    private TestWorkspace $workspace;
     private string $project;
 
     protected function setUp(): void
     {
-        $this->directory = Path::join(sys_get_temp_dir(), 'symfony-lsp-dogfood-server-'.bin2hex(random_bytes(8)));
-        $this->project = Path::join($this->directory, 'project');
+        $this->workspace = new TestWorkspace('symfony-lsp-dogfood-server-');
+        $this->project = Path::join($this->workspace->rootPath, 'project');
         (new Filesystem())->dumpFile(Path::join($this->project, 'src/Controller/HelloController.php'), self::CONTROLLER);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testRefusesToRunWithoutAScenarioManifest(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, []);
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, []);
         $result = $this->execute([$server->path, $this->project]);
 
         self::assertSame(2, $result->exitCode);
@@ -60,8 +61,8 @@ final class DogfoodServerTest extends TestCase
 
     public function testRejectsAnUnusableManifestBeforeStartingTheServer(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, []);
-        $manifest = Path::join($this->directory, 'empty.json');
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, []);
+        $manifest = Path::join($this->workspace->rootPath, 'empty.json');
         (new Filesystem())->dumpFile($manifest, json_encode([
             'version' => 1,
             'revision' => str_repeat('a', 40),
@@ -77,7 +78,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testRejectsAManifestReviewedForAnotherRevision(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, []);
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, []);
         $result = $this->execute([
             '--scenarios='.$this->manifest(),
             '--revision='.str_repeat('b', 40),
@@ -92,7 +93,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testDoesNotSpendRequestsOnScenariosWhenRuntimeIndexingFails(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [[
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [[
             'method' => 'workspace/executeCommand',
             'result' => [['source' => ['state' => 'ready'], 'runtime' => ['state' => 'failed']]],
         ]]]);
@@ -107,7 +108,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testReportsPassingScenarios(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]],
         ]]);
         $result = $this->execute(['--scenarios='.$this->manifest(), $server->path, $this->project]);
@@ -151,7 +152,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testRunsScenariosWithoutRuntimeIndexingInSourceOnlyMode(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'workspace/executeCommand', 'result' => [[
                 'source' => ['state' => 'ready'],
                 'runtime' => ['state' => 'not-indexed'],
@@ -174,7 +175,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testRefusesToRunScenariosWhenSourceOnlyRuntimeIsStillEnabled(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'workspace/executeCommand', 'result' => [[
                 'source' => ['state' => 'ready'],
                 'runtime' => ['state' => 'ready'],
@@ -194,7 +195,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testDisabledStatusCannotHideEnabledRuntimeIndexing(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'workspace/executeCommand', 'result' => [[
                 'source' => ['state' => 'ready'],
                 'runtime' => ['state' => 'disabled'],
@@ -210,7 +211,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testKeepsTheReportedRuntimeStateWhenRuntimeIndexingWasNotDisabled(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'workspace/executeCommand', 'result' => [[
                 'source' => ['state' => 'ready'],
                 'runtime' => ['state' => 'not-indexed'],
@@ -224,7 +225,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testReportsRuntimeAnalysisByDefault(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]],
         ]]);
         $report = $this->report($this->execute(['--scenarios='.$this->manifest(), $server->path, $this->project]));
@@ -237,7 +238,7 @@ final class DogfoodServerTest extends TestCase
     #[DataProvider('kernelProvider')]
     public function testInitializesOnlyExplicitKernels(?string $kernel): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]],
         ]]);
         $result = $this->execute([
@@ -268,7 +269,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testKeepsTheProcessSuccessfulWhenScenariosFail(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, ['responses' => [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, ['responses' => [
             ['method' => 'textDocument/completion', 'result' => [['label' => 'other/template.html.twig']]],
         ]]);
         $result = $this->execute(['--scenarios='.$this->manifest(), $server->path, $this->project]);
@@ -283,7 +284,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testReportsEveryExpectedCheckWhenTheServerNeverAnswers(): void
     {
-        $server = Path::join($this->directory, 'silent-server');
+        $server = Path::join($this->workspace->rootPath, 'silent-server');
         file_put_contents($server, "#!/usr/bin/env php\n<?php\n\nsleep(10);\n");
         chmod($server, 0755);
         $result = $this->execute(['--scenarios='.$this->manifest(), $server, $this->project], timeout: 20.0);
@@ -301,8 +302,8 @@ final class DogfoodServerTest extends TestCase
 
     public function testTerminatesTheServerWhenProtocolParsingFails(): void
     {
-        $lockPath = Path::join($this->directory, 'server.lock');
-        $server = Path::join($this->directory, 'malformed-server');
+        $lockPath = Path::join($this->workspace->rootPath, 'server.lock');
+        $server = Path::join($this->workspace->rootPath, 'malformed-server');
         file_put_contents($server, <<<'PHP'
             #!/usr/bin/env php
             <?php
@@ -331,7 +332,7 @@ final class DogfoodServerTest extends TestCase
 
     public function testCapturesLargeServerErrorOutputWithoutBlockingProtocolResponses(): void
     {
-        $server = new ScriptedLanguageServer($this->directory, [
+        $server = new ScriptedLanguageServer($this->workspace->rootPath, [
             'noise' => str_repeat('x', 1000000),
             'responses' => [['method' => 'textDocument/completion', 'result' => [['label' => 'hello/index.html.twig']]]],
         ]);
@@ -359,7 +360,7 @@ final class DogfoodServerTest extends TestCase
 
     private function manifest(): string
     {
-        $path = Path::join($this->directory, 'scenarios.json');
+        $path = Path::join($this->workspace->rootPath, 'scenarios.json');
         (new Filesystem())->dumpFile($path, json_encode([
             'version' => 1,
             'revision' => str_repeat('a', 40),

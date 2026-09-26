@@ -9,25 +9,25 @@ use Symfony\Lsp\Index\PersistentSourceIndexWriter;
 use Symfony\Lsp\Index\SourceIndexJsonLinesCodec;
 use Symfony\Lsp\Index\SourceIndexStoreInterface;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 /**
  * @phpstan-import-type SourceIndexMetadata from SourceIndexStoreInterface
  */
 final class PersistentSourceIndexStoreTest extends TestCase
 {
-    private string $temporaryDirectory;
+    private TestWorkspace $workspace;
     private Project $project;
 
     protected function setUp(): void
     {
-        $this->temporaryDirectory = sys_get_temp_dir().'/symfony-lsp-store-'.bin2hex(random_bytes(8));
-        mkdir($this->temporaryDirectory, 0777, true);
-        $this->project = new Project($this->temporaryDirectory, 'file://'.$this->temporaryDirectory);
+        $this->workspace = new TestWorkspace('symfony-lsp-store-');
+        $this->project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->temporaryDirectory);
+        $this->workspace->cleanup();
     }
 
     public function testRewriteRoundTripsMetadataAndPayloads(): void

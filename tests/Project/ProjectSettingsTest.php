@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Feature\Translation\TranslationConfigurationRegistry;
 use Symfony\Lsp\Project\AnalysisSettings;
 use Symfony\Lsp\Project\GlobPatternCompiler;
@@ -15,6 +14,7 @@ use Symfony\Lsp\Project\ProjectSettings;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Tests\Support\RecordingClient;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class ProjectSettingsTest extends TestCase
 {
@@ -54,10 +54,10 @@ final class ProjectSettingsTest extends TestCase
 
     public function testPhpCommandSettingsOverrideTheSymfonyCliDefault(): void
     {
-        $directory = sys_get_temp_dir().'/symfony-lsp-project-settings-'.bin2hex(random_bytes(6));
-        mkdir($directory);
+        $workspace = new TestWorkspace('symfony-lsp-project-settings-');
+        $directory = $workspace->rootPath;
         try {
-            file_put_contents($directory.'/.symfony-lsp.json', json_encode([
+            $workspace->write('.symfony-lsp.json', json_encode([
                 'version' => 1,
                 'phpCommand' => ['project-php'],
             ], \JSON_THROW_ON_ERROR));
@@ -89,16 +89,16 @@ final class ProjectSettingsTest extends TestCase
             $settings->applyFileSettings(['phpCommand' => ['command-line-php']]);
             self::assertSame(['command-line-php'], $runtime->phpCommand($project));
         } finally {
-            (new Filesystem())->remove($directory);
+            $workspace->cleanup();
         }
     }
 
     public function testResourceSettingsOverrideInitializationAndCheckedInSettings(): void
     {
-        $directory = sys_get_temp_dir().'/symfony-lsp-project-settings-'.bin2hex(random_bytes(6));
-        mkdir($directory);
+        $workspace = new TestWorkspace('symfony-lsp-project-settings-');
+        $directory = $workspace->rootPath;
         try {
-            file_put_contents($directory.'/.symfony-lsp.json', json_encode([
+            $workspace->write('.symfony-lsp.json', json_encode([
                 'version' => 1,
                 'environment' => 'file',
                 'translationDiagnostics' => true,
@@ -131,7 +131,7 @@ final class ProjectSettingsTest extends TestCase
             self::assertFalse($fileScope->isExcluded($project, $directory.'/tests/Rule.php'));
             self::assertTrue($fileScope->isExcluded($project, $directory.'/fixtures/Rule.php'));
         } finally {
-            (new Filesystem())->remove($directory);
+            $workspace->cleanup();
         }
     }
 }

@@ -4,31 +4,36 @@ namespace Symfony\Lsp\Tests\Index;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Index\SourceFileEnumerator;
 use Symfony\Lsp\Project\GlobPatternCompiler;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class SourceFileEnumeratorTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
     private Project $project;
     private ProjectFileScopeRegistry $fileScope;
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir().'/symfony-lsp-enumerator-'.bin2hex(random_bytes(6));
-        mkdir($this->directory.'/src', 0777, true);
-        $this->project = new Project($this->directory, 'file://'.$this->directory);
+        $this->workspace = new TestWorkspace('symfony-lsp-enumerator-');
+        $this->workspace->mkdir('project/src');
+        $this->project = new Project($this->root(), 'file://'.$this->root());
         $this->fileScope = new ProjectFileScopeRegistry(new GlobPatternCompiler());
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove([$this->directory, $this->directory.'-outside']);
+        $this->workspace->cleanup();
+    }
+
+    private function root(): string
+    {
+        return $this->workspace->path('project');
     }
 
     public function testEnumeratesFilesAndTraversalFailuresTogether(): void
@@ -36,18 +41,18 @@ final class SourceFileEnumeratorTest extends TestCase
         if ('Windows' === \PHP_OS_FAMILY || (\function_exists('posix_geteuid') && 0 === posix_geteuid())) {
             self::markTestSkipped('Directory permissions are not enforced in this environment.');
         }
-        file_put_contents($this->directory.'/src/Controller.php', '<?php');
-        mkdir($this->directory.'/blocked');
-        chmod($this->directory.'/blocked', 0000);
+        $this->workspace->write('project/src/Controller.php', '<?php');
+        $this->workspace->mkdir('project/blocked');
+        chmod($this->workspace->path('project/blocked'), 0000);
 
         try {
             $entries = iterator_to_array($this->enumerator()->entries($this->project));
         } finally {
-            chmod($this->directory.'/blocked', 0700);
+            chmod($this->workspace->path('project/blocked'), 0700);
         }
 
-        self::assertContains(['path' => Path::canonicalize($this->directory.'/src/Controller.php')], $entries);
-        self::assertContains(['directory' => Path::canonicalize($this->directory.'/blocked'), 'error' => 'unreadable'], $entries);
+        self::assertContains(['path' => Path::canonicalize($this->workspace->path('project/src/Controller.php'))], $entries);
+        self::assertContains(['directory' => Path::canonicalize($this->workspace->path('project/blocked')), 'error' => 'unreadable'], $entries);
     }
 
     public function testIgnoresExcludedSymlinkDirectoriesOutsideTheProject(): void
@@ -55,16 +60,15 @@ final class SourceFileEnumeratorTest extends TestCase
         if ('Windows' === \PHP_OS_FAMILY || !\function_exists('symlink')) {
             self::markTestSkipped('Directory symlinks are not supported in this environment.');
         }
-        $outside = $this->directory.'-outside';
-        mkdir($outside);
-        if (!symlink($outside, $this->directory.'/linked')) {
+        $this->workspace->mkdir('outside');
+        if (!symlink($this->workspace->path('outside'), $this->workspace->path('project/linked'))) {
             self::markTestSkipped('Unable to create a directory symlink in this environment.');
         }
         $this->fileScope->configure($this->project, ['linked/**']);
 
         self::assertSame([], iterator_to_array($this->enumerator()->entries($this->project)));
         self::assertSame(
-            [['directory' => Path::canonicalize($this->directory.'/linked'), 'error' => 'outside']],
+            [['directory' => Path::canonicalize($this->workspace->path('project/linked')), 'error' => 'outside']],
             array_values(iterator_to_array($this->enumerator()->entries($this->project, true))),
         );
     }
@@ -81,17 +85,13 @@ final class SourceFileEnumeratorTest extends TestCase
             'templates/admin/page.twig',
         ];
         foreach ($files as $file) {
-            $directory = \dirname($this->directory.'/'.$file);
-            if (!is_dir($directory)) {
-                mkdir($directory, 0777, true);
-            }
-            file_put_contents($this->directory.'/'.$file, '');
+            $this->workspace->write('project/'.$file, '');
         }
         $this->fileScope->configure($this->project, [$pattern]);
 
         $included = [];
         foreach ($this->enumerator()->files($this->project) as $path) {
-            $included[] = str_replace('\\', '/', Path::makeRelative($path, $this->directory));
+            $included[] = str_replace('\\', '/', Path::makeRelative($path, $this->root()));
         }
         $expected = array_values(array_diff($files, $excluded));
 
@@ -118,26 +118,26 @@ final class SourceFileEnumeratorTest extends TestCase
 
     public function testKeepsRootDotenvFilesWhileApplyingGitignoreAndFileScopeRules(): void
     {
-        mkdir($this->directory.'/.git');
-        file_put_contents($this->directory.'/.gitignore', "/ignored/\n/.env.local\n");
-        mkdir($this->directory.'/ignored');
-        file_put_contents($this->directory.'/ignored/Cache.php', '<?php');
-        file_put_contents($this->directory.'/.env.local', "APP_ENV=test\n");
-        file_put_contents($this->directory.'/src/Included.php', '<?php');
-        file_put_contents($this->directory.'/src/Excluded.php', '<?php');
+        $this->workspace->mkdir('project/.git');
+        $this->workspace->write('project/.gitignore', "/ignored/\n/.env.local\n");
+        $this->workspace->mkdir('project/ignored');
+        $this->workspace->write('project/ignored/Cache.php', '<?php');
+        $this->workspace->write('project/.env.local', "APP_ENV=test\n");
+        $this->workspace->write('project/src/Included.php', '<?php');
+        $this->workspace->write('project/src/Excluded.php', '<?php');
         $this->fileScope->configure($this->project, ['src/Excluded.php']);
 
         $default = array_values(iterator_to_array($this->enumerator()->files($this->project)));
         $withExcluded = array_values(iterator_to_array($this->enumerator()->files($this->project, true)));
 
         self::assertSame([
-            Path::canonicalize($this->directory.'/.env.local'),
-            Path::canonicalize($this->directory.'/src/Included.php'),
+            Path::canonicalize($this->workspace->path('project/.env.local')),
+            Path::canonicalize($this->workspace->path('project/src/Included.php')),
         ], $this->sorted($default));
         self::assertSame([
-            Path::canonicalize($this->directory.'/.env.local'),
-            Path::canonicalize($this->directory.'/src/Excluded.php'),
-            Path::canonicalize($this->directory.'/src/Included.php'),
+            Path::canonicalize($this->workspace->path('project/.env.local')),
+            Path::canonicalize($this->workspace->path('project/src/Excluded.php')),
+            Path::canonicalize($this->workspace->path('project/src/Included.php')),
         ], $this->sorted($withExcluded));
     }
 
@@ -154,10 +154,9 @@ final class SourceFileEnumeratorTest extends TestCase
             'vendor/acme/src/Thing.php',
         ];
         foreach ($files as $file) {
-            mkdir(\dirname($this->directory.'/'.$file), 0777, true);
-            file_put_contents($this->directory.'/'.$file, '');
+            $this->workspace->write('project/'.$file, '');
         }
-        file_put_contents($this->directory.'/.gitignore', "/var/\n/assets/vendor/\n");
+        $this->workspace->write('project/.gitignore', "/var/\n/assets/vendor/\n");
 
         self::assertSame(['src/var/Value.php', 'templates/vendor/show.html.twig'], $this->relativeFiles($this->project));
     }
@@ -165,10 +164,9 @@ final class SourceFileEnumeratorTest extends TestCase
     public function testEnumeratesTheDirectoryComposerInstallsIntoInsteadOfEveryVendorDirectory(): void
     {
         foreach (['libraries/acme/Thing.php', 'vendor/acme/Thing.php'] as $file) {
-            mkdir(\dirname($this->directory.'/'.$file), 0777, true);
-            file_put_contents($this->directory.'/'.$file, '<?php');
+            $this->workspace->write('project/'.$file, '<?php');
         }
-        $project = new Project($this->directory, 'file://'.$this->directory, 'libraries');
+        $project = new Project($this->root(), 'file://'.$this->root(), 'libraries');
 
         self::assertSame(['vendor/acme/Thing.php'], $this->relativeFiles($project));
     }
@@ -183,7 +181,7 @@ final class SourceFileEnumeratorTest extends TestCase
     {
         $files = [];
         foreach ($this->enumerator()->files($project) as $path) {
-            $files[] = str_replace('\\', '/', Path::makeRelative($path, $this->directory));
+            $files[] = str_replace('\\', '/', Path::makeRelative($path, $this->root()));
         }
 
         return $this->sorted($files);

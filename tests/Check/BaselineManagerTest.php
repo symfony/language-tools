@@ -15,54 +15,54 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DiagnosticCodeRegistry;
 use Symfony\Lsp\Project\InvalidConfigurationException;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class BaselineManagerTest extends TestCase
 {
-    private string $directory;
+    private TestWorkspace $workspace;
     private BaselineManager $manager;
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir().'/symfony-lsp-baseline-'.bin2hex(random_bytes(6));
-        mkdir($this->directory);
+        $this->workspace = new TestWorkspace('symfony-lsp-baseline-');
         $this->manager = $this->manager(new Filesystem());
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        $this->workspace->cleanup();
     }
 
     public function testGeneratedBaselineMatchesGoldenFile(): void
     {
         $diagnostic = $this->diagnostic('same-fingerprint');
-        $this->manager->apply($this->directory, $this->options('create'), [$diagnostic, $diagnostic->withOccurrence(2)]);
+        $this->manager->apply($this->workspace->rootPath, $this->options('create'), [$diagnostic, $diagnostic->withOccurrence(2)]);
 
-        self::assertFileEquals(__DIR__.'/Fixtures/baseline-v1.json', $this->directory.'/baseline.json');
+        self::assertFileEquals(__DIR__.'/Fixtures/baseline-v1.json', $this->workspace->path('baseline.json'));
     }
 
     public function testMatchesDuplicateOccurrencesByMultiplicityAndReportsStaleEntries(): void
     {
         $diagnostic = $this->diagnostic('same-fingerprint');
         $create = $this->options('create');
-        $created = $this->manager->apply($this->directory, $create, [$diagnostic]);
+        $created = $this->manager->apply($this->workspace->rootPath, $create, [$diagnostic]);
         self::assertSame('matched', $created['diagnostics'][0]->baselineState);
 
-        $matched = $this->manager->apply($this->directory, $this->options(), [$diagnostic, $diagnostic]);
+        $matched = $this->manager->apply($this->workspace->rootPath, $this->options(), [$diagnostic, $diagnostic]);
         self::assertSame(['matched', 'active'], array_map(
             static fn (CheckDiagnostic $item): string => $item->baselineState,
             $matched['diagnostics'],
         ));
         self::assertSame([], $matched['stale']);
 
-        $stale = $this->manager->apply($this->directory, $this->options(), []);
+        $stale = $this->manager->apply($this->workspace->rootPath, $this->options(), []);
         self::assertCount(1, $stale['stale']);
         self::assertSame(1, $stale['stale'][0]->occurrence);
     }
 
     public function testRejectsRemovedDiagnosticCodesInExistingBaselines(): void
     {
-        file_put_contents($this->directory.'/baseline.json', json_encode([
+        $this->workspace->write('baseline.json', json_encode([
             'version' => 1,
             'diagnostics' => [[
                 'project' => '.',
@@ -79,7 +79,7 @@ final class BaselineManagerTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('invalid diagnostic entry');
 
-        $this->manager->apply($this->directory, $this->options(), []);
+        $this->manager->apply($this->workspace->rootPath, $this->options(), []);
     }
 
     public function testRefreshRequiresAnExistingBaseline(): void
@@ -87,7 +87,7 @@ final class BaselineManagerTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('--generate-baseline');
 
-        $this->manager->apply($this->directory, $this->options('refresh'), []);
+        $this->manager->apply($this->workspace->rootPath, $this->options('refresh'), []);
     }
 
     public function testOnlyOneConcurrentBaselineCreationSucceeds(): void
@@ -96,7 +96,7 @@ final class BaselineManagerTest extends TestCase
             self::markTestSkipped('The pcntl extension is required.');
         }
 
-        $barrier = $this->directory.'/barrier';
+        $barrier = $this->workspace->path('barrier');
         mkdir($barrier);
         $pids = [];
         foreach ([1, 2] as $worker) {
@@ -129,11 +129,11 @@ final class BaselineManagerTest extends TestCase
     public function testFingerprintSurvivesUnrelatedLineMovementButNotChangedEvidence(): void
     {
         $file = new CheckFile(
-            new CheckProject(new Project($this->directory, 'file://'.$this->directory), '.'),
-            $this->directory.'/config/services.yaml',
+            new CheckProject(new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath), '.'),
+            $this->workspace->path('config/services.yaml'),
             'config/services.yaml',
             'config/services.yaml',
-            'file://'.$this->directory.'/config/services.yaml',
+            'file://'.$this->workspace->path('config/services.yaml'),
             'yaml',
             false,
         );
@@ -161,7 +161,7 @@ final class BaselineManagerTest extends TestCase
     {
         $manager = $this->manager(new SynchronizingBaselineFilesystem($barrier));
         try {
-            $manager->apply($this->directory, $this->options('create'), []);
+            $manager->apply($this->workspace->rootPath, $this->options('create'), []);
             $result = 'created';
         } catch (InvalidConfigurationException $error) {
             $result = str_contains($error->getMessage(), 'already exists') ? 'exists' : $error->getMessage();
@@ -202,7 +202,7 @@ final class BaselineManagerTest extends TestCase
     {
         return new CheckOptions(
             'json',
-            $this->directory,
+            $this->workspace->rootPath,
             null,
             [],
             [],

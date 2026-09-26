@@ -106,7 +106,7 @@ final class DiscoverExecutableTest extends TestCase
 
         $cold = $this->execute([$this->workspace->path()]);
         $warm = $this->execute([$this->workspace->path()]);
-        file_put_contents($this->workspace->path('var/symfony-lsp/dogfood-discover/index/source.jsonl'), "corrupted\n");
+        $this->workspace->write('var/symfony-lsp/dogfood-discover/index/source.jsonl', "corrupted\n");
         $rebuilt = $this->execute([$this->workspace->path()]);
 
         self::assertSame(0, $cold->exitCode, $cold->stderr);

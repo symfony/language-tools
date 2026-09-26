@@ -4,10 +4,10 @@ namespace Symfony\Lsp\Tests\Project;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class ProjectPathResolverTest extends TestCase
 {
@@ -19,14 +19,12 @@ final class ProjectPathResolverTest extends TestCase
 
     public function testKeepsExternalSymlinksReadOnlyWithoutRejectingInternalSymlinks(): void
     {
-        $directory = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
+        $workspace = new TestWorkspace('symfony-lsp-');
+        $directory = $workspace->rootPath;
         $root = $directory.'/project';
-        mkdir($root.'/src', 0777, true);
-        mkdir($root.'/templates', 0777, true);
-        mkdir($root.'/vendor', 0777, true);
-        mkdir($directory.'/external', 0777, true);
-        file_put_contents($root.'/src/Internal.php', '<?php');
-        file_put_contents($directory.'/external/External.php', '<?php');
+        $workspace->mkdir('project/src', 'project/templates', 'project/vendor', 'external');
+        $workspace->write('project/src/Internal.php', '<?php');
+        $workspace->write('external/External.php', '<?php');
         symlink($root.'/src/Internal.php', $root.'/src/InternalLink.php');
         symlink($directory.'/external/External.php', $root.'/src/ExternalLink.php');
         symlink($directory.'/external', $root.'/templates/external');
@@ -42,17 +40,16 @@ final class ProjectPathResolverTest extends TestCase
             self::assertFalse($resolver->isApplicationOwned($project, $converter->toUri($root.'/templates/external/New.html.twig')));
             self::assertFalse($resolver->isApplicationOwned($project, $converter->toUri($root.'/vendor/symfony/External.php')));
         } finally {
-            (new Filesystem())->remove($directory);
+            $workspace->cleanup();
         }
     }
 
     public function testOwnsApplicationDirectoriesNamedLikeDependencyDirectories(): void
     {
-        $root = sys_get_temp_dir().'/symfony-lsp-'.bin2hex(random_bytes(8));
-        mkdir($root.'/templates/vendor', 0777, true);
-        mkdir($root.'/vendor/acme', 0777, true);
-        mkdir($root.'/var/cache', 0777, true);
-        file_put_contents($root.'/.gitignore', "/var/\n/vendor/\n");
+        $workspace = new TestWorkspace('symfony-lsp-');
+        $root = $workspace->rootPath;
+        $workspace->mkdir('templates/vendor', 'vendor/acme', 'var/cache');
+        $workspace->write('.gitignore', "/var/\n/vendor/\n");
         $converter = new UriToPathConverter();
         $project = new Project($root, $converter->toUri($root));
         $resolver = ProjectPaths::resolver($converter);
@@ -62,7 +59,7 @@ final class ProjectPathResolverTest extends TestCase
             self::assertFalse($resolver->isApplicationOwned($project, $converter->toUri($root.'/vendor/acme/Thing.php')));
             self::assertFalse($resolver->isApplicationOwned($project, $converter->toUri($root.'/var/cache/app.php')));
         } finally {
-            (new Filesystem())->remove($root);
+            $workspace->cleanup();
         }
     }
 
