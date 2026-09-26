@@ -2,42 +2,20 @@
 
 namespace Symfony\Lsp\Tests\Feature\Metadata;
 
-use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
-use Symfony\Lsp\Feature\Configuration\YamlConfigurationParser;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
-use Symfony\Lsp\Feature\Metadata\FormMetadataExtractor;
 use Symfony\Lsp\Feature\Metadata\MetadataExtractor;
-use Symfony\Lsp\Feature\Metadata\SerializerMetadataExtractor;
-use Symfony\Lsp\Feature\Metadata\ValidationMetadataExtractor;
-use Symfony\Lsp\Feature\Metadata\YamlMetadataExtractor;
-use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\TolerantPhpParser;
-use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
-use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
-use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 abstract class MetadataTestCase extends TestCase
 {
-    protected function createExtractor(PositionConverter $converter): MetadataExtractor
+    protected function extractor(): MetadataExtractor
     {
-        $parser = new TolerantPhpParser(new Parser());
-        $comments = new PhpCommentParser();
-
-        return new MetadataExtractor(
-            $converter,
-            $parser,
-            $comments,
-            new FormMetadataExtractor($converter),
-            new ValidationMetadataExtractor($converter),
-            new SerializerMetadataExtractor($converter),
-            new YamlMetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))),
-        );
+        return (new ProjectTestKit())->get(MetadataExtractor::class);
     }
 
     /** @return list<string> */

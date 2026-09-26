@@ -3,29 +3,17 @@
 namespace Symfony\Lsp\Tests\Feature\Metadata;
 
 use PHPUnit\Framework\Attributes\DataProvider;
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Metadata\MetadataCompletionProvider;
-use Symfony\Lsp\Feature\Metadata\MetadataIndexRegistry;
-use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
 use Symfony\Lsp\Feature\Metadata\MetadataSymbolKind;
 use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class SerializerMetadataProviderTest extends MetadataTestCase
 {
     public function testCompletesSerializerGroupReferences(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
-        $project = new Project('/workspace', 'file:///workspace');
-        $projects = new ProjectRegistry();
-        $projects->replace([$project]);
-        $entityText = <<<'PHP'
+        $kit = (new ProjectTestKit())->open('file:///workspace/src/Entity/User.php', <<<'PHP'
             <?php
             namespace App\Entity;
             use Symfony\Component\Serializer\Attribute\Groups;
@@ -34,21 +22,17 @@ final class SerializerMetadataProviderTest extends MetadataTestCase
                 #[Groups(['admin'])]
                 public string $email;
             }
-            PHP;
-        $sourceIndexes = new MetadataSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument('file:///workspace/src/Entity/User.php', 'php', $entityText)));
-        $documents = new DocumentStore();
-        $completionProvider = new MetadataCompletionProvider(new LspProtocolMapper(), new MetadataIndexRegistry(), $sourceIndexes, $extractor);
+            PHP)->index();
         $groupUri = 'file:///workspace/src/Serializer.php';
         $groupText = "<?php\n\$context = ['groups' => ['ad";
-        $documents->open(new Document($groupUri, 'php', 1, $groupText));
+        $kit->open($groupUri, $groupText);
 
-        self::assertSame(['admin'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $groupUri, $groupText, \strlen($groupText)));
+        self::assertSame(['admin'], $kit->labels($kit->get(MetadataCompletionProvider::class)->complete($kit->positioned($kit->offset($groupUri, \strlen($groupText))))));
     }
 
     public function testIndexesGroupReferencesOnlyInSerializerContexts(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Controller;
@@ -97,8 +81,7 @@ final class SerializerMetadataProviderTest extends MetadataTestCase
     #[DataProvider('serializerGroupsAttributeCompletionProvider')]
     public function testCompletesSerializerGroupsOnlyInResolvedGroupsAttributes(string $text, ?string $expectedPrefix): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
 
         self::assertSame($expectedPrefix, $extractor->completionContext('php', $text, \strlen($text))?->prefix);
     }
@@ -127,7 +110,7 @@ final class SerializerMetadataProviderTest extends MetadataTestCase
     public function testIgnoresCommentedSerializerMetadataWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Dto;
@@ -157,8 +140,7 @@ final class SerializerMetadataProviderTest extends MetadataTestCase
 
     public function testOffersNoMetadataCompletionsInsidePhpComments(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $text = "<?php // #[Groups(['adm";
 
         self::assertNull($extractor->completionContext('php', $text, \strlen($text)));

@@ -26,7 +26,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
     public function testProvidesFormMetadata(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -77,7 +77,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
     public function testCompletesFormOptionsOnlyForCompleteClassReferenceTypeArguments(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $prefix = <<<'PHP'
             <?php
             namespace App;
@@ -105,7 +105,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
     #[DataProvider('rejectedFormCompletionProvider')]
     public function testOffersNoFormCompletionWhereIndexingReadsNoReference(string $call): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<PHP
             <?php
             namespace App\Form;
@@ -143,7 +143,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
     public function testLinksFormFieldsToDataClassProperties(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -270,7 +270,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
     public function testScopesCompleteMetadataCallsToTheirTypedParameters(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -328,7 +328,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
     public function testLinksFormFieldsAddedInsideClosuresCapturingTheBuilder(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -370,7 +370,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
     public function testKeepsOptionsAfterClosingBracketsInNestedStrings(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             use App\Form\EventType;
@@ -392,7 +392,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
     public function testDecodesLiteralOptionKeysAroundDynamicArrayEntries(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             use App\Form\EventType;
@@ -418,7 +418,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
     public function testIgnoresCommasInsideCommentsWhenSplittingFormMetadataArrays(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -469,7 +469,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
     public function testReadsFormMetadataWrittenWithLegacyArraySyntaxAndUppercaseConstants(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -510,7 +510,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
     public function testResolvesSelfDataClassReferencesButNotLateBoundOnes(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -544,7 +544,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
     public function testKeepsDynamicDefaultsConservative(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Form;
@@ -580,8 +580,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
     public function testIgnoresNamedArgumentsInPositionalMetadataSlots(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             use App\Form\EventType;
@@ -597,7 +596,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
     public function testIgnoresOptionsOfDynamicFormTypeExpressions(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -640,7 +639,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
     public function testIndexesFormOptionsOnlyForSymfonyFormCreators(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Report;
@@ -669,7 +668,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
 
     public function testIndexesFormOptionsFromIncompleteSource(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             use App\Form\EventType;
@@ -687,7 +686,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
     public function testIgnoresCommentedFormMetadataWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Controller;

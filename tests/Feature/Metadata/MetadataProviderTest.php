@@ -2,28 +2,13 @@
 
 namespace Symfony\Lsp\Tests\Feature\Metadata;
 
-use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentStore;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
-use Symfony\Lsp\Feature\Metadata\MetadataSourceIndexRegistry;
-use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
-use Symfony\Lsp\Index\SourceDocument;
-use Symfony\Lsp\Project\Project;
-use Symfony\Lsp\Project\ProjectRegistry;
-use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Tests\Support\LspRequests;
-use Symfony\Lsp\Tests\Support\ProviderRequests;
+use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
 final class MetadataProviderTest extends MetadataTestCase
 {
     public function testIntegratesPhpDeclarationsWithYamlReferencesAcrossDomains(): void
     {
-        $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
-        $project = new Project('/workspace', 'file:///workspace');
-        $projects = new ProjectRegistry();
-        $projects->replace([$project]);
         $entityUri = 'file:///workspace/src/Entity/User.php';
         $entityText = <<<'PHP'
             <?php
@@ -51,26 +36,22 @@ final class MetadataProviderTest extends MetadataTestCase
                     email:
                         groups: [admin]
             YAML;
-        $sourceIndexes = new MetadataSourceIndexRegistry();
-        $sourceIndexes->forProject($project)->replace(
-            $extractor->extract(new SourceDocument($entityUri, 'php', $entityText)),
-            $extractor->extract(new SourceDocument($constraintDeclarationUri, 'php', $constraintDeclarationText)),
-            $extractor->extract(new SourceDocument($mappingUri, 'yaml', $mappingText)),
-        );
-        $documents = new DocumentStore();
-        $documents->open(new Document($entityUri, 'php', 1, $entityText));
-        $documents->open(new Document($mappingUri, 'yaml', 1, $mappingText));
-        $requests = new ProviderRequests($documents, $projects);
-        $relationshipProvider = new MetadataRelationshipProvider(new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $sourceIndexes, $extractor);
+        $kit = (new ProjectTestKit())
+            ->open($entityUri, $entityText)
+            ->open($constraintDeclarationUri, $constraintDeclarationText)
+            ->open($mappingUri, $mappingText)
+            ->index()
+        ;
+        $relationshipProvider = $kit->get(MetadataRelationshipProvider::class);
 
         $mappedClass = strpos($mappingText, 'App\Entity\User') + 1;
-        $classDefinition = $relationshipProvider->definition($requests->positioned(LspRequests::offset($mappingUri, $mappingText, $mappedClass)));
-        self::assertSame([$entityUri], array_column($classDefinition, 'uri'));
+        $classDefinition = $relationshipProvider->definition($kit->positioned($kit->offset($mappingUri, $mappedClass)));
+        self::assertSame([$entityUri], $kit->targets($classDefinition));
         $email = strpos($mappingText, 'email') + 1;
-        $definition = $relationshipProvider->definition($requests->positioned(LspRequests::offset($mappingUri, $mappingText, $email)));
-        self::assertSame([$entityUri], array_column($definition, 'uri'));
+        $definition = $relationshipProvider->definition($kit->positioned($kit->offset($mappingUri, $email)));
+        self::assertSame([$entityUri], $kit->targets($definition));
         $admin = strpos($mappingText, 'admin') + 1;
-        $references = $relationshipProvider->references($requests->references(LspRequests::offset($mappingUri, $mappingText, $admin)));
+        $references = $relationshipProvider->references($kit->references($kit->offset($mappingUri, $admin)));
         self::assertCount(2, $references);
     }
 }

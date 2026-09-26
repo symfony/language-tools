@@ -22,7 +22,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
     public function testProvidesPhpValidationMetadata(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -97,7 +97,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
     public function testProvidesYamlValidationMetadata(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $project = new Project('/workspace', 'file:///workspace');
         $projects = new ProjectRegistry();
         $projects->replace([$project]);
@@ -143,7 +143,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
 
     public function testReadsNestedYamlConstraintsAsConstraintsRatherThanOptions(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<'YAML'
             App\Entity\Order:
                 properties:
@@ -180,7 +180,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
 
     public function testIndexesConstraintOptionsFromIncompleteSource(): void
     {
-        $extractor = $this->createExtractor(new PositionConverter());
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             use Symfony\Component\Validator\Constraints as Assert;
@@ -196,7 +196,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
     public function testIgnoresCommentedValidationMetadataWhilePreservingActiveRanges(): void
     {
         $converter = new PositionConverter();
-        $extractor = $this->createExtractor($converter);
+        $extractor = $this->extractor();
         $text = <<<'PHP'
             <?php
             namespace App\Dto;
