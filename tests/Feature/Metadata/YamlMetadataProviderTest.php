@@ -23,4 +23,22 @@ final class YamlMetadataProviderTest extends MetadataTestCase
 
         self::assertSame(['email'], $kit->labels($kit->get(MetadataCompletionProvider::class)->complete($kit->positioned($kit->offset($propertyUri, \strlen($propertyText))))));
     }
+
+    public function testCompletesPropertiesAfterAPropertyWithConstraints(): void
+    {
+        $kit = (new ProjectTestKit())->open('file:///workspace/src/Entity/User.php', <<<'PHP'
+            <?php
+            namespace App\Entity;
+            final class User
+            {
+                public string $password;
+                public string $email;
+            }
+            PHP)->index();
+        $uri = 'file:///workspace/config/validator/User.yaml';
+        $text = "App\\Entity\\User:\n    properties:\n        password:\n            - NotBlank: ~\n        em";
+        $kit->open($uri, $text);
+
+        self::assertContains('email', $kit->labels($kit->get(MetadataCompletionProvider::class)->complete($kit->positioned($kit->offset($uri, \strlen($text))))));
+    }
 }

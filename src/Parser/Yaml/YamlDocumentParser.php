@@ -56,11 +56,19 @@ final class YamlDocumentParser
     /** @return list<string> */
     public function parentPath(string $source, int $offset): array
     {
+        $lineStart = $this->lineStart($source, $offset);
+        $indent = $this->contentIndent($source, $lineStart);
         $mapping = null;
         foreach ($this->parse($source) as $candidate) {
-            if ($candidate->keyEndByte < $offset) {
-                $mapping = $candidate;
+            if ($candidate->keyEndByte >= $offset) {
+                continue;
             }
+            if (null !== $indent && $candidate->keyStartByte < $lineStart
+                && $candidate->keyStartByte - $this->lineStart($source, $candidate->keyStartByte) >= $indent
+            ) {
+                continue;
+            }
+            $mapping = $candidate;
         }
         if (null === $mapping) {
             return [];
@@ -256,10 +264,31 @@ final class YamlDocumentParser
 
     private function lineIndent(string $source, int $offset): int
     {
-        $lineStart = 0 === $offset ? false : strrpos($source, "\n", $offset - \strlen($source) - 1);
-        $lineStart = false === $lineStart ? 0 : $lineStart + 1;
+        $lineStart = $this->lineStart($source, $offset);
 
         return strspn($source, " \t", $lineStart, $offset - $lineStart);
+    }
+
+    private function lineStart(string $source, int $offset): int
+    {
+        $newline = 0 === $offset ? false : strrpos($source, "\n", $offset - \strlen($source) - 1);
+
+        return false === $newline ? 0 : $newline + 1;
+    }
+
+    private function contentIndent(string $source, int $lineStart): ?int
+    {
+        $lineEnd = strpos($source, "\n", $lineStart);
+        $line = rtrim(substr($source, $lineStart, false === $lineEnd ? null : $lineEnd - $lineStart), "\r");
+        if ('' === trim($line)) {
+            return null;
+        }
+        $indent = strspn($line, " \t");
+        while ('-' === ($line[$indent] ?? null) && \in_array($line[$indent + 1] ?? ' ', [' ', "\t"], true)) {
+            $indent += 1 + strspn($line, " \t", $indent + 1);
+        }
+
+        return $indent;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete YAML keys at the indentation of the line being typed, so a key after a nested list is completed under its real parent
 - Reload the application metadata when the configured kernel changes
 - Parse large YAML files in linear time instead of slowing down quadratically with their size
 - Recognize Doctrine repository criteria and Console input names passed as the `criteria` and `name` named arguments

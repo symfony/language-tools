@@ -144,6 +144,13 @@ final class YamlDocumentParserTest extends TestCase
                     tags:
             |            - { name: 
             YAML, ['services', 'App\Foo', 'tags']];
+        yield 'sibling of a key with nested items' => [<<<'YAML'
+            App\Entity\User:
+                properties:
+                    password:
+                        - NotBlank: ~
+                    em|
+            YAML, ['App\Entity\User', 'properties']];
         yield 'environment section' => [<<<'YAML'
             when@test:
                 framework:
