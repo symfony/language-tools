@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Feature\Metadata;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Metadata\MetadataCompletionProvider;
@@ -39,7 +38,6 @@ final class SerializerMetadataProviderTest extends MetadataTestCase
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument('file:///workspace/src/Entity/User.php', 'php', $entityText)));
         $documents = new DocumentStore();
-        $resolver = new DocumentContextResolver($documents, $projects);
         $completionProvider = new MetadataCompletionProvider(new LspProtocolMapper(), new MetadataIndexRegistry(), $sourceIndexes, $extractor);
         $groupUri = 'file:///workspace/src/Serializer.php';
         $groupText = "<?php\n\$context = ['groups' => ['ad";

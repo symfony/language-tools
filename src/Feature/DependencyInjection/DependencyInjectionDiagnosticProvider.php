@@ -2,15 +2,15 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Runtime\EnvironmentScopeResolver;
 
 final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly ServiceIndexRegistry $serviceIndexes,
         private readonly ParameterIndexRegistry $parameterIndexes,
@@ -26,7 +26,7 @@ final class DependencyInjectionDiagnosticProvider implements DiagnosticProviderI
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->documentContextResolver->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request || !\in_array($request->document->languageId, ['php', 'yaml'], true)) {
             return null;
         }

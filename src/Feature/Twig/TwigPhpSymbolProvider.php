@@ -7,14 +7,12 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class TwigPhpSymbolProvider implements CompletionProviderInterface, DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigPhpSymbolSourceIndexRegistry $indexes,
         private readonly TwigPhpSymbolExtractor $extractor,
@@ -79,13 +77,8 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
         return $items;
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->requests->positioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         $resolved = $this->resolveTwig($request);
         if (null === $resolved) {
             return null;

@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\Translation;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\ProjectDocumentReader;
@@ -45,7 +44,7 @@ final class TranslationProviderTest extends TestCase
         $fullText = "<?php \$translator->trans('article.title', ['%name%' => \$name]);";
         [$fullProvider, $fullConverter, , , $requests] = $this->provider($uri, $fullText);
         $fullPosition = $fullConverter->toPosition($fullText, strpos($fullText, 'article.title') + 1);
-        $hover = $fullProvider->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $fullPosition->line, 'character' => $fullPosition->character]]);
+        $hover = $fullProvider->hover($requests->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $fullPosition->line, 'character' => $fullPosition->character]]));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents']);
         self::assertIsString($hover['contents']['value']);
@@ -114,7 +113,7 @@ final class TranslationProviderTest extends TestCase
         $position = $converter->toPosition($text, (int) strpos($text, "'|trans"));
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $uri]]));
-        $hover = $provider->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]);
+        $hover = $provider->hover($requests->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
@@ -300,8 +299,7 @@ final class TranslationProviderTest extends TestCase
         );
         $configuration = new AnalysisSettingsRegistry();
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
-        $documentResolver = new DocumentContextResolver($documents, $projects);
-        $provider = new TranslationProvider($documentResolver, new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor);
+        $provider = new TranslationProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor);
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -389,8 +387,7 @@ final class TranslationProviderTest extends TestCase
         );
         $configuration = new AnalysisSettingsRegistry();
         $configuration->configureProject($project, new ProjectAnalysisSettings(translationDiagnostics: true));
-        $documentResolver = new DocumentContextResolver($documents, $projects);
-        $provider = new TranslationProvider($documentResolver, new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor);
+        $provider = new TranslationProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor);
 
         try {
             $diagnostics = $provider->diagnostics(['textDocument' => ['uri' => $uri]]);
@@ -770,10 +767,9 @@ final class TranslationProviderTest extends TestCase
         }
         $indexes->forProject($project)->replaceSources(...$sourceFacts);
         $configuration = new AnalysisSettingsRegistry();
-        $documentResolver = new DocumentContextResolver($documents, $projects);
 
         return [
-            new TranslationProvider($documentResolver, new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor),
+            new TranslationProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $configuration, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TranslationReferenceResolver($converter, $extractor), new TwigDirectiveLocator(), $extractor),
             $converter,
             $configuration,
             $project,

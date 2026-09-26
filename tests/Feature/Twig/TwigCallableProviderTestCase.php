@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\Twig;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\ProjectDocumentReader;
@@ -83,7 +82,7 @@ class TwigCallableProviderTestCase extends TestCase
         $indexes->forProject($project)->replace(...$callableFacts);
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $classIndexes->forProject($project)->replace(...$classFacts);
-        $documentResolver = new DocumentContextResolver($documents, $projects);
+        $requestFactory = new LspRequestFactory($documents, $projects, $converter);
         $protocol = new LspProtocolMapper();
         $methodResolver = new TwigCallableMethodResolver(
             $classIndexes,
@@ -98,8 +97,8 @@ class TwigCallableProviderTestCase extends TestCase
             'converter' => $converter,
             'protocol' => $protocol,
             'completion' => new TwigCallableCompletionProvider($converter, $protocol, $indexes, $methodResolver, $argumentAnalyzer, $commentParser, $directives),
-            'diagnostic' => new TwigCallableDiagnosticProvider($documentResolver, $protocol, $indexes, $methodResolver),
-            'relationship' => new TwigCallableRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $phpParser),
+            'diagnostic' => new TwigCallableDiagnosticProvider($requestFactory, $protocol, $indexes, $methodResolver),
+            'relationship' => new TwigCallableRelationshipProvider($converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $phpParser),
         ];
     }
 }

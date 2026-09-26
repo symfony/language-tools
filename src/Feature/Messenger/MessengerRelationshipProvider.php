@@ -7,24 +7,21 @@ use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class MessengerRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
         private readonly MessengerRelationshipResolver $relationships,
     ) {
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->requests->positioned($params);
-        $resolved = null === $request ? null : $this->relationships->resolve($request);
+        $resolved = $this->relationships->resolve($request);
         if (null === $resolved) {
             return null;
         }

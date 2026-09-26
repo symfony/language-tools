@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Configuration;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
@@ -11,11 +10,12 @@ use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectPathResolver;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
+        private readonly LspRequestFactory $requests,
         private readonly ProjectPathResolver $projectPaths,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
@@ -37,7 +37,7 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->resolver->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request || !\in_array($request->document->languageId, ['php', 'xml', 'yaml'], true)) {
             return null;
         }

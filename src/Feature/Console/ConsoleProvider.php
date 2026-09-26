@@ -2,17 +2,17 @@
 
 namespace Symfony\Lsp\Feature\Console;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class ConsoleProvider implements CompletionProviderInterface, DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly ConsoleIndexRegistry $indexes,
         private readonly ConsoleSourceIndexRegistry $sourceIndexes,
@@ -65,7 +65,7 @@ final class ConsoleProvider implements CompletionProviderInterface, DiagnosticPr
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->documents->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }

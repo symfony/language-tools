@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Tests\Feature\Metadata;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Metadata\MetadataCompletionProvider;
@@ -35,7 +34,6 @@ final class YamlMetadataProviderTest extends MetadataTestCase
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument('file:///workspace/src/Entity/User.php', 'php', $entityText)));
         $documents = new DocumentStore();
-        $resolver = new DocumentContextResolver($documents, $projects);
         $completionProvider = new MetadataCompletionProvider(new LspProtocolMapper(), new MetadataIndexRegistry(), $sourceIndexes, $extractor);
         $propertyUri = 'file:///workspace/config/serializer/Completion.yaml';
         $propertyText = "App\\Entity\\User:\n    attributes:\n        em";

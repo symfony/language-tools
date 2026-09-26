@@ -2,14 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Environment;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class EnvironmentDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly EnvironmentIndexRegistry $indexes,
         private readonly EnvironmentProcessorChainValidator $processorChainValidator,
@@ -23,7 +23,7 @@ final class EnvironmentDiagnosticProvider implements DiagnosticProviderInterface
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->resolver->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request) {
             return null;
         }

@@ -6,31 +6,27 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class TwigComponentRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TwigComponentResolver $components,
     ) {
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->requests->positioned($params);
-        $action = null === $request ? null : $this->components->resolveAction($request);
+        $action = $this->components->resolveAction($request);
         if (null !== $action) {
             [$component, $componentAction] = $action;
 
             return $this->protocol->markdownHover(\sprintf('Live action: `%s#%s`', $component->name, $componentAction->name));
         }
-        $request = $this->requests->positioned($params);
-        $resolved = null === $request ? null : $this->components->resolveComponent($request);
+        $resolved = $this->components->resolveComponent($request);
         if (null === $resolved) {
             return null;
         }

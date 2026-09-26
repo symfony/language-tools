@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
@@ -20,7 +19,6 @@ use Symfony\Lsp\Protocol\PositionedRequest;
 final class TwigVariableProvider implements CompletionProviderInterface, HoverProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TemplateIndexRegistry $indexes,
@@ -73,10 +71,9 @@ final class TwigVariableProvider implements CompletionProviderInterface, HoverPr
         return $items;
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId || null === $template = $this->nameResolver->resolve($request->project, $request->document->uri)) {
+        if ('twig' !== $request->document->languageId || null === $template = $this->nameResolver->resolve($request->project, $request->document->uri)) {
             return null;
         }
         $name = $this->word($this->commentParser->mask($request->document->text), $request->position);

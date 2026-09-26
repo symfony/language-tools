@@ -102,26 +102,26 @@ final class TwigCallableRelationshipProviderTest extends TwigCallableProviderTes
                 'value' => "Twig function: `function_name`\n\nCallable: `App\\Twig\\AppExtensionRuntime::doSomething`\n\n```php\npublic function doSomething(string \$value): string\n```\n\nFormats the value for display.",
             ],
         ];
-        self::assertSame($functionHover, $provider->hover(LspRequests::inside($twigUri, $twigText, 'function_name')));
+        self::assertSame($functionHover, $provider->hover($requests->positioned(LspRequests::inside($twigUri, $twigText, 'function_name'))));
         $delimiterOffset = strpos($twigText, 'function_name', \strlen('{{ function_name'));
         self::assertIsInt($delimiterOffset);
-        self::assertSame($functionHover, $provider->hover(LspRequests::inside($twigUri, $twigText, 'function_name', $delimiterOffset)));
+        self::assertSame($functionHover, $provider->hover($requests->positioned(LspRequests::inside($twigUri, $twigText, 'function_name', $delimiterOffset))));
         $filterHover = [
             'contents' => [
                 'kind' => 'markdown',
                 'value' => "Twig filter: `filter_name`\n\nCallable: `App\\Twig\\AppExtensionRuntime::doSomething`\n\n```php\npublic function doSomething(string \$value): string\n```\n\nFormats the value for display.",
             ],
         ];
-        self::assertSame($filterHover, $provider->hover(LspRequests::inside($twigUri, $twigText, 'filter_name')));
+        self::assertSame($filterHover, $provider->hover($requests->positioned(LspRequests::inside($twigUri, $twigText, 'filter_name'))));
         $nestedFilterOffset = strpos($twigText, 'filter_name', strpos($twigText, 'filter_name') + 1);
         self::assertIsInt($nestedFilterOffset);
-        self::assertSame($filterHover, $provider->hover(LspRequests::inside($twigUri, $twigText, 'filter_name', $nestedFilterOffset)));
+        self::assertSame($filterHover, $provider->hover($requests->positioned(LspRequests::inside($twigUri, $twigText, 'filter_name', $nestedFilterOffset))));
         self::assertSame([
             'contents' => [
                 'kind' => 'markdown',
                 'value' => "Twig function: `attribute_function`\n\nCallable: `App\\Twig\\AppExtension::attributeFunction`\n\n```php\npublic function attributeFunction(string \$value): string\n```\n\nBuilds an attributed value.",
             ],
-        ], $provider->hover(LspRequests::inside($twigUri, $twigText, 'attribute_function')));
+        ], $provider->hover($requests->positioned(LspRequests::inside($twigUri, $twigText, 'attribute_function'))));
         $methodOffset = strpos($runtimeText, 'doSomething');
         self::assertIsInt($methodOffset);
         $methodLength = \strlen('doSomething');
@@ -163,7 +163,7 @@ final class TwigCallableRelationshipProviderTest extends TwigCallableProviderTes
                 'kind' => 'markdown',
                 'value' => "Twig function: `outside_name`\n\nCallable: `App\\Twig\\OutsideRuntime::outside`",
             ],
-        ], $provider->hover(LspRequests::inside($twigUri, $twigText, 'outside_name')));
+        ], $provider->hover($requests->positioned(LspRequests::inside($twigUri, $twigText, 'outside_name'))));
         $outsideOffset = strpos($extensionText, 'outside_name');
         self::assertIsInt($outsideOffset);
         self::assertSame([
@@ -193,8 +193,8 @@ final class TwigCallableRelationshipProviderTest extends TwigCallableProviderTes
         self::assertCount(1, $provider->references($requests->references(LspRequests::inside($extensionUri, $extensionText, 'attributeFunction'))));
         self::assertSame([], $provider->references($requests->references(LspRequests::inside($extensionUri, $extensionText, 'getFunctions'))));
 
-        self::assertNull($provider->hover(LspRequests::inside($twigUri, $twigText, 'path')));
-        self::assertNull($provider->hover(LspRequests::inside($twigUri, $twigText, 'function_name', (int) strrpos($twigText, 'function_name'))));
-        self::assertNull($provider->hover(LspRequests::inside($twigUri, $twigText, 'function_name', (int) strpos($twigText, 'Plain function_name') + \strlen('Plain '))));
+        self::assertNull($provider->hover($requests->positioned(LspRequests::inside($twigUri, $twigText, 'path'))));
+        self::assertNull($provider->hover($requests->positioned(LspRequests::inside($twigUri, $twigText, 'function_name', (int) strrpos($twigText, 'function_name')))));
+        self::assertNull($provider->hover($requests->positioned(LspRequests::inside($twigUri, $twigText, 'function_name', (int) strpos($twigText, 'Plain function_name') + \strlen('Plain ')))));
     }
 }

@@ -6,14 +6,12 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class SecurityRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly SecurityIndexRegistry $indexes,
         private readonly SecuritySourceIndexRegistry $sourceIndexes,
@@ -21,10 +19,9 @@ final class SecurityRelationshipProvider implements DefinitionProviderInterface,
     ) {
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->requests->positioned($params);
-        $resolved = null === $request ? null : $this->symbols->resolve($request);
+        $resolved = $this->symbols->resolve($request);
         if (null === $resolved) {
             return null;
         }

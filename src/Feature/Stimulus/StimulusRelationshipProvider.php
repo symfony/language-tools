@@ -7,14 +7,12 @@ use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class StimulusRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly UriToPathConverter $uriConverter,
         private readonly LspProtocolMapper $protocol,
         private readonly StimulusIndexRegistry $indexes,
@@ -23,10 +21,9 @@ final class StimulusRelationshipProvider implements DefinitionProviderInterface,
     ) {
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->requests->positioned($params);
-        $resolved = null === $request ? null : $this->stimulus->resolve($request);
+        $resolved = $this->stimulus->resolve($request);
         if (null === $resolved) {
             return null;
         }

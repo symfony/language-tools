@@ -6,7 +6,6 @@ use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Configuration\ConfigurationCompletionProvider;
@@ -42,6 +41,7 @@ use Symfony\Lsp\Project\SavedDocumentMatcher;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
@@ -67,7 +67,7 @@ final class ConfigurationProviderTest extends TestCase
         $hoverOffset = strpos($text, 'utf8') + 2;
         $hoverPosition = $fixture->converter->toPosition($text, $hoverOffset);
         /** @var array{contents: array{value: string}} $hover */
-        $hover = $fixture->hover->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character]]);
+        $hover = $fixture->hover->hover($fixture->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character]]));
         self::assertStringContainsString('framework.router.utf8', $hover['contents']['value']);
         self::assertSame(['config.invalid_type', 'config.deprecated_key', 'config.invalid_type', 'config.unknown_key', 'config.duplicate_key'], array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
     }
@@ -165,7 +165,7 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
         $hoverPosition = $fixture->converter->toPosition($text, (int) strpos($text, 'strict_reset_mode') + 2);
         /** @var array{contents: array{value: string}} $hover */
-        $hover = $fixture->hover->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character]]);
+        $hover = $fixture->hover->hover($fixture->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character]]));
         self::assertStringContainsString('!php/enum App\\ResetMode::SCHEMA', $hover['contents']['value']);
 
         $fixture->documents->update($uri, 3, str_replace('::SCHEMA', '::UNKNOWN', $text));
@@ -318,10 +318,10 @@ final class ConfigurationProviderTest extends TestCase
             ['default-src', 'framework.exact_keys.default-src'],
         ] as [$key, $expectedPath]) {
             $position = $fixture->converter->toPosition($text, strpos($text, $key) + 2);
-            $hover = $fixture->hover->hover([
+            $hover = $fixture->hover->hover($fixture->positioned([
                 'textDocument' => ['uri' => $uri],
                 'position' => ['line' => $position->line, 'character' => $position->character],
-            ]);
+            ]));
             self::assertIsArray($hover);
             self::assertIsArray($hover['contents'] ?? null);
             self::assertIsString($hover['contents']['value'] ?? null);
@@ -814,10 +814,10 @@ final class ConfigurationProviderTest extends TestCase
             'position' => ['line' => $position->line, 'character' => $position->character],
         ])), 'label'));
         $position = $fixture->converter->toPosition($text, strpos($text, 'cookie_secure') + 2);
-        $hover = $fixture->hover->hover([
+        $hover = $fixture->hover->hover($fixture->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
+        ]));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
@@ -849,7 +849,7 @@ final class ConfigurationProviderTest extends TestCase
             $fixture->documents->open(new Document($uri, $language, 1, $text));
             self::assertSame($diagnostics, array_column($fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]) ?? [], 'code'));
             $position = $fixture->converter->toPosition($text, strpos($text, $hovered) + 1);
-            self::assertIsArray($fixture->hover->hover(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]]));
+            self::assertIsArray($fixture->hover->hover($fixture->positioned(['textDocument' => ['uri' => $uri], 'position' => ['line' => $position->line, 'character' => $position->character]])));
             $fixture->documents->close($uri);
         }
     }
@@ -966,10 +966,10 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['Expected boolean for "monolog.handler.main.process_psr_3_messages".'], array_column($diagnostics, 'message'));
 
         $position = $fixture->converter->toPosition($text, strpos($text, 'processPsr3Messages') + 1);
-        $hover = $fixture->hover->hover([
+        $hover = $fixture->hover->hover($fixture->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]);
+        ]));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
@@ -1019,7 +1019,7 @@ final class ConfigurationProviderTest extends TestCase
 
         self::assertSame([], $fixture->diagnostics->diagnostics(['textDocument' => ['uri' => $uri]]));
 
-        $hover = $fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'failureHandler') + 1));
+        $hover = $fixture->hover->hover($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'failureHandler') + 1)));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
@@ -1056,7 +1056,7 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['Expected boolean for "framework.router.strict".'], array_column($diagnostics, 'message'));
         self::assertSame($this->protocolRange($fixture->converter, $text, (int) strpos($text, "strict('"), \strlen('strict')), $diagnostics[0]['range'] ?? null);
 
-        $hover = $fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'router') + 1));
+        $hover = $fixture->hover->hover($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'router') + 1)));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
@@ -1087,7 +1087,7 @@ final class ConfigurationProviderTest extends TestCase
             'Expected boolean for "monolog.handler.main.nested".',
         ], array_column($diagnostics, 'message'));
 
-        $hover = $fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'handler') + 1));
+        $hover = $fixture->hover->hover($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'handler') + 1)));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
@@ -1174,10 +1174,10 @@ final class ConfigurationProviderTest extends TestCase
             self::assertSame(['config.invalid_type'], array_column($diagnostics, 'code'));
             self::assertSame([$message], array_column($diagnostics, 'message'));
             $position = $fixture->converter->toPosition($text, (int) strrpos($text, $hovered) + 1);
-            $hover = $fixture->hover->hover([
+            $hover = $fixture->hover->hover($fixture->positioned([
                 'textDocument' => ['uri' => $uri],
                 'position' => ['line' => $position->line, 'character' => $position->character],
-            ]);
+            ]));
             self::assertIsArray($hover);
             self::assertIsArray($hover['contents'] ?? null);
             self::assertIsString($hover['contents']['value'] ?? null);
@@ -1368,8 +1368,8 @@ final class ConfigurationProviderTest extends TestCase
         ], array_column($diagnostics, 'message'));
         self::assertSame($this->protocolRange($fixture->converter, $text, (int) strpos($text, "utf8('invalid inferred')"), \strlen('utf8')), $diagnostics[0]['range'] ?? null);
         self::assertSame($this->protocolRange($fixture->converter, $text, (int) strrpos($text, "utf8('invalid')"), \strlen('utf8')), $diagnostics[1]['range'] ?? null);
-        self::assertNull($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'router') + 1)));
-        self::assertIsArray($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, (int) strrpos($text, 'router') + 1)));
+        self::assertNull($fixture->hover->hover($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, (int) strpos($text, 'router') + 1))));
+        self::assertIsArray($fixture->hover->hover($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, (int) strrpos($text, 'router') + 1))));
     }
 
     public function testRejectsPhpCompletionOutsideConfigurationBuilderChains(): void
@@ -1414,8 +1414,8 @@ final class ConfigurationProviderTest extends TestCase
 
         $commentHoverOffset = strpos($text, 'utf8') + 1;
         $liveHoverOffset = strrpos($text, 'utf8') + 1;
-        self::assertNull($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, $commentHoverOffset)));
-        self::assertIsArray($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, $liveHoverOffset)));
+        self::assertNull($fixture->hover->hover($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, $commentHoverOffset))));
+        self::assertIsArray($fixture->hover->hover($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, $liveHoverOffset))));
 
         $commentCompletionOffset = strpos($text, '// $framework->router()->ut') + \strlen('// $framework->router()->ut');
         $liveCompletionStart = (int) strrpos($text, 'utf8');
@@ -1452,8 +1452,8 @@ final class ConfigurationProviderTest extends TestCase
 
         $commentHoverOffset = strpos($text, 'framework:utf8') + \strlen('framework:') + 1;
         $liveHoverOffset = strrpos($text, 'framework:utf8') + \strlen('framework:') + 1;
-        self::assertNull($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, $commentHoverOffset)));
-        self::assertIsArray($fixture->hover->hover($this->positionParams($fixture->converter, $uri, $text, $liveHoverOffset)));
+        self::assertNull($fixture->hover->hover($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, $commentHoverOffset))));
+        self::assertIsArray($fixture->hover->hover($fixture->positioned($this->positionParams($fixture->converter, $uri, $text, $liveHoverOffset))));
 
         $commentCompletionOffset = strpos($text, '<framework:ut', (int) strpos($text, '-->')) + \strlen('<framework:ut');
         $liveCompletionStart = strrpos($text, '<framework:utf8') + \strlen('<framework:');
@@ -1746,7 +1746,7 @@ final class ConfigurationProviderTest extends TestCase
                 'tree' => $this->node('services', 'array'),
             ],
         ]]));
-        $resolver = new DocumentContextResolver($documents, $projects);
+        $requests = new LspRequestFactory($documents, $projects, $converter);
         $protocol = new LspProtocolMapper();
         $phpComments = new PhpCommentParser();
         $xmlParser = new TolerantXmlParser();
@@ -1767,8 +1767,8 @@ final class ConfigurationProviderTest extends TestCase
 
         return new ConfigurationProviderFixture(
             new ConfigurationCompletionProvider($converter, $protocol, $indexes, $yaml, $php, $xml),
-            new ConfigurationHoverProvider($resolver, $converter, $protocol, $indexes, $yaml, $php, $xml),
-            new ConfigurationDiagnosticProvider($resolver, ProjectPaths::resolver(), $converter, $protocol, $indexes, $routeIndexes, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
+            new ConfigurationHoverProvider($converter, $protocol, $indexes, $yaml, $php, $xml),
+            new ConfigurationDiagnosticProvider($requests, ProjectPaths::resolver(), $converter, $protocol, $indexes, $routeIndexes, $yaml, $values, $php, $xml, new YamlIndentationAnalyzer($converter, $documentParser, new YamlCommentParser($treeSitter)), $validationReconciler),
             new ConfigurationDocumentLinkProvider($converter, $protocol, $uriConverter, $documentParser),
             $documents,
             $projects,

@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Feature\Translation;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
@@ -25,7 +24,6 @@ use Symfony\Lsp\Protocol\ReferencesRequest;
 final class TranslationProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
         private readonly LspRequestFactory $requests,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
@@ -108,10 +106,9 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         return strtr($value, ['\\' => '\\\\', $quote => '\\'.$quote]);
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->requests->positioned($params);
-        $resolved = null === $request ? null : $this->resolve($request);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -167,7 +164,7 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->resolver->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request) {
             return null;
         }

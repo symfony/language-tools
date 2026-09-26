@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
@@ -68,7 +67,7 @@ final class UnknownNameSemanticActionsTest extends TestCase
     {
         $uri = 'file:///workspace/config/packages/messenger.yaml';
         $text = "bus: command.bu\ntransport: asyn\n";
-        [$document, $resolver, $project, $converter, $protocol, $requests] = $this->context($uri, 'yaml', $text);
+        [$document, $project, $converter, $protocol, $requests] = $this->context($uri, 'yaml', $text);
         $busRange = $converter->toRange($text, (int) strpos($text, 'command.bu'), \strlen('command.bu'));
         $transportRange = $converter->toRange($text, (int) strpos($text, 'asyn'), \strlen('asyn'));
         $indexes = new MessengerIndexRegistry();
@@ -97,7 +96,7 @@ final class UnknownNameSemanticActionsTest extends TestCase
     {
         $uri = 'file:///workspace/config/packages/security.yaml';
         $text = "firewall: main_are\nprovider: userz\n";
-        [, $resolver, $project, $converter, $protocol, $requests] = $this->context($uri, 'yaml', $text);
+        [, $project, $converter, $protocol, $requests] = $this->context($uri, 'yaml', $text);
         $firewallRange = $converter->toRange($text, (int) strpos($text, 'main_are'), \strlen('main_are'));
         $providerRange = $converter->toRange($text, (int) strpos($text, 'userz'), \strlen('userz'));
         $indexes = new SecurityIndexRegistry();
@@ -121,7 +120,7 @@ final class UnknownNameSemanticActionsTest extends TestCase
     {
         $uri = 'file:///workspace/src/Form.php';
         $text = "<?php ['requird' => true, 'messag' => 'invalid'];";
-        [, $resolver, $project, $converter, $protocol, $requests] = $this->context($uri, 'php', $text);
+        [, $project, $converter, $protocol, $requests] = $this->context($uri, 'php', $text);
         $formRange = $converter->toRange($text, (int) strpos($text, 'requird'), \strlen('requird'));
         $constraintRange = $converter->toRange($text, (int) strpos($text, 'messag'), \strlen('messag'));
         $indexes = new MetadataIndexRegistry();
@@ -144,7 +143,7 @@ final class UnknownNameSemanticActionsTest extends TestCase
     {
         $uri = 'file:///workspace/templates/page.html.twig';
         $text = '<twig:UserCrad />';
-        [, $resolver, $project, $converter, $protocol, $requests] = $this->context($uri, 'twig', $text);
+        [, $project, $converter, $protocol, $requests] = $this->context($uri, 'twig', $text);
         $range = $converter->toRange($text, (int) strpos($text, 'UserCrad'), \strlen('UserCrad'));
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replaceRuntime(true, true, ['UserCard'], 'components');
@@ -171,7 +170,7 @@ final class UnknownNameSemanticActionsTest extends TestCase
         self::assertSame([], (new TwigComponentCodeActionProvider($indexes, $templates, $componentResolver, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions($requests->codeAction($uri, [$diagnostic])));
     }
 
-    /** @return array{Document, DocumentContextResolver, Project, PositionConverter, LspProtocolMapper, ProviderRequests} */
+    /** @return array{Document, Project, PositionConverter, LspProtocolMapper, ProviderRequests} */
     private function context(string $uri, string $language, string $text): array
     {
         $document = new Document($uri, $language, 4, $text);
@@ -182,7 +181,6 @@ final class UnknownNameSemanticActionsTest extends TestCase
 
         return [
             $document,
-            new DocumentContextResolver($documents, $projects),
             $project,
             new PositionConverter(),
             new LspProtocolMapper(),

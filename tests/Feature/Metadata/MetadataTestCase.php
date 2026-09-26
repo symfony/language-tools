@@ -54,10 +54,10 @@ abstract class MetadataTestCase extends TestCase
      *
      * @return array<array-key, mixed>|null
      */
-    protected function hover(array $providers, string $uri, string $text, int $offset): ?array
+    protected function hover(array $providers, ProviderRequests $requests, string $uri, string $text, int $offset): ?array
     {
         foreach ($providers as $provider) {
-            if (null !== $hover = $provider->hover(LspRequests::offset($uri, $text, $offset))) {
+            if (null !== $hover = $provider->hover($requests->positioned(LspRequests::offset($uri, $text, $offset)))) {
                 return $hover;
             }
         }

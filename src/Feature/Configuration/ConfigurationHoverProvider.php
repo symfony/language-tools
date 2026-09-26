@@ -2,15 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Configuration;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class ConfigurationHoverProvider implements HoverProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly ConfigurationIndexRegistry $indexes,
@@ -20,13 +19,9 @@ final class ConfigurationHoverProvider implements HoverProviderInterface
     ) {
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $offset = $request->offset;
         $index = $this->indexes->forProject($request->project);
         if ('php' === $request->document->languageId) {
             $resolved = $this->php->resolveNode($request->document->text, $index, $offset);

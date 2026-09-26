@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
@@ -34,6 +33,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class DependencyInjectionHoverHandlerTest extends TestCase
 {
@@ -85,14 +85,13 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             new Parameter('app.api_key', 'Use app.new_api_key.'),
         );
         $handler = new DependencyInjectionHoverHandler(
-            new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $extractor),
             new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
         );
 
-        $serviceHover = $handler->hover(LspRequests::inside($uri, $text, 'app.mailer'));
-        $parameterHover = $handler->hover(LspRequests::inside($uri, $text, 'app.api_key%'));
+        $serviceHover = $handler->hover((new ProviderRequests($documents, $projects, $converter))->positioned(LspRequests::inside($uri, $text, 'app.mailer')));
+        $parameterHover = $handler->hover((new ProviderRequests($documents, $projects, $converter))->positioned(LspRequests::inside($uri, $text, 'app.api_key%')));
         self::assertIsArray($serviceHover);
         self::assertIsArray($serviceHover['contents']);
         self::assertIsArray($parameterHover);
@@ -174,13 +173,12 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             ['app.shared', 'app.inner'],
         ));
         $handler = new DependencyInjectionHoverHandler(
-            new DocumentContextResolver($documents, $projects),
             new LspProtocolMapper(),
             new DependencyInjectionSymbolResolver($converter, $extractor),
             new DependencyInjectionProjectLookup($serviceIndexes, new ParameterIndexRegistry(), $sourceIndexes),
         );
 
-        $hover = $handler->hover(LspRequests::inside($uri, $text, 'app.shared'));
+        $hover = $handler->hover((new ProviderRequests($documents, $projects, $converter))->positioned(LspRequests::inside($uri, $text, 'app.shared')));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents']);
 

@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\Twig;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
@@ -34,7 +33,6 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
@@ -94,11 +92,10 @@ final class LiveComponentProviderTest extends TestCase
             $extractor->extract($project, new SourceDocument($templateUri, 'twig', $templateText)),
             $extractor->extract($project, new SourceDocument($usageUri, 'twig', $usageText)),
         );
-        $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry()), $extractor);
         $completionProvider = new TwigComponentCompletionProvider($converter, $protocol, $indexes, $componentResolver, $commentParser);
-        $relationshipProvider = new TwigComponentRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, $componentResolver);
+        $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
 
         self::assertSame(['submit'], array_column($completionProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($completionUri, $completionText, \strlen($completionText)))), 'label'));
         $nestedActionOffset = strpos($templateText, 'submit') + \strlen('sub');
@@ -106,13 +103,13 @@ final class LiveComponentProviderTest extends TestCase
         $actionParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, 'submit') + 2);
         self::assertSame([$classUri], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($actionParams)), 'uri'));
         self::assertCount(4, $relationshipProvider->references((new ProviderRequests($documents, $projects))->references($actionParams)));
-        $actionHover = $relationshipProvider->hover($actionParams);
+        $actionHover = $relationshipProvider->hover((new ProviderRequests($documents, $projects))->positioned($actionParams));
         self::assertIsArray($actionHover);
         self::assertIsArray($actionHover['contents'] ?? null);
         self::assertSame('Live action: `Search#submit`', $actionHover['contents']['value'] ?? null);
 
         $componentParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, 'Search') + 2);
-        $componentHover = $relationshipProvider->hover($componentParams);
+        $componentHover = $relationshipProvider->hover((new ProviderRequests($documents, $projects))->positioned($componentParams));
         self::assertIsArray($componentHover);
         self::assertIsArray($componentHover['contents'] ?? null);
         self::assertIsString($componentHover['contents']['value'] ?? null);
@@ -128,12 +125,12 @@ final class LiveComponentProviderTest extends TestCase
             );
         }
 
-        $eventProvider = new LiveComponentEventProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $eventProvider = new LiveComponentEventProvider($converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
         self::assertSame(['search:completed'], array_column($eventProvider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co")))), 'label'));
         $eventParams = LspRequests::offset($classUri, $classText, strpos($classText, "emit('search:completed") + \strlen("emit('search:"));
         self::assertSame([$classUri], array_column($eventProvider->definition((new ProviderRequests($documents, $projects))->positioned($eventParams)), 'uri'));
         self::assertCount(2, $eventProvider->references((new ProviderRequests($documents, $projects))->references($eventParams)));
-        $eventHover = $eventProvider->hover($eventParams);
+        $eventHover = $eventProvider->hover((new ProviderRequests($documents, $projects))->positioned($eventParams));
         self::assertIsArray($eventHover);
         self::assertIsArray($eventHover['contents'] ?? null);
         self::assertIsString($eventHover['contents']['value'] ?? null);
@@ -183,7 +180,7 @@ final class LiveComponentProviderTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
-        $provider = new LiveComponentEventProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $provider = new LiveComponentEventProvider($converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
 
         /** @var list<array{string, list<string>, bool}> $cases */
         $cases = [
@@ -260,7 +257,7 @@ final class LiveComponentProviderTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
-        $provider = new LiveComponentEventProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $provider = new LiveComponentEventProvider($converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
 
         self::assertSame([], $provider->complete((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($uri, $text, strpos($text, 'search:c') + \strlen('search:c')))));
     }

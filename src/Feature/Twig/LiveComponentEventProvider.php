@@ -17,7 +17,6 @@ use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\CompletionItemKind;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
 
@@ -26,7 +25,6 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
     private const AS_LIVE_COMPONENT = 'Symfony\\UX\\LiveComponent\\Attribute\\AsLiveComponent';
 
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly PositionConverter $converter,
         private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly LspProtocolMapper $protocol,
@@ -66,13 +64,8 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         return $items;
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->requests->positioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;

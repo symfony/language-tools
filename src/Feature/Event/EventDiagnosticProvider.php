@@ -2,14 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Event;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class EventDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly EventSourceIndexRegistry $sourceIndexes,
     ) {
@@ -22,7 +22,7 @@ final class EventDiagnosticProvider implements DiagnosticProviderInterface
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->documents->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }

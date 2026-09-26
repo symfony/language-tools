@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\Route;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
@@ -26,6 +25,7 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class RouteHoverHandlerTest extends TestCase
 {
@@ -81,8 +81,6 @@ final class RouteHoverHandlerTest extends TestCase
             new DependencyInjectionSourceFacts($uri, classes: $classExtractor->extract($uri, $text)),
         );
         $handler = new RouteHoverHandler(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
             new LspProtocolMapper(),
             $indexes,
             $classIndexes,
@@ -95,9 +93,9 @@ final class RouteHoverHandlerTest extends TestCase
                 'kind' => 'markdown',
                 'value' => "`article_show`\n\nAlias of: `article_detail`\n\nPath: `/article/{id}`\n\nHost: `{subdomain}.example.com`\n\nMethods: `GET`\n\nSchemes: `https`\n\nDefaults: `locale`\n\nRequirements: `id: \\d+`\n\nController: `App\\Controller\\ArticleController::show`",
             ],
-        ], $handler->hover([
+        ], $handler->hover((new ProviderRequests($documents, $projects, $converter))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 }

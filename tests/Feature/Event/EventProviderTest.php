@@ -479,7 +479,7 @@ PHP;
 
         self::assertSame(['App\\Event\\OrderPlaced'], $kit->labels($kit->get(EventCompletionProvider::class)->complete($kit->positioned($kit->after($dispatcherUri, "'App\\Event\\Ord")))));
         $dispatched = $kit->at($dispatcherUri, 'OrderPlaced());');
-        self::assertStringContainsString('Symfony event', $kit->hoverText($relationshipProvider->hover($dispatched)));
+        self::assertStringContainsString('Symfony event', $kit->hoverText($relationshipProvider->hover($kit->positioned($dispatched))));
         self::assertSame([$eventUri, $listenerUri], $kit->targets($relationshipProvider->definition($kit->positioned($dispatched))));
 
         $declared = $kit->at($eventUri, 'OrderPlaced');

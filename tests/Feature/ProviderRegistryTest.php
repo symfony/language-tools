@@ -218,20 +218,25 @@ final class ProviderRegistryTest extends TestCase
         $first = new StubProvider(null);
         $second = new StubProvider([$protocol->markdownHover('second')]);
         $third = new StubProvider([$protocol->markdownHover('third')]);
+        $uri = 'file:///workspace/src/Kernel.php';
+        $requests = $this->requestFactory($uri, 'php', '<?php');
+        $params = LspRequests::position($uri, new Position(0, 1));
 
         self::assertSame(
             $protocol->markdownHover("second\n\n---\n\nthird"),
-            (new HoverProviderRegistry($protocol, [$first, $second, $third]))->hover([]),
+            (new HoverProviderRegistry($protocol, $requests, [$first, $second, $third]))->hover($params),
         );
         self::assertSame(['hover'], $first->calls);
         self::assertSame(['hover'], $second->calls);
         self::assertSame(['hover'], $third->calls);
-        self::assertNull((new HoverProviderRegistry($protocol, [new StubProvider(null)]))->hover([]));
+        self::assertNull((new HoverProviderRegistry($protocol, $requests, [new StubProvider(null)]))->hover($params));
+        self::assertNull((new HoverProviderRegistry($protocol, $requests, [$first]))->hover(LspRequests::document($uri)));
+        self::assertSame(['hover'], $first->calls);
 
         $afterEmpty = new StubProvider([$protocol->markdownHover('later')]);
         self::assertSame(
             $protocol->markdownHover('later'),
-            (new HoverProviderRegistry($protocol, [new StubProvider([[]]), $afterEmpty]))->hover([]),
+            (new HoverProviderRegistry($protocol, $requests, [new StubProvider([[]]), $afterEmpty]))->hover($params),
         );
         self::assertSame(['hover'], $afterEmpty->calls);
     }
@@ -278,9 +283,9 @@ final class ProviderRegistryTest extends TestCase
         );
         $metadataIndexes = new MetadataSourceIndexRegistry();
         $metadataIndexes->forProject($project)->replace($metadataExtractor->extract($source));
-        $registry = new HoverProviderRegistry($protocol, [
-            new MetadataRelationshipProvider($requestFactory, $positionedSymbols, $protocol, $metadataIndexes, $metadataExtractor),
-            new DoctrineRelationshipProvider($requestFactory, $positionedSymbols, $protocol, $doctrineIndexes, $doctrineExtractor),
+        $registry = new HoverProviderRegistry($protocol, $requestFactory, [
+            new MetadataRelationshipProvider($positionedSymbols, $protocol, $metadataIndexes, $metadataExtractor),
+            new DoctrineRelationshipProvider($positionedSymbols, $protocol, $doctrineIndexes, $doctrineExtractor),
         ]);
 
         $position = $converter->toPosition($text, (int) strpos($text, '$category = null') + 2);
@@ -428,7 +433,7 @@ final class StubProvider implements CodeActionProviderInterface, CodeLensProvide
         return $this->result(__FUNCTION__) ?? [];
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
         return $this->firstResult(__FUNCTION__);
     }

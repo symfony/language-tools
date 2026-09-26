@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Feature\Metadata;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Metadata\FormMetadataProvider;
@@ -40,11 +39,11 @@ final class FormMetadataProviderTest extends MetadataTestCase
             true,
         );
         $documents = new DocumentStore();
-        $resolver = new DocumentContextResolver($documents, $projects);
+        $requests = new ProviderRequests($documents, $projects, $converter);
         $protocol = new LspProtocolMapper();
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $completionProvider = new MetadataCompletionProvider($protocol, $indexes, $sourceIndexes, $extractor);
-        $formProvider = new FormMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes);
+        $formProvider = new FormMetadataProvider(new LspRequestFactory($documents, $projects, $converter), $converter, $protocol, $indexes, $sourceIndexes);
         $formUri = 'file:///workspace/src/Controller/EventController.php';
         $formText = <<<'PHP'
             <?php
@@ -74,7 +73,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame(['required'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $formUri, $formText, $builderRequired + 4));
         self::assertSame(['form.unknown_option'], array_column($this->diagnostics([$formProvider], $formUri), 'code'));
         $required = strpos($formText, 'required') + 1;
-        self::assertIsArray($this->hover([$formProvider], $formUri, $formText, $required));
+        self::assertIsArray($this->hover([$formProvider], $requests, $formUri, $formText, $required));
     }
 
     public function testCompletesFormOptionsOnlyForCompleteClassReferenceTypeArguments(): void
@@ -231,13 +230,13 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $documents = new DocumentStore();
         $documents->open(new Document($dtoUri, 'php', 1, $dtoText));
         $documents->open(new Document($formUri, 'php', 1, $formText));
-        $resolver = new DocumentContextResolver($documents, $projects);
+        $requests = new ProviderRequests($documents, $projects, $converter);
         $protocol = new LspProtocolMapper();
-        $relationshipProvider = new MetadataRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), $protocol, $sourceIndexes, $extractor);
+        $relationshipProvider = new MetadataRelationshipProvider(new PositionedSourceSymbolResolver($converter), $protocol, $sourceIndexes, $extractor);
         $completionProvider = new MetadataCompletionProvider($protocol, new MetadataIndexRegistry(), $sourceIndexes, $extractor);
 
         $titleOffset = strpos($formText, "'title'") + 2;
-        $hover = $relationshipProvider->hover(LspRequests::offset($formUri, $formText, $titleOffset));
+        $hover = $relationshipProvider->hover($requests->positioned(LspRequests::offset($formUri, $formText, $titleOffset)));
         self::assertIsArray($hover);
         $hoverValue = \is_array($hover['contents'] ?? null) ? ($hover['contents']['value'] ?? null) : null;
         self::assertIsString($hoverValue);
@@ -611,9 +610,8 @@ final class FormMetadataProviderTest extends MetadataTestCase
             true,
         );
         $documents = new DocumentStore();
-        $resolver = new DocumentContextResolver($documents, $projects);
         $sourceIndexes = new MetadataSourceIndexRegistry();
-        $formProvider = new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $sourceIndexes);
+        $formProvider = new FormMetadataProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes);
         $uri = 'file:///workspace/src/Controller/EventController.php';
         $text = <<<'PHP'
             <?php
@@ -728,7 +726,6 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $documents->open(new Document($uri, 'php', 1, $text));
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument($uri, 'php', $text)));
-        $resolver = new DocumentContextResolver($documents, $projects);
-        self::assertSame([], (new FormMetadataProvider($resolver, $converter, new LspProtocolMapper(), $indexes, $sourceIndexes))->diagnostics(LspRequests::document($uri)));
+        self::assertSame([], (new FormMetadataProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new LspProtocolMapper(), $indexes, $sourceIndexes))->diagnostics(LspRequests::document($uri)));
     }
 }

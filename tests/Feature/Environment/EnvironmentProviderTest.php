@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\Environment;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
@@ -143,7 +142,7 @@ final class EnvironmentProviderTest extends TestCase
             'range' => ['start' => ['line' => 0, 'character' => 16], 'end' => ['line' => 0, 'character' => 23]],
             'newText' => 'APP_URL',
         ], $completion[0]['textEdit'] ?? null);
-        $hover = $relationshipProvider->hover($params);
+        $hover = $relationshipProvider->hover((new ProviderRequests($documents, $projects))->positioned($params));
         self::assertIsArray($hover);
         self::assertStringNotContainsString('CANARY_SECRET_VALUE', json_encode($hover, \JSON_THROW_ON_ERROR));
         self::assertSame(['file:///workspace/.env'], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($params)), 'uri'));
@@ -192,11 +191,11 @@ final class EnvironmentProviderTest extends TestCase
         self::assertSame($this->protocolRange($converter, $text, $liveNameStart, \strlen('APP_URL')), $textEdit['range']);
 
         $commentHoverOffset = strpos($text, 'unknown:APP_URL') + \strlen('unknown:') + 1;
-        self::assertNull($relationshipProvider->hover($this->positionParams($converter, $uri, $text, $commentHoverOffset)));
+        self::assertNull($relationshipProvider->hover((new ProviderRequests($documents, $projects))->positioned($this->positionParams($converter, $uri, $text, $commentHoverOffset))));
         self::assertSame([], $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($this->positionParams($converter, $uri, $text, $commentHoverOffset))));
         $liveOffset = $liveNameStart + 1;
         $liveParams = $this->positionParams($converter, $uri, $text, $liveOffset);
-        self::assertIsArray($relationshipProvider->hover($liveParams));
+        self::assertIsArray($relationshipProvider->hover((new ProviderRequests($documents, $projects))->positioned($liveParams)));
         self::assertSame(['file:///workspace/.env'], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($liveParams)), 'uri'));
         $references = $relationshipProvider->references((new ProviderRequests($documents, $projects))->references($liveParams));
         self::assertSame([$uri], array_column($references, 'uri'));
@@ -309,13 +308,12 @@ final class EnvironmentProviderTest extends TestCase
                 $indexes->forProject($project)->replaceSource($extractor->extract(SourceDocument::fromDocument($document)));
             }
         }
-        $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
 
         return [
             new EnvironmentCompletionProvider($converter, $protocol, $indexes, $comments, $yamlParser),
-            new EnvironmentRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, new EnvironmentSymbolResolver(new PositionedSourceSymbolResolver($converter), $extractor)),
-            new EnvironmentDiagnosticProvider($resolver, $protocol, $indexes, new EnvironmentProcessorChainValidator()),
+            new EnvironmentRelationshipProvider($protocol, $indexes, new EnvironmentSymbolResolver(new PositionedSourceSymbolResolver($converter), $extractor)),
+            new EnvironmentDiagnosticProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, new EnvironmentProcessorChainValidator()),
         ];
     }
 

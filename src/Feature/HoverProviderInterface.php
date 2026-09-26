@@ -2,12 +2,10 @@
 
 namespace Symfony\Lsp\Feature;
 
+use Symfony\Lsp\Protocol\PositionedRequest;
+
 interface HoverProviderInterface
 {
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array<array-key, mixed>|null
-     */
-    public function hover(array $params): ?array;
+    /** @return array<array-key, mixed>|null */
+    public function hover(PositionedRequest $request): ?array;
 }

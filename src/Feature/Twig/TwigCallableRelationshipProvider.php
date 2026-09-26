@@ -11,14 +11,12 @@ use Symfony\Lsp\Index\SourceSymbolOrder;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
 use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class TwigCallableRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly LspRequestFactory $requests,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigCallableSourceIndexRegistry $indexes,
@@ -28,13 +26,8 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
     ) {
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->requests->positioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;

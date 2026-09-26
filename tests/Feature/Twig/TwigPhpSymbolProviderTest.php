@@ -27,7 +27,6 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
@@ -81,30 +80,30 @@ final class TwigPhpSymbolProviderTest extends TestCase
         $indexes = new TwigPhpSymbolSourceIndexRegistry();
         $indexes->forProject($project)->replace($phpFacts, $twigFacts);
         $provider = new TwigPhpSymbolProvider(
-            new LspRequestFactory($documents, $projects, $converter),
             $protocol = new LspProtocolMapper(),
             $indexes,
             $extractor,
         );
+        $requests = new ProviderRequests($documents, $projects, $converter);
 
         self::assertSame([
             'contents' => [
                 'kind' => 'markdown',
                 'value' => "PHP class constant: `App\\Model\\ViewOptions::FORMAT`\n\n```php\npublic const FORMAT;\n```\n\nOutput format.",
             ],
-        ], $provider->hover(LspRequests::inside($twigUri, $twig, 'FORMAT')));
+        ], $provider->hover($requests->positioned(LspRequests::inside($twigUri, $twig, 'FORMAT'))));
         self::assertSame([
             'contents' => [
                 'kind' => 'markdown',
                 'value' => "PHP enum: `App\\Model\\Status`\n\n```php\nenum Status: string\n```\n\nWorkflow status.",
             ],
-        ], $provider->hover(LspRequests::inside($twigUri, $twig, 'App\\\\Model\\\\Status')));
+        ], $provider->hover($requests->positioned(LspRequests::inside($twigUri, $twig, 'App\\\\Model\\\\Status'))));
         self::assertSame([
             'contents' => [
                 'kind' => 'markdown',
                 'value' => "PHP enum case: `App\\Model\\Status::Published`\n\n```php\ncase Published;\n```\n\nReady for readers.",
             ],
-        ], $provider->hover(LspRequests::inside($twigUri, $twig, 'Published', (int) strpos($twig, ').Published') + 2)));
+        ], $provider->hover($requests->positioned(LspRequests::inside($twigUri, $twig, 'Published', (int) strpos($twig, ').Published') + 2))));
 
         $format = $indexes->forProject($project)->memberDeclarations('App\Model\ViewOptions', 'FORMAT')[0];
         self::assertSame([
@@ -115,7 +114,6 @@ final class TwigPhpSymbolProviderTest extends TestCase
             $protocol->location($phpUri, $status->range),
         ], $provider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::inside($twigUri, $twig, 'App\\\\Model\\\\Status'))));
 
-        $requests = new ProviderRequests($documents, $projects);
         $published = LspRequests::inside($phpUri, $php, 'Published');
         self::assertCount(3, $provider->references($requests->references(LspRequests::inside($twigUri, $twig, 'Published', (int) strpos($twig, ').Published') + 2))));
         self::assertCount(3, $provider->references($requests->references($published)));

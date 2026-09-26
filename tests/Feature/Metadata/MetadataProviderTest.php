@@ -12,7 +12,6 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
@@ -62,7 +61,7 @@ final class MetadataProviderTest extends MetadataTestCase
         $documents->open(new Document($entityUri, 'php', 1, $entityText));
         $documents->open(new Document($mappingUri, 'yaml', 1, $mappingText));
         $requests = new ProviderRequests($documents, $projects);
-        $relationshipProvider = new MetadataRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $sourceIndexes, $extractor);
+        $relationshipProvider = new MetadataRelationshipProvider(new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $sourceIndexes, $extractor);
 
         $mappedClass = strpos($mappingText, 'App\Entity\User') + 1;
         $classDefinition = $relationshipProvider->definition($requests->positioned(LspRequests::offset($mappingUri, $mappingText, $mappedClass)));

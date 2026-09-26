@@ -123,7 +123,7 @@ final class AssetProviderTest extends TestCase
 
         $assetOffset = strpos($usageText, 'images/logo.svg') + 2;
         $assetParams = LspRequests::offset($usageUri, $usageText, $assetOffset);
-        $assetHover = $provider->hover($assetParams);
+        $assetHover = $provider->hover($requests->positioned($assetParams));
         self::assertIsArray($assetHover);
         self::assertIsArray($assetHover['contents'] ?? null);
         self::assertIsString($assetHover['contents']['value'] ?? null);
@@ -240,7 +240,7 @@ final class AssetProviderTest extends TestCase
             $requests = new ProviderRequests($documents, $projects);
 
             $params = LspRequests::offset($uri, $text, strpos($text, 'css/app.css') + 2);
-            $hover = $provider->hover($params);
+            $hover = $provider->hover($requests->positioned($params));
             self::assertIsArray($hover);
             self::assertIsArray($hover['contents'] ?? null);
             self::assertIsString($hover['contents']['value'] ?? null);

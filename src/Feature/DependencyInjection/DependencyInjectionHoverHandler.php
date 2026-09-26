@@ -2,32 +2,22 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\HoverProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class DependencyInjectionHoverHandler implements HoverProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
         private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionSymbolResolver $symbolResolver,
         private readonly DependencyInjectionProjectLookup $lookup,
     ) {
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-
-        $symbol = $this->symbolResolver->resolve(
-            SourceDocument::fromDocument($request->document),
-            $request->position,
-        );
+        $symbol = $this->symbolResolver->resolve($request->source, $request->position);
         if (null === $symbol) {
             return null;
         }

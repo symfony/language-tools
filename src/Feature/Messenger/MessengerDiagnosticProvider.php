@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Messenger;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
@@ -11,6 +10,7 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Runtime\EnvironmentScopeResolver;
 
 final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
@@ -18,7 +18,7 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
     private const SCALAR_TYPES = ['array', 'bool', 'callable', 'float', 'int', 'never', 'resource', 'string', 'void'];
 
     public function __construct(
-        private readonly DocumentContextResolver $documents,
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
         private readonly MessengerSourceIndexRegistry $sourceIndexes,
@@ -36,7 +36,7 @@ final class MessengerDiagnosticProvider implements DiagnosticProviderInterface
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->documents->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request) {
             return null;
         }

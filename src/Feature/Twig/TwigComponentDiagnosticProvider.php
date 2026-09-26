@@ -2,14 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TemplateIndexRegistry $templates,
@@ -24,7 +24,7 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->documents->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }

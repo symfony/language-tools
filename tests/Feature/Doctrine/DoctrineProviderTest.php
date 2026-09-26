@@ -19,9 +19,9 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
-use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectTestKit;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class DoctrineProviderTest extends TestCase
 {
@@ -136,7 +136,7 @@ final class DoctrineProviderTest extends TestCase
         $field = $kit->after($usageUri, "['na");
         self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($kit->positioned($field))));
         self::assertCount(3, $relationshipProvider->references($kit->references($field)));
-        self::assertStringContainsString('Doctrine field: `App\\Entity\\Product::$name`', $kit->hoverText($relationshipProvider->hover($field)));
+        self::assertStringContainsString('Doctrine field: `App\\Entity\\Product::$name`', $kit->hoverText($relationshipProvider->hover($kit->positioned($field))));
 
         self::assertSame([$repositoryUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside($entityUri, 'ProductRepository:')))));
         self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside($repositoryUri, 'Product:')))));
@@ -406,13 +406,14 @@ final class DoctrineProviderTest extends TestCase
         $indexes->forProject($project)->replace($facts);
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
-        $provider = new DoctrineRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor);
+        $provider = new DoctrineRelationshipProvider(new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor);
+        $requests = new ProviderRequests($documents, $projects, $converter);
 
         self::assertSame(
             [null, 'App\Entity\Category'],
             array_map(static fn (DoctrineField $field): ?string => $field->targetEntity, $facts->entities[0]->fields),
         );
-        $hover = $provider->hover(LspRequests::offset($uri, $text, strpos($text, '$name') + 2));
+        $hover = $provider->hover($requests->positioned(LspRequests::offset($uri, $text, strpos($text, '$name') + 2)));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertSame("Doctrine field: `App\Entity\Product::\$name`\n\nType: `string`", $hover['contents']['value'] ?? null);
@@ -732,7 +733,7 @@ final class DoctrineProviderTest extends TestCase
         $field = $kit->after($usageUri, "['ti");
 
         self::assertSame([$entityUri], $kit->targets($provider->definition($kit->positioned($field))));
-        self::assertStringContainsString('Doctrine field: `Acme\Entity\Book::$title`', $kit->hoverText($provider->hover($field)));
+        self::assertStringContainsString('Doctrine field: `Acme\Entity\Book::$title`', $kit->hoverText($provider->hover($kit->positioned($field))));
     }
 
     public function testOffersNoDoctrineCompletionsInsidePhpComments(): void

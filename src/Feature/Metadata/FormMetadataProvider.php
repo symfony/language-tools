@@ -2,17 +2,18 @@
 
 namespace Symfony\Lsp\Feature\Metadata;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class FormMetadataProvider implements DiagnosticProviderInterface, HoverProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
+        private readonly LspRequestFactory $requests,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly MetadataIndexRegistry $indexes,
@@ -20,13 +21,9 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
     ) {
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $offset = $request->offset;
         $facts = $this->sourceIndexes->forProject($request->project)->factsForUri($request->document->uri);
         foreach ($facts instanceof MetadataSourceFacts ? $facts->formOptions : [] as $option) {
             if (!$this->converter->containsByteOffset($request->document->text, $option->range, $offset, inclusiveEnd: true)) {
@@ -51,7 +48,7 @@ final class FormMetadataProvider implements DiagnosticProviderInterface, HoverPr
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->resolver->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request || 'php' !== $request->document->languageId) {
             return null;
         }

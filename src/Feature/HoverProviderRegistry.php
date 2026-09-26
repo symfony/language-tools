@@ -3,12 +3,14 @@
 namespace Symfony\Lsp\Feature;
 
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 
 final class HoverProviderRegistry
 {
     /** @param iterable<HoverProviderInterface> $providers */
     public function __construct(
         private readonly LspProtocolMapper $protocol,
+        private readonly LspRequestFactory $requests,
         private readonly iterable $providers,
     ) {
     }
@@ -20,9 +22,14 @@ final class HoverProviderRegistry
      */
     public function hover(array $params): ?array
     {
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
         $values = [];
         foreach ($this->providers as $provider) {
-            $value = $this->markdown($provider->hover($params));
+            $value = $this->markdown($provider->hover($request));
             if ('' !== $value) {
                 $values[] = $value;
             }

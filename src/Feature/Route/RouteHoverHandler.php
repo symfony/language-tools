@@ -2,18 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Route;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\HoverProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class RouteHoverHandler implements HoverProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
-        private readonly PositionConverter $positionConverter,
         private readonly LspProtocolMapper $protocol,
         private readonly RouteIndexRegistry $routeIndexes,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
@@ -22,23 +18,16 @@ final class RouteHoverHandler implements HoverProviderInterface
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{contents: array{kind: string, value: string}}|null
-     */
-    public function hover(array $params): ?array
+    /** @return array{contents: array{kind: string, value: string}}|null */
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig'], true)) {
+        if (!\in_array($request->document->languageId, ['php', 'twig'], true)) {
             return null;
         }
 
-        $offset = $this->positionConverter->toByteOffset($request->document->text, $request->position);
-        $document = SourceDocument::fromDocument($request->document);
         $reference = 'twig' === $request->document->languageId
-            ? $this->twigReferenceExtractor->at($document, $offset)
-            : $this->phpReferenceExtractor->at($document, $offset, $this->classIndexes->forProject($request->project));
+            ? $this->twigReferenceExtractor->at($request->source, $request->offset)
+            : $this->phpReferenceExtractor->at($request->source, $request->offset, $this->classIndexes->forProject($request->project));
         if (null === $reference || null === $route = $this->routeIndexes->forProject($request->project)->get($reference->name)) {
             return null;
         }

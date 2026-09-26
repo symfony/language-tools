@@ -6,7 +6,6 @@ use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
@@ -38,6 +37,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectTestKit;
@@ -472,7 +472,7 @@ YAML;
         $kit->open($bundleUri, $bundleYaml);
         self::assertSame([], $completionProvider->complete($kit->positioned($kit->offset($bundleUri, \strlen($bundleYaml)))));
         self::assertSame(['async'], $kit->labels($completionProvider->complete($kit->positioned($kit->after($yamlUri, 'Ping: asy')))));
-        self::assertStringContainsString('Messenger transport', $kit->hoverText($relationshipProvider->hover($kit->after($yamlUri, 'from_transport: as'))));
+        self::assertStringContainsString('Messenger transport', $kit->hoverText($relationshipProvider->hover($kit->positioned($kit->after($yamlUri, 'from_transport: as')))));
         self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside($yamlUri, 'command.bus')))));
         self::assertSame(['messenger.unknown_bus'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($yamlUri))));
         self::assertSame(['messenger.invalid_handler_signature', 'messenger.invalid_handler_signature'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($handlerUri))));
@@ -612,7 +612,7 @@ YAML;
             }
         };
         $provider = new MessengerDiagnosticProvider(
-            new DocumentContextResolver($documents, $projects),
+            new LspRequestFactory($documents, $projects, $converter),
             new LspProtocolMapper(),
             $indexes,
             new MessengerSourceIndexRegistry(),

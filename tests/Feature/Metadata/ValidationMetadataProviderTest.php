@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Tests\Feature\Metadata;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Metadata\MetadataCompletionProvider;
@@ -16,6 +15,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class ValidationMetadataProviderTest extends MetadataTestCase
@@ -30,10 +30,10 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         $indexes = $this->createIndexes($project);
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $documents = new DocumentStore();
-        $resolver = new DocumentContextResolver($documents, $projects);
+        $requests = new ProviderRequests($documents, $projects, $converter);
         $protocol = new LspProtocolMapper();
         $completionProvider = new MetadataCompletionProvider($protocol, $indexes, $sourceIndexes, $extractor);
-        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes);
+        $validationProvider = new ValidationMetadataProvider(new LspRequestFactory($documents, $projects, $converter), $converter, $protocol, $indexes, $sourceIndexes);
         $constraintUri = 'file:///workspace/src/Dto/Input.php';
         $constraintText = <<<'PHP'
             <?php
@@ -64,10 +64,10 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         self::assertIsInt($validatorWhen);
         self::assertSame(['expression'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $constraintUri, $constraintText, $validatorWhen + 3));
         self::assertSame(['max'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $constraintUri, $constraintText, strpos($constraintText, 'ma)') + 2));
-        self::assertNull($this->hover([$validationProvider], $constraintUri, $constraintText, strpos($constraintText, 'Assert\When') + \strlen('Assert\\')));
-        self::assertNull($this->hover([$validationProvider], $constraintUri, $constraintText, strpos($constraintText, 'env:') + 1));
-        self::assertIsArray($this->hover([$validationProvider], $constraintUri, $constraintText, strpos($constraintText, 'unknown:') + 1));
-        self::assertIsArray($this->hover([$validationProvider], $constraintUri, $constraintText, strpos($constraintText, "expression: 'true'") + 1));
+        self::assertNull($this->hover([$validationProvider], $requests, $constraintUri, $constraintText, strpos($constraintText, 'Assert\When') + \strlen('Assert\\')));
+        self::assertNull($this->hover([$validationProvider], $requests, $constraintUri, $constraintText, strpos($constraintText, 'env:') + 1));
+        self::assertIsArray($this->hover([$validationProvider], $requests, $constraintUri, $constraintText, strpos($constraintText, 'unknown:') + 1));
+        self::assertIsArray($this->hover([$validationProvider], $requests, $constraintUri, $constraintText, strpos($constraintText, "expression: 'true'") + 1));
         $diagnostics = $this->diagnostics([$validationProvider], $constraintUri);
         self::assertSame(['validation.unknown_constraint_option', 'validation.unknown_constraint_option'], array_column($diagnostics, 'code'));
         self::assertSame('Unknown option "unknown" for constraint "Length".', $diagnostics[0]['message'] ?? null);
@@ -114,10 +114,10 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         $sourceIndexes = new MetadataSourceIndexRegistry();
         $sourceIndexes->forProject($project)->replace($extractor->extract(new SourceDocument('file:///workspace/src/Validator/Slug.php', 'php', $constraintDeclarationText)));
         $documents = new DocumentStore();
-        $resolver = new DocumentContextResolver($documents, $projects);
+        $requests = new ProviderRequests($documents, $projects, $converter);
         $protocol = new LspProtocolMapper();
         $completionProvider = new MetadataCompletionProvider($protocol, $indexes, $sourceIndexes, $extractor);
-        $validationProvider = new ValidationMetadataProvider($resolver, $converter, $protocol, $indexes, $sourceIndexes);
+        $validationProvider = new ValidationMetadataProvider(new LspRequestFactory($documents, $projects, $converter), $converter, $protocol, $indexes, $sourceIndexes);
         $validationUri = 'file:///workspace/config/validator/User.yaml';
         $validationText = <<<'YAML'
             App\Entity\User:
@@ -134,7 +134,7 @@ final class ValidationMetadataProviderTest extends MetadataTestCase
         );
 
         self::assertSame(['max'], $this->completionLabels($completionProvider, new ProviderRequests($documents, $projects), $validationUri, $validationText, strpos($validationText, 'max:') + 3));
-        self::assertIsArray($this->hover([$validationProvider], $validationUri, $validationText, strpos($validationText, 'max:') + 1));
+        self::assertIsArray($this->hover([$validationProvider], $requests, $validationUri, $validationText, strpos($validationText, 'max:') + 1));
         self::assertSame(['validation.unknown_constraint_option'], array_column($this->diagnostics([$validationProvider], $validationUri), 'code'));
         $constraintNameUri = 'file:///workspace/config/validator/Custom.yaml';
         $constraintNameText = "App\\Entity\\User:\n    properties:\n        email:\n            - Sl";

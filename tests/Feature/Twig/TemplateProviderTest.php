@@ -7,7 +7,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -456,10 +455,8 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replace(new TemplateSourceFacts($reference->uri, null, [$reference]));
         $indexes->forProject($project)->replaceGlobals(['app']);
         $commentParser = new TwigCommentParser();
-        $documentResolver = new DocumentContextResolver($documents, $projects);
         $requests = new ProviderRequests($documents, $projects);
         $provider = new TwigVariableProvider(
-            $documentResolver,
             $converter,
             new LspProtocolMapper(),
             $indexes,
@@ -475,10 +472,10 @@ final class TemplateProviderTest extends TestCase
             'position' => ['line' => $position->line, 'character' => $position->character],
         ])), 'label'));
         $hoverPosition = $converter->toPosition($text, strrpos($text, 'app') + 1);
-        $hover = $provider->hover([
+        $hover = $provider->hover($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character],
-        ]);
+        ]));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
@@ -507,10 +504,8 @@ final class TemplateProviderTest extends TestCase
         $projects->replace([new Project('/workspace', 'file:///workspace')]);
         $converter = new PositionConverter();
         $commentParser = new TwigCommentParser();
-        $documentResolver = new DocumentContextResolver($documents, $projects);
         $requests = new ProviderRequests($documents, $projects);
         $provider = new TwigVariableProvider(
-            $documentResolver,
             $converter,
             new LspProtocolMapper(),
             $this->templateIndexes(),
@@ -545,10 +540,10 @@ final class TemplateProviderTest extends TestCase
                 'kind' => 'markdown',
                 'value' => "Twig variable: `café`\n\nDeclared type: `string`\n\nRequired template variable",
             ],
-        ], $provider->hover([
+        ], $provider->hover($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $unicodePosition->line, 'character' => $unicodePosition->character],
-        ]));
+        ])));
 
         $hoverPosition = $converter->toPosition($text, strrpos($text, 'featured') + 1);
         self::assertSame([
@@ -556,15 +551,15 @@ final class TemplateProviderTest extends TestCase
                 'kind' => 'markdown',
                 'value' => "Twig variable: `featured`\n\nDeclared type: `boolean`\n\nOptional template variable\n\nWhether to highlight the article.",
             ],
-        ], $provider->hover([
+        ], $provider->hover($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $hoverPosition->line, 'character' => $hoverPosition->character],
-        ]));
+        ])));
         $commentPosition = $converter->toPosition($text, strpos($text, 'article to display') + 1);
-        self::assertNull($provider->hover([
+        self::assertNull($provider->hover($requests->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $commentPosition->line, 'character' => $commentPosition->character],
-        ]));
+        ])));
     }
 
     public function testIndexesAndProvidesTwigComponents(): void
@@ -613,13 +608,12 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(true, true, [], 'components');
         $templateIndexes = $this->templateIndexes();
         $templateIndexes->forProject($project)->replaceRuntime(true);
-        $documentResolver = new DocumentContextResolver($documents, $projects);
         $requests = new ProviderRequests($documents, $projects);
         $protocol = new LspProtocolMapper();
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
         $completionProvider = new TwigComponentCompletionProvider($converter, $protocol, $indexes, $componentResolver, $commentParser);
-        $relationshipProvider = new TwigComponentRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, $componentResolver);
-        $diagnosticProvider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $componentResolver);
+        $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
+        $diagnosticProvider = new TwigComponentDiagnosticProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, $templateIndexes, $componentResolver);
         $codeLensProvider = new TwigComponentCodeLensProvider($protocol, $indexes, $extractor);
         $completionPosition = $converter->toPosition($completionText, \strlen($completionText));
         self::assertSame(['Alert'], array_column($completionProvider->complete($requests->positioned([
@@ -643,7 +637,7 @@ final class TemplateProviderTest extends TestCase
         $requests = new ProviderRequests($documents, $projects);
         self::assertSame([$classUri, $templateUri], array_column($relationshipProvider->definition($requests->positioned($params)), 'uri'));
         self::assertCount(1, $relationshipProvider->references($requests->references($params)));
-        $hover = $relationshipProvider->hover($params);
+        $hover = $relationshipProvider->hover($requests->positioned($params));
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertIsString($hover['contents']['value'] ?? null);
@@ -655,7 +649,6 @@ final class TemplateProviderTest extends TestCase
         self::assertSame('1 Twig component usage', $lenses[0]['command']['title'] ?? null);
         $commentParser = new TwigCommentParser();
         $variableProvider = new TwigVariableProvider(
-            $documentResolver,
             $converter,
             new LspProtocolMapper(),
             $this->templateIndexes(),
@@ -688,11 +681,10 @@ final class TemplateProviderTest extends TestCase
             $extractor->extract($project, new SourceDocument($usageUri, 'twig', $usageText)),
         );
         $templateIndexes = $this->templateIndexes();
-        $documentResolver = new DocumentContextResolver($documents, $projects);
         $requests = new ProviderRequests($documents, $projects);
         $protocol = new LspProtocolMapper();
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
-        $provider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $componentResolver);
+        $provider = new TwigComponentDiagnosticProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, $templateIndexes, $componentResolver);
         $params = ['textDocument' => ['uri' => $usageUri]];
 
         $withoutRuntimeMetadata = $provider->diagnostics($params);
@@ -743,9 +735,8 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(true, false, [], 'components');
         $templateIndexes = $this->templateIndexes();
         $templateIndexes->forProject($project)->replaceRuntime(true);
-        $documentResolver = new DocumentContextResolver($documents, $projects);
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
-        $provider = new TwigComponentDiagnosticProvider($documentResolver, new LspProtocolMapper(), $indexes, $templateIndexes, $componentResolver);
+        $provider = new TwigComponentDiagnosticProvider(new LspRequestFactory($documents, $projects, $converter), new LspProtocolMapper(), $indexes, $templateIndexes, $componentResolver);
 
         self::assertSame([], $provider->diagnostics(['textDocument' => ['uri' => $usageUri]]));
     }
@@ -773,7 +764,6 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration('@acme/components/badge.html.twig', 'file:///workspace/vendor/acme/bundle/templates/components/badge.html.twig', $range),
             new TemplateDeclaration('page.html.twig', 'file:///workspace/templates/page.html.twig', $range),
         );
-        $documentResolver = new DocumentContextResolver($documents, $projects);
         $requests = new ProviderRequests($documents, $projects);
         $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templateIndexes, $extractor);
         $provider = new TwigComponentCompletionProvider($converter, new LspProtocolMapper(), $indexes, $componentResolver, $commentParser);
@@ -967,7 +957,6 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration('article/show.html.twig', 'file:///workspace/templates/article/show.html.twig', $converter->toRange($text, 0, 0)),
         );
         $indexes->forProject($project)->replace(new TemplateSourceFacts($uri, null, $extractor->extractCandidates(new SourceDocument($uri, 'twig', $text))));
-        $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
         $diagnostics = (new TemplateNavigationProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), $protocol, $extractor, $indexes, $classIndexes))->diagnostics(['textDocument' => ['uri' => $uri]]);
         self::assertIsArray($diagnostics);
@@ -1249,7 +1238,6 @@ final class TemplateProviderTest extends TestCase
         if ($indexReferences) {
             $indexes->forProject($project)->replace(new TemplateSourceFacts($uri, null, $extractor->extractCandidates(new SourceDocument($uri, $languageId, $text))));
         }
-        $resolver = new DocumentContextResolver($documents, $projects);
 
         return [
             new TemplateCompletionHandler($converter, new LspProtocolMapper(), $indexes, $extractor, $classIndexes, new CommentParserRegistry(['twig' => $commentParser, 'php' => new PhpCommentParser()]), new TwigDirectiveLocator()),

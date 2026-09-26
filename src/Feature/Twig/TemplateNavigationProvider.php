@@ -28,13 +28,8 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
     ) {
     }
 
-    public function hover(array $params): ?array
+    public function hover(PositionedRequest $request): ?array
     {
-        $request = $this->requests->positioned($params);
-        if (null === $request) {
-            return null;
-        }
-
         $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
