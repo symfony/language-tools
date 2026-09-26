@@ -26,7 +26,9 @@ final class TemplateCodeActionProvider implements CodeActionProviderInterface
 
     public function actions(CodeActionRequest $request): array
     {
-        if (!$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
+        if ([] === $request->diagnostics('template.not_found')
+            || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)
+        ) {
             return [];
         }
 

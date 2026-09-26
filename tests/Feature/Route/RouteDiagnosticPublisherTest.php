@@ -54,6 +54,7 @@ use Symfony\Lsp\Tests\Support\EnvironmentScopes;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 use Symfony\Lsp\Tests\Support\RecordingClient;
+use Symfony\Lsp\Tests\Support\RecordingTreeSitterParser;
 
 final class RouteDiagnosticPublisherTest extends TestCase
 {
@@ -474,6 +475,31 @@ final class RouteDiagnosticPublisherTest extends TestCase
             'uri' => $uri,
             'diagnostics' => [],
         ], $client->notifications[0]['params']);
+    }
+
+    public function testSkipsReferenceExtractionForCodeActionRequestsWithoutRouteDiagnostics(): void
+    {
+        $uri = 'file:///workspace/templates/page.html.twig';
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, 'twig', 1, "{{ path('missing') }}"));
+        $projects = new ProjectRegistry();
+        $projects->replace([new Project('/workspace', 'file:///workspace')]);
+        $converter = new PositionConverter();
+        $protocol = new LspProtocolMapper();
+        $parser = new RecordingTreeSitterParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()));
+        $provider = new RouteCodeActionProvider(
+            $converter,
+            $protocol,
+            new RouteIndexRegistry(),
+            new DependencyInjectionSourceIndexRegistry(),
+            RouteReferenceExtractorFactory::create($converter),
+            new TwigRouteReferenceExtractor($converter, new TwigDocumentParser($parser, new TwigCommentParser(), new TwigDirectiveLocator())),
+            ProjectPaths::resolver(),
+            new UnknownNameCodeActionBuilder($protocol),
+        );
+
+        self::assertSame([], $provider->actions((new ProviderRequests($documents, $projects))->codeAction($uri, [])));
+        self::assertSame([], $parser->calls);
     }
 
     private function sourceIndexes(

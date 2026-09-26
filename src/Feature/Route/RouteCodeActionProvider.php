@@ -30,6 +30,7 @@ final class RouteCodeActionProvider implements CodeActionProviderInterface
     {
         if (!$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)
             || !\in_array($request->document->languageId, ['php', 'twig'], true)
+            || [] === $request->diagnostics('route.not_found', 'route.missing_parameters')
         ) {
             return [];
         }

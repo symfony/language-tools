@@ -30,7 +30,9 @@ final class TranslationCodeActionProvider implements CodeActionProviderInterface
 
     public function actions(CodeActionRequest $request): array
     {
-        if (!$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)) {
+        if ([] === $request->diagnostics('translation.not_found')
+            || !$this->pathResolver->isApplicationOwned($request->project, $request->document->uri)
+        ) {
             return [];
         }
 
