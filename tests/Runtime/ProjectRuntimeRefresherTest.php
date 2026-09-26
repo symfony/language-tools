@@ -22,11 +22,11 @@ use Symfony\Lsp\Tests\Support\ProjectPaths;
 final class ProjectRuntimeRefresherTest extends TestCase
 {
     /**
-     * @param list<string>      $domains
-     * @param list<string>|null $sections
+     * @param list<string> $domains
+     * @param list<string> $sections
      */
     #[DataProvider('resourceProvider')]
-    public function testPlansRefreshesFromChangedSourceDomains(string $uri, array $domains, RuntimeRefreshMode $mode, ?array $sections, bool $preservesContainer): void
+    public function testPlansRefreshesFromChangedSourceDomains(string $uri, array $domains, RuntimeRefreshMode $mode, array $sections): void
     {
         [$refresher, $scheduler] = $this->refresher(TrustStatus::Trusted);
 
@@ -35,22 +35,14 @@ final class ProjectRuntimeRefresherTest extends TestCase
         self::assertCount(1, $scheduler->plans);
         self::assertSame($mode, $scheduler->plans[0]->mode());
         self::assertSame($sections, $scheduler->plans[0]->sections());
-        self::assertSame($preservesContainer, $scheduler->plans[0]->preservesContainer());
     }
 
-    /** @return iterable<string, array{string, list<string>, RuntimeRefreshMode, list<string>|null, bool}> */
+    /** @return iterable<string, array{string, list<string>, RuntimeRefreshMode, list<string>}> */
     public static function resourceProvider(): iterable
     {
-        yield 'route attribute' => ['file:///workspace/src/Controller.php', ['route'], RuntimeRefreshMode::Reuse, ['routes'], true];
-        yield 'route YAML' => ['file:///workspace/config/routes.yaml', ['route'], RuntimeRefreshMode::Reuse, ['routes'], true];
-        yield 'asset and Stimulus' => ['file:///workspace/assets/app.js', ['asset', 'stimulus'], RuntimeRefreshMode::Reuse, ['assets', 'stimulus'], true];
-        yield 'event' => ['file:///workspace/src/Listener.php', ['event'], RuntimeRefreshMode::Clear, ['events', 'container'], false];
-        yield 'translation' => ['file:///workspace/translations/messages.en.yaml', ['translation'], RuntimeRefreshMode::Reuse, ['translations'], true];
-        yield 'directory locale translation' => ['file:///workspace/app/Bundle/Translations/en_US/messages.ini', ['translation'], RuntimeRefreshMode::Reuse, ['translations'], true];
-        yield 'XML service' => ['file:///workspace/src/Resources/config/services.xml', ['dependency_injection'], RuntimeRefreshMode::Clear, ['container'], false];
-        yield 'Twig callable' => ['file:///workspace/src/Twig/AppExtension.php', ['twig_callable'], RuntimeRefreshMode::Clear, ['twig'], false];
-        yield 'ambiguous configuration' => ['file:///workspace/config/packages/framework.yaml', ['dependency_injection'], RuntimeRefreshMode::Clear, null, false];
-        yield 'domain without runtime sections' => ['file:///workspace/src/Entity.php', ['doctrine'], RuntimeRefreshMode::Clear, null, false];
+        yield 'route attribute' => ['file:///workspace/src/Controller.php', ['route'], RuntimeRefreshMode::Preserve, ['routes']];
+        yield 'event' => ['file:///workspace/src/Listener.php', ['event'], RuntimeRefreshMode::Rebuild, ['events', 'container']];
+        yield 'ambiguous configuration' => ['file:///workspace/config/packages/framework.yaml', ['dependency_injection'], RuntimeRefreshMode::Rebuild, []];
     }
 
     public function testPlansCreatedAndDeletedIndependentResourcesFromTheirPaths(): void
@@ -62,7 +54,7 @@ final class ProjectRuntimeRefresherTest extends TestCase
         ], SourceFileChange::untracked());
 
         self::assertSame(['assets', 'stimulus'], $scheduler->plans[0]->sections());
-        self::assertTrue($scheduler->plans[0]->preservesContainer());
+        self::assertSame(RuntimeRefreshMode::Preserve, $scheduler->plans[0]->mode());
     }
 
     #[DataProvider('composerFileProvider')]
@@ -73,8 +65,8 @@ final class ProjectRuntimeRefresherTest extends TestCase
         $refresher->refreshAfterRediscovery('file:///workspace/'.$composerFile);
 
         self::assertCount(1, $scheduler->plans);
-        self::assertSame(RuntimeRefreshMode::Clear, $scheduler->plans[0]->mode());
-        self::assertNull($scheduler->plans[0]->sections());
+        self::assertSame(RuntimeRefreshMode::Rebuild, $scheduler->plans[0]->mode());
+        self::assertTrue($scheduler->plans[0]->refreshesEverySection());
     }
 
     public function testDoesNotRefreshComposerAfterRuntimeAlreadyInitializedForTheChange(): void
@@ -172,8 +164,8 @@ final class RefreshScheduler implements RuntimeRefreshSchedulerInterface
     /** @var list<RuntimeRefreshPlan> */
     public array $plans = [];
 
-    public function schedule(Project $project, ?RuntimeRefreshPlan $plan = null): void
+    public function schedule(Project $project, RuntimeRefreshPlan $plan): void
     {
-        $this->plans[] = $plan ?? new RuntimeRefreshPlan(RuntimeRefreshMode::Clear);
+        $this->plans[] = $plan;
     }
 }

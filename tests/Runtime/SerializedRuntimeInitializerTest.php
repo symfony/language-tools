@@ -23,8 +23,8 @@ final class SerializedRuntimeInitializerTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace');
 
         await([
-            async(static fn () => $initializer->initialize($project)),
-            async(static fn () => $initializer->initialize($project)),
+            async(static fn () => $initializer->initialize($project, RuntimeRefreshPlan::reuse())),
+            async(static fn () => $initializer->initialize($project, RuntimeRefreshPlan::reuse())),
         ]);
 
         self::assertSame(1, $delegate->maximumActive);
@@ -38,7 +38,7 @@ final class ConcurrentRuntimeInitializer implements RuntimeInitializerInterface
     public int $refreshes = 0;
     private int $active = 0;
 
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
         ++$this->active;
         $this->maximumActive = max($this->maximumActive, $this->active);

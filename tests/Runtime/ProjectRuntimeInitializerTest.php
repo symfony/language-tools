@@ -26,7 +26,6 @@ use Symfony\Lsp\Runtime\PartialRuntimeMetadataException;
 use Symfony\Lsp\Runtime\ProcessResult;
 use Symfony\Lsp\Runtime\ProcessRunnerInterface;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
-use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderInterface;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
@@ -120,7 +119,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             releaseMetadataUrl: 'https://symfony.com/releases.json',
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name);
         self::assertSame('app.mailer', $serviceIndexes->forProject($project)->get('app.mailer')?->id);
@@ -165,7 +164,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             releaseMetadataUrl: 'https://symfony.com/releases.json',
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame([], array_values(array_filter(
             $processRunner->command,
@@ -191,7 +190,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             logger: $logger,
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertContains('--error-details=1', $processRunner->command);
     }
@@ -217,7 +216,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             logger: new ServerLogger($silent, new SensitiveDataRedactor()),
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame('', $silent->contents());
 
@@ -231,7 +230,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             logger: $logger,
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame(
             '[debug] The "twig" runtime metadata section reported: The debug:twig command is unavailable.'."\n"
@@ -267,7 +266,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('Initialization for the removed project should have been abandoned.');
         } catch (CancelledException) {
         }
@@ -297,7 +296,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             releaseMetadataUrl: 'https://symfony.com/releases.json',
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame(['docker', 'compose', 'exec', '-T', 'php', 'php'], \array_slice($processRunner->command, 0, 6));
         self::assertStringStartsWith('/app/var/symfony-lsp/test/', $processRunner->command[6]);
@@ -328,16 +327,16 @@ final class ProjectRuntimeInitializerTest extends TestCase
             configuration: $configuration,
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame('--kernel=Api\Kernel', $processRunner->command[4]);
 
         $configuration->setKernel($project, 'bin/apiconsole');
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
         self::assertSame('--kernel=bin/apiconsole', $processRunner->command[4]);
 
         $configuration->setKernel($project, null);
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
         self::assertNotContains('--kernel=bin/apiconsole', $processRunner->command);
     }
 
@@ -358,7 +357,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Runtime indexing requires Symfony debug mode.');
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
     }
 
     public function testReportsSymfonyBranchesRejectedByReleaseMetadata(): void
@@ -380,7 +379,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         $this->expectException(UnsupportedSymfonyVersionException::class);
         $this->expectExceptionMessage('Symfony 5.4 is not supported by Symfony Language Tools.');
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
     }
 
     public function testAcceptsIntermediateSymfonyBranchesWithoutAnUnsupportedMarker(): void
@@ -400,7 +399,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             configuration: new RuntimeConfiguration(),
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertCount(1, $processRunner->commands);
     }
@@ -422,7 +421,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
         $initializer->initialize(
             $project,
-            new RuntimeRefreshPlan(RuntimeRefreshMode::Clear),
+            RuntimeRefreshPlan::rebuild(),
         );
 
         self::assertCount(1, $processRunner->commands);
@@ -460,7 +459,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
         $initializer->initialize(
             $project,
-            new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['routes'], true),
+            RuntimeRefreshPlan::preserve(['routes']),
         );
 
         self::assertCount(1, $processRunner->commands);
@@ -515,7 +514,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
 
         $routeIndexes->forProject($project)->replace(new Route('existing', '/existing', [], [], null, null));
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The section error was not reported.');
         } catch (PartialRuntimeMetadataException $error) {
             self::assertSame(['routes'], $error->sections);
@@ -577,7 +576,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The section error was not reported.');
         } catch (PartialRuntimeMetadataException $error) {
             self::assertSame(['container'], $error->sections);
@@ -633,7 +632,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The stale configuration validation was accepted.');
         } catch (CancelledException) {
         }
@@ -670,7 +669,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The configuration validation failure was not reported.');
         } catch (ConfigurationValidationException $error) {
             self::assertSame('framework.router', $error->validation->path);
@@ -705,7 +704,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             $firstStatuses,
             $projects,
         );
-        $first->initialize($project);
+        $first->initialize($project, RuntimeRefreshPlan::reuse());
         self::assertSame('ready', $firstStatuses->status($project)['runtime']['state']);
 
         $restoredIndexes = new RouteIndexRegistry();
@@ -725,7 +724,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $restored->initialize($project);
+            $restored->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The failed bridge execution was accepted.');
         } catch (BridgeExecutionException) {
         }
@@ -767,7 +766,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The failed bridge execution was accepted.');
         } catch (BridgeExecutionException) {
         }
@@ -820,7 +819,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The configuration validation failure was not reported.');
         } catch (ConfigurationValidationException $error) {
             self::assertSame('framework.router', $error->validation->path);
@@ -859,7 +858,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             logger: $logger,
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name);
         self::assertSame("[debug] The project bridge exited with status 255 after returning runtime metadata.\n", $output->contents());
@@ -880,7 +879,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The failed bridge execution was accepted.');
         } catch (BridgeExecutionException $error) {
             self::assertSame('The project bridge failed with status 1.', $error->getMessage());
@@ -910,7 +909,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
             configuration: new RuntimeConfiguration(),
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame('homepage', $indexes->forProject($project)->get('homepage')?->name);
     }
@@ -932,7 +931,7 @@ final class ProjectRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The missing bridge payload was accepted.');
         } catch (\RuntimeException $error) {
             self::assertSame('The project bridge returned invalid JSON.', $error->getMessage());

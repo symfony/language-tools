@@ -6,5 +6,5 @@ use Symfony\Lsp\Project\Project;
 
 interface RuntimeRefreshSchedulerInterface
 {
-    public function schedule(Project $project, ?RuntimeRefreshPlan $plan = null): void;
+    public function schedule(Project $project, RuntimeRefreshPlan $plan): void;
 }

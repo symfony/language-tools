@@ -31,16 +31,14 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
     ) {
     }
 
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
         if (!$this->configuration->debug($project)) {
             throw new \RuntimeException('Runtime indexing requires Symfony debug mode.');
         }
-        $plan ??= new RuntimeRefreshPlan();
-        $mode = $plan->mode();
         $cancellation?->throwIfRequested();
-        $requestedSections = $plan->sections();
-        $sections = $requestedSections ?? $this->snapshotLoaders->sections();
+        $refreshesEverySection = $plan->refreshesEverySection();
+        $sections = $refreshesEverySection ? $this->snapshotLoaders->sections() : $plan->sections();
         $bridge = $this->bridgeInstaller->install($project);
         $kernel = $this->configuration->kernel($project);
         $loadedSections = [];
@@ -61,8 +59,11 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                     '--release-metadata-url='.$this->releaseMetadataUrl,
                     '--release-metadata-cache='.$this->pathMapper->toContainer($project, \dirname($bridge).'/release-metadata.json'),
                 ]),
-                ...($plan->preservesContainer() ? ['--targeted-refresh=1'] : []),
-                ...(RuntimeRefreshMode::Clear === $mode ? ['--rebuild-container=1'] : []),
+                ...match ($plan->mode()) {
+                    RuntimeRefreshMode::Preserve => ['--targeted-refresh=1'],
+                    RuntimeRefreshMode::Reuse => [],
+                    RuntimeRefreshMode::Rebuild => ['--rebuild-container=1'],
+                },
             ], $project->rootPath, $cancellation, $this->configuration->bridgeTimeout($project));
 
             $cancellation?->throwIfRequested();
@@ -100,7 +101,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
             $timings = $this->runtimeBridgeTimings->normalize(
                 $snapshot['timings'] ?? null,
                 $sections,
-                null === $requestedSections ? 'full' : 'targeted',
+                $refreshesEverySection ? 'full' : 'targeted',
             );
             if (null !== $timings) {
                 $this->statuses->runtimeTimings($project, $timings);
@@ -151,7 +152,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 throw new RuntimeMetadataException(array_keys($failedSections), $sectionErrors);
             }
 
-            $this->snapshotStore?->save($project, $bridge, $snapshot, $sections, null === $requestedSections);
+            $this->snapshotStore?->save($project, $bridge, $snapshot, $sections, $refreshesEverySection);
         } catch (CancelledException $error) {
             throw $error;
         } catch (\Throwable $error) {

@@ -31,7 +31,7 @@ final class StatusRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The cancellation should have propagated.');
         } catch (CancelledException) {
         }
@@ -52,7 +52,7 @@ final class StatusRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The failure should have propagated.');
         } catch (\RuntimeException) {
         }
@@ -73,7 +73,7 @@ final class StatusRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The failure should have propagated.');
         } catch (BridgeExecutionException) {
         }
@@ -97,7 +97,7 @@ final class StatusRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The failure should have propagated.');
         } catch (ConfigurationValidationException) {
         }
@@ -121,7 +121,7 @@ final class StatusRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The partial failure should have propagated.');
         } catch (PartialRuntimeMetadataException) {
         }
@@ -145,7 +145,7 @@ final class StatusRuntimeInitializerTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
             self::fail('The failure should have propagated.');
         } catch (\RuntimeException) {
         }
@@ -164,7 +164,7 @@ final class ThrowingInitializer implements RuntimeInitializerInterface
     ) {
     }
 
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
         throw $this->error;
     }
@@ -179,7 +179,7 @@ final class RemovingThrowingInitializer implements RuntimeInitializerInterface
     ) {
     }
 
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
         // mimic the workspace change: the registry shrinks and the cleaner runs
         $this->registry->replace([]);

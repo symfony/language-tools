@@ -31,13 +31,13 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
         $project = new Project('/workspace', 'file:///workspace');
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, self::projects($project), 0.001);
 
-        $scheduler->schedule($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['routes'], true));
-        $scheduler->schedule($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['assets'], true));
+        $scheduler->schedule($project, RuntimeRefreshPlan::preserve(['routes']));
+        $scheduler->schedule($project, RuntimeRefreshPlan::preserve(['assets']));
         EventLoop::run();
 
         self::assertSame(['/workspace'], $initializer->projects);
         self::assertSame(['routes', 'assets'], $initializer->plans[0]->sections());
-        self::assertTrue($initializer->plans[0]->preservesContainer());
+        self::assertSame(RuntimeRefreshMode::Preserve, $initializer->plans[0]->mode());
     }
 
     public function testSerializesRefreshesAndQueuesOneReplacement(): void
@@ -47,14 +47,14 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, self::projects($project), 0.001);
         $initializer->scheduler = $scheduler;
 
-        $scheduler->schedule($project, new RuntimeRefreshPlan());
+        $scheduler->schedule($project, RuntimeRefreshPlan::reuse());
         EventLoop::run();
 
-        self::assertSame([RuntimeRefreshMode::Reuse, RuntimeRefreshMode::Clear], array_map(
+        self::assertSame([RuntimeRefreshMode::Reuse, RuntimeRefreshMode::Rebuild], array_map(
             static fn (RuntimeRefreshPlan $plan): RuntimeRefreshMode => $plan->mode(),
             $initializer->plans,
         ));
-        self::assertNull($initializer->plans[1]->sections());
+        self::assertTrue($initializer->plans[1]->refreshesEverySection());
         self::assertSame(1, $initializer->maximumActive);
     }
 
@@ -65,14 +65,14 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
         $registry = self::projects($project);
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
 
-        $scheduler->schedule($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['routes'], true));
+        $scheduler->schedule($project, RuntimeRefreshPlan::preserve(['routes']));
         $replacement = new Project('/workspace', 'file:///workspace');
         $registry->replace([$replacement]);
-        $scheduler->schedule($replacement, new RuntimeRefreshPlan(RuntimeRefreshMode::Clear));
+        $scheduler->schedule($replacement, RuntimeRefreshPlan::rebuild());
         EventLoop::run();
 
         self::assertSame([$replacement], $initializer->instances);
-        self::assertSame(RuntimeRefreshMode::Clear, $initializer->plans[0]->mode());
+        self::assertSame(RuntimeRefreshMode::Rebuild, $initializer->plans[0]->mode());
     }
 
     public function testRemovalCancelsDelayedRefreshes(): void
@@ -82,7 +82,7 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
         $registry = self::projects($project);
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
 
-        $scheduler->schedule($project);
+        $scheduler->schedule($project, RuntimeRefreshPlan::rebuild());
         $registry->replace([]);
         $scheduler->removeProject($project);
         EventLoop::run();
@@ -97,10 +97,10 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
         $registry = self::projects($project);
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
 
-        $scheduler->schedule($project);
+        $scheduler->schedule($project, RuntimeRefreshPlan::rebuild());
         EventLoop::queue(static function () use ($scheduler, $registry, $project): void {
             delay(0.005);
-            $scheduler->schedule($project);
+            $scheduler->schedule($project, RuntimeRefreshPlan::rebuild());
             $registry->replace([]);
             $scheduler->removeProject($project);
         });
@@ -117,7 +117,7 @@ final class DebouncedRuntimeRefreshSchedulerTest extends TestCase
         $registry = self::projects($project);
         $scheduler = new DebouncedRuntimeRefreshScheduler($initializer, $registry, 0.001);
 
-        $scheduler->schedule($project);
+        $scheduler->schedule($project, RuntimeRefreshPlan::rebuild());
         $registry->replace([]);
         EventLoop::run();
 
@@ -130,7 +130,7 @@ final class BlockingRuntimeInitializer implements RuntimeInitializerInterface
     public int $starts = 0;
     public bool $cancelled = false;
 
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
         ++$this->starts;
         try {
@@ -154,11 +154,11 @@ final class DebouncedRuntimeInitializer implements RuntimeInitializerInterface
     /** @var list<RuntimeRefreshPlan> */
     public array $plans = [];
 
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
         $this->projects[] = $project->rootPath;
         $this->instances[] = $project;
-        $this->plans[] = $plan ?? new RuntimeRefreshPlan();
+        $this->plans[] = $plan;
     }
 }
 
@@ -171,14 +171,14 @@ final class QueuingRuntimeInitializer implements RuntimeInitializerInterface
     public int $maximumActive = 0;
     private int $active = 0;
 
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
-        $this->plans[] = $plan ?? new RuntimeRefreshPlan();
+        $this->plans[] = $plan;
         ++$this->active;
         $this->maximumActive = max($this->maximumActive, $this->active);
         if (1 === \count($this->plans)) {
-            $this->scheduler->schedule($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Reuse, ['translations'], true));
-            $this->scheduler->schedule($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Clear));
+            $this->scheduler->schedule($project, RuntimeRefreshPlan::preserve(['translations']));
+            $this->scheduler->schedule($project, RuntimeRefreshPlan::rebuild());
             delay(0.01);
         }
         --$this->active;

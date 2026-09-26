@@ -9,6 +9,7 @@ use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Runtime\PartialRuntimeMetadataException;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
+use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 
 final class CheckProjectAnalyzer
 {
@@ -93,7 +94,7 @@ final class CheckProjectAnalyzer
                     $ready = $this->profiler->projectPhase($project, 'runtimeIndex', function () use ($plan, $project, $root, $cancellation, $verbose, &$errors, &$diagnosable, &$complete, &$statuses): bool {
                         $runtimeError = null;
                         try {
-                            $this->runtimeInitializer->initialize($project->project, cancellation: $cancellation->cancellation());
+                            $this->runtimeInitializer->initialize($project->project, RuntimeRefreshPlan::reuse(), $cancellation->cancellation());
                         } catch (CancelledException $error) {
                             throw $error;
                         } catch (\Throwable $error) {

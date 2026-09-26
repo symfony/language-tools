@@ -101,7 +101,7 @@ final class WorkspaceTrustManagerTest extends TestCase
             {
             }
 
-            public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+            public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
             {
                 ++$this->count;
                 $this->statuses->runtimePartial($project);
@@ -207,7 +207,7 @@ final class CapturingRuntimeInitializer implements RuntimeInitializerInterface
     ) {
     }
 
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
         $this->projects[] = $project->rootPath;
         if (false === (array_shift($this->results) ?? true)) {

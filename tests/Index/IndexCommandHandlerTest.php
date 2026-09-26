@@ -101,7 +101,7 @@ final class IndexCommandHandlerTest extends TestCase
         ]);
         self::assertSame('test', $runtimeConfiguration->environment($project));
         self::assertSame('test', $switched[0]['environment'] ?? null);
-        self::assertSame(RuntimeRefreshMode::Clear, $runtime->plans[1]->mode());
+        self::assertSame(RuntimeRefreshMode::Rebuild, $runtime->plans[1]->mode());
 
         foreach (["prod\n", 'prod env', ''] as $invalid) {
             self::assertNull($handler->execute([
@@ -148,7 +148,7 @@ final class IndexCommandHandlerTest extends TestCase
 
         self::assertSame('Api\\Kernel', $runtimeConfiguration->kernel($project));
         self::assertSame('Api\\Kernel', $switched[0]['kernel'] ?? null);
-        self::assertSame(RuntimeRefreshMode::Clear, $runtime->plans[0]->mode());
+        self::assertSame(RuntimeRefreshMode::Rebuild, $runtime->plans[0]->mode());
 
         $entryPoint = $handler->execute([
             'command' => IndexCommandHandler::SWITCH_KERNEL_COMMAND,
@@ -246,10 +246,10 @@ final class RecordingRuntimeInitializer implements RuntimeInitializerInterface
     {
     }
 
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
         $this->projects[] = $project->rootPath;
-        $this->plans[] = $plan ?? new RuntimeRefreshPlan();
+        $this->plans[] = $plan;
         if (0 < $this->staleSnapshots) {
             --$this->staleSnapshots;
 

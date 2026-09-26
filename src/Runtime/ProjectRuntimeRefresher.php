@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Runtime;
 
-use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Index\SourceFileChange;
@@ -64,52 +63,13 @@ final class ProjectRuntimeRefresher
         if (!$this->configuration->runtimeIndexing($project)
             || TrustStatus::Trusted !== $this->workspaceTrust->status($project)
             || null === $path
-            || !$this->affectsRuntime($path, $sourceFileChange)
+            || !$this->planner->requiresRefresh($path, $sourceFileChange)
         ) {
-            return;
-        }
-
-        $plan = $this->planner->plan($path, $sourceFileChange);
-        if (null === $plan) {
             return;
         }
 
         $this->configurationValidations->pending($project);
         $this->statuses->runtimeStale($project);
-        $this->refreshScheduler->schedule($project, $plan);
-    }
-
-    private function affectsRuntime(string $path, SourceFileChange $sourceFileChange): bool
-    {
-        if (str_starts_with($path, 'var/') || str_starts_with($path, 'vendor/')) {
-            return false;
-        }
-
-        $extension = Path::getExtension($path, true);
-        if ('php' === $extension || \in_array(basename($path), ['composer.json', 'composer.lock'], true)) {
-            return true;
-        }
-
-        if (str_starts_with($path, 'assets/')) {
-            return true;
-        }
-        if ('xml' === $extension) {
-            return [] !== $sourceFileChange->domains()
-                || str_starts_with($path, 'config/')
-                || false !== stripos('/'.$path, '/resources/config/');
-        }
-        if (\in_array($extension, ['ini', 'json', 'xlf', 'xliff'], true)) {
-            return $this->isTranslationPath($path);
-        }
-        if (!\in_array($extension, ['yaml', 'yml'], true)) {
-            return false;
-        }
-
-        return str_starts_with($path, 'config/') || $this->isTranslationPath($path);
-    }
-
-    private function isTranslationPath(string $path): bool
-    {
-        return false !== stripos('/'.$path, '/translations/');
+        $this->refreshScheduler->schedule($project, $this->planner->plan($path, $sourceFileChange));
     }
 }

@@ -27,7 +27,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
         $statuses->runtimeFailed($project);
         $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger(null, new SensitiveDataRedactor()));
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame([[
             'method' => 'window/showMessage',
@@ -51,7 +51,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
             new ServerLogger(null, new SensitiveDataRedactor()),
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame(
             'Symfony Language Tools could not load 1 runtime metadata section for "/workspace": twig. Other runtime-backed features remain active.',
@@ -83,7 +83,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
             $logger,
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         $log->close();
         self::assertStringContainsString(
@@ -107,7 +107,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
         $statuses->runtimeFailed($project);
         $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger(null, new SensitiveDataRedactor()));
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame(
             'Symfony Language Tools could not initialize runtime metadata for "/workspace". Static-only features remain active.',
@@ -128,7 +128,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
             new ServerLogger(null, new SensitiveDataRedactor()),
         );
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame(
             'The project "/workspace" uses Symfony 5.4, which is not supported by Symfony Language Tools. Static-only features remain active.',
@@ -144,7 +144,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
         $statuses->runtimeFailed($project, 'configuration');
         $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger(null, new SensitiveDataRedactor()));
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame(
             'Symfony Language Tools found invalid application configuration for "/workspace".',
@@ -161,7 +161,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
         $statuses->runtimeFailed($project, 'configuration');
         $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger(null, new SensitiveDataRedactor()));
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         self::assertSame(
             'Symfony Language Tools found invalid application configuration for "/workspace". The last valid runtime metadata remains active.',
@@ -178,7 +178,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
         $log = new WritableBuffer();
         $initializer = new ReportingRuntimeInitializer($this->failingInitializer(), $client, $statuses, new ServerLogger($log, new SensitiveDataRedactor()));
 
-        $initializer->initialize($project);
+        $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
         $log->close();
         self::assertSame("[error] secret=[redacted]\n", $log->buffer());
@@ -192,7 +192,7 @@ final class ReportingRuntimeInitializerTest extends TestCase
             {
             }
 
-            public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+            public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
             {
                 throw $this->error;
             }

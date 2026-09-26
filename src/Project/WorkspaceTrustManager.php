@@ -6,6 +6,7 @@ use Symfony\Lsp\Client\ClientInterface;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
+use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 
 final class WorkspaceTrustManager implements ProjectStateInterface
 {
@@ -116,7 +117,7 @@ final class WorkspaceTrustManager implements ProjectStateInterface
             return false;
         }
 
-        $this->runtimeInitializer->initialize($project);
+        $this->runtimeInitializer->initialize($project, RuntimeRefreshPlan::reuse());
         if (\in_array($this->statuses->status($project)['runtime']['state'], ['ready', 'partial'], true)) {
             $this->runtimeStarted[$project->rootPath] = $configuration;
         } else {

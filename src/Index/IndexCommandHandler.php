@@ -12,7 +12,6 @@ use Symfony\Lsp\Project\TrustStatus;
 use Symfony\Lsp\Project\WorkspaceTrust;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
 use Symfony\Lsp\Runtime\RuntimeInitializerInterface;
-use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 
 /**
@@ -65,7 +64,7 @@ final class IndexCommandHandler
                     $this->configuration->setKernel($project, '' === $value ? null : $value);
                 }
                 if ($this->configuration->runtimeIndexing($project) && TrustStatus::Trusted === $this->workspaceTrust->status($project)) {
-                    $this->initializeRuntime($project, new RuntimeRefreshPlan(RuntimeRefreshMode::Clear), $cancellation);
+                    $this->initializeRuntime($project, RuntimeRefreshPlan::rebuild(), $cancellation);
                 }
             }
         } elseif (self::REFRESH_COMMAND === $command) {
@@ -73,7 +72,7 @@ final class IndexCommandHandler
                 $cancellation?->throwIfRequested();
                 $this->sourceScanner->refreshProject($project, $cancellation);
                 if ($this->configuration->runtimeIndexing($project) && TrustStatus::Trusted === $this->workspaceTrust->status($project)) {
-                    $this->initializeRuntime($project, cancellation: $cancellation);
+                    $this->initializeRuntime($project, RuntimeRefreshPlan::reuse(), $cancellation);
                 }
             }
         }
@@ -87,7 +86,7 @@ final class IndexCommandHandler
         ], $projects);
     }
 
-    private function initializeRuntime(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    private function initializeRuntime(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
         while (true) {
             try {

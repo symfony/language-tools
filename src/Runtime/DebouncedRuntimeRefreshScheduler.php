@@ -36,9 +36,8 @@ final class DebouncedRuntimeRefreshScheduler implements RuntimeRefreshSchedulerI
         }
     }
 
-    public function schedule(Project $project, ?RuntimeRefreshPlan $plan = null): void
+    public function schedule(Project $project, RuntimeRefreshPlan $plan): void
     {
-        $plan ??= new RuntimeRefreshPlan(RuntimeRefreshMode::Clear);
         $key = $project->rootPath;
         $this->pendingPlans[$key] = isset($this->pendingPlans[$key])
             ? $this->pendingPlans[$key]->combine($plan)
@@ -49,9 +48,11 @@ final class DebouncedRuntimeRefreshScheduler implements RuntimeRefreshSchedulerI
 
         $this->watchers[$key] = EventLoop::delay($this->delay, function () use ($key, $project): void {
             unset($this->watchers[$key]);
-            $plan = $this->pendingPlans[$key] ?? new RuntimeRefreshPlan();
+            $plan = $this->pendingPlans[$key] ?? null;
             unset($this->pendingPlans[$key]);
-            $this->run($project, $plan);
+            if (null !== $plan) {
+                $this->run($project, $plan);
+            }
         });
     }
 

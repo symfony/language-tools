@@ -19,7 +19,7 @@ final class ObservedRuntimeInitializerTest extends TestCase
             $observer = new CapturingRuntimeRefreshObserver(),
         );
 
-        $initializer->initialize(new Project('/workspace', 'file:///workspace'));
+        $initializer->initialize(new Project('/workspace', 'file:///workspace'), RuntimeRefreshPlan::reuse());
 
         self::assertSame(['/workspace'], $observer->projects);
     }
@@ -27,7 +27,7 @@ final class ObservedRuntimeInitializerTest extends TestCase
 
 final class SuccessfulRuntimeInitializer implements RuntimeInitializerInterface
 {
-    public function initialize(Project $project, ?RuntimeRefreshPlan $plan = null, ?Cancellation $cancellation = null): void
+    public function initialize(Project $project, RuntimeRefreshPlan $plan, ?Cancellation $cancellation = null): void
     {
     }
 }

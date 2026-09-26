@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Runtime;
 
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Index\SourceFileChange;
 
 final class RuntimeRefreshPlanner
@@ -23,36 +24,61 @@ final class RuntimeRefreshPlanner
         'twig_component' => ['twig', 'twig_components', 'container'],
     ];
 
-    public function plan(string $path, SourceFileChange $change): ?RuntimeRefreshPlan
+    /** Domains the application describes without its container, so the compiled one stays usable. */
+    private const CONTAINER_FREE_DOMAINS = ['asset', 'route', 'stimulus', 'translation'];
+
+    /** Whether the change to a project-relative path can make the runtime metadata stale. */
+    public function requiresRefresh(string $path, SourceFileChange $change): bool
     {
-        if (!$change->requiresRuntimeRefresh()) {
-            return null;
+        if (!$change->requiresRuntimeRefresh() || str_starts_with($path, 'var/') || str_starts_with($path, 'vendor/')) {
+            return false;
         }
 
+        $extension = Path::getExtension($path, true);
+        if ('php' === $extension || \in_array(basename($path), ['composer.json', 'composer.lock'], true)) {
+            return true;
+        }
+
+        if (str_starts_with($path, 'assets/')) {
+            return true;
+        }
+        if ('xml' === $extension) {
+            return [] !== $change->domains()
+                || str_starts_with($path, 'config/')
+                || false !== stripos('/'.$path, '/resources/config/');
+        }
+        if (\in_array($extension, ['ini', 'json', 'xlf', 'xliff'], true)) {
+            return $this->isTranslationPath($path);
+        }
+        if (!\in_array($extension, ['yaml', 'yml'], true)) {
+            return false;
+        }
+
+        return str_starts_with($path, 'config/') || $this->isTranslationPath($path);
+    }
+
+    public function plan(string $path, SourceFileChange $change): RuntimeRefreshPlan
+    {
         $domains = $change->domains();
         if ([] === $domains) {
             $domains = $this->domainsFromPath($path);
         }
         if ([] === $domains || $this->isAmbiguousConfiguration($path)) {
-            return new RuntimeRefreshPlan(RuntimeRefreshMode::Clear);
+            return RuntimeRefreshPlan::rebuild();
         }
 
         $sections = [];
         foreach ($domains as $domain) {
             if (!isset(self::DOMAIN_SECTIONS[$domain])) {
-                return new RuntimeRefreshPlan(RuntimeRefreshMode::Clear);
+                return RuntimeRefreshPlan::rebuild();
             }
             array_push($sections, ...self::DOMAIN_SECTIONS[$domain]);
         }
         $sections = array_values(array_unique($sections));
 
-        $preserveContainer = [] === array_diff($domains, ['asset', 'route', 'stimulus', 'translation']);
-
-        return new RuntimeRefreshPlan(
-            $preserveContainer ? RuntimeRefreshMode::Reuse : RuntimeRefreshMode::Clear,
-            $sections,
-            $preserveContainer,
-        );
+        return [] === array_diff($domains, self::CONTAINER_FREE_DOMAINS)
+            ? RuntimeRefreshPlan::preserve($sections)
+            : RuntimeRefreshPlan::rebuild($sections);
     }
 
     /** @return list<string> */
@@ -76,5 +102,10 @@ final class RuntimeRefreshPlanner
         return str_starts_with($path, 'config/')
             && !str_starts_with($path, 'config/routes.')
             && !str_starts_with($path, 'config/routes/');
+    }
+
+    private function isTranslationPath(string $path): bool
+    {
+        return false !== stripos('/'.$path, '/translations/');
     }
 }

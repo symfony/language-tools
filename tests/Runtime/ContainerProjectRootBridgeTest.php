@@ -27,6 +27,7 @@ use Symfony\Lsp\Runtime\NativeProcessRunner;
 use Symfony\Lsp\Runtime\ProjectRuntimeInitializer;
 use Symfony\Lsp\Runtime\RuntimeBridgeTimingNormalizer;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
@@ -92,7 +93,7 @@ final class ContainerProjectRootBridgeTest extends TestCase
         );
 
         try {
-            $initializer->initialize($project);
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
 
             $template = $templateIndexes->forProject($project)->get('fixture.html.twig');
             self::assertNotNull($template);
