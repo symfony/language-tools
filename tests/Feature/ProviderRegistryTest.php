@@ -272,7 +272,7 @@ final class ProviderRegistryTest extends TestCase
             $converter,
             $phpParser,
             $phpComments,
-            new FormMetadataExtractor($converter, new PhpLiteralArrayKeyParser()),
+            new FormMetadataExtractor($converter),
             new ValidationMetadataExtractor($converter),
             new SerializerMetadataExtractor($converter),
             new YamlMetadataExtractor($converter, new YamlConfigurationParser($converter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())))),

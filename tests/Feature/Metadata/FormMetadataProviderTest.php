@@ -469,6 +469,81 @@ final class FormMetadataProviderTest extends MetadataTestCase
         );
     }
 
+    public function testReadsFormMetadataWrittenWithLegacyArraySyntaxAndUppercaseConstants(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Form;
+
+            use App\Dto\Article;
+            use Symfony\Component\Form\FormBuilderInterface;
+            use Symfony\Component\OptionsResolver\OptionsResolver;
+
+            final class ArticleType
+            {
+                public function buildForm(FormBuilderInterface $builder): void
+                {
+                    $builder->add('title', null, array('mapped' => TRUE));
+                    $builder->add('headline', null, ['property_path' => 'summary', 'mapped' => True]);
+                    $builder->add('ignored', null, array('mapped' => FALSE));
+                    $this->createForm(ArticleType::class, null, array('required' => TRUE));
+                }
+
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefaults(array('data_class' => Article::class));
+                }
+            }
+            PHP;
+
+        $facts = $extractor->extract(new SourceDocument('file:///workspace/src/Form/ArticleType.php', 'php', $text));
+
+        self::assertSame(['App\Dto\Article'], array_map(static fn ($dataClass): string => $dataClass->dataClass, $facts->formDataClasses));
+        self::assertSame(['required'], array_map(static fn ($option): string => $option->option, $facts->formOptions));
+        self::assertSame(
+            ['App\Dto\Article::$title', 'App\Dto\Article::$summary'],
+            array_map(
+                static fn ($symbol): string => $symbol->name,
+                array_values(array_filter($facts->symbols, static fn ($symbol): bool => MetadataSymbolKind::Property === $symbol->kind && !$symbol->declaration)),
+            ),
+        );
+    }
+
+    public function testResolvesSelfDataClassReferencesButNotLateBoundOnes(): void
+    {
+        $extractor = $this->createExtractor(new PositionConverter());
+        $text = <<<'PHP'
+            <?php
+            namespace App\Form;
+
+            use Symfony\Component\OptionsResolver\OptionsResolver;
+
+            final class SelfType
+            {
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefaults(['data_class' => self::class]);
+                }
+            }
+
+            class LateBoundType
+            {
+                public function configureOptions(OptionsResolver $resolver): void
+                {
+                    $resolver->setDefault('data_class', static::class);
+                }
+            }
+            PHP;
+
+        $dataClasses = [];
+        foreach ($extractor->extract(new SourceDocument('file:///workspace/src/Form/Types.php', 'php', $text))->formDataClasses as $formDataClass) {
+            $dataClasses[$formDataClass->formClass] = $formDataClass->dataClass;
+        }
+
+        self::assertSame(['App\Form\SelfType' => 'App\Form\SelfType'], $dataClasses);
+    }
+
     public function testKeepsDynamicDefaultsConservative(): void
     {
         $extractor = $this->createExtractor(new PositionConverter());

@@ -3,17 +3,18 @@
 namespace Symfony\Lsp\Feature\Metadata;
 
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\ClassNameKey;
 use Symfony\Lsp\Parser\DelimiterScanner;
-use Symfony\Lsp\Parser\DelimiterSegment;
 use Symfony\Lsp\Parser\Php\PhpArgument;
+use Symfony\Lsp\Parser\Php\PhpClassReference;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
+use Symfony\Lsp\Parser\Php\PhpLiteralArrayEntry;
+use Symfony\Lsp\Parser\Php\PhpLiteralKind;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpMethodDeclaration;
 use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpReceiverMatch;
+use Symfony\Lsp\Parser\Php\PhpStringLiteral;
 use Symfony\Lsp\Parser\Php\PhpTypedVariable;
 use Symfony\Lsp\Parser\Php\PhpTypedVariableKind;
 
@@ -27,7 +28,6 @@ final class FormMetadataExtractor
 
     public function __construct(
         private readonly PositionConverter $converter,
-        private readonly PhpLiteralArrayKeyParser $arrayKeys,
     ) {
     }
 
@@ -51,31 +51,22 @@ final class FormMetadataExtractor
                     continue;
                 }
                 if ('setDefaults' === $call->method) {
-                    $argument = $call->positionalArgument(0);
-                    $expression = $argument?->expression;
-                    $offset = $argument?->expressionStartOffset;
-                    if (!\is_string($expression) || !\is_int($offset) || null === $entries = $this->arrayEntries($expression, $offset)) {
+                    $entries = $this->arrayEntries($php, $call->positionalArgument(0));
+                    if (null === $entries) {
                         $dataClass = null;
                         continue;
                     }
                     if (!\array_key_exists('data_class', $entries)) {
                         continue;
                     }
-                    $dataClassExpression = $entries['data_class'];
+                    $reference = $entries['data_class']->classReference;
                 } else {
-                    if ('data_class' !== $this->quotedIdentifier($call->positionalArgument(0)->expression ?? '')) {
+                    if ('data_class' !== $call->positionalArgument(0)?->stringLiteral?->value) {
                         continue;
                     }
-                    $argument = $call->positionalArgument(1);
-                    $expression = $argument?->expression;
-                    $offset = $argument?->expressionStartOffset;
-                    if (!\is_string($expression) || !\is_int($offset)) {
-                        $dataClass = null;
-                        continue;
-                    }
-                    $dataClassExpression = ['text' => $expression, 'offset' => $offset];
+                    $reference = $call->positionalArgument(1)?->completeClassReference;
                 }
-                $dataClass = $this->staticClassName($source, $dataClassExpression, $php);
+                $dataClass = $this->earlyBoundClassName($source, $reference);
             }
             if (null !== $dataClass) {
                 $classes[ClassNameKey::from($method->className)] = new FormDataClass($method->className, $dataClass);
@@ -113,8 +104,8 @@ final class FormMetadataExtractor
                 ) {
                     continue;
                 }
-                $field = null === $call->positionalArgument(0) ? null : $this->quotedIdentifierArgument($text, $call->positionalArgument(0));
-                $property = null === $field ? null : $this->formPropertyName($call->arguments, $field['name']);
+                $field = $this->identifierArgument($call->positionalArgument(0));
+                $property = null === $field ? null : $this->formPropertyName($php, $call->arguments, $field->value);
                 if (null === $field || null === $property) {
                     continue;
                 }
@@ -122,7 +113,7 @@ final class FormMetadataExtractor
                     MetadataSymbolKind::Property,
                     $dataClass.'::$'.$property,
                     $uri,
-                    $field['range'],
+                    $this->converter->toRange($text, $field->startOffset, $field->endOffset - $field->startOffset),
                     false,
                 );
             }
@@ -141,7 +132,7 @@ final class FormMetadataExtractor
             if (null === $type || null === $argument) {
                 continue;
             }
-            foreach ($this->arrayKeys->parseArgument($argument, allowNestedUnpacking: true, collectPartialLiteralKeys: true) ?? [] as $key) {
+            foreach ($php->literalArray($argument)->keys ?? [] as $key) {
                 $options[] = new FormOptionReference(
                     $type->className,
                     $key->value,
@@ -285,93 +276,49 @@ final class FormMetadataExtractor
         return null;
     }
 
-    /** @param array{text: string, offset: int} $expression */
-    private function staticClassName(string $source, array $expression, PhpDocument $php): ?string
+    /** Late static binding hides the class the option resolves to, so only `self`, `parent` and named classes count. */
+    private function earlyBoundClassName(string $source, ?PhpClassReference $reference): ?string
     {
-        $references = [];
-        $end = $expression['offset'] + \strlen($expression['text']);
-        foreach ($php->classReferences as $reference) {
-            if ($reference->startOffset >= $expression['offset'] && $reference->endOffset <= $end) {
-                $references[] = $reference;
-            }
-        }
-        if (1 !== \count($references)) {
+        if (null === $reference) {
             return null;
         }
-        $reference = $references[0];
-        $rawName = substr($source, $reference->startOffset, $reference->endOffset - $reference->startOffset);
-        if (\in_array(ClassNameKey::from($rawName), ['self', 'static', 'parent'], true)) {
-            return null;
-        }
-        $before = trim(substr($source, $expression['offset'], $reference->startOffset - $expression['offset']));
-        $after = preg_replace('/\\s+/', '', substr($source, $reference->endOffset, $end - $reference->endOffset));
+        $name = ClassNameKey::from(substr($source, $reference->startOffset, $reference->endOffset - $reference->startOffset));
 
-        return '' === $before && '::class' === $after ? $reference->className : null;
+        return 'static' === $name ? null : $reference->className;
     }
 
-    /** @return array<string, array{text: string, offset: int}>|null */
-    private function arrayEntries(string $text, int $base = 0): ?array
+    /**
+     * The entries of the array literal the argument holds, keyed by identifier
+     * key, or null when a key or the array itself cannot be read statically.
+     *
+     * @return array<string, PhpLiteralArrayEntry>|null
+     */
+    private function arrayEntries(PhpDocument $php, ?PhpArgument $argument): ?array
     {
-        if (!preg_match('/^\\s*\\[(.*)\\]\\s*$/s', $text, $array, \PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-        $items = $array[1][0];
-        $itemsOffset = $base + $array[1][1];
-        $keys = $this->arrayKeys->parse($items, allowNestedUnpacking: true, sourceOffset: $itemsOffset);
-        if (null === $keys) {
-            return null;
-        }
-        $arguments = array_values(array_filter(
-            DelimiterScanner::split($items, ',', $itemsOffset, phpComments: true),
-            fn (DelimiterSegment $entry): bool => $this->hasCode($entry->text),
-        ));
-        if (\count($arguments) !== \count($keys)) {
+        $array = $php->literalArray($argument);
+        if (null === $array || !$array->complete || $array->hasUnknownKeys) {
             return null;
         }
         $entries = [];
-        foreach ($arguments as $index => $entry) {
-            $key = $keys[$index];
-            $entryEnd = $entry->offset + \strlen($entry->text);
-            if ($key->startOffset < $entry->offset || $key->endOffset >= $entryEnd || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $key->value)) {
+        foreach ($array->entries as $entry) {
+            if (null === $entry->key || 1 !== preg_match(self::IDENTIFIER_PATTERN, $entry->key->value)) {
                 return null;
             }
-            $tailOffset = $key->endOffset - $entry->offset + 1;
-            if (!preg_match('/^\\s*=>\\s*(.*?)\\s*$/s', substr($entry->text, $tailOffset), $match, \PREG_OFFSET_CAPTURE)) {
-                return null;
-            }
-            $entries[$key->value] = ['text' => $match[1][0], 'offset' => $entry->offset + $tailOffset + $match[1][1]];
+            $entries[$entry->key->value] = $entry;
         }
 
         return $entries;
     }
 
-    private function quotedIdentifier(string $text): ?string
+    private function identifierArgument(?PhpArgument $argument): ?PhpStringLiteral
     {
-        if (!preg_match('/^\\s*(["\'])([A-Za-z_][A-Za-z0-9_]*)\\1\\s*$/', $text, $match)) {
-            return null;
-        }
+        $literal = $argument?->stringLiteral;
 
-        return $match[2];
-    }
-
-    /** @return array{name: string, range: Range}|null */
-    private function quotedIdentifierArgument(string $document, PhpArgument $argument): ?array
-    {
-        $expression = $argument->expression;
-        $offset = $argument->expressionStartOffset;
-        if (!\is_string($expression) || !\is_int($offset) || !preg_match('/^\\s*(["\'])([A-Za-z_][A-Za-z0-9_]*)\\1\\s*$/', $expression, $match, \PREG_OFFSET_CAPTURE)) {
-            return null;
-        }
-        $name = $match[2][0];
-
-        return [
-            'name' => $name,
-            'range' => $this->converter->toRange($document, $offset + $match[2][1], \strlen($name)),
-        ];
+        return null !== $literal && 1 === preg_match(self::IDENTIFIER_PATTERN, $literal->value) ? $literal : null;
     }
 
     /** @param list<PhpArgument> $arguments */
-    private function formPropertyName(array $arguments, string $field): ?string
+    private function formPropertyName(PhpDocument $php, array $arguments, string $field): ?string
     {
         foreach (\array_slice($arguments, 1) as $argument) {
             if (null !== $argument->name) {
@@ -381,43 +328,22 @@ final class FormMetadataExtractor
         if (!isset($arguments[2])) {
             return $field;
         }
-        $expression = $arguments[2]->expression;
-        $offset = $arguments[2]->expressionStartOffset;
-        if (!\is_string($expression) || !\is_int($offset) || null === $options = $this->arrayEntries($expression, $offset)) {
+        $options = $this->arrayEntries($php, $arguments[2]);
+        if (null === $options) {
             return null;
         }
-        if (isset($options['mapped'])) {
-            $mapped = trim($options['mapped']['text']);
-            if ('false' === $mapped) {
-                return null;
-            }
-            if ('true' !== $mapped) {
-                return null;
-            }
+        if (isset($options['mapped']) && true !== $options['mapped']->value?->scalarValue) {
+            return null;
         }
         if (!isset($options['property_path'])) {
             return $field;
         }
-        $propertyPath = trim($options['property_path']['text']);
-        if ('null' === $propertyPath) {
+        if (PhpLiteralKind::Null === $options['property_path']->value?->kind) {
             return $field;
         }
-        if ('false' === $propertyPath) {
-            return null;
-        }
+        $propertyPath = $options['property_path']->stringValue?->value;
 
-        return $this->quotedIdentifier($propertyPath);
-    }
-
-    private function hasCode(string $text): bool
-    {
-        foreach (\PhpToken::tokenize('<?php '.$text) as $token) {
-            if (!$token->is([\T_OPEN_TAG, \T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT])) {
-                return true;
-            }
-        }
-
-        return false;
+        return null !== $propertyPath && 1 === preg_match(self::IDENTIFIER_PATTERN, $propertyPath) ? $propertyPath : null;
     }
 
     private function context(MetadataCompletionKind $kind, string $prefix, string $text, int $offset, ?string $owner = null): MetadataCompletionContext
