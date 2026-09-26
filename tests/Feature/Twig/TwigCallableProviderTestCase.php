@@ -32,7 +32,9 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 class TwigCallableProviderTestCase extends TestCase
 {
@@ -42,6 +44,7 @@ class TwigCallableProviderTestCase extends TestCase
      *
      * @return array{
      *     documents: DocumentStore,
+     *     requests: ProviderRequests,
      *     converter: PositionConverter,
      *     protocol: LspProtocolMapper,
      *     completion: TwigCallableCompletionProvider,
@@ -91,11 +94,12 @@ class TwigCallableProviderTestCase extends TestCase
 
         return [
             'documents' => $documents,
+            'requests' => new ProviderRequests($documents, $projects),
             'converter' => $converter,
             'protocol' => $protocol,
             'completion' => new TwigCallableCompletionProvider($documentResolver, $converter, $protocol, $indexes, $methodResolver, $argumentAnalyzer, $commentParser, $directives),
             'diagnostic' => new TwigCallableDiagnosticProvider($documentResolver, $protocol, $indexes, $methodResolver),
-            'relationship' => new TwigCallableRelationshipProvider($documentResolver, $converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $phpParser),
+            'relationship' => new TwigCallableRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $phpParser),
         ];
     }
 }

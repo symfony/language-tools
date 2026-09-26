@@ -6,10 +6,14 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class SecurityRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly SecurityIndexRegistry $indexes,
         private readonly SecuritySourceIndexRegistry $sourceIndexes,
@@ -19,7 +23,8 @@ final class SecurityRelationshipProvider implements DefinitionProviderInterface,
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->symbols->resolve($params);
+        $request = $this->requests->positioned($params);
+        $resolved = null === $request ? null : $this->symbols->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -34,11 +39,11 @@ final class SecurityRelationshipProvider implements DefinitionProviderInterface,
         return [] === $lines ? null : $this->protocol->markdownHover(implode("\n", $lines));
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->symbols->resolve($params);
+        $resolved = $this->symbols->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $project] = $resolved;
         $declarations = array_filter(
@@ -49,15 +54,15 @@ final class SecurityRelationshipProvider implements DefinitionProviderInterface,
         return array_map(fn (SecuritySourceSymbol $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), array_values($declarations));
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->symbols->resolve($params);
+        $resolved = $this->symbols->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $project] = $resolved;
 
-        return array_map(fn (SecuritySourceSymbol $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), $this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name));
+        return $this->protocol->locations($request->reported($this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name)));
     }
 
     /** @return list<string> */

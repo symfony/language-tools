@@ -7,10 +7,14 @@ use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class StimulusRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
+        private readonly LspRequestFactory $requests,
         private readonly UriToPathConverter $uriConverter,
         private readonly LspProtocolMapper $protocol,
         private readonly StimulusIndexRegistry $indexes,
@@ -21,7 +25,8 @@ final class StimulusRelationshipProvider implements DefinitionProviderInterface,
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->stimulus->resolve($params);
+        $request = $this->requests->positioned($params);
+        $resolved = null === $request ? null : $this->stimulus->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -57,11 +62,11 @@ final class StimulusRelationshipProvider implements DefinitionProviderInterface,
         return $this->protocol->markdownHover(implode("\n\n", $details));
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->stimulus->resolve($params);
+        $resolved = $this->stimulus->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$reference, $project] = $resolved;
         $locations = $this->stimulus->declarationLocations($project, $reference);
@@ -76,14 +81,14 @@ final class StimulusRelationshipProvider implements DefinitionProviderInterface,
         return null === $controller ? [] : [['uri' => $this->uriConverter->toUri($controller->sourcePath), 'range' => $this->protocol->zeroRange()]];
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->stimulus->resolve($params);
+        $resolved = $this->stimulus->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$reference, $project] = $resolved;
-        $locations = $this->stimulus->declarationLocations($project, $reference);
+        $locations = $request->includeDeclaration ? $this->stimulus->declarationLocations($project, $reference) : [];
         foreach ($this->sourceIndexes->forProject($project)->references($reference->controller, $reference->kind, $reference->member) as $candidate) {
             $locations[] = $this->protocol->location($candidate->uri, $candidate->range);
         }

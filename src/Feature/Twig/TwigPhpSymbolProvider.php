@@ -2,19 +2,19 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class TwigPhpSymbolProvider implements CompletionProviderInterface, DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
-        private readonly PositionConverter $converter,
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigPhpSymbolSourceIndexRegistry $indexes,
         private readonly TwigPhpSymbolExtractor $extractor,
@@ -23,12 +23,16 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
 
     public function complete(array $params): ?array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId) {
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
+        if ('twig' !== $request->document->languageId) {
             return null;
         }
         $text = $request->document->text;
-        $context = $this->extractor->completionContext($text, $this->converter->toByteOffset($text, $request->position));
+        $context = $this->extractor->completionContext($text, $request->offset);
         if (null === $context) {
             return null;
         }
@@ -82,7 +86,12 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->resolveTwig($params);
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
+        $resolved = $this->resolveTwig($request);
         if (null === $resolved) {
             return null;
         }
@@ -103,11 +112,11 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
         return $this->protocol->markdownHover($value);
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->resolveTwig($params);
+        $resolved = $this->resolveTwig($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [, $declarations] = $resolved;
 
@@ -117,62 +126,48 @@ final class TwigPhpSymbolProvider implements CompletionProviderInterface, Defini
         );
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request || !\in_array($request->document->languageId, ['php', 'twig'], true)) {
-            return null;
+        if (!\in_array($request->document->languageId, ['php', 'twig'], true)) {
+            return [];
         }
         $index = $this->indexes->forProject($request->project);
         if ('php' === $request->document->languageId) {
             $declaration = $index->declarationAt($request->document->uri, $request->position);
             if (null === $declaration) {
-                return null;
+                return [];
             }
             $className = $declaration->className;
             $memberName = $declaration->memberName;
             $declarations = [$declaration];
         } else {
             $text = $request->document->text;
-            $reference = $this->extractor->referenceAt($request->document->uri, $text, $this->converter->toByteOffset($text, $request->position));
+            $reference = $this->extractor->referenceAt($request->document->uri, $text, $request->offset);
             if (null === $reference) {
-                return null;
+                return [];
             }
             $className = $reference->className;
             $memberName = $reference->memberName;
             $declarations = $this->declarations($index, $className, $memberName);
             if ([] === $declarations) {
-                return null;
+                return [];
             }
         }
 
-        $locations = array_map(
-            fn (TwigPhpSymbolReference $reference): array => $this->protocol->location($reference->uri, $reference->range),
-            $index->references($className, $memberName),
-        );
-        $context = $params['context'] ?? null;
-        if (\is_array($context) && true === ($context['includeDeclaration'] ?? null)) {
-            foreach ($declarations as $declaration) {
-                $locations[] = $this->protocol->location($declaration->uri, $declaration->range);
-            }
-        }
-
-        return $locations;
+        return $this->protocol->locations([
+            ...$index->references($className, $memberName),
+            ...($request->includeDeclaration ? $declarations : []),
+        ]);
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{TwigPhpSymbolReference, list<TwigPhpSymbolDeclaration>}|null
-     */
-    private function resolveTwig(array $params): ?array
+    /** @return array{TwigPhpSymbolReference, list<TwigPhpSymbolDeclaration>}|null */
+    private function resolveTwig(PositionedRequest $request): ?array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId) {
+        if ('twig' !== $request->document->languageId) {
             return null;
         }
         $text = $request->document->text;
-        $reference = $this->extractor->referenceAt($request->document->uri, $text, $this->converter->toByteOffset($text, $request->position));
+        $reference = $this->extractor->referenceAt($request->document->uri, $text, $request->offset);
         if (null === $reference) {
             return null;
         }

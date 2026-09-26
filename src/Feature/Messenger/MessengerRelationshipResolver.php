@@ -2,20 +2,19 @@
 
 namespace Symfony\Lsp\Feature\Messenger;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
-use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class MessengerRelationshipResolver
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
-        private readonly PositionConverter $converter,
+        private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
         private readonly MessengerSourceIndexRegistry $sourceIndexes,
@@ -25,50 +24,30 @@ final class MessengerRelationshipResolver
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{MessengerSourceSymbol|null, PhpClassDeclaration|null, Project}|null
-     */
-    public function resolve(array $params): ?array
+    /** @return array{MessengerSourceSymbol|null, PhpClassDeclaration|null, Project}|null */
+    public function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request) {
-            return null;
+        $symbol = $this->positionedSymbols->resolve($request->source, $request->position, $this->extractor->extract($request->source)->symbols);
+        if ($symbol instanceof MessengerSourceSymbol) {
+            return [$symbol, null, $request->project];
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->symbols as $symbol) {
-            if ($this->converter->containsByteOffset($request->document->text, $symbol->range, $offset, inclusiveEnd: true)) {
-                return [$symbol, null, $request->project];
-            }
-        }
-        if ('php' === $request->document->languageId) {
-            foreach ($this->classExtractor->extract($request->document->uri, $request->document->text) as $class) {
-                if ($this->converter->containsByteOffset($request->document->text, $class->range, $offset, inclusiveEnd: true)) {
-                    return [null, $class, $request->project];
-                }
-            }
-        }
+        $class = 'php' === $request->document->languageId
+            ? $this->positionedSymbols->resolve($request->source, $request->position, $this->classExtractor->extract($request->document->uri, $request->document->text))
+            : null;
 
-        return null;
+        return $class instanceof PhpClassDeclaration ? [null, $class, $request->project] : null;
     }
 
-    /** @param array<array-key, mixed> $params
-     *
-     * @return list<array<array-key, mixed>>|null
-     */
-    public function definitions(array $params): ?array
+    /** @return list<array<array-key, mixed>> */
+    public function definitions(PositionedRequest $request): array
     {
-        return $this->relations($params, true);
+        return $this->relations($request, null);
     }
 
-    /** @param array<array-key, mixed> $params
-     *
-     * @return list<array<array-key, mixed>>|null
-     */
-    public function references(array $params): ?array
+    /** @return list<array<array-key, mixed>> */
+    public function references(ReferencesRequest $request): array
     {
-        return $this->relations($params, false);
+        return $this->relations($request, $request);
     }
 
     /** @return list<MessengerHandlerDeclaration> */
@@ -103,15 +82,15 @@ final class MessengerRelationshipResolver
     }
 
     /**
-     * @param array<array-key, mixed> $params
+     * @param ReferencesRequest|null $references the request when it asks for references, null when it asks for definitions
      *
-     * @return list<array<array-key, mixed>>|null
+     * @return list<array<array-key, mixed>>
      */
-    private function relations(array $params, bool $definitionsOnly): ?array
+    private function relations(PositionedRequest $request, ?ReferencesRequest $references): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $class, $project] = $resolved;
         if ($symbol instanceof MessengerSourceSymbol) {
@@ -122,25 +101,19 @@ final class MessengerRelationshipResolver
                     $classNames[] = $handler->className;
                 }
                 $locations = $this->classLocations($project, array_values(array_unique($classNames)));
-                if (!$definitionsOnly) {
-                    foreach ($symbols as $item) {
-                        $locations[] = $this->protocol->location($item->uri, $item->range);
-                    }
+                if (null !== $references) {
+                    array_push($locations, ...$this->protocol->locations($references->reported($symbols)));
                 }
 
                 return $locations;
             }
-            $locations = [];
-            foreach ($symbols as $item) {
-                if (!$definitionsOnly || $item->declaration) {
-                    $locations[] = $this->protocol->location($item->uri, $item->range);
-                }
-            }
 
-            return $locations;
+            return $this->protocol->locations(null === $references
+                ? array_filter($symbols, static fn (MessengerSourceSymbol $item): bool => $item->declaration)
+                : $references->reported($symbols));
         }
         if (!$class instanceof PhpClassDeclaration) {
-            return null;
+            return [];
         }
         $index = $this->indexes->forProject($project);
         $relatedClasses = [];
@@ -157,10 +130,10 @@ final class MessengerRelationshipResolver
             }
         }
         $locations = $this->classLocations($project, array_keys($relatedClasses));
-        if (!$definitionsOnly && null !== $messageClass) {
-            foreach ($this->sourceIndexes->forProject($project)->symbols(MessengerSymbolKind::Message, $messageClass) as $reference) {
-                $locations[] = $this->protocol->location($reference->uri, $reference->range);
-            }
+        if (null !== $references && null !== $messageClass) {
+            array_push($locations, ...$this->protocol->locations($references->reported(
+                $this->sourceIndexes->forProject($project)->symbols(MessengerSymbolKind::Message, $messageClass),
+            )));
         }
 
         return $locations;

@@ -34,8 +34,10 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class LiveComponentProviderTest extends TestCase
 {
@@ -94,16 +96,16 @@ final class LiveComponentProviderTest extends TestCase
         );
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $componentResolver = new TwigComponentResolver($documentResolver, new PositionedSourceSymbolResolver($converter), $indexes, new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry()), $extractor);
+        $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, new TemplateIndexRegistry(new DependencyInjectionSourceIndexRegistry()), $extractor);
         $completionProvider = new TwigComponentCompletionProvider($documentResolver, $converter, $protocol, $indexes, $componentResolver, $commentParser);
-        $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
+        $relationshipProvider = new TwigComponentRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $protocol, $indexes, $componentResolver);
 
         self::assertSame(['submit'], array_column($completionProvider->complete(LspRequests::offset($completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
         $nestedActionOffset = strpos($templateText, 'submit') + \strlen('sub');
         self::assertSame(['submit'], array_column($completionProvider->complete(LspRequests::offset($templateUri, $templateText, $nestedActionOffset)) ?? [], 'label'));
         $actionParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, 'submit') + 2);
-        self::assertSame([$classUri], array_column($relationshipProvider->definition($actionParams) ?? [], 'uri'));
-        self::assertCount(4, $relationshipProvider->references($actionParams) ?? []);
+        self::assertSame([$classUri], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($actionParams)), 'uri'));
+        self::assertCount(4, $relationshipProvider->references((new ProviderRequests($documents, $projects))->references($actionParams)));
         $actionHover = $relationshipProvider->hover($actionParams);
         self::assertIsArray($actionHover);
         self::assertIsArray($actionHover['contents'] ?? null);
@@ -126,11 +128,11 @@ final class LiveComponentProviderTest extends TestCase
             );
         }
 
-        $eventProvider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $eventProvider = new LiveComponentEventProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
         self::assertSame(['search:completed'], array_column($eventProvider->complete(LspRequests::offset($classUri, $classText, strpos($classText, "emit('search:co") + \strlen("emit('search:co"))) ?? [], 'label'));
         $eventParams = LspRequests::offset($classUri, $classText, strpos($classText, "emit('search:completed") + \strlen("emit('search:"));
-        self::assertSame([$classUri], array_column($eventProvider->definition($eventParams) ?? [], 'uri'));
-        self::assertCount(2, $eventProvider->references($eventParams) ?? []);
+        self::assertSame([$classUri], array_column($eventProvider->definition((new ProviderRequests($documents, $projects))->positioned($eventParams)), 'uri'));
+        self::assertCount(2, $eventProvider->references((new ProviderRequests($documents, $projects))->references($eventParams)));
         $eventHover = $eventProvider->hover($eventParams);
         self::assertIsArray($eventHover);
         self::assertIsArray($eventHover['contents'] ?? null);
@@ -181,7 +183,7 @@ final class LiveComponentProviderTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
-        $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $provider = new LiveComponentEventProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
 
         /** @var list<array{string, list<string>, bool}> $cases */
         $cases = [
@@ -258,7 +260,7 @@ final class LiveComponentProviderTest extends TestCase
         $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
         $indexes = new TwigComponentIndexRegistry();
         $indexes->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'php', $text)));
-        $provider = new LiveComponentEventProvider(new DocumentContextResolver($documents, $projects), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
+        $provider = new LiveComponentEventProvider(new LspRequestFactory($documents, $projects, $converter), $converter, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor, new PhpCommentParser(), new TolerantPhpParser(new Parser()));
 
         self::assertNull($provider->complete(LspRequests::offset($uri, $text, strpos($text, 'search:c') + \strlen('search:c'))));
     }

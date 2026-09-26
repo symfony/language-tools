@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Feature\Asset;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Asset\Asset;
@@ -31,6 +30,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
 
@@ -83,8 +83,7 @@ final class AssetProviderTest extends TestCase
         $documents->open(new Document($importMapUri, 'php', 1, $importMapText));
         $documents->open(new Document($usageUri, 'twig', 1, $usageText));
         $provider = new AssetProvider(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
+            new LspRequestFactory($documents, $projects, $converter),
             new PositionedSourceSymbolResolver($converter),
             new UriToPathConverter(),
             new LspProtocolMapper(),
@@ -128,13 +127,13 @@ final class AssetProviderTest extends TestCase
         self::assertIsArray($assetHover['contents'] ?? null);
         self::assertIsString($assetHover['contents']['value'] ?? null);
         self::assertStringContainsString('AssetMapper asset', $assetHover['contents']['value']);
-        self::assertSame(['file:///workspace/assets/images/logo.svg'], array_column($provider->definition($assetParams) ?? [], 'uri'));
-        self::assertCount(1, $provider->references($assetParams) ?? []);
+        self::assertSame(['file:///workspace/assets/images/logo.svg'], array_column($provider->definition((new ProviderRequests($documents, $projects))->positioned($assetParams)), 'uri'));
+        self::assertCount(1, $provider->references((new ProviderRequests($documents, $projects))->references($assetParams)));
 
         $entryOffset = strpos($usageText, "'app'") + 2;
         $entryParams = LspRequests::offset($usageUri, $usageText, $entryOffset);
-        self::assertSame([$importMapUri], array_column($provider->definition($entryParams) ?? [], 'uri'));
-        self::assertCount(2, $provider->references($entryParams) ?? []);
+        self::assertSame([$importMapUri], array_column($provider->definition((new ProviderRequests($documents, $projects))->positioned($entryParams)), 'uri'));
+        self::assertCount(2, $provider->references((new ProviderRequests($documents, $projects))->references($entryParams)));
         self::assertCount(2, $provider->links((new ProviderRequests($documents, $projects))->document($usageUri)));
         $diagnostics = $provider->diagnostics(LspRequests::document($usageUri));
         self::assertIsArray($diagnostics);
@@ -231,8 +230,7 @@ final class AssetProviderTest extends TestCase
             $documents->open(new Document($uri, 'twig', 1, $text));
             $publicAssets = new PublicAssetResolver();
             $provider = new AssetProvider(
-                new DocumentContextResolver($documents, $projects),
-                $converter,
+                new LspRequestFactory($documents, $projects, $converter),
                 new PositionedSourceSymbolResolver($converter),
                 new UriToPathConverter(),
                 new LspProtocolMapper(),
@@ -248,8 +246,8 @@ final class AssetProviderTest extends TestCase
             self::assertIsArray($hover['contents'] ?? null);
             self::assertIsString($hover['contents']['value'] ?? null);
             self::assertStringContainsString('Public asset', $hover['contents']['value']);
-            self::assertSame(['file://'.$root.'/public/css/app.css'], array_column($provider->definition($params) ?? [], 'uri'));
-            self::assertSame([], $provider->definition(LspRequests::offset($uri, $text, strpos($text, 'css/missing.css') + 2)));
+            self::assertSame(['file://'.$root.'/public/css/app.css'], array_column($provider->definition((new ProviderRequests($documents, $projects))->positioned($params)), 'uri'));
+            self::assertSame([], $provider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($uri, $text, strpos($text, 'css/missing.css') + 2))));
 
             $completionUri = $rootUri.'/templates/completion.html.twig';
             $completionText = "{{ asset('css/";

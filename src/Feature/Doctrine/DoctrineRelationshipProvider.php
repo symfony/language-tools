@@ -2,19 +2,20 @@
 
 namespace Symfony\Lsp\Feature\Doctrine;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class DoctrineRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
+        private readonly LspRequestFactory $requests,
         private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly LspProtocolMapper $protocol,
         private readonly DoctrineIndexRegistry $indexes,
@@ -24,7 +25,12 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->resolve($params);
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -64,11 +70,11 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
         return null === $repository ? null : $this->protocol->markdownHover(\sprintf("Doctrine repository: `%s`\n\nEntity: `%s`", $repository->className, $repository->entityClass));
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $project] = $resolved;
         $index = $this->indexes->forProject($project);
@@ -98,33 +104,21 @@ final class DoctrineRelationshipProvider implements DefinitionProviderInterface,
         return $locations;
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $project] = $resolved;
-        $locations = [];
-        foreach ($this->indexes->forProject($project)->relatedSymbols($symbol) as $candidate) {
-            $locations[] = $this->protocol->location($candidate->uri, $candidate->range);
-        }
 
-        return $locations;
+        return $this->protocol->locations($request->reported($this->indexes->forProject($project)->relatedSymbols($symbol)));
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{DoctrineSourceSymbol, Project}|null
-     */
-    private function resolve(array $params): ?array
+    /** @return array{DoctrineSourceSymbol, Project}|null */
+    private function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $document = SourceDocument::fromDocument($request->document);
+        $document = $request->source;
         $symbol = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document)->symbols);
 
         return null === $symbol ? null : [$symbol, $request->project];

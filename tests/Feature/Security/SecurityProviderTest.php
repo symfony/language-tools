@@ -363,8 +363,8 @@ PHP;
         self::assertSame(['ROLE_ADMIN'], $kit->labels($kit->get(SecurityCompletionProvider::class)->complete($kit->after($completionUri, 'ROLE_A'))));
         $role = $kit->inside($phpUri, 'ROLE_ADMIN');
         self::assertStringContainsString('App\\Security\\PostVoter', $kit->hoverText($relationshipProvider->hover($role)));
-        self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->after($yamlUri, 'provider: us'))));
-        self::assertContains($twigUri, $kit->targets($relationshipProvider->references($role)));
+        self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->after($yamlUri, 'provider: us')))));
+        self::assertContains($twigUri, $kit->targets($relationshipProvider->references($kit->references($role))));
         self::assertSame(['security.unknown_provider'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($yamlUri))));
         self::assertSame(['security.unknown_firewall'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($twigUri))));
     }
@@ -397,12 +397,13 @@ PHP;
         self::assertSame(['in-memory', 'main-area', 'in-memory'], array_map(static fn ($symbol): string => $symbol->name, $yamlFacts->symbols));
 
         $provider = $kit->after($yamlUri, 'provider: in-me');
-        self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($provider)));
-        self::assertSame([$yamlUri, $yamlUri], $kit->targets($relationshipProvider->references($provider)));
+        self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->positioned($provider))));
+        self::assertSame([$yamlUri, $yamlUri], $kit->targets($relationshipProvider->references($kit->references($provider))));
 
         $firewall = $kit->inside($twigUri, 'main-area');
-        self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($firewall)));
-        self::assertSame([$yamlUri, $twigUri], $kit->targets($relationshipProvider->references($firewall)));
+        self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->positioned($firewall))));
+        self::assertSame([$yamlUri, $twigUri], $kit->targets($relationshipProvider->references($kit->references($firewall))));
+        self::assertSame([$twigUri], $kit->targets($relationshipProvider->references($kit->references($firewall, includeDeclaration: false))));
 
         self::assertSame([], $diagnosticProvider->diagnostics(LspRequests::document($yamlUri)));
         self::assertSame([], $diagnosticProvider->diagnostics(LspRequests::document($twigUri)));
@@ -422,7 +423,7 @@ PHP;
             YAML;
         $kit = (new ProjectTestKit())->open($uri, $text)->index();
 
-        self::assertSame([$uri], $kit->targets($kit->get(SecurityRelationshipProvider::class)->definition($kit->after($uri, 'provider: users'))));
+        self::assertSame([$uri], $kit->targets($kit->get(SecurityRelationshipProvider::class)->definition($kit->positioned($kit->after($uri, 'provider: users')))));
     }
 
     private function extractor(): SecurityExtractor

@@ -6,10 +6,14 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class TwigComponentRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TwigComponentResolver $components,
@@ -18,13 +22,15 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
 
     public function hover(array $params): ?array
     {
-        $action = $this->components->resolveAction($params);
+        $request = $this->requests->positioned($params);
+        $action = null === $request ? null : $this->components->resolveAction($request);
         if (null !== $action) {
             [$component, $componentAction] = $action;
 
             return $this->protocol->markdownHover(\sprintf('Live action: `%s#%s`', $component->name, $componentAction->name));
         }
-        $resolved = $this->components->resolveComponent($params);
+        $request = $this->requests->positioned($params);
+        $resolved = null === $request ? null : $this->components->resolveComponent($request);
         if (null === $resolved) {
             return null;
         }
@@ -50,9 +56,9 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
         return $this->protocol->markdownHover(implode("\n\n", $details));
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $action = $this->components->resolveAction($params);
+        $action = $this->components->resolveAction($request);
         if (null !== $action) {
             [$component, $componentAction, $project] = $action;
             $locations = [];
@@ -66,9 +72,9 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
 
             return $locations;
         }
-        $resolved = $this->components->resolveComponent($params);
+        $resolved = $this->components->resolveComponent($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$component, $project] = $resolved;
         $locations = [];
@@ -83,21 +89,21 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
         return $locations;
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $action = $this->components->resolveAction($params);
+        $action = $this->components->resolveAction($request);
         if (null !== $action) {
             [$component, $componentAction, $project] = $action;
-            $locations = $this->definition($params) ?? [];
+            $locations = $this->definition($request);
             foreach ($this->indexes->forProject($project)->actionReferences($component->name, $componentAction->name) as $reference) {
                 $locations[] = $this->protocol->location($reference->uri, $reference->range);
             }
 
             return $locations;
         }
-        $resolved = $this->components->resolveComponent($params);
+        $resolved = $this->components->resolveComponent($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$component, $project] = $resolved;
         $locations = [];

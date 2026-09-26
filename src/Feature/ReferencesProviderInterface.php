@@ -2,12 +2,10 @@
 
 namespace Symfony\Lsp\Feature;
 
+use Symfony\Lsp\Protocol\ReferencesRequest;
+
 interface ReferencesProviderInterface
 {
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return list<array<array-key, mixed>>|null
-     */
-    public function references(array $params): ?array;
+    /** @return list<array<array-key, mixed>> */
+    public function references(ReferencesRequest $request): array;
 }

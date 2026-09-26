@@ -7,10 +7,14 @@ use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class EventRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly EventIndexRegistry $indexes,
         private readonly EventRelationshipResolver $relationships,
@@ -19,7 +23,8 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->relationships->resolve($params);
+        $request = $this->requests->positioned($params);
+        $resolved = null === $request ? null : $this->relationships->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -46,11 +51,11 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
         return $this->protocol->markdownHover('Event listener: `'.$class->className.'`'."\n\n".'Events: `'.implode('`, `', array_keys($events)).'`');
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->relationships->resolve($params);
+        $resolved = $this->relationships->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $class, $project] = $resolved;
         $index = $this->indexes->forProject($project);
@@ -58,7 +63,7 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
             return $this->relationships->eventDefinitionLocations($project, $index, $symbol->name);
         }
         if (!$class instanceof PhpClassDeclaration) {
-            return null;
+            return [];
         }
         if (null !== $index->event($class->className) || [] !== $index->listenersForEvent($class->className)) {
             $classes = [];
@@ -78,18 +83,18 @@ final class EventRelationshipProvider implements DefinitionProviderInterface, Ho
         return $this->relationships->classLocations($project, $eventClasses);
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->relationships->resolve($params);
+        $resolved = $this->relationships->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $class, $project] = $resolved;
         if ($symbol instanceof EventSourceSymbol) {
             return $this->relationships->sourceLocations($project, $symbol->name);
         }
         if (!$class instanceof PhpClassDeclaration) {
-            return null;
+            return [];
         }
         $index = $this->indexes->forProject($project);
         if (null !== $index->event($class->className) || [] !== $index->listenersForEvent($class->className)) {

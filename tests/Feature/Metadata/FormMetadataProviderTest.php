@@ -19,7 +19,9 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class FormMetadataProviderTest extends MetadataTestCase
 {
@@ -231,7 +233,7 @@ final class FormMetadataProviderTest extends MetadataTestCase
         $documents->open(new Document($formUri, 'php', 1, $formText));
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $relationshipProvider = new MetadataRelationshipProvider($resolver, new PositionedSourceSymbolResolver($converter), $protocol, $sourceIndexes, $extractor);
+        $relationshipProvider = new MetadataRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), $protocol, $sourceIndexes, $extractor);
         $completionProvider = new MetadataCompletionProvider($resolver, $converter, $protocol, new MetadataIndexRegistry(), $sourceIndexes, $extractor);
 
         $titleOffset = strpos($formText, "'title'") + 2;
@@ -243,13 +245,11 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertStringContainsString('private ?string $title', $hoverValue);
         self::assertStringContainsString('The article title.', $hoverValue);
 
-        $definition = $relationshipProvider->definition(LspRequests::offset($formUri, $formText, $titleOffset));
-        self::assertIsArray($definition);
+        $definition = $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($formUri, $formText, $titleOffset)));
         self::assertSame([$dtoUri], array_column($definition, 'uri'));
 
         $propertyOffset = strpos($dtoText, '$title') + 2;
-        $references = $relationshipProvider->references(LspRequests::offset($dtoUri, $dtoText, $propertyOffset));
-        self::assertIsArray($references);
+        $references = $relationshipProvider->references((new ProviderRequests($documents, $projects))->references(LspRequests::offset($dtoUri, $dtoText, $propertyOffset)));
         $referenceUris = [];
         foreach ($references as $reference) {
             self::assertIsString($reference['uri'] ?? null);
@@ -258,15 +258,14 @@ final class FormMetadataProviderTest extends MetadataTestCase
         self::assertSame([$dtoUri, $formUri], array_keys($referenceUris));
 
         self::assertSame(['title'], $this->completionLabels($completionProvider, $formUri, $formText, strpos($formText, "'title'") + \strlen("'ti")));
-        $headlineDefinition = $relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'headline'") + 2));
-        self::assertIsArray($headlineDefinition);
+        $headlineDefinition = $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($formUri, $formText, strpos($formText, "'headline'") + 2)));
         self::assertSame([$dtoUri], array_column($headlineDefinition, 'uri'));
-        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'ignored'") + 2)));
-        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'dynamic'") + 2)));
-        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'street'") + 2)));
-        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'named'") + 2)));
-        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'leaked'") + 2)));
-        self::assertNull($relationshipProvider->definition(LspRequests::offset($formUri, $formText, strpos($formText, "'unrelated'") + 2)));
+        self::assertSame([], $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($formUri, $formText, strpos($formText, "'ignored'") + 2))));
+        self::assertSame([], $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($formUri, $formText, strpos($formText, "'dynamic'") + 2))));
+        self::assertSame([], $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($formUri, $formText, strpos($formText, "'street'") + 2))));
+        self::assertSame([], $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($formUri, $formText, strpos($formText, "'named'") + 2))));
+        self::assertSame([], $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($formUri, $formText, strpos($formText, "'leaked'") + 2))));
+        self::assertSame([], $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($formUri, $formText, strpos($formText, "'unrelated'") + 2))));
         self::assertSame([], $this->completionLabels($completionProvider, $formUri, $formText, strpos($formText, "'street'") + \strlen("'str")));
     }
 

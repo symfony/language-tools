@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
@@ -10,15 +9,17 @@ use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class TemplateNavigationProvider implements DefinitionProviderInterface, DiagnosticProviderInterface, DocumentLinkProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
+        private readonly LspRequestFactory $requests,
         private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly LspProtocolMapper $protocol,
         private readonly TemplateReferenceExtractor $extractor,
@@ -29,7 +30,12 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->resolve($params);
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -42,22 +48,22 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         ));
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$template] = $resolved;
 
         return [$this->protocol->location($template->uri, $template->range)];
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$template, $project] = $resolved;
 
@@ -84,7 +90,7 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->resolver->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request) {
             return null;
         }
@@ -105,18 +111,10 @@ final class TemplateNavigationProvider implements DefinitionProviderInterface, D
         return $diagnostics;
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{TemplateDeclaration, Project}|null
-     */
-    private function resolve(array $params): ?array
+    /** @return array{TemplateDeclaration, Project}|null */
+    private function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $document = SourceDocument::fromDocument($request->document);
+        $document = $request->source;
         $reference = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document, $this->classIndexes->forProject($request->project)));
         if (null === $reference) {
             return null;

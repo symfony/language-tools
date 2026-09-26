@@ -11,6 +11,8 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\CodeActionRequest;
 use Symfony\Lsp\Protocol\DocumentRequest;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
@@ -123,6 +125,23 @@ final class ProjectTestKit
     public function document(string $uri): DocumentRequest
     {
         return $this->requests()->document($uri);
+    }
+
+    /**
+     * The typed request a positioned capability serves, out of the parameters
+     * one of the cursor helpers built.
+     *
+     * @param array<array-key, mixed> $params
+     */
+    public function positioned(array $params): PositionedRequest
+    {
+        return $this->requests()->positioned($params);
+    }
+
+    /** @param array<array-key, mixed> $params */
+    public function references(array $params, bool $includeDeclaration = true): ReferencesRequest
+    {
+        return $this->requests()->references($params, $includeDeclaration);
     }
 
     /**

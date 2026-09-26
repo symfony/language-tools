@@ -18,6 +18,8 @@ use Symfony\Lsp\Project\AnalysisSettingsRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class TranslationProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
@@ -112,7 +114,8 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->resolve($params);
+        $request = $this->requests->positioned($params);
+        $resolved = null === $request ? null : $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -141,21 +144,21 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         ));
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
 
         return array_map(fn (TranslationDeclaration $declaration): array => $this->protocol->location($declaration->uri, $declaration->range), $this->indexes->forProject($resolved->project)->declarations($resolved->reference->domain, $resolved->reference->key));
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
 
         return array_map(fn (TranslationReference $item): array => $this->protocol->location($item->uri, $item->range), $this->indexes->forProject($resolved->project)->references($resolved->reference->domain, $resolved->reference->key));
@@ -231,12 +234,9 @@ final class TranslationProvider implements CompletionProviderInterface, Definiti
         return true === $this->settings->forProject($project)->translationDiagnostics;
     }
 
-    /** @param array<array-key, mixed> $params */
-    private function resolve(array $params): ?ResolvedTranslationReference
+    private function resolve(PositionedRequest $request): ?ResolvedTranslationReference
     {
-        $request = $this->requests->positioned($params);
-
-        return null === $request ? null : $this->referenceResolver->resolve($request);
+        return $this->referenceResolver->resolve($request);
     }
 
     /** @return list<string> */

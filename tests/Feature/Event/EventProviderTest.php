@@ -480,10 +480,10 @@ PHP;
         self::assertSame(['App\\Event\\OrderPlaced'], $kit->labels($kit->get(EventCompletionProvider::class)->complete($kit->after($dispatcherUri, "'App\\Event\\Ord"))));
         $dispatched = $kit->at($dispatcherUri, 'OrderPlaced());');
         self::assertStringContainsString('Symfony event', $kit->hoverText($relationshipProvider->hover($dispatched)));
-        self::assertSame([$eventUri, $listenerUri], $kit->targets($relationshipProvider->definition($dispatched)));
+        self::assertSame([$eventUri, $listenerUri], $kit->targets($relationshipProvider->definition($kit->positioned($dispatched))));
 
         $declared = $kit->at($eventUri, 'OrderPlaced');
-        self::assertContains($dispatcherUri, $kit->targets($relationshipProvider->references($declared)));
+        self::assertContains($dispatcherUri, $kit->targets($relationshipProvider->references($kit->references($declared))));
         self::assertSame(['event.invalid_listener_method'], $kit->codes($kit->get(EventDiagnosticProvider::class)->diagnostics(LspRequests::document($invalidUri))));
         self::assertSame(['1 event listener'], $kit->titles($codeLensProvider->codeLenses($kit->document($eventUri))));
         self::assertSame(['Listens to 1 event'], $kit->titles($codeLensProvider->codeLenses($kit->document($listenerUri))));

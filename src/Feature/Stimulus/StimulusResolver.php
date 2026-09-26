@@ -2,16 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Stimulus;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class StimulusResolver
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly StimulusIndexRegistry $indexes,
@@ -64,19 +62,11 @@ final class StimulusResolver
         return $members;
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{StimulusReference, Project}|null
-     */
-    public function resolve(array $params): ?array
+    /** @return array{StimulusReference, Project}|null */
+    public function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        $facts = $this->extractor->extract($request->project, SourceDocument::fromDocument($request->document));
+        $offset = $request->offset;
+        $facts = $this->extractor->extract($request->project, $request->source);
         foreach ($facts->references as $reference) {
             if ($this->converter->containsByteOffset($request->document->text, $reference->range, $offset, inclusiveEnd: true)) {
                 return [$reference, $request->project];

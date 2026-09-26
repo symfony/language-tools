@@ -3,9 +3,10 @@
 namespace Symfony\Lsp\Feature\Twig;
 
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Index\RangedSourceSymbolInterface;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
+use Symfony\Lsp\Index\NamedSourceSymbolInterface;
 
-final class LiveComponentEvent implements RangedSourceSymbolInterface
+final class LiveComponentEvent implements LocatedSourceSymbolInterface, NamedSourceSymbolInterface
 {
     public function __construct(
         public readonly string $name,

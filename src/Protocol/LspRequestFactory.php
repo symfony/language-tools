@@ -58,6 +58,21 @@ final class LspRequestFactory
             : new PositionedRequest($request, $position, $this->positions->toByteOffset($request->document->text, $position));
     }
 
+    /**
+     * The declaration of a symbol is reported unless the client asks for the
+     * references alone.
+     *
+     * @param array<array-key, mixed> $params
+     */
+    public function references(array $params): ?ReferencesRequest
+    {
+        $request = $this->positioned($params);
+        $context = $params['context'] ?? null;
+        $includeDeclaration = \is_array($context) ? $context['includeDeclaration'] ?? null : null;
+
+        return null === $request ? null : new ReferencesRequest($request, false !== $includeDeclaration);
+    }
+
     /** @param array<array-key, mixed> $params */
     public function codeAction(array $params): ?CodeActionRequest
     {

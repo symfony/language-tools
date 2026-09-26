@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
@@ -12,11 +11,14 @@ use Symfony\Lsp\Index\SourceSymbolOrder;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class TwigCallableRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
+        private readonly LspRequestFactory $requests,
         private readonly PositionConverter $converter,
         private readonly LspProtocolMapper $protocol,
         private readonly TwigCallableSourceIndexRegistry $indexes,
@@ -28,7 +30,12 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->resolve($params);
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -58,11 +65,11 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
         return $this->protocol->markdownHover($value);
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [, $declarations, $project] = $resolved;
         $methods = [];
@@ -92,18 +99,17 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
         return $this->unique($locations);
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null !== $resolved) {
             [, $declarations, $project] = $resolved;
 
             return $this->referenceLocations($project, $declarations);
         }
 
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'php' !== $request->document->languageId) {
-            return null;
+        if ('php' !== $request->document->languageId) {
+            return [];
         }
         $index = $this->indexes->forProject($request->project);
         $declaration = $index->declarationAt($request->document->uri, $request->position);
@@ -111,33 +117,28 @@ final class TwigCallableRelationshipProvider implements DefinitionProviderInterf
             return $this->referenceLocations($request->project, [$declaration]);
         }
         if (!$index->hasCallableDeclarations()) {
-            return null;
+            return [];
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $offset = $request->offset;
         foreach ($this->phpParser->parse($request->document->text)->methodDeclarations as $method) {
             if ($offset < $method->nameStartOffset || $offset > $method->nameEndOffset) {
                 continue;
             }
             $declarations = $index->declarationsForCallable($method->className, $method->name);
 
-            return [] === $declarations ? null : $this->referenceLocations($request->project, $declarations);
+            return $this->referenceLocations($request->project, $declarations);
         }
 
-        return null;
+        return [];
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{TwigCallableReference, list<TwigCallableDeclaration>, Project}|null
-     */
-    private function resolve(array $params): ?array
+    /** @return array{TwigCallableReference, list<TwigCallableDeclaration>, Project}|null */
+    private function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request || 'twig' !== $request->document->languageId) {
+        if ('twig' !== $request->document->languageId) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+        $offset = $request->offset;
         $reference = $this->references->at($request->document->text, $offset);
         if (null === $reference) {
             return null;

@@ -157,7 +157,7 @@ final class UnknownNameSemanticActionsTest extends TestCase
             new TwigComponentPhpExtractor($converter, $names),
             new TwigComponentTemplateExtractor($converter, $names, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator()), new TwigCallArgumentResolver(new TwigArgumentParser())),
         );
-        $componentResolver = new TwigComponentResolver($resolver, new PositionedSourceSymbolResolver($converter), $indexes, $templates, $extractor);
+        $componentResolver = new TwigComponentResolver(new PositionedSourceSymbolResolver($converter), $indexes, $templates, $extractor);
         $diagnostic = $protocol->diagnostic($range, 1, 'twig_component.not_found', 'Unknown component.');
         $actions = (new TwigComponentCodeActionProvider($indexes, $templates, $componentResolver, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))->actions($requests->codeAction($uri, [$diagnostic]));
 

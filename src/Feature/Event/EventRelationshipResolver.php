@@ -2,20 +2,18 @@
 
 namespace Symfony\Lsp\Feature\Event;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
-use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class EventRelationshipResolver
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
-        private readonly PositionConverter $converter,
+        private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly LspProtocolMapper $protocol,
         private readonly EventSourceIndexRegistry $sourceIndexes,
         private readonly EventExtractor $extractor,
@@ -24,32 +22,18 @@ final class EventRelationshipResolver
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{EventSourceSymbol|null, PhpClassDeclaration|null, Project}|null
-     */
-    public function resolve(array $params): ?array
+    /** @return array{EventSourceSymbol|null, PhpClassDeclaration|null, Project}|null */
+    public function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request) {
-            return null;
+        $symbol = $this->positionedSymbols->resolve($request->source, $request->position, $this->extractor->extract($request->source)->symbols);
+        if ($symbol instanceof EventSourceSymbol) {
+            return [$symbol, null, $request->project];
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
-        foreach ($this->extractor->extract(SourceDocument::fromDocument($request->document))->symbols as $symbol) {
-            if ($this->converter->containsByteOffset($request->document->text, $symbol->range, $offset, inclusiveEnd: true)) {
-                return [$symbol, null, $request->project];
-            }
-        }
-        if ('php' === $request->document->languageId) {
-            foreach ($this->classExtractor->extract($request->document->uri, $request->document->text) as $class) {
-                if ($this->converter->containsByteOffset($request->document->text, $class->range, $offset, inclusiveEnd: true)) {
-                    return [null, $class, $request->project];
-                }
-            }
-        }
+        $class = 'php' === $request->document->languageId
+            ? $this->positionedSymbols->resolve($request->source, $request->position, $this->classExtractor->extract($request->document->uri, $request->document->text))
+            : null;
 
-        return null;
+        return $class instanceof PhpClassDeclaration ? [null, $class, $request->project] : null;
     }
 
     /** @return array<array-key, mixed>|null */

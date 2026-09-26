@@ -2,32 +2,34 @@
 
 namespace Symfony\Lsp\Feature;
 
+use Symfony\Lsp\Protocol\LspRequestFactory;
+
 final class DefinitionProviderRegistry
 {
     /** @param iterable<DefinitionProviderInterface> $providers */
-    public function __construct(private readonly iterable $providers)
-    {
+    public function __construct(
+        private readonly LspRequestFactory $requests,
+        private readonly iterable $providers,
+    ) {
     }
 
     /**
      * @param array<array-key, mixed> $params
      *
-     * @return list<array<array-key, mixed>>|null
+     * @return list<array<array-key, mixed>>
      */
-    public function definition(array $params): ?array
+    public function definition(array $params): array
     {
-        $locations = [];
-        $matched = false;
-        foreach ($this->providers as $provider) {
-            $providedLocations = $provider->definition($params);
-            if (null === $providedLocations) {
-                continue;
-            }
-
-            $matched = true;
-            array_push($locations, ...$providedLocations);
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return [];
         }
 
-        return $matched ? $locations : null;
+        $locations = [];
+        foreach ($this->providers as $provider) {
+            array_push($locations, ...$provider->definition($request));
+        }
+
+        return $locations;
     }
 }

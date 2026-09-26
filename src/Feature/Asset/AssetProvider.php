@@ -2,8 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Asset;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
-use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderInterface;
@@ -11,17 +9,18 @@ use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class AssetProvider implements CompletionProviderInterface, DefinitionProviderInterface, DiagnosticProviderInterface, DocumentLinkProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
-        private readonly PositionConverter $converter,
+        private readonly LspRequestFactory $requests,
         private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly UriToPathConverter $uriConverter,
         private readonly LspProtocolMapper $protocol,
@@ -34,11 +33,12 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
 
     public function complete(array $params): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
+        $request = $this->requests->positioned($params);
         if (null === $request) {
             return null;
         }
-        $offset = $this->converter->toByteOffset($request->document->text, $request->position);
+
+        $offset = $request->offset;
         $context = $this->extractor->completionContext($request->document->languageId, $request->document->text, $offset);
         if (null === $context) {
             return null;
@@ -73,7 +73,12 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->resolve($params);
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -111,11 +116,11 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         return $this->protocol->markdownHover(implode("\n", $lines));
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $project] = $resolved;
         if (AssetSymbolKind::Asset === $symbol->kind) {
@@ -132,15 +137,15 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         return array_map(fn (AssetSourceSymbol $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), $declarations);
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $project] = $resolved;
 
-        return array_map(fn (AssetSourceSymbol $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), $this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name));
+        return $this->protocol->locations($request->reported($this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name)));
     }
 
     public function links(DocumentRequest $request): array
@@ -166,7 +171,7 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
 
     public function diagnostics(array $params): ?array
     {
-        $request = $this->resolver->resolveDocument($params);
+        $request = $this->requests->document($params);
         if (null === $request || 'twig' !== $request->document->languageId) {
             return null;
         }
@@ -207,18 +212,10 @@ final class AssetProvider implements CompletionProviderInterface, DefinitionProv
         return $names;
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{AssetSourceSymbol, Project}|null
-     */
-    private function resolve(array $params): ?array
+    /** @return array{AssetSourceSymbol, Project}|null */
+    private function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $document = SourceDocument::fromDocument($request->document);
+        $document = $request->source;
         $symbol = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document)->symbols);
 
         return null === $symbol ? null : [$symbol, $request->project];

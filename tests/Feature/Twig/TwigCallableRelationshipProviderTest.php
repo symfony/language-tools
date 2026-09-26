@@ -92,6 +92,7 @@ final class TwigCallableRelationshipProviderTest extends TwigCallableProviderTes
             $outsideUri => $outsideText,
         ], [$twigUri => $twigText]);
         $provider = $environment['relationship'];
+        $requests = $environment['requests'];
         $converter = $environment['converter'];
         $protocol = $environment['protocol'];
 
@@ -132,7 +133,7 @@ final class TwigCallableRelationshipProviderTest extends TwigCallableProviderTes
                     $converter->toPosition($runtimeText, $methodOffset + $methodLength),
                 ),
             ),
-        ], $provider->definition(LspRequests::inside($twigUri, $twigText, 'function_name')));
+        ], $provider->definition($requests->positioned(LspRequests::inside($twigUri, $twigText, 'function_name'))));
         $attributeMethodOffset = strpos($extensionText, 'attributeFunction');
         self::assertIsInt($attributeMethodOffset);
         self::assertSame([
@@ -143,7 +144,7 @@ final class TwigCallableRelationshipProviderTest extends TwigCallableProviderTes
                     $converter->toPosition($extensionText, $attributeMethodOffset + \strlen('attributeFunction')),
                 ),
             ),
-        ], $provider->definition(LspRequests::inside($twigUri, $twigText, 'attribute_function')));
+        ], $provider->definition($requests->positioned(LspRequests::inside($twigUri, $twigText, 'attribute_function'))));
 
         $dynamicOffset = strpos($extensionText, 'dynamic_name');
         self::assertIsInt($dynamicOffset);
@@ -155,7 +156,7 @@ final class TwigCallableRelationshipProviderTest extends TwigCallableProviderTes
                     $converter->toPosition($extensionText, $dynamicOffset + \strlen('dynamic_name')),
                 ),
             ),
-        ], $provider->definition(LspRequests::inside($twigUri, $twigText, 'dynamic_name')));
+        ], $provider->definition($requests->positioned(LspRequests::inside($twigUri, $twigText, 'dynamic_name'))));
 
         self::assertSame([
             'contents' => [
@@ -173,24 +174,24 @@ final class TwigCallableRelationshipProviderTest extends TwigCallableProviderTes
                     $converter->toPosition($extensionText, $outsideOffset + \strlen('outside_name')),
                 ),
             ),
-        ], $provider->definition(LspRequests::inside($twigUri, $twigText, 'outside_name')));
+        ], $provider->definition($requests->positioned(LspRequests::inside($twigUri, $twigText, 'outside_name'))));
 
-        $functionReferences = $provider->references(LspRequests::inside($twigUri, $twigText, 'function_name'));
-        self::assertCount(2, $functionReferences ?? []);
-        self::assertSame([$twigUri, $twigUri], array_column($functionReferences ?? [], 'uri'));
-        self::assertCount(2, $provider->references(LspRequests::inside($twigUri, $twigText, 'filter_name')) ?? []);
-        self::assertCount(2, $provider->references(LspRequests::inside($extensionUri, $extensionText, 'function_name')) ?? []);
-        self::assertCount(2, $provider->references(LspRequests::inside($extensionUri, $extensionText, 'filter_name')) ?? []);
-        self::assertCount(1, $provider->references(LspRequests::inside($extensionUri, $extensionText, 'attribute_function')) ?? []);
-        self::assertCount(1, $provider->references(LspRequests::inside($extensionUri, $extensionText, 'dynamic_name')) ?? []);
-        self::assertSame([], $provider->references(LspRequests::inside($extensionUri, $extensionText, 'unused_name')));
+        $functionReferences = $provider->references($requests->references(LspRequests::inside($twigUri, $twigText, 'function_name')));
+        self::assertCount(2, $functionReferences);
+        self::assertSame([$twigUri, $twigUri], array_column($functionReferences, 'uri'));
+        self::assertCount(2, $provider->references($requests->references(LspRequests::inside($twigUri, $twigText, 'filter_name'))));
+        self::assertCount(2, $provider->references($requests->references(LspRequests::inside($extensionUri, $extensionText, 'function_name'))));
+        self::assertCount(2, $provider->references($requests->references(LspRequests::inside($extensionUri, $extensionText, 'filter_name'))));
+        self::assertCount(1, $provider->references($requests->references(LspRequests::inside($extensionUri, $extensionText, 'attribute_function'))));
+        self::assertCount(1, $provider->references($requests->references(LspRequests::inside($extensionUri, $extensionText, 'dynamic_name'))));
+        self::assertSame([], $provider->references($requests->references(LspRequests::inside($extensionUri, $extensionText, 'unused_name'))));
         /** @var list<array{range: array{start: array{line: int}}}> $methodReferences */
-        $methodReferences = $provider->references(LspRequests::inside($runtimeUri, $runtimeText, 'doSomething')) ?? [];
+        $methodReferences = $provider->references($requests->references(LspRequests::inside($runtimeUri, $runtimeText, 'doSomething')));
         self::assertSame([0, 1, 3, 4], array_map(static fn (array $location): int => $location['range']['start']['line'], $methodReferences));
-        self::assertCount(4, $provider->references(LspRequests::inside($runtimeUri, $runtimeText, 'doSomething', $methodOffset - intdiv($methodLength, 2))) ?? []);
-        self::assertCount(4, $provider->references(LspRequests::inside($runtimeUri, $runtimeText, 'doSomething', $methodOffset + $methodLength - intdiv($methodLength, 2))) ?? []);
-        self::assertCount(1, $provider->references(LspRequests::inside($extensionUri, $extensionText, 'attributeFunction')) ?? []);
-        self::assertNull($provider->references(LspRequests::inside($extensionUri, $extensionText, 'getFunctions')));
+        self::assertCount(4, $provider->references($requests->references(LspRequests::inside($runtimeUri, $runtimeText, 'doSomething', $methodOffset - intdiv($methodLength, 2)))));
+        self::assertCount(4, $provider->references($requests->references(LspRequests::inside($runtimeUri, $runtimeText, 'doSomething', $methodOffset + $methodLength - intdiv($methodLength, 2)))));
+        self::assertCount(1, $provider->references($requests->references(LspRequests::inside($extensionUri, $extensionText, 'attributeFunction'))));
+        self::assertSame([], $provider->references($requests->references(LspRequests::inside($extensionUri, $extensionText, 'getFunctions'))));
 
         self::assertNull($provider->hover(LspRequests::inside($twigUri, $twigText, 'path')));
         self::assertNull($provider->hover(LspRequests::inside($twigUri, $twigText, 'function_name', (int) strrpos($twigText, 'function_name'))));

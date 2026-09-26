@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 
-final class ParameterDeclaration
+final class ParameterDeclaration implements LocatedSourceSymbolInterface
 {
     public function __construct(
         public readonly string $name,

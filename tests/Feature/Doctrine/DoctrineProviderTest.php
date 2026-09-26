@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\Doctrine;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Doctrine\DoctrineCompletionProvider;
@@ -20,6 +19,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectTestKit;
 
@@ -134,12 +134,12 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame(['category'], $kit->labels($completionProvider->complete($kit->offset($managerCompletionUri, \strlen($managerCompletionText)))));
 
         $field = $kit->after($usageUri, "['na");
-        self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($field)));
-        self::assertCount(3, $relationshipProvider->references($field) ?? []);
+        self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($kit->positioned($field))));
+        self::assertCount(3, $relationshipProvider->references($kit->references($field)));
         self::assertStringContainsString('Doctrine field: `App\\Entity\\Product::$name`', $kit->hoverText($relationshipProvider->hover($field)));
 
-        self::assertSame([$repositoryUri], $kit->targets($relationshipProvider->definition($kit->inside($entityUri, 'ProductRepository:'))));
-        self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($kit->inside($repositoryUri, 'Product:'))));
+        self::assertSame([$repositoryUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside($entityUri, 'ProductRepository:')))));
+        self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside($repositoryUri, 'Product:')))));
 
         $codeLensProvider = $kit->get(DoctrineRelationshipCodeLensProvider::class);
         self::assertSame(['Repository: App\\Repository\\ProductRepository'], $kit->titles($codeLensProvider->codeLenses($kit->document($entityUri))));
@@ -406,7 +406,7 @@ final class DoctrineProviderTest extends TestCase
         $indexes->forProject($project)->replace($facts);
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
-        $provider = new DoctrineRelationshipProvider(new DocumentContextResolver($documents, $projects), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor);
+        $provider = new DoctrineRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $indexes, $extractor);
 
         self::assertSame(
             [null, 'App\Entity\Category'],
@@ -697,7 +697,7 @@ final class DoctrineProviderTest extends TestCase
         $provider = $kit->get(DoctrineRelationshipProvider::class);
         $field = $kit->after($usageUri, "['ti");
 
-        self::assertSame([$entityUri], $kit->targets($provider->definition($field)));
+        self::assertSame([$entityUri], $kit->targets($provider->definition($kit->positioned($field))));
         self::assertStringContainsString('Doctrine field: `Acme\Entity\Book::$title`', $kit->hoverText($provider->hover($field)));
     }
 

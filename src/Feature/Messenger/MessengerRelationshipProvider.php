@@ -7,10 +7,14 @@ use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclaration;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class MessengerRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
         private readonly MessengerRelationshipResolver $relationships,
@@ -19,7 +23,8 @@ final class MessengerRelationshipProvider implements DefinitionProviderInterface
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->relationships->resolve($params);
+        $request = $this->requests->positioned($params);
+        $resolved = null === $request ? null : $this->relationships->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -75,14 +80,14 @@ final class MessengerRelationshipProvider implements DefinitionProviderInterface
         return [] === $lines ? null : $this->protocol->markdownHover(implode("\n", $lines));
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        return $this->relationships->definitions($params);
+        return $this->relationships->definitions($request);
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        return $this->relationships->references($params);
+        return $this->relationships->references($request);
     }
 
     /**

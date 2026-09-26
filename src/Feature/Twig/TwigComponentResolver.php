@@ -2,15 +2,13 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class TwigComponentResolver
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
         private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly TwigComponentIndexRegistry $indexes,
         private readonly TemplateIndexRegistry $templates,
@@ -102,18 +100,10 @@ final class TwigComponentResolver
         return false;
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{TwigComponent, TwigComponentAction, Project}|null
-     */
-    public function resolveAction(array $params): ?array
+    /** @return array{TwigComponent, TwigComponentAction, Project}|null */
+    public function resolveAction(PositionedRequest $request): ?array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $document = SourceDocument::fromDocument($request->document);
+        $document = $request->source;
         $facts = $this->extractor->extract($request->project, $document);
         $reference = $this->positionedSymbols->resolve($document, $request->position, $facts->actionReferences);
         if (null !== $reference) {
@@ -137,18 +127,10 @@ final class TwigComponentResolver
         return null;
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{TwigComponent, Project}|null
-     */
-    public function resolveComponent(array $params): ?array
+    /** @return array{TwigComponent, Project}|null */
+    public function resolveComponent(PositionedRequest $request): ?array
     {
-        $request = $this->documents->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $document = SourceDocument::fromDocument($request->document);
+        $document = $request->source;
         $facts = $this->extractor->extract($request->project, $document);
         $reference = $this->positionedSymbols->resolve($document, $request->position, $facts->references);
         if (null !== $reference) {

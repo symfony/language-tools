@@ -3,8 +3,9 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 
-final class RouteDeclaration
+final class RouteDeclaration implements LocatedSourceSymbolInterface
 {
     public function __construct(
         public readonly string $name,

@@ -6,10 +6,14 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class EnvironmentRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
+        private readonly LspRequestFactory $requests,
         private readonly LspProtocolMapper $protocol,
         private readonly EnvironmentIndexRegistry $indexes,
         private readonly EnvironmentSymbolResolver $symbols,
@@ -18,7 +22,8 @@ final class EnvironmentRelationshipProvider implements DefinitionProviderInterfa
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->symbols->resolve($params);
+        $request = $this->requests->positioned($params);
+        $resolved = null === $request ? null : $this->symbols->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -42,22 +47,22 @@ final class EnvironmentRelationshipProvider implements DefinitionProviderInterfa
         return $this->protocol->markdownHover(implode("\n\n", $details));
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->symbols->resolve($params);
+        $resolved = $this->symbols->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$reference, $project] = $resolved;
 
         return array_map(fn (EnvironmentDeclaration $declaration): array => $this->protocol->location($declaration->uri, $declaration->range), $this->indexes->forProject($project)->declarations($reference->name));
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->symbols->resolve($params);
+        $resolved = $this->symbols->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$reference, $project] = $resolved;
 

@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\Twig;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -28,7 +27,9 @@ use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class TwigPhpSymbolProviderTest extends TestCase
 {
@@ -80,8 +81,7 @@ final class TwigPhpSymbolProviderTest extends TestCase
         $indexes = new TwigPhpSymbolSourceIndexRegistry();
         $indexes->forProject($project)->replace($phpFacts, $twigFacts);
         $provider = new TwigPhpSymbolProvider(
-            new DocumentContextResolver($documents, $projects),
-            $converter,
+            new LspRequestFactory($documents, $projects, $converter),
             $protocol = new LspProtocolMapper(),
             $indexes,
             $extractor,
@@ -109,19 +109,19 @@ final class TwigPhpSymbolProviderTest extends TestCase
         $format = $indexes->forProject($project)->memberDeclarations('App\Model\ViewOptions', 'FORMAT')[0];
         self::assertSame([
             $protocol->location($phpUri, $format->range),
-        ], $provider->definition(LspRequests::inside($twigUri, $twig, 'FORMAT')));
+        ], $provider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::inside($twigUri, $twig, 'FORMAT'))));
         $status = $indexes->forProject($project)->typeDeclarations('App\Model\Status')[0];
         self::assertSame([
             $protocol->location($phpUri, $status->range),
-        ], $provider->definition(LspRequests::inside($twigUri, $twig, 'App\\\\Model\\\\Status')));
+        ], $provider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::inside($twigUri, $twig, 'App\\\\Model\\\\Status'))));
 
-        self::assertCount(2, $provider->references(LspRequests::inside($twigUri, $twig, 'Published', (int) strpos($twig, ').Published') + 2)) ?? []);
-        self::assertCount(2, $provider->references(LspRequests::inside($phpUri, $php, 'Published')) ?? []);
-        self::assertCount(3, $provider->references(LspRequests::inside($phpUri, $php, 'Status')) ?? []);
-        $withDeclaration = LspRequests::inside($phpUri, $php, 'Published');
-        $withDeclaration['context'] = ['includeDeclaration' => true];
-        self::assertCount(3, $provider->references($withDeclaration) ?? []);
-        self::assertCount(1, $provider->references(LspRequests::inside($phpUri, $php, 'ViewOptions', (int) strpos($php, 'ViewOptions') + 2)) ?? []);
+        $requests = new ProviderRequests($documents, $projects);
+        $published = LspRequests::inside($phpUri, $php, 'Published');
+        self::assertCount(3, $provider->references($requests->references(LspRequests::inside($twigUri, $twig, 'Published', (int) strpos($twig, ').Published') + 2))));
+        self::assertCount(3, $provider->references($requests->references($published)));
+        self::assertCount(2, $provider->references($requests->references($published, includeDeclaration: false)));
+        self::assertCount(4, $provider->references($requests->references(LspRequests::inside($phpUri, $php, 'Status'))));
+        self::assertCount(2, $provider->references($requests->references(LspRequests::inside($phpUri, $php, 'ViewOptions', (int) strpos($php, 'ViewOptions') + 2))));
 
         $complete = static function (string $text, ?int $cursor = null) use ($provider, $documents, $converter): array {
             $uri = 'file:///workspace/templates/completion.html.twig';

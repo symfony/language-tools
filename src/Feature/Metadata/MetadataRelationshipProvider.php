@@ -2,19 +2,20 @@
 
 namespace Symfony\Lsp\Feature\Metadata;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class MetadataRelationshipProvider implements DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
+        private readonly LspRequestFactory $requests,
         private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly LspProtocolMapper $protocol,
         private readonly MetadataSourceIndexRegistry $sourceIndexes,
@@ -24,7 +25,12 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->resolveSourceSymbol($params);
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
+        $resolved = $this->resolveSourceSymbol($request);
         if (null === $resolved) {
             return null;
         }
@@ -41,11 +47,11 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
         return $this->protocol->markdownHover($value);
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->resolveSourceSymbol($params);
+        $resolved = $this->resolveSourceSymbol($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $project] = $resolved;
         $locations = [];
@@ -58,19 +64,15 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
         return $locations;
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->resolveSourceSymbol($params);
+        $resolved = $this->resolveSourceSymbol($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$symbol, $project] = $resolved;
-        $locations = [];
-        foreach ($this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name) as $candidate) {
-            $locations[] = $this->protocol->location($candidate->uri, $candidate->range);
-        }
 
-        return $locations;
+        return $this->protocol->locations($request->reported($this->sourceIndexes->forProject($project)->symbols($symbol->kind, $symbol->name)));
     }
 
     /** @param list<MetadataSourceSymbol> $symbols */
@@ -95,18 +97,10 @@ final class MetadataRelationshipProvider implements DefinitionProviderInterface,
         return $value;
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{MetadataSourceSymbol, Project}|null
-     */
-    private function resolveSourceSymbol(array $params): ?array
+    /** @return array{MetadataSourceSymbol, Project}|null */
+    private function resolveSourceSymbol(PositionedRequest $request): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $document = SourceDocument::fromDocument($request->document);
+        $document = $request->source;
         $symbol = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($document)->symbols);
 
         return null === $symbol ? null : [$symbol, $request->project];

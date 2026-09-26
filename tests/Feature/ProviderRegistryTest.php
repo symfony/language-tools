@@ -6,7 +6,6 @@ use Fabpot\JsonRpc\Exception\JsonRpcException;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -56,6 +55,7 @@ use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 use Symfony\Lsp\Protocol\RenameRequest;
 use Symfony\Lsp\Tests\Support\LspRequests;
 
@@ -78,38 +78,55 @@ final class ProviderRegistryTest extends TestCase
         self::assertSame([], (new CompletionProviderRegistry([new StubProvider([])]))->complete([]));
     }
 
-    public function testDefinitionProvidersAggregateInOrderAndDistinguishNoMatchFromEmptyMatch(): void
+    public function testDefinitionProvidersAggregateEveryTargetOfAnOpenProjectDocument(): void
     {
-        $first = new StubProvider(null);
+        $first = new StubProvider([]);
         $second = new StubProvider([['uri' => 'file:///second']]);
         $third = new StubProvider([['uri' => 'file:///third']]);
+        $uri = 'file:///workspace/src/Kernel.php';
+        $requests = $this->requestFactory($uri, 'php', '<?php');
+        $params = LspRequests::position($uri, new Position(0, 1));
 
         self::assertSame(
             [['uri' => 'file:///second'], ['uri' => 'file:///third']],
-            (new DefinitionProviderRegistry([$first, $second, $third]))->definition([]),
+            (new DefinitionProviderRegistry($requests, [$first, $second, $third]))->definition($params),
         );
         self::assertSame(['definition'], $first->calls);
         self::assertSame(['definition'], $second->calls);
         self::assertSame(['definition'], $third->calls);
-        self::assertNull((new DefinitionProviderRegistry([new StubProvider(null)]))->definition([]));
-        self::assertSame([], (new DefinitionProviderRegistry([new StubProvider([])]))->definition([]));
+        self::assertSame([], (new DefinitionProviderRegistry($requests, [$first]))->definition(LspRequests::document($uri)));
+        self::assertSame(['definition'], $first->calls);
     }
 
-    public function testReferenceProvidersAggregateInOrderAndDistinguishNoMatchFromEmptyMatch(): void
+    public function testReferenceProvidersAggregateEveryLocationOfAnOpenProjectDocument(): void
     {
-        $first = new StubProvider(null);
+        $first = new StubProvider([]);
         $second = new StubProvider([['uri' => 'file:///second']]);
         $third = new StubProvider([['uri' => 'file:///third']]);
+        $uri = 'file:///workspace/src/Kernel.php';
+        $requests = $this->requestFactory($uri, 'php', '<?php');
+        $params = LspRequests::position($uri, new Position(0, 1));
 
         self::assertSame(
             [['uri' => 'file:///second'], ['uri' => 'file:///third']],
-            (new ReferencesProviderRegistry([$first, $second, $third]))->references([]),
+            (new ReferencesProviderRegistry($requests, [$first, $second, $third]))->references($params),
         );
         self::assertSame(['references'], $first->calls);
         self::assertSame(['references'], $second->calls);
         self::assertSame(['references'], $third->calls);
-        self::assertNull((new ReferencesProviderRegistry([new StubProvider(null)]))->references([]));
-        self::assertSame([], (new ReferencesProviderRegistry([new StubProvider([])]))->references([]));
+        self::assertSame([], (new ReferencesProviderRegistry($requests, [$first]))->references(LspRequests::document($uri)));
+        self::assertSame(['references'], $first->calls);
+    }
+
+    public function testReferenceRequestsReportDeclarationsUnlessTheClientOptsOut(): void
+    {
+        $uri = 'file:///workspace/src/Kernel.php';
+        $requests = $this->requestFactory($uri, 'php', '<?php');
+        $position = LspRequests::position($uri, new Position(0, 1));
+
+        self::assertTrue($requests->references($position)?->includeDeclaration);
+        self::assertTrue($requests->references([...$position, 'context' => ['includeDeclaration' => true]])?->includeDeclaration);
+        self::assertFalse($requests->references([...$position, 'context' => ['includeDeclaration' => false]])?->includeDeclaration);
     }
 
     public function testDocumentLinkProvidersAggregateEveryLinkOfAnOpenProjectDocument(): void
@@ -240,7 +257,7 @@ final class ProviderRegistryTest extends TestCase
         $documents = new DocumentStore();
         $documents->open(new Document($uri, 'php', 1, $text));
         $source = new SourceDocument($uri, 'php', $text);
-        $resolver = new DocumentContextResolver($documents, $projects);
+        $requestFactory = new LspRequestFactory($documents, $projects, $converter);
         $protocol = new LspProtocolMapper();
         $positionedSymbols = new PositionedSourceSymbolResolver($converter);
         $phpParser = new TolerantPhpParser(new Parser());
@@ -260,8 +277,8 @@ final class ProviderRegistryTest extends TestCase
         $metadataIndexes = new MetadataSourceIndexRegistry();
         $metadataIndexes->forProject($project)->replace($metadataExtractor->extract($source));
         $registry = new HoverProviderRegistry($protocol, [
-            new MetadataRelationshipProvider($resolver, $positionedSymbols, $protocol, $metadataIndexes, $metadataExtractor),
-            new DoctrineRelationshipProvider($resolver, $positionedSymbols, $protocol, $doctrineIndexes, $doctrineExtractor),
+            new MetadataRelationshipProvider($requestFactory, $positionedSymbols, $protocol, $metadataIndexes, $metadataExtractor),
+            new DoctrineRelationshipProvider($requestFactory, $positionedSymbols, $protocol, $doctrineIndexes, $doctrineExtractor),
         ]);
 
         $position = $converter->toPosition($text, (int) strpos($text, '$category = null') + 2);
@@ -399,9 +416,9 @@ final class StubProvider implements CodeActionProviderInterface, CodeLensProvide
         return $this->result(__FUNCTION__);
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        return $this->result(__FUNCTION__);
+        return $this->result(__FUNCTION__) ?? [];
     }
 
     public function links(DocumentRequest $request): array
@@ -414,9 +431,9 @@ final class StubProvider implements CodeActionProviderInterface, CodeLensProvide
         return $this->firstResult(__FUNCTION__);
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        return $this->result(__FUNCTION__);
+        return $this->result(__FUNCTION__) ?? [];
     }
 
     public function prepare(PositionedRequest $request): ?array

@@ -472,15 +472,15 @@ YAML;
         self::assertNull($completionProvider->complete($kit->offset($bundleUri, \strlen($bundleYaml))));
         self::assertSame(['async'], $kit->labels($completionProvider->complete($kit->after($yamlUri, 'Ping: asy'))));
         self::assertStringContainsString('Messenger transport', $kit->hoverText($relationshipProvider->hover($kit->after($yamlUri, 'from_transport: as'))));
-        self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->inside($yamlUri, 'command.bus'))));
+        self::assertSame([$yamlUri], $kit->targets($relationshipProvider->definition($kit->positioned($kit->inside($yamlUri, 'command.bus')))));
         self::assertSame(['messenger.unknown_bus'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($yamlUri))));
         self::assertSame(['messenger.invalid_handler_signature', 'messenger.invalid_handler_signature'], $kit->codes($diagnosticProvider->diagnostics(LspRequests::document($handlerUri))));
 
         $declared = $kit->at($messageUri, 'Ping');
-        self::assertSame([$handlerUri], $kit->targets($relationshipProvider->definition($declared)));
-        self::assertContains($controllerUri, $kit->targets($relationshipProvider->references($declared)));
+        self::assertSame([$handlerUri], $kit->targets($relationshipProvider->definition($kit->positioned($declared))));
+        self::assertContains($controllerUri, $kit->targets($relationshipProvider->references($kit->references($declared))));
         $dispatched = $kit->at($controllerUri, 'Ping());');
-        self::assertSame([$messageUri, $handlerUri], $kit->targets($relationshipProvider->definition($dispatched)));
+        self::assertSame([$messageUri, $handlerUri], $kit->targets($relationshipProvider->definition($kit->positioned($dispatched))));
         self::assertSame(
             ['1 Messenger handler', '1 Messenger handler', '1 Messenger handler'],
             $kit->titles($kit->get(MessengerCodeLensProvider::class)->codeLenses($kit->document($messageUri))),

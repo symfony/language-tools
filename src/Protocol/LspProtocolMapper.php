@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Protocol;
 
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 
 final class LspProtocolMapper
 {
@@ -20,6 +21,26 @@ final class LspProtocolMapper
     public function location(string $uri, Range $range): array
     {
         return ['uri' => $uri, 'range' => $this->range($range)];
+    }
+
+    /**
+     * The locations of source symbols, without the ones a previous symbol
+     * already reported.
+     *
+     * @param iterable<LocatedSourceSymbolInterface> $symbols
+     *
+     * @return list<array{uri: string, range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}}>
+     */
+    public function locations(iterable $symbols): array
+    {
+        $locations = [];
+        foreach ($symbols as $symbol) {
+            $range = $symbol->range;
+            $key = implode("\0", [$symbol->uri, $range->start->line, $range->start->character, $range->end->line, $range->end->character]);
+            $locations[$key] ??= $this->location($symbol->uri, $range);
+        }
+
+        return array_values($locations);
     }
 
     /** @return array{start: array{line: int, character: int}, end: array{line: int, character: int}} */

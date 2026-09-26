@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\Route;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -36,6 +35,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class RouteReferencesHandlerTest extends TestCase
 {
@@ -77,9 +77,7 @@ final class RouteReferencesHandlerTest extends TestCase
                 'App\\Controller\\DemoController',
             )]),
         );
-        $handler = new RouteReferencesHandler(
-            new DocumentContextResolver($documents, $projects),
-            new LspProtocolMapper(),
+        $handler = new RouteReferencesHandler(new LspProtocolMapper(),
             new RouteSymbolResolver(
                 $positionConverter,
                 RouteReferenceExtractorFactory::create($positionConverter),
@@ -107,10 +105,10 @@ final class RouteReferencesHandlerTest extends TestCase
                     'end' => ['line' => 2, 'character' => 44],
                 ],
             ],
-        ], $handler->references([
+        ], $handler->references((new ProviderRequests($documents, $projects))->references([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => 2, 'character' => 35],
             'context' => ['includeDeclaration' => true],
-        ]));
+        ])));
     }
 }

@@ -2,12 +2,10 @@
 
 namespace Symfony\Lsp\Feature;
 
+use Symfony\Lsp\Protocol\PositionedRequest;
+
 interface DefinitionProviderInterface
 {
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return list<array<array-key, mixed>>|null
-     */
-    public function definition(array $params): ?array;
+    /** @return list<array<array-key, mixed>> */
+    public function definition(PositionedRequest $request): array;
 }

@@ -2,7 +2,6 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
@@ -10,7 +9,6 @@ use Symfony\Lsp\Feature\DefinitionProviderInterface;
 use Symfony\Lsp\Feature\HoverProviderInterface;
 use Symfony\Lsp\Feature\ReferencesProviderInterface;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpAttributeTargetKind;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -18,13 +16,16 @@ use Symfony\Lsp\Parser\Php\PhpMethodReceiverKind;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 
 final class LiveComponentEventProvider implements CompletionProviderInterface, DefinitionProviderInterface, HoverProviderInterface, ReferencesProviderInterface
 {
     private const AS_LIVE_COMPONENT = 'Symfony\\UX\\LiveComponent\\Attribute\\AsLiveComponent';
 
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
+        private readonly LspRequestFactory $requests,
         private readonly PositionConverter $converter,
         private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly LspProtocolMapper $protocol,
@@ -37,12 +38,16 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
 
     public function complete(array $params): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request || 'php' !== $request->document->languageId) {
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
+        if ('php' !== $request->document->languageId) {
             return null;
         }
         $text = $request->document->text;
-        $offset = $this->converter->toByteOffset($text, $request->position);
+        $offset = $request->offset;
         $php = $this->phpParser->parse($text);
         $source = $this->phpComments->mask($text);
         $prefix = $this->completionPrefix($source, $php, $offset);
@@ -67,7 +72,12 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
 
     public function hover(array $params): ?array
     {
-        $resolved = $this->resolve($params);
+        $request = $this->requests->positioned($params);
+        if (null === $request) {
+            return null;
+        }
+
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
             return null;
         }
@@ -82,11 +92,11 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         return $this->protocol->markdownHover(implode("\n\n", array_values(array_unique($details))));
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$event, $project] = $resolved;
         $locations = [];
@@ -99,15 +109,15 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         return $locations;
     }
 
-    public function references(array $params): ?array
+    public function references(ReferencesRequest $request): array
     {
-        $resolved = $this->resolve($params);
+        $resolved = $this->resolve($request);
         if (null === $resolved) {
-            return null;
+            return [];
         }
         [$event, $project] = $resolved;
 
-        return array_map(fn (LiveComponentEvent $candidate): array => $this->protocol->location($candidate->uri, $candidate->range), $this->indexes->forProject($project)->events($event->name));
+        return $this->protocol->locations($request->reported($this->indexes->forProject($project)->events($event->name)));
     }
 
     private function completionPrefix(string $source, PhpDocument $php, int $offset): ?string
@@ -145,18 +155,10 @@ final class LiveComponentEventProvider implements CompletionProviderInterface, D
         return false;
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{LiveComponentEvent, Project}|null
-     */
-    private function resolve(array $params): ?array
+    /** @return array{LiveComponentEvent, Project}|null */
+    private function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $document = SourceDocument::fromDocument($request->document);
+        $document = $request->source;
         $event = $this->positionedSymbols->resolve($document, $request->position, $this->extractor->extract($request->project, $document)->events);
 
         return null === $event ? null : [$event, $request->project];

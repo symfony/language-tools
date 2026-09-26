@@ -2,34 +2,24 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\DefinitionProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class DependencyInjectionDefinitionHandler implements DefinitionProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documentContextResolver,
         private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionSymbolResolver $symbolResolver,
         private readonly DependencyInjectionProjectLookup $lookup,
     ) {
     }
 
-    public function definition(array $params): ?array
+    public function definition(PositionedRequest $request): array
     {
-        $request = $this->documentContextResolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-
-        $symbol = $this->symbolResolver->resolve(
-            SourceDocument::fromDocument($request->document),
-            $request->position,
-        );
+        $symbol = $this->symbolResolver->resolve($request->source, $request->position);
         if (null === $symbol) {
-            return null;
+            return [];
         }
 
         return array_map(

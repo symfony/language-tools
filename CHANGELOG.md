@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Honor the `includeDeclaration` flag of a references request in every integration, and report the declaration when the client omits it
+- Answer a definition or references request with an empty list instead of nothing when nothing matches
 - Answer a document link request with an empty list instead of nothing when a document has no link
 - Refresh only the translation catalogs when a catalog inside a `Translations` directory changes, instead of the whole runtime index
 - Treat `%%` in an `#[Autowire]` attribute as an escaped percent sign, so a literal like `%%message%%` is no longer read as a parameter reference

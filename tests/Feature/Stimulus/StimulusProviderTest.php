@@ -37,6 +37,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\ProviderRequests;
@@ -59,7 +60,7 @@ final class StimulusProviderTest extends TestCase
         $sources->forProject($project)->replace($extractor->extract($project, new SourceDocument($uri, 'twig', $text)));
         $resolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $stimulus = new StimulusResolver($resolver, $converter, $protocol, $indexes, $sources, $extractor);
+        $stimulus = new StimulusResolver($converter, $protocol, $indexes, $sources, $extractor);
         $diagnostics = (new StimulusDiagnosticProvider($resolver, $protocol, $indexes, $sources, $stimulus))->diagnostics(LspRequests::document($uri));
         self::assertIsArray($diagnostics);
         $actions = (new StimulusCodeActionProvider($indexes, $sources, $stimulus, ProjectPaths::resolver(), new UnknownNameCodeActionBuilder($protocol)))
@@ -180,9 +181,9 @@ final class StimulusProviderTest extends TestCase
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $uriConverter = new UriToPathConverter();
         $protocol = new LspProtocolMapper();
-        $stimulus = new StimulusResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $stimulus = new StimulusResolver($converter, $protocol, $indexes, $sourceIndexes, $extractor);
         $completionProvider = new StimulusCompletionProvider($documentResolver, $converter, $protocol, $extractor, $stimulus);
-        $relationshipProvider = new StimulusRelationshipProvider($uriConverter, $protocol, $indexes, $sourceIndexes, $stimulus);
+        $relationshipProvider = new StimulusRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), $uriConverter, $protocol, $indexes, $sourceIndexes, $stimulus);
         $diagnosticProvider = new StimulusDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $stimulus);
         $documentLinkProvider = new StimulusDocumentLinkProvider($uriConverter, $protocol, $indexes, $extractor, $stimulus);
         $codeLensProvider = new StimulusCodeLensProvider($protocol, $sourceIndexes, $extractor);
@@ -200,27 +201,27 @@ final class StimulusProviderTest extends TestCase
         self::assertNull($completionProvider->complete(LspRequests::offset($markupHelperUri, $markupHelperText, \strlen($markupHelperText))));
 
         $actionParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, '#open') + 2);
-        self::assertSame([$controllerUri], array_column($relationshipProvider->definition($actionParams) ?? [], 'uri'));
-        self::assertCount(3, $relationshipProvider->references($actionParams) ?? []);
+        self::assertSame([$controllerUri], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($actionParams)), 'uri'));
+        self::assertCount(3, $relationshipProvider->references((new ProviderRequests($documents, $projects))->references($actionParams)));
         $hover = $relationshipProvider->hover($actionParams);
         self::assertIsArray($hover);
         self::assertIsArray($hover['contents'] ?? null);
         self::assertSame('Stimulus action: `search#open`', $hover['contents']['value'] ?? null);
         $unknownActionParams = LspRequests::offset($unknownActionUri, $unknownActionText, strpos($unknownActionText, 'missing') + 2);
         self::assertNull($relationshipProvider->hover($unknownActionParams));
-        self::assertSame([], $relationshipProvider->definition($unknownActionParams));
+        self::assertSame([], $relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($unknownActionParams)));
 
         $packageControllerParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, 'symfony/ux-autocomplete/autocomplete') + 2);
         self::assertSame(
             ['file:///workspace/vendor/symfony/ux-autocomplete/assets/dist/controller.js'],
-            array_column($relationshipProvider->definition($packageControllerParams) ?? [], 'uri'),
+            array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($packageControllerParams)), 'uri'),
         );
-        self::assertCount(5, $relationshipProvider->references($packageControllerParams) ?? []);
+        self::assertCount(5, $relationshipProvider->references((new ProviderRequests($documents, $projects))->references($packageControllerParams)));
         foreach (['onChange', 'field'] as $member) {
             $memberParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, $member) + 2);
             self::assertSame(
                 ['file:///workspace/vendor/symfony/ux-autocomplete/assets/dist/controller.js'],
-                array_column($relationshipProvider->definition($memberParams) ?? [], 'uri'),
+                array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($memberParams)), 'uri'),
             );
         }
 
@@ -267,14 +268,14 @@ final class StimulusProviderTest extends TestCase
         );
         $documentResolver = new DocumentContextResolver($documents, $projects);
         $protocol = new LspProtocolMapper();
-        $stimulus = new StimulusResolver($documentResolver, $converter, $protocol, $indexes, $sourceIndexes, $extractor);
+        $stimulus = new StimulusResolver($converter, $protocol, $indexes, $sourceIndexes, $extractor);
         $diagnosticProvider = new StimulusDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $stimulus);
         $completionProvider = new StimulusCompletionProvider($documentResolver, $converter, $protocol, $extractor, $stimulus);
-        $relationshipProvider = new StimulusRelationshipProvider(new UriToPathConverter(), $protocol, $indexes, $sourceIndexes, $stimulus);
+        $relationshipProvider = new StimulusRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), new UriToPathConverter(), $protocol, $indexes, $sourceIndexes, $stimulus);
 
         self::assertSame([], $diagnosticProvider->diagnostics(LspRequests::document($usageUri)));
         self::assertSame(['clipboard'], array_column($completionProvider->complete(LspRequests::offset($completionUri, $completionText, \strlen($completionText))) ?? [], 'label'));
-        self::assertSame([$bootstrapUri], array_column($relationshipProvider->definition(LspRequests::offset($usageUri, $usageText, strpos($usageText, 'clipboard') + 2)) ?? [], 'uri'));
+        self::assertSame([$bootstrapUri], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned(LspRequests::offset($usageUri, $usageText, strpos($usageText, 'clipboard') + 2))), 'uri'));
     }
 
     private function createExtractor(PositionConverter $converter): StimulusExtractor

@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -36,14 +35,15 @@ use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class DependencyInjectionNavigationTest extends TestCase
 {
     public function testNavigatesToServiceDeclarationsAndClasses(): void
     {
-        [$definition, , $params] = $this->handlers();
+        [$definition, , $params, $requests] = $this->handlers();
 
-        $locations = $definition->definition($params);
+        $locations = $definition->definition($requests->positioned($params));
 
         self::assertSame([
             'file:///workspace/config/services.yaml',
@@ -51,25 +51,24 @@ final class DependencyInjectionNavigationTest extends TestCase
             'file:///workspace/src/RuntimeMailer.php',
             'file:///workspace/src/Mailer.php',
             'file:///workspace/src/RuntimeAlias.php',
-        ], array_column($locations ?? [], 'uri'));
+        ], array_column($locations, 'uri'));
     }
 
     public function testFindsYamlAndAutowireReferencesWithDeclarations(): void
     {
-        [, $references, $params] = $this->handlers();
-        $params['context'] = ['includeDeclaration' => true];
+        [, $references, $params, $requests] = $this->handlers();
 
-        $locations = $references->references($params);
+        $locations = $references->references($requests->references($params));
 
         self::assertSame([
             'file:///workspace/config/services.yaml',
             'file:///workspace/src/Consumer.php',
             'file:///workspace/config/services.yaml',
-        ], array_column($locations ?? [], 'uri'));
+        ], array_column($locations, 'uri'));
     }
 
     /**
-     * @return array{DependencyInjectionDefinitionHandler, DependencyInjectionReferencesHandler, array<string, mixed>}
+     * @return array{DependencyInjectionDefinitionHandler, DependencyInjectionReferencesHandler, array<string, mixed>, ProviderRequests}
      */
     private function handlers(): array
     {
@@ -148,7 +147,6 @@ final class DependencyInjectionNavigationTest extends TestCase
             new Service('runtime.alias', 'App\\RuntimeAlias', null, false, false, null, [], null, []),
         );
         $resolver = new DependencyInjectionSymbolResolver($converter, $extractor);
-        $contextResolver = new DocumentContextResolver($documents, $projects);
         $position = $converter->toPosition($consumer, strpos($consumer, 'app.mailer') + 1);
         $params = [
             'textDocument' => ['uri' => $consumerUri],
@@ -156,14 +154,13 @@ final class DependencyInjectionNavigationTest extends TestCase
         ];
 
         return [
-            new DependencyInjectionDefinitionHandler(
-                $contextResolver,
-                new LspProtocolMapper(),
+            new DependencyInjectionDefinitionHandler(new LspProtocolMapper(),
                 $resolver,
                 new DependencyInjectionProjectLookup($serviceIndexes, new ParameterIndexRegistry(), $sourceIndexes),
             ),
-            new DependencyInjectionReferencesHandler($contextResolver, new LspProtocolMapper(), $resolver, $sourceIndexes),
+            new DependencyInjectionReferencesHandler(new LspProtocolMapper(), $resolver, $sourceIndexes),
             $params,
+            new ProviderRequests($documents, $projects),
         ];
     }
 }

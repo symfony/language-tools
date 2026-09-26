@@ -5,7 +5,6 @@ namespace Symfony\Lsp\Tests\Feature\Route;
 use Microsoft\PhpParser\Parser;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -35,6 +34,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class RouteDefinitionHandlerTest extends TestCase
 {
@@ -84,9 +84,7 @@ final class RouteDefinitionHandlerTest extends TestCase
             new DependencyInjectionSourceFacts($baseUri, classes: $classExtractor->extract($baseUri, $base)),
             new DependencyInjectionSourceFacts($uri, classes: $classExtractor->extract($uri, $text)),
         );
-        $handler = new RouteDefinitionHandler(
-            new DocumentContextResolver($documents, $projects),
-            new LspProtocolMapper(),
+        $handler = new RouteDefinitionHandler(new LspProtocolMapper(),
             new RouteSymbolResolver(
                 $converter,
                 RouteReferenceExtractorFactory::create($converter),
@@ -105,9 +103,9 @@ final class RouteDefinitionHandlerTest extends TestCase
                 'start' => ['line' => 10, 'character' => 20],
                 'end' => ['line' => 10, 'character' => 32],
             ],
-        ]], $handler->definition([
+        ]], $handler->definition((new ProviderRequests($documents, $projects))->positioned([
             'textDocument' => ['uri' => $uri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ])));
     }
 }

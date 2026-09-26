@@ -2,32 +2,22 @@
 
 namespace Symfony\Lsp\Feature\Environment;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Index\PositionedSourceSymbolResolver;
-use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Protocol\PositionedRequest;
 
 final class EnvironmentSymbolResolver
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
         private readonly PositionedSourceSymbolResolver $positionedSymbols,
         private readonly EnvironmentExtractor $extractor,
     ) {
     }
 
-    /**
-     * @param array<array-key, mixed> $params
-     *
-     * @return array{EnvironmentReference, Project}|null
-     */
-    public function resolve(array $params): ?array
+    /** @return array{EnvironmentReference, Project}|null */
+    public function resolve(PositionedRequest $request): ?array
     {
-        $request = $this->resolver->resolvePositioned($params);
-        if (null === $request) {
-            return null;
-        }
-        $document = SourceDocument::fromDocument($request->document);
+        $document = $request->source;
         $facts = $this->extractor->extract($document);
         $declaration = $this->positionedSymbols->resolve($document, $request->position, $facts->declarations);
         if (null !== $declaration) {

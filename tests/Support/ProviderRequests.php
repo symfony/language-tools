@@ -9,6 +9,7 @@ use Symfony\Lsp\Protocol\CodeActionRequest;
 use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Protocol\PositionedRequest;
+use Symfony\Lsp\Protocol\ReferencesRequest;
 use Symfony\Lsp\Protocol\RenameRequest;
 
 /**
@@ -35,6 +36,12 @@ final class ProviderRequests
     {
         return $this->factory->positioned($params)
             ?? throw new \InvalidArgumentException('The request does not point at an open document of a project.');
+    }
+
+    /** @param array<array-key, mixed> $params */
+    public function references(array $params, bool $includeDeclaration = true): ReferencesRequest
+    {
+        return new ReferencesRequest($this->positioned($params), $includeDeclaration);
     }
 
     /**

@@ -3,9 +3,9 @@
 namespace Symfony\Lsp\Feature\Route;
 
 use Symfony\Lsp\Document\Range;
-use Symfony\Lsp\Index\RangedSourceSymbolInterface;
+use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
 
-final class RouteReference implements RangedSourceSymbolInterface
+final class RouteReference implements LocatedSourceSymbolInterface
 {
     /**
      * @param list<string>|null $providedParameters

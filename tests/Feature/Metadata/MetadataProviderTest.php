@@ -3,7 +3,6 @@
 namespace Symfony\Lsp\Tests\Feature\Metadata;
 
 use Symfony\Lsp\Document\Document;
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\Metadata\MetadataRelationshipProvider;
@@ -13,7 +12,9 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 use Symfony\Lsp\Tests\Support\LspRequests;
+use Symfony\Lsp\Tests\Support\ProviderRequests;
 
 final class MetadataProviderTest extends MetadataTestCase
 {
@@ -60,20 +61,17 @@ final class MetadataProviderTest extends MetadataTestCase
         $documents = new DocumentStore();
         $documents->open(new Document($entityUri, 'php', 1, $entityText));
         $documents->open(new Document($mappingUri, 'yaml', 1, $mappingText));
-        $resolver = new DocumentContextResolver($documents, $projects);
-        $relationshipProvider = new MetadataRelationshipProvider($resolver, new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $sourceIndexes, $extractor);
+        $requests = new ProviderRequests($documents, $projects);
+        $relationshipProvider = new MetadataRelationshipProvider(new LspRequestFactory($documents, $projects, $converter), new PositionedSourceSymbolResolver($converter), new LspProtocolMapper(), $sourceIndexes, $extractor);
 
         $mappedClass = strpos($mappingText, 'App\Entity\User') + 1;
-        $classDefinition = $relationshipProvider->definition(LspRequests::offset($mappingUri, $mappingText, $mappedClass));
-        self::assertIsArray($classDefinition);
+        $classDefinition = $relationshipProvider->definition($requests->positioned(LspRequests::offset($mappingUri, $mappingText, $mappedClass)));
         self::assertSame([$entityUri], array_column($classDefinition, 'uri'));
         $email = strpos($mappingText, 'email') + 1;
-        $definition = $relationshipProvider->definition(LspRequests::offset($mappingUri, $mappingText, $email));
-        self::assertIsArray($definition);
+        $definition = $relationshipProvider->definition($requests->positioned(LspRequests::offset($mappingUri, $mappingText, $email)));
         self::assertSame([$entityUri], array_column($definition, 'uri'));
         $admin = strpos($mappingText, 'admin') + 1;
-        $references = $relationshipProvider->references(LspRequests::offset($mappingUri, $mappingText, $admin));
-        self::assertIsArray($references);
+        $references = $relationshipProvider->references($requests->references(LspRequests::offset($mappingUri, $mappingText, $admin)));
         self::assertCount(2, $references);
     }
 }
