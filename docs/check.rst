@@ -180,6 +180,14 @@ The command reads ``.symfony-lsp.json`` from the workspace root, like the
 editor does; see `project configuration`_. Command-line options win over the
 file. Use ``--config=PATH`` to load another file.
 
+The command checks every Symfony application it finds in the workspace. To
+check specific ones, pass ``--project-root=PATH`` once per application; each
+root must be inside the workspace:
+
+.. code-block:: terminal
+
+    $ symfony-lsp check --project-root=apps/admin --project-root=apps/api
+
 Applications that ship several kernels are checked one at a time:
 
 .. code-block:: terminal
