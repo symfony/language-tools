@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.23.0 (2026-09-26)
 
 - Complete translation keys inside a Twig string interpolation
