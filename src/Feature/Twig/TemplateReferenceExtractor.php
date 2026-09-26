@@ -6,14 +6,13 @@ use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndex;
 use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Parser\Php\PhpArgument;
 use Symfony\Lsp\Parser\Php\PhpArgumentCursor;
 use Symfony\Lsp\Parser\Php\PhpAttribute;
 use Symfony\Lsp\Parser\Php\PhpDocument;
-use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpMethodCall;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\PhpStringLiteral;
-use Symfony\Lsp\Parser\Php\PhpStringLiteralDecoder;
 use Symfony\Lsp\Parser\Twig\TwigCallArgumentResolver;
 use Symfony\Lsp\Parser\Twig\TwigDocumentParser;
 
@@ -26,7 +25,6 @@ final class TemplateReferenceExtractor
         private readonly TwigDocumentParser $twigParser,
         private readonly TwigCallArgumentResolver $twigArguments,
         private readonly PhpParserInterface $phpParser,
-        private readonly PhpLiteralArrayKeyParser $arrayKeys,
         private readonly TemplatePhpReferenceResolver $phpReferences,
     ) {
     }
@@ -118,19 +116,7 @@ final class TemplateReferenceExtractor
                 continue;
             }
             $parameters = $call->namedOrPositionalArgument($receiver['variablesArgumentName'], 1);
-            $array = $php->literalArray($parameters);
-            $parametersExpression = $parameters?->expression;
-            $parametersOffset = $parameters?->expressionStartOffset;
-            $keys = $array?->keys;
-            if (null === $keys && \is_string($parametersExpression) && \is_int($parametersOffset)) {
-                $keys = $this->arrayKeys->parseExpression(
-                    $parametersExpression,
-                    allowNestedUnpacking: true,
-                    collectPartialLiteralKeys: true,
-                    sourceOffset: $parametersOffset,
-                );
-            }
-            $variables = $this->literalArrayKeyValues($keys);
+            $variables = $this->literalArrayKeyValues($php->literalArray($parameters)->keys ?? []);
             $references[] = $this->reference(
                 $template->value,
                 $document->uri,
@@ -157,7 +143,7 @@ final class TemplateReferenceExtractor
                     $this->positionConverter->toPosition($document->text, $template->startOffset),
                     $this->positionConverter->toPosition($document->text, $template->endOffset),
                 ),
-                $this->attributeVariables($attribute->namedOrPositionalArgument('vars', 1)?->expression),
+                $this->attributeVariables($php, $attribute->namedOrPositionalArgument('vars', 1)),
             );
         }
 
@@ -198,43 +184,34 @@ final class TemplateReferenceExtractor
     }
 
     /**
-     * @param list<PhpStringLiteral>|null $keys
+     * @param list<PhpStringLiteral> $keys
      *
      * @return list<string>
      */
-    private function literalArrayKeyValues(?array $keys): array
+    private function literalArrayKeyValues(array $keys): array
     {
-        return array_values(array_unique(array_filter(array_map(static fn (PhpStringLiteral $key): string => $key->value, $keys ?? []), static fn (string $key): bool => '' !== $key)));
+        return array_values(array_unique(array_filter(array_map(static fn (PhpStringLiteral $key): string => $key->value, $keys), static fn (string $key): bool => '' !== $key)));
     }
 
-    /** @return list<string> */
-    private function attributeVariables(?string $expression): array
+    /**
+     * The variable names a `#[Template]` attribute lists, which are the string
+     * values of a keyless array literal.
+     *
+     * @return list<string>
+     */
+    private function attributeVariables(PhpDocument $php, ?PhpArgument $argument): array
     {
-        if (null === $expression) {
+        $array = $php->literalArray($argument);
+        if (null === $array || !$array->complete || $array->hasUnknownKeys) {
             return [];
         }
         $variables = [];
-        $first = true;
-        foreach (\PhpToken::tokenize('<?php '.$expression) as $token) {
-            if ($token->is([\T_OPEN_TAG, \T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT])) {
-                continue;
-            }
-            if ($first) {
-                $first = false;
-                if (!$token->is(\T_ARRAY) && '[' !== $token->text) {
-                    return [];
-                }
-                continue;
-            }
-            if ($token->is(\T_CONSTANT_ENCAPSED_STRING)) {
-                $variable = PhpStringLiteralDecoder::decode($token->text[0], substr($token->text, 1, -1));
-                if ('' !== $variable) {
-                    $variables[] = $variable;
-                }
-                continue;
-            }
-            if (!\in_array($token->text, ['(', ')', '[', ']', ','], true)) {
+        foreach ($array->entries as $entry) {
+            if (null !== $entry->key || null === $entry->stringValue) {
                 return [];
+            }
+            if ('' !== $entry->stringValue->value) {
+                $variables[] = $entry->stringValue->value;
             }
         }
 

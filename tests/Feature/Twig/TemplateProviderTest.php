@@ -46,7 +46,6 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\CommentParserRegistry;
 use Symfony\Lsp\Parser\Php\PhpCommentParser;
-use Symfony\Lsp\Parser\Php\PhpLiteralArrayKeyParser;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
@@ -1341,6 +1340,12 @@ final class TemplateProviderTest extends TestCase
                 #[Template('product/export.html.twig', vars: ['pro'.'duct'])]
                 public function export() {}
 
+                #[Template('product/nested.html.twig', vars: ['product', ['nested']])]
+                public function nested() {}
+
+                #[Template('product/keyed.html.twig', vars: ['product' => 'value'])]
+                public function keyed() {}
+
                 // #[Template('commented.html.twig')]
                 #[Template]
                 public function guessed() {}
@@ -1361,6 +1366,8 @@ final class TemplateProviderTest extends TestCase
                 ["product/it's.html.twig", []],
                 ['product/delete.html.twig', ['product', 'category']],
                 ['product/export.html.twig', []],
+                ['product/nested.html.twig', []],
+                ['product/keyed.html.twig', []],
                 ['product/list.html.twig', []],
             ],
             array_map(static fn (TemplateReference $reference): array => [$reference->name, $reference->variables], $references),
@@ -1434,7 +1441,6 @@ final class TemplateProviderTest extends TestCase
             new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), $comments ?? new TwigCommentParser(), new TwigDirectiveLocator()),
             new TwigCallArgumentResolver(new TwigArgumentParser()),
             $parser ?? new TolerantPhpParser(new Parser()),
-            new PhpLiteralArrayKeyParser(),
             new TemplatePhpReferenceResolver(),
         );
     }
