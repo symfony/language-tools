@@ -95,8 +95,9 @@ final class PhpTranslationReferenceExtractor
         $key = $this->keyArgument($call);
         if ($cursor->isArrayItemLiteral() && $cursor->argument === $call->namedOrPositionalArgument('parameters', 1)) {
             $message = $key?->stringLiteral?->value;
+            $domain = $this->domain($call->namedOrPositionalArgument('domain', 2));
 
-            return null === $message ? null : $this->context('placeholder', $cursor, $text, $offset, $message);
+            return null === $message || null === $domain ? null : $this->context('placeholder', $cursor, $text, $offset, $domain, $message);
         }
         if (!$cursor->isArgumentLiteral()) {
             return null;
@@ -161,7 +162,7 @@ final class PhpTranslationReferenceExtractor
             : $call->namedOrPositionalArgument('message', 0);
     }
 
-    private function context(string $kind, PhpArgumentCursor $cursor, string $text, int $offset, ?string $key = null): TranslationCompletionContext
+    private function context(string $kind, PhpArgumentCursor $cursor, string $text, int $offset, string $domain = 'messages', ?string $key = null): TranslationCompletionContext
     {
         $placeholder = 'placeholder' === $kind && str_starts_with($cursor->prefix, '%');
         $prefix = $placeholder ? substr($cursor->prefix, 1) : $cursor->prefix;
@@ -171,7 +172,7 @@ final class PhpTranslationReferenceExtractor
             $kind,
             $prefix,
             $this->converter->toRange($text, $start, $offset - $start),
-            'messages',
+            $domain,
             $key,
         );
     }

@@ -91,6 +91,20 @@ final class TranslationProviderTest extends TestCase
         self::assertSame('name%', $result[0]['textEdit']['newText']);
     }
 
+    /** @param list<string> $expected */
+    #[DataProvider('placeholderDomainProvider')]
+    public function testScopesPhpPlaceholderCompletionToTheCallDomain(string $text, array $expected): void
+    {
+        $uri = 'file:///workspace/src/Controller.php';
+        [$provider, $converter, , , $requests] = $this->provider($uri, $text);
+        $position = $converter->toPosition($text, (int) strpos($text, '%') + 1);
+
+        self::assertSame($expected, array_column($provider->complete($requests->positioned([
+            'textDocument' => ['uri' => $uri],
+            'position' => ['line' => $position->line, 'character' => $position->character],
+        ])), 'label'));
+    }
+
     public function testIgnoresCompletionInsideTwigDocumentationComments(): void
     {
         $uri = 'file:///workspace/templates/page.html.twig';
@@ -652,6 +666,27 @@ final class TranslationProviderTest extends TestCase
         yield 'default domain tag' => ["{% trans_default_domain 'admin' %}\n{{ 'panel.ti'|trans }}"];
     }
 
+    /** @return iterable<string, array{string, list<string>}> */
+    public static function placeholderDomainProvider(): iterable
+    {
+        yield 'trans method without domain' => ["<?php \$translator->trans('greeting', ['%' => \$name]);", ['user']];
+        yield 'trans method' => ["<?php \$translator->trans('greeting', ['%' => \$name], 'admin');", ['name']];
+        yield 'trans method named domain' => ["<?php \$translator->trans('greeting', domain: 'admin', parameters: ['%' => \$name]);", ['name']];
+        yield 'trans method dynamic domain' => ["<?php \$translator->trans('greeting', ['%' => \$name], \$domain);", []];
+        yield 't helper' => [<<<'PHP'
+            <?php
+            use function Symfony\Component\Translation\t;
+
+            t('greeting', ['%' => $name], 'admin');
+            PHP, ['name']];
+        yield 'translatable message' => [<<<'PHP'
+            <?php
+            use Symfony\Component\Translation\TranslatableMessage;
+
+            new TranslatableMessage('greeting', ['%' => $name], 'admin');
+            PHP, ['name']];
+    }
+
     /** @return iterable<string, array{string, string, string}> */
     public static function dynamicDomainCallProvider(): iterable
     {
@@ -756,6 +791,8 @@ final class TranslationProviderTest extends TestCase
             new TranslationMessage('foo', 'messages', 'en', 'Foo'),
             new TranslationMessage("line\nkey", 'messages', 'en', 'Line key'),
             new TranslationMessage('panel.title', 'admin', 'en', 'Panel title'),
+            new TranslationMessage('greeting', 'messages', 'en', 'Hello %user%'),
+            new TranslationMessage('greeting', 'admin', 'en', 'Welcome back %name%'),
         );
         $sourceFacts = [$extractor->extract(new SourceDocument($uri, $languageId, $text))];
         foreach ($sources as [$sourceUri, $sourceLanguageId, $source]) {
