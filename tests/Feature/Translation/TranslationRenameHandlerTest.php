@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Feature\Translation;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
@@ -61,6 +62,43 @@ final class TranslationRenameHandlerTest extends TestCase
             $newTexts[] = $change['edits'][0]['newText'];
         }
         self::assertSame(['article.heading', 'heading'], $newTexts);
+    }
+
+    #[DataProvider('unsafeNameProvider')]
+    public function testRefusesNamesALiteralCannotHoldAsWritten(string $newName): void
+    {
+        $resourceUri = 'file:///workspace/translations/messages.en.yaml';
+        $resource = "title: Article\n";
+        $referenceUri = 'file:///workspace/src/Controller.php';
+        $reference = "<?php \$translator->trans('title');";
+        $documents = new DocumentStore();
+        $documents->open(new Document($referenceUri, 'php', 1, $reference));
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $converter = new PositionConverter();
+        $extractor = TranslationExtractorTestFactory::create($converter);
+        $indexes = new TranslationIndexRegistry();
+        $indexes->forProject($project)->replaceSources(
+            $extractor->extract(new SourceDocument($resourceUri, 'yaml', $resource)),
+            $extractor->extract(new SourceDocument($referenceUri, 'php', $reference)),
+        );
+        $handler = $this->createHandler($documents, $projects, $converter, $extractor, $indexes);
+        $position = $converter->toPosition($reference, strpos($reference, 'title') + 1);
+        $request = (new ProviderRequests($documents, $projects))->rename(LspRequests::position($referenceUri, $position), $newName);
+
+        self::assertNull($handler->rename($request));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function unsafeNameProvider(): iterable
+    {
+        yield 'single quote' => ["it's"];
+        yield 'double quote' => ['say"hi'];
+        yield 'backslash' => ['back\\slash'];
+        yield 'tab' => ["tab\there"];
+        yield 'markup' => ['a<b'];
+        yield 'interpolation' => ['$name'];
+        yield 'yaml indicator' => ['-dash'];
     }
 
     public function testEmitsOneEditWhenADeclarationAndAReferenceShareARange(): void

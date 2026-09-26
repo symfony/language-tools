@@ -43,7 +43,7 @@ final class TranslationRenameHandler implements RenameProviderInterface
     {
         $newName = $request->newName;
         $resolved = $this->resolve($request);
-        if (str_contains($newName, ' ') || null === $resolved) {
+        if (!$this->isLiteralSafe($newName) || null === $resolved) {
             return null;
         }
 
@@ -96,6 +96,11 @@ final class TranslationRenameHandler implements RenameProviderInterface
         }
 
         return $resolved;
+    }
+
+    private function isLiteralSafe(string $name): bool
+    {
+        return 1 === preg_match('/^[^\s\'"\\\\<>&$#{}\[\]!*%@`|,?-][^\s\'"\\\\<>&$#{}\[\]]*$/u', $name);
     }
 
     private function declarationText(string $oldName, string $newName): ?string
