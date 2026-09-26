@@ -90,7 +90,7 @@ final class TwigComponentRelationshipProvider implements DefinitionProviderInter
         $action = $this->components->resolveAction($request);
         if (null !== $action) {
             [$component, $componentAction, $project] = $action;
-            $locations = $this->definition($request);
+            $locations = $request->includeDeclaration ? $this->definition($request) : [];
             foreach ($this->indexes->forProject($project)->actionReferences($component->name, $componentAction->name) as $reference) {
                 $locations[] = $this->protocol->location($reference->uri, $reference->range);
             }

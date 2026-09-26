@@ -101,6 +101,8 @@ final class LiveComponentProviderTest extends TestCase
         $actionParams = LspRequests::offset($usageUri, $usageText, strpos($usageText, 'submit') + 2);
         self::assertSame([$classUri], array_column($relationshipProvider->definition((new ProviderRequests($documents, $projects))->positioned($actionParams)), 'uri'));
         self::assertCount(4, $relationshipProvider->references((new ProviderRequests($documents, $projects))->references($actionParams)));
+        self::assertNotContains($classUri, array_column($relationshipProvider->references((new ProviderRequests($documents, $projects))->references($actionParams, false)), 'uri'));
+        self::assertCount(3, $relationshipProvider->references((new ProviderRequests($documents, $projects))->references($actionParams, false)));
         $actionHover = $relationshipProvider->hover((new ProviderRequests($documents, $projects))->positioned($actionParams));
         self::assertIsArray($actionHover);
         self::assertIsArray($actionHover['contents'] ?? null);
