@@ -485,8 +485,8 @@ PHP;
         $declared = $kit->at($eventUri, 'OrderPlaced');
         self::assertContains($dispatcherUri, $kit->targets($relationshipProvider->references($declared)));
         self::assertSame(['event.invalid_listener_method'], $kit->codes($kit->get(EventDiagnosticProvider::class)->diagnostics(LspRequests::document($invalidUri))));
-        self::assertSame(['1 event listener'], $kit->titles($codeLensProvider->codeLenses(LspRequests::document($eventUri))));
-        self::assertSame(['Listens to 1 event'], $kit->titles($codeLensProvider->codeLenses(LspRequests::document($listenerUri))));
+        self::assertSame(['1 event listener'], $kit->titles($codeLensProvider->codeLenses($kit->document($eventUri))));
+        self::assertSame(['Listens to 1 event'], $kit->titles($codeLensProvider->codeLenses($kit->document($listenerUri))));
     }
 
     public function testIgnoresCommentedPhpEventConstructs(): void

@@ -482,7 +482,7 @@ YAML;
         self::assertSame([$messageUri, $handlerUri], $kit->targets($relationshipProvider->definition($dispatched)));
         self::assertSame(
             ['1 Messenger handler', '1 Messenger handler', '1 Messenger handler'],
-            $kit->titles($kit->get(MessengerCodeLensProvider::class)->codeLenses(LspRequests::document($messageUri))),
+            $kit->titles($kit->get(MessengerCodeLensProvider::class)->codeLenses($kit->document($messageUri))),
             'Every message the handler accepts, including the contracts it inherits from, announces it.',
         );
     }

@@ -2,15 +2,27 @@
 
 namespace Symfony\Lsp\Tests\Support;
 
+use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\DocumentRequest;
+use Symfony\Lsp\Protocol\LspRequestFactory;
 
 /**
  * Builds the LSP request parameters a feature provider expects, placing the
- * cursor relative to a needle instead of an absolute offset.
+ * cursor relative to a needle instead of an absolute offset, and the typed
+ * requests a capability registry decodes them into.
  */
 final class LspRequests
 {
+    /** The typed request a document capability serves for an open document. */
+    public static function forDocument(DocumentStore $documents, ProjectRegistry $projects, string $uri): DocumentRequest
+    {
+        return (new LspRequestFactory($documents, $projects))->document(self::document($uri))
+            ?? throw new \InvalidArgumentException(\sprintf('The document "%s" is not open in a project.', $uri));
+    }
+
     /** @return array{textDocument: array{uri: string}} */
     public static function document(string $uri): array
     {

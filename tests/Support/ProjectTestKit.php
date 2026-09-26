@@ -9,6 +9,7 @@ use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Runtime\RuntimeSnapshotLoaderRegistry;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
@@ -113,6 +114,12 @@ final class ProjectTestKit
         $this->get(RuntimeSnapshotLoaderRegistry::class)->load($this->project, ['sections' => [$section => $payload]]);
 
         return $this;
+    }
+
+    /** The typed request a document capability serves for one of the open documents. */
+    public function document(string $uri): DocumentRequest
+    {
+        return LspRequests::forDocument($this->get(DocumentStore::class), $this->get(ProjectRegistry::class), $uri);
     }
 
     /** @return array{textDocument: array{uri: string}, position: array{line: int, character: int}} */

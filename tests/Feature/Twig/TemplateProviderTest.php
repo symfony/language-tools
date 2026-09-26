@@ -61,6 +61,7 @@ use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 use Symfony\Lsp\Runtime\RuntimeConfiguration;
+use Symfony\Lsp\Tests\Support\LspRequests;
 use Symfony\Lsp\Tests\Support\ProjectPaths;
 use Symfony\Lsp\Tests\Support\SnapshotSections;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
@@ -613,7 +614,7 @@ final class TemplateProviderTest extends TestCase
         $completionProvider = new TwigComponentCompletionProvider($documentResolver, $converter, $protocol, $indexes, $componentResolver, $commentParser);
         $relationshipProvider = new TwigComponentRelationshipProvider($protocol, $indexes, $componentResolver);
         $diagnosticProvider = new TwigComponentDiagnosticProvider($documentResolver, $protocol, $indexes, $templateIndexes, $componentResolver);
-        $codeLensProvider = new TwigComponentCodeLensProvider($documentResolver, $protocol, $indexes, $extractor);
+        $codeLensProvider = new TwigComponentCodeLensProvider($protocol, $indexes, $extractor);
         $completionPosition = $converter->toPosition($completionText, \strlen($completionText));
         self::assertSame(['Alert'], array_column($completionProvider->complete([
             'textDocument' => ['uri' => $completionUri],
@@ -641,8 +642,7 @@ final class TemplateProviderTest extends TestCase
         self::assertIsString($hover['contents']['value'] ?? null);
         self::assertStringContainsString('Properties: `title`', $hover['contents']['value']);
         self::assertSame([], $diagnosticProvider->diagnostics(['textDocument' => ['uri' => $usageUri]]));
-        $lenses = $codeLensProvider->codeLenses(['textDocument' => ['uri' => $classUri]]);
-        self::assertIsArray($lenses);
+        $lenses = $codeLensProvider->codeLenses(LspRequests::forDocument($documents, $projects, $classUri));
         self::assertCount(1, $lenses);
         self::assertIsArray($lenses[0]['command'] ?? null);
         self::assertSame('1 Twig component usage', $lenses[0]['command']['title'] ?? null);

@@ -50,7 +50,10 @@ use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
+use Symfony\Lsp\Protocol\LspRequestFactory;
+use Symfony\Lsp\Tests\Support\LspRequests;
 
 final class ProviderRegistryTest extends TestCase
 {
@@ -138,20 +141,23 @@ final class ProviderRegistryTest extends TestCase
         self::assertSame([], (new CodeActionProviderRegistry([new StubProvider(null)]))->actions([]));
     }
 
-    public function testCodeLensProvidersAggregateAllMatchesAndAlwaysReturnAList(): void
+    public function testCodeLensProvidersAggregateEveryLensOfAnOpenProjectDocument(): void
     {
-        $first = new StubProvider(null);
+        $first = new StubProvider([]);
         $second = new StubProvider([['command' => ['title' => 'second']]]);
         $third = new StubProvider([['command' => ['title' => 'third']]]);
+        $uri = 'file:///workspace/src/Kernel.php';
+        $requests = $this->requestFactory($uri, 'php', '<?php');
 
         self::assertSame(
             [['command' => ['title' => 'second']], ['command' => ['title' => 'third']]],
-            (new CodeLensProviderRegistry([$first, $second, $third]))->codeLenses([]),
+            (new CodeLensProviderRegistry($requests, [$first, $second, $third]))->codeLenses(LspRequests::document($uri)),
         );
         self::assertSame(['codeLenses'], $first->calls);
         self::assertSame(['codeLenses'], $second->calls);
         self::assertSame(['codeLenses'], $third->calls);
-        self::assertSame([], (new CodeLensProviderRegistry([new StubProvider(null)]))->codeLenses([]));
+        self::assertSame([], (new CodeLensProviderRegistry($requests, [$first]))->codeLenses(LspRequests::document('file:///elsewhere/Kernel.php')));
+        self::assertSame(['codeLenses'], $first->calls);
     }
 
     public function testHoverProvidersMergeEveryMatchInOrder(): void
@@ -294,6 +300,16 @@ final class ProviderRegistryTest extends TestCase
             self::assertSame(['rename'], $provider->calls);
         }
     }
+
+    private function requestFactory(string $uri, string $languageId, string $text): LspRequestFactory
+    {
+        $projects = new ProjectRegistry();
+        $projects->replace([new Project('/workspace', 'file:///workspace')]);
+        $documents = new DocumentStore();
+        $documents->open(new Document($uri, $languageId, 1, $text));
+
+        return new LspRequestFactory($documents, $projects);
+    }
 }
 
 final class StubProvider implements CodeActionProviderInterface, CodeLensProviderInterface, CompletionProviderInterface, DefinitionProviderInterface, DocumentLinkProviderInterface, HoverProviderInterface, ReferencesProviderInterface, RenameProviderInterface
@@ -315,9 +331,9 @@ final class StubProvider implements CodeActionProviderInterface, CodeLensProvide
         return $this->result(__FUNCTION__);
     }
 
-    public function codeLenses(array $params): ?array
+    public function codeLenses(DocumentRequest $request): array
     {
-        return $this->result(__FUNCTION__);
+        return $this->result(__FUNCTION__) ?? [];
     }
 
     public function complete(array $params): ?array

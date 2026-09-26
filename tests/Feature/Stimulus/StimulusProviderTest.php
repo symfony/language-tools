@@ -184,7 +184,7 @@ final class StimulusProviderTest extends TestCase
         $relationshipProvider = new StimulusRelationshipProvider($uriConverter, $protocol, $indexes, $sourceIndexes, $stimulus);
         $diagnosticProvider = new StimulusDiagnosticProvider($documentResolver, $protocol, $indexes, $sourceIndexes, $stimulus);
         $documentLinkProvider = new StimulusDocumentLinkProvider($documentResolver, $uriConverter, $protocol, $indexes, $extractor, $stimulus);
-        $codeLensProvider = new StimulusCodeLensProvider($documentResolver, $protocol, $sourceIndexes, $extractor);
+        $codeLensProvider = new StimulusCodeLensProvider($protocol, $sourceIndexes, $extractor);
 
         self::assertSame(['search'], array_column($completionProvider->complete(LspRequests::offset($controllerCompletionUri, $controllerCompletionText, \strlen($controllerCompletionText))) ?? [], 'label'));
         $packageControllerCompletion = $completionProvider->complete(LspRequests::offset($packageControllerCompletionUri, $packageControllerCompletionText, \strlen($packageControllerCompletionText))) ?? [];
@@ -226,8 +226,7 @@ final class StimulusProviderTest extends TestCase
         self::assertSame(['stimulus.unknown_controller'], array_column($diagnostics, 'code'));
         self::assertSame(['Unknown Stimulus controller "missing".'], array_column($diagnostics, 'message'));
         self::assertGreaterThanOrEqual(4, \count($documentLinkProvider->links(LspRequests::document($usageUri)) ?? []));
-        $lenses = $codeLensProvider->codeLenses(LspRequests::document($controllerUri));
-        self::assertIsArray($lenses);
+        $lenses = $codeLensProvider->codeLenses(LspRequests::forDocument($documents, $projects, $controllerUri));
         self::assertIsArray($lenses[0]['command'] ?? null);
         self::assertSame('3 Stimulus controller usages', $lenses[0]['command']['title'] ?? null);
     }

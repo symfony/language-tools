@@ -2,29 +2,26 @@
 
 namespace Symfony\Lsp\Feature\Stimulus;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class StimulusCodeLensProvider implements CodeLensProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
         private readonly LspProtocolMapper $protocol,
         private readonly StimulusSourceIndexRegistry $sourceIndexes,
         private readonly StimulusExtractor $extractor,
     ) {
     }
 
-    public function codeLenses(array $params): ?array
+    public function codeLenses(DocumentRequest $request): array
     {
-        $request = $this->documents->resolveDocument($params);
-        if (null === $request || !\in_array($request->document->languageId, ['javascript', 'typescript'], true)) {
-            return null;
+        if (!\in_array($request->document->languageId, ['javascript', 'typescript'], true)) {
+            return [];
         }
         $lenses = [];
-        foreach ($this->extractor->extract($request->project, SourceDocument::fromDocument($request->document))->declarations as $declaration) {
+        foreach ($this->extractor->extract($request->project, $request->source)->declarations as $declaration) {
             $locations = [];
             foreach ($this->sourceIndexes->forProject($request->project)->references($declaration->name) as $reference) {
                 $locations[] = $this->protocol->location($reference->uri, $reference->range);

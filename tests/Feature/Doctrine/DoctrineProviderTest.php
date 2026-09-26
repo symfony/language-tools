@@ -142,8 +142,8 @@ final class DoctrineProviderTest extends TestCase
         self::assertSame([$entityUri], $kit->targets($relationshipProvider->definition($kit->inside($repositoryUri, 'Product:'))));
 
         $codeLensProvider = $kit->get(DoctrineRelationshipCodeLensProvider::class);
-        self::assertSame(['Repository: App\\Repository\\ProductRepository'], $kit->titles($codeLensProvider->codeLenses(LspRequests::document($entityUri))));
-        self::assertSame(['Entity: App\\Entity\\Product'], $kit->titles($codeLensProvider->codeLenses(LspRequests::document($repositoryUri))));
+        self::assertSame(['Repository: App\\Repository\\ProductRepository'], $kit->titles($codeLensProvider->codeLenses($kit->document($entityUri))));
+        self::assertSame(['Entity: App\\Entity\\Product'], $kit->titles($codeLensProvider->codeLenses($kit->document($repositoryUri))));
     }
 
     public function testMapsOnlyCompleteClassReferencesInMappingAttributes(): void

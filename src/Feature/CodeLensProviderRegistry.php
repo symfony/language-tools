@@ -2,11 +2,15 @@
 
 namespace Symfony\Lsp\Feature;
 
+use Symfony\Lsp\Protocol\LspRequestFactory;
+
 final class CodeLensProviderRegistry
 {
     /** @param iterable<CodeLensProviderInterface> $providers */
-    public function __construct(private readonly iterable $providers)
-    {
+    public function __construct(
+        private readonly LspRequestFactory $requests,
+        private readonly iterable $providers,
+    ) {
     }
 
     /**
@@ -16,12 +20,14 @@ final class CodeLensProviderRegistry
      */
     public function codeLenses(array $params): array
     {
+        $request = $this->requests->document($params);
+        if (null === $request) {
+            return [];
+        }
+
         $lenses = [];
         foreach ($this->providers as $provider) {
-            $provided = $provider->codeLenses($params);
-            if (null !== $provided) {
-                array_push($lenses, ...$provided);
-            }
+            array_push($lenses, ...$provider->codeLenses($request));
         }
 
         return $lenses;

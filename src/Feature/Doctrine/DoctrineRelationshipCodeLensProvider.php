@@ -2,29 +2,26 @@
 
 namespace Symfony\Lsp\Feature\Doctrine;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
-use Symfony\Lsp\Index\SourceDocument;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class DoctrineRelationshipCodeLensProvider implements CodeLensProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $resolver,
         private readonly LspProtocolMapper $protocol,
         private readonly DoctrineIndexRegistry $indexes,
         private readonly DoctrineExtractor $extractor,
     ) {
     }
 
-    public function codeLenses(array $params): ?array
+    public function codeLenses(DocumentRequest $request): array
     {
-        $request = $this->resolver->resolveDocument($params);
-        if (null === $request || 'php' !== $request->document->languageId) {
-            return null;
+        if ('php' !== $request->document->languageId) {
+            return [];
         }
         $index = $this->indexes->forProject($request->project);
-        $facts = $this->extractor->extract(SourceDocument::fromDocument($request->document));
+        $facts = $this->extractor->extract($request->source);
         $lenses = [];
         foreach ($facts->entities as $entity) {
             $repository = null === $entity->repositoryClass ? null : $index->repository($entity->repositoryClass);

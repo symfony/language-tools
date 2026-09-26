@@ -2,15 +2,14 @@
 
 namespace Symfony\Lsp\Feature\Messenger;
 
-use Symfony\Lsp\Document\DocumentContextResolver;
 use Symfony\Lsp\Feature\CodeLensProviderInterface;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
+use Symfony\Lsp\Protocol\DocumentRequest;
 use Symfony\Lsp\Protocol\LspProtocolMapper;
 
 final class MessengerCodeLensProvider implements CodeLensProviderInterface
 {
     public function __construct(
-        private readonly DocumentContextResolver $documents,
         private readonly LspProtocolMapper $protocol,
         private readonly MessengerIndexRegistry $indexes,
         private readonly PhpClassDeclarationExtractor $classExtractor,
@@ -18,11 +17,10 @@ final class MessengerCodeLensProvider implements CodeLensProviderInterface
     ) {
     }
 
-    public function codeLenses(array $params): ?array
+    public function codeLenses(DocumentRequest $request): array
     {
-        $request = $this->documents->resolveDocument($params);
-        if (null === $request || 'php' !== $request->document->languageId) {
-            return null;
+        if ('php' !== $request->document->languageId) {
+            return [];
         }
         $index = $this->indexes->forProject($request->project);
         $lenses = [];
