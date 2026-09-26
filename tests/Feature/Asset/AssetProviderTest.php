@@ -57,6 +57,11 @@ final class AssetProviderTest extends TestCase
         }
 
         self::assertSame(['app'], $this->completeAtEnd($kit, 'file:///workspace/templates/entrypoint.html.twig', "{{ importmap(['ap"));
+        self::assertSame(['app'], $this->completeAtEnd($kit, 'file:///workspace/templates/named-entrypoint.html.twig', "{{ importmap(entryPoint: 'ap"));
+        self::assertSame(['app'], $this->completeAtEnd($kit, 'file:///workspace/templates/named-entrypoints.html.twig', "{{ importmap(entryPoint: ['ap"));
+        foreach (["{{ product.asset('images/lo", "{{ value|asset('images/lo", "{{ config.importmap('ap"] as $index => $unrelated) {
+            self::assertSame([], $this->completeAtEnd($kit, 'file:///workspace/templates/unrelated-'.$index.'.html.twig', $unrelated));
+        }
 
         $commentUri = 'file:///workspace/templates/comment.html.twig';
         $kit->open($commentUri, "{## {{ asset('images/lo') }} #}");

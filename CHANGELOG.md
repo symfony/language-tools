@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete importmap entrypoints passed as the `entryPoint` named argument, and stop completing assets on Twig method calls and filters named `asset` or `importmap`
 - Stop completing route names on Twig method calls and filters named `path` or `url`, and route parameter names inside a parameter value
 - Complete Doctrine criteria fields, `EntityType` fields and form options before the first character is typed
 - Stop completing PHP array keys and Doctrine `EntityType` fields in a string that is concatenated with something else

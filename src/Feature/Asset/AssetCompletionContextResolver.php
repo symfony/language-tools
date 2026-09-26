@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Feature\Asset;
 
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Parser\Twig\TwigCallSyntax;
 use Symfony\Lsp\Parser\Twig\TwigCommentParser;
 use Symfony\Lsp\Parser\Twig\TwigDirectiveLocator;
 
@@ -25,11 +26,15 @@ final class AssetCompletionContextResolver
             return null;
         }
         $before = substr($masked, 0, $offset);
-        if (preg_match('/\basset\s*\(\s*(?:path\s*[:=](?![=>])\s*)?["\']([A-Za-z0-9_@.\/-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {
-            return $this->context(AssetSymbolKind::Asset, $match[1][0], $text, $match[1][1]);
+        if (preg_match('/\b(asset)\s*\(\s*(?:path\s*[:=](?![=>])\s*)?["\']([A-Za-z0-9_@.\/-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)
+            && TwigCallSyntax::isFunctionCall($before, $match[1][1])
+        ) {
+            return $this->context(AssetSymbolKind::Asset, $match[2][0], $text, $match[2][1]);
         }
-        if (preg_match('/\bimportmap\s*\(\s*(?:\[[^\]]*)?["\']([A-Za-z0-9_@.\/-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)) {
-            return $this->context(AssetSymbolKind::Entrypoint, $match[1][0], $text, $match[1][1]);
+        if (preg_match('/\b(importmap)\s*\(\s*(?:entryPoint\s*[:=](?![=>])\s*)?(?:\[[^\]]*)?["\']([A-Za-z0-9_@.\/-]*)$/s', $before, $match, \PREG_OFFSET_CAPTURE)
+            && TwigCallSyntax::isFunctionCall($before, $match[1][1])
+        ) {
+            return $this->context(AssetSymbolKind::Entrypoint, $match[2][0], $text, $match[2][1]);
         }
 
         return null;
