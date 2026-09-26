@@ -2,15 +2,17 @@
 
 namespace Symfony\Lsp\Tests\Support\Bridge;
 
+use Symfony\Lsp\Tests\Support\TestWorkspace;
+
 final class ConsoleFixtureBuilder
 {
-    public function __construct(private readonly BridgeFixtureWorkspace $workspace)
+    public function __construct(private readonly TestWorkspace $workspace)
     {
     }
 
     public function writeDefinitionsScript(): string
     {
-        return $this->workspace->writeExecutable('console.php', str_replace(
+        return $this->workspace->executable('console.php', str_replace(
             '__BRIDGE__',
             var_export(\dirname(__DIR__, 3).'/resources/bridge/sections/console.php', true),
             <<<'PHP'

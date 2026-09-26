@@ -42,6 +42,24 @@ final class TestWorkspace
         return $path;
     }
 
+    public function read(string $relativePath): string
+    {
+        return (string) file_get_contents($this->path($relativePath));
+    }
+
+    /** @return int the number of replacements */
+    public function replace(string $relativePath, string $search, string $replacement): int
+    {
+        $this->write($relativePath, str_replace($search, $replacement, $this->read($relativePath), $count));
+
+        return $count;
+    }
+
+    public function remove(string ...$relativePaths): void
+    {
+        (new Filesystem())->remove(array_map($this->path(...), $relativePaths));
+    }
+
     public function cleanup(): void
     {
         (new Filesystem())->remove($this->rootPath);

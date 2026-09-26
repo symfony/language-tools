@@ -3,20 +3,20 @@
 namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
 use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
 use Symfony\Lsp\Tests\Support\Bridge\RouteFixtureBuilder;
 use Symfony\Lsp\Tests\Support\Bridge\TwigComponentFixtureBuilder;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class BridgeTwigComponentsTest extends TestCase
 {
-    private BridgeFixtureWorkspace $workspace;
+    private TestWorkspace $workspace;
     private BridgeProcessFixture $bridge;
 
     protected function setUp(): void
     {
-        $this->workspace = new BridgeFixtureWorkspace();
-        $this->bridge = new BridgeProcessFixture($this->workspace->path);
+        $this->workspace = new TestWorkspace();
+        $this->bridge = new BridgeProcessFixture($this->workspace->rootPath);
     }
 
     protected function tearDown(): void

@@ -3,16 +3,16 @@
 namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
 use Symfony\Lsp\Tests\Support\Bridge\ConsoleFixtureBuilder;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class BridgeConsoleTest extends TestCase
 {
-    private BridgeFixtureWorkspace $workspace;
+    private TestWorkspace $workspace;
 
     protected function setUp(): void
     {
-        $this->workspace = new BridgeFixtureWorkspace('symfony-lsp-console-');
+        $this->workspace = new TestWorkspace('symfony-lsp-console-');
     }
 
     protected function tearDown(): void

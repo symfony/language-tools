@@ -2,10 +2,12 @@
 
 namespace Symfony\Lsp\Tests\Support\Bridge;
 
+use Symfony\Lsp\Tests\Support\TestWorkspace;
+
 final class TwigFixtureBuilder
 {
     public function __construct(
-        private readonly BridgeFixtureWorkspace $workspace,
+        private readonly TestWorkspace $workspace,
         private readonly FakeFrameworkPrelude $prelude = new FakeFrameworkPrelude(),
     ) {
     }
@@ -21,8 +23,8 @@ final class TwigFixtureBuilder
 
     public function writeThemedTwigApplicationWithEffectiveConfiguration(): void
     {
-        $this->workspace->makeDirectory('command-templates');
-        $this->workspace->makeDirectory('effective-templates');
+        $this->workspace->mkdir('command-templates');
+        $this->workspace->mkdir('effective-templates');
         $this->writeThemedTwigApplicationWithConfiguration(
             <<<'PHP'
                 namespace Symfony\Component\Config\Definition;
@@ -95,9 +97,9 @@ final class TwigFixtureBuilder
 
     private function writeThemedTwigApplicationWithConfiguration(string $configurationSupport, string $kernelConfiguration, string $commandConfiguration): void
     {
-        $this->workspace->makeDirectory('templates');
-        $this->workspace->makeDirectory('templates/bundles/ShopBundle');
-        $this->workspace->makeDirectory('src/ShopBundle/templates');
+        $this->workspace->mkdir('templates');
+        $this->workspace->mkdir('templates/bundles/ShopBundle');
+        $this->workspace->mkdir('src/ShopBundle/templates');
         $source = str_replace(
             ['__CONFIGURATION_SUPPORT__', '__KERNEL_CONFIGURATION__', '__COMMAND_CONFIGURATION__'],
             [$configurationSupport, $kernelConfiguration, $commandConfiguration],
@@ -146,8 +148,8 @@ PHP,
 
     public function writeTwigApplicationWithDecoratedLoader(): void
     {
-        $this->workspace->makeDirectory('templates');
-        $this->workspace->makeDirectory('src/ShopBundle/templates');
+        $this->workspace->mkdir('templates');
+        $this->workspace->mkdir('src/ShopBundle/templates');
         $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
             __INSTALLED_VERSIONS__
             namespace Twig\Loader;
@@ -216,11 +218,11 @@ PHP,
 
     public function writeThemedTwigApplicationWithThemes(): void
     {
-        $this->workspace->makeDirectory('templates');
+        $this->workspace->mkdir('templates');
         $this->workspace->write('themes/TestTheme/composer.json', json_encode(['name' => 'acme/test-theme', 'type' => 'sylius-theme'], \JSON_THROW_ON_ERROR));
         $this->workspace->write('themes/TestTheme/templates/shop/home.html.twig', '<p>home</p>');
         $this->workspace->write('themes/TestTheme/templates/bundles/SyliusShopBundle/custom/_promo.html.twig', '<p>promo</p>');
-        $this->workspace->makeDirectory('themes/NotATheme/templates');
+        $this->workspace->mkdir('themes/NotATheme/templates');
         $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
             __INSTALLED_VERSIONS__
             __CONTAINER_BUILDER__

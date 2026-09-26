@@ -4,7 +4,6 @@ namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Tests\Support\Bridge\AutoloaderFixtureBuilder;
-use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
 use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
 use Symfony\Lsp\Tests\Support\Bridge\DoctrineFixtureBuilder;
 use Symfony\Lsp\Tests\Support\Bridge\EnvironmentFixtureBuilder;
@@ -14,16 +13,17 @@ use Symfony\Lsp\Tests\Support\Bridge\RuntimeFrontControllerFixtureBuilder;
 use Symfony\Lsp\Tests\Support\Bridge\SecurityFixtureBuilder;
 use Symfony\Lsp\Tests\Support\Bridge\StimulusFixtureBuilder;
 use Symfony\Lsp\Tests\Support\Bridge\TwigFixtureBuilder;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class BridgeSectionsTest extends TestCase
 {
-    private BridgeFixtureWorkspace $workspace;
+    private TestWorkspace $workspace;
     private BridgeProcessFixture $bridge;
 
     protected function setUp(): void
     {
-        $this->workspace = new BridgeFixtureWorkspace();
-        $this->bridge = new BridgeProcessFixture($this->workspace->path);
+        $this->workspace = new TestWorkspace();
+        $this->bridge = new BridgeProcessFixture($this->workspace->rootPath);
     }
 
     protected function tearDown(): void
@@ -299,7 +299,7 @@ final class BridgeSectionsTest extends TestCase
         $entity = $doctrine['entities'][0] ?? null;
         self::assertIsArray($entity);
         self::assertSame('App\Entity\Book', $entity['className'] ?? null);
-        self::assertSame(realpath($this->workspace->path).'/src/Entity/Book.php', $entity['file'] ?? null);
+        self::assertSame(realpath($this->workspace->rootPath).'/src/Entity/Book.php', $entity['file'] ?? null);
         self::assertSame('App\Repository\BookRepository', $entity['repositoryClass'] ?? null);
         self::assertSame([
             ['name' => 'title', 'type' => 'string', 'association' => false, 'targetEntity' => null],
@@ -463,8 +463,8 @@ final class BridgeSectionsTest extends TestCase
         self::assertIsString($shop[1]);
         self::assertStringEndsWith('/templates/bundles/ShopBundle', $shop[0]);
         self::assertStringEndsWith('/src/ShopBundle/templates', $shop[1]);
-        self::assertSame([realpath($this->workspace->path).'/templates'], $byNamespace['(None)'] ?? null);
-        self::assertSame([realpath($this->workspace->path).'/src/ShopBundle/templates'], $byNamespace['@!Shop'] ?? null);
+        self::assertSame([realpath($this->workspace->rootPath).'/templates'], $byNamespace['(None)'] ?? null);
+        self::assertSame([realpath($this->workspace->rootPath).'/src/ShopBundle/templates'], $byNamespace['@!Shop'] ?? null);
     }
 
     public function testReadsLoaderPathsFromTheLoaderADecoratorHides(): void
@@ -520,7 +520,7 @@ final class BridgeSectionsTest extends TestCase
             self::assertIsString($path['path'] ?? null);
             $byNamespace[$path['namespace']][] = $path['path'];
         }
-        $theme = realpath($this->workspace->path).'/themes/TestTheme/templates';
+        $theme = realpath($this->workspace->rootPath).'/themes/TestTheme/templates';
         self::assertContains($theme, $byNamespace['(None)'] ?? []);
         self::assertSame([$theme.'/bundles/SyliusShopBundle'], $byNamespace['@SyliusShop'] ?? null);
         foreach ($byNamespace as $namespace => $namespacePaths) {
@@ -546,7 +546,7 @@ final class BridgeSectionsTest extends TestCase
         self::assertIsArray($twig);
         $paths = $twig['paths'] ?? null;
         self::assertIsArray($paths);
-        $project = realpath($this->workspace->path);
+        $project = realpath($this->workspace->rootPath);
         self::assertIsString($project);
         self::assertContains([
             'namespace' => '@Effective',

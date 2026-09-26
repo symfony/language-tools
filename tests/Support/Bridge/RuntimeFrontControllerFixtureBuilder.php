@@ -2,10 +2,12 @@
 
 namespace Symfony\Lsp\Tests\Support\Bridge;
 
+use Symfony\Lsp\Tests\Support\TestWorkspace;
+
 final class RuntimeFrontControllerFixtureBuilder
 {
     public function __construct(
-        private readonly BridgeFixtureWorkspace $workspace,
+        private readonly TestWorkspace $workspace,
         private readonly FakeFrameworkPrelude $prelude = new FakeFrameworkPrelude(),
     ) {
     }
@@ -87,7 +89,7 @@ PHP,
             'extra' => ['runtime' => [
                 'class' => 'Distribution\\ConfiguredRuntime',
                 'configured_option' => 'composer',
-                'project_dir' => $this->workspace->path,
+                'project_dir' => $this->workspace->rootPath,
             ]],
         ], \JSON_THROW_ON_ERROR));
         $this->workspace->write('vendor/autoload_runtime.php', <<<'PHP'
@@ -97,7 +99,7 @@ PHP,
             }
             throw new RuntimeException('The runtime must not run when the autoloader is already loaded.');
             PHP);
-        $this->workspace->makeDirectory('bin');
+        $this->workspace->mkdir('bin');
         $this->workspace->write('bin/console', <<<'PHP'
             <?php
             require_once dirname(__DIR__).'/vendor/autoload_runtime.php';
@@ -206,7 +208,7 @@ PHP,
             }
             throw new RuntimeException('The runtime must not run when the autoloader is already loaded.');
             PHP);
-        $this->workspace->makeDirectory('bin');
+        $this->workspace->mkdir('bin');
         $this->workspace->write('bin/console', $failingFrontController ? <<<'PHP'
             <?php
             require_once dirname(__DIR__).'/vendor/autoload_runtime.php';

@@ -2,21 +2,23 @@
 
 namespace Symfony\Lsp\Tests\Support\Bridge;
 
+use Symfony\Lsp\Tests\Support\TestWorkspace;
+
 final class StimulusFixtureBuilder
 {
     public function __construct(
-        private readonly BridgeFixtureWorkspace $workspace,
+        private readonly TestWorkspace $workspace,
         private readonly FakeFrameworkPrelude $prelude = new FakeFrameworkPrelude(),
     ) {
     }
 
     public function writeThemedStimulusApplication(): void
     {
-        $this->workspace->makeDirectory('src/ShopBundle/Resources/assets');
+        $this->workspace->mkdir('src/ShopBundle/Resources/assets');
         $this->workspace->write('src/ShopBundle/Resources/assets/controllers.json', json_encode([
             'controllers' => ['@acme/ux-widget' => ['widget' => ['enabled' => true, 'fetch' => 'eager']]],
         ], \JSON_THROW_ON_ERROR));
-        $this->workspace->makeDirectory('vendor/acme/ux-widget/assets/dist');
+        $this->workspace->mkdir('vendor/acme/ux-widget/assets/dist');
         $this->workspace->write('vendor/acme/ux-widget/assets/package.json', json_encode([
             'symfony' => ['controllers' => ['widget' => ['main' => 'dist/widget_controller.js', 'name' => 'acme/widget']]],
         ], \JSON_THROW_ON_ERROR));

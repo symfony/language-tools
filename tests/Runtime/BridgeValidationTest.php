@@ -4,20 +4,20 @@ namespace Symfony\Lsp\Tests\Runtime;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
 use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
 use Symfony\Lsp\Tests\Support\Bridge\ValidationFixtureBuilder;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class BridgeValidationTest extends TestCase
 {
-    private BridgeFixtureWorkspace $workspace;
+    private TestWorkspace $workspace;
     private BridgeProcessFixture $bridge;
     private ValidationFixtureBuilder $fixtures;
 
     protected function setUp(): void
     {
-        $this->workspace = new BridgeFixtureWorkspace();
-        $this->bridge = new BridgeProcessFixture($this->workspace->path);
+        $this->workspace = new TestWorkspace();
+        $this->bridge = new BridgeProcessFixture($this->workspace->rootPath);
         $this->fixtures = new ValidationFixtureBuilder($this->workspace);
     }
 

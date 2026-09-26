@@ -5,20 +5,20 @@ namespace Symfony\Lsp\Tests\Runtime;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Tests\Support\Bridge\AutoloaderFixtureBuilder;
-use Symfony\Lsp\Tests\Support\Bridge\BridgeFixtureWorkspace;
 use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessFixture;
 use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessResult;
 use Symfony\Lsp\Tests\Support\Bridge\RouteFixtureBuilder;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class BridgeTest extends TestCase
 {
-    private BridgeFixtureWorkspace $workspace;
+    private TestWorkspace $workspace;
     private BridgeProcessFixture $bridge;
 
     protected function setUp(): void
     {
-        $this->workspace = new BridgeFixtureWorkspace();
-        $this->bridge = new BridgeProcessFixture($this->workspace->path);
+        $this->workspace = new TestWorkspace();
+        $this->bridge = new BridgeProcessFixture($this->workspace->rootPath);
     }
 
     protected function tearDown(): void
@@ -51,7 +51,7 @@ final class BridgeTest extends TestCase
         $metadata = $this->workspace->write('releases.json', json_encode([
             'supported_versions' => $supportedVersions,
         ], \JSON_THROW_ON_ERROR));
-        $cache = $this->workspace->path.'/release-metadata-cache.json';
+        $cache = $this->workspace->rootPath.'/release-metadata-cache.json';
 
         $process = $this->bridge->run([
             '--release-metadata-url='.$metadata,
@@ -79,7 +79,7 @@ final class BridgeTest extends TestCase
 
         $process = $this->bridge->run([
             '--release-metadata-url='.$metadata,
-            '--release-metadata-cache='.$this->workspace->path.'/release-metadata-cache.json',
+            '--release-metadata-cache='.$this->workspace->rootPath.'/release-metadata-cache.json',
         ]);
 
         self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
@@ -96,7 +96,7 @@ final class BridgeTest extends TestCase
         touch($cache, time() - 7200);
 
         $process = $this->bridge->run([
-            '--release-metadata-url='.$this->workspace->path.'/missing-releases.json',
+            '--release-metadata-url='.$this->workspace->rootPath.'/missing-releases.json',
             '--release-metadata-cache='.$cache,
         ]);
 
@@ -114,7 +114,7 @@ final class BridgeTest extends TestCase
 
         $process = $this->bridge->run([
             '--release-metadata-url='.$metadata,
-            '--release-metadata-cache='.$this->workspace->path.'/missing-cache.json',
+            '--release-metadata-cache='.$this->workspace->rootPath.'/missing-cache.json',
         ]);
 
         self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
@@ -191,13 +191,13 @@ final class BridgeTest extends TestCase
     public function testRebuildsContainerCacheBeforeLoadingSections(): void
     {
         (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
-        $this->workspace->makeDirectory('var/cache');
+        $this->workspace->mkdir('var/cache');
         $this->workspace->write('var/cache/marker', 'stale');
 
         $process = $this->bridge->run(['--sections=routes', '--rebuild-container=1']);
 
         self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
-        self::assertFileDoesNotExist($this->workspace->path.'/var/cache/marker');
+        self::assertFileDoesNotExist($this->workspace->rootPath.'/var/cache/marker');
     }
 
     public function testTargetedRefreshDiscardsStaleTranslationCatalogueCaches(): void
@@ -259,7 +259,7 @@ final class BridgeTest extends TestCase
         $cause = $error['cause'] ?? null;
         self::assertIsArray($cause);
         self::assertStringNotContainsString(
-            (string) realpath($this->workspace->path),
+            (string) realpath($this->workspace->rootPath),
             json_encode($cause, \JSON_THROW_ON_ERROR),
         );
         $chain = $cause['chain'] ?? null;
@@ -386,7 +386,7 @@ PHP,
         $this->workspace->write('composer.json', json_encode([
             'autoload' => ['psr-4' => ['Acme\\' => 'src/']],
         ], \JSON_THROW_ON_ERROR));
-        $this->workspace->makeDirectory('src');
+        $this->workspace->mkdir('src');
         $this->workspace->write('src/Kernel.php', '<?php');
 
         $process = $this->bridge->run(['--sections=routes']);
@@ -407,8 +407,8 @@ PHP,
         $this->workspace->write('composer.json', json_encode([
             'autoload' => ['psr-4' => ['Tests\\' => 'tests/', 'Acme\\' => 'src/']],
         ], \JSON_THROW_ON_ERROR));
-        $this->workspace->makeDirectory('src');
-        $this->workspace->makeDirectory('tests');
+        $this->workspace->mkdir('src');
+        $this->workspace->mkdir('tests');
         $this->workspace->write('src/Kernel.php', '<?php');
         $this->workspace->write('tests/Kernel.php', '<?php');
 
@@ -437,7 +437,7 @@ PHP,
     {
         (new RouteFixtureBuilder($this->workspace))->writeMultiKernelApplication();
 
-        self::assertStringNotContainsString('autoload_runtime.php', (string) file_get_contents($this->workspace->path.'/bin/apiconsole'));
+        self::assertStringNotContainsString('autoload_runtime.php', (string) file_get_contents($this->workspace->rootPath.'/bin/apiconsole'));
         self::assertSame(['api_dashboard'], $this->routeNames($this->bridge->run(['--sections=routes', '--kernel=bin/apiconsole'])));
     }
 

@@ -2,10 +2,12 @@
 
 namespace Symfony\Lsp\Tests\Support\Bridge;
 
+use Symfony\Lsp\Tests\Support\TestWorkspace;
+
 final class TwigComponentFixtureBuilder
 {
     public function __construct(
-        private readonly BridgeFixtureWorkspace $workspace,
+        private readonly TestWorkspace $workspace,
         private readonly FakeFrameworkPrelude $prelude = new FakeFrameworkPrelude(),
     ) {
     }

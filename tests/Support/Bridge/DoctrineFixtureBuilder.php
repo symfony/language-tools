@@ -2,17 +2,19 @@
 
 namespace Symfony\Lsp\Tests\Support\Bridge;
 
+use Symfony\Lsp\Tests\Support\TestWorkspace;
+
 final class DoctrineFixtureBuilder
 {
     public function __construct(
-        private readonly BridgeFixtureWorkspace $workspace,
+        private readonly TestWorkspace $workspace,
         private readonly FakeFrameworkPrelude $prelude = new FakeFrameworkPrelude(),
     ) {
     }
 
     public function writeDoctrineApplication(): void
     {
-        $this->workspace->makeDirectory('src/Entity');
+        $this->workspace->mkdir('src/Entity');
         $this->workspace->write('src/Entity/Book.php', <<<'PHP'
             <?php
             namespace App\Entity;
