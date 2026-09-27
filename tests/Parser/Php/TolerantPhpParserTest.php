@@ -723,6 +723,32 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame('Formats the value.', $method->description);
     }
 
+    public function testKeepsTheDocCommentsOfTypesAndMethods(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Twig;
+
+            /**
+             * @psalm-type Options = array{size?: 'sm'|'md'}
+             */
+            #[Marker]
+            final class Extension
+            {
+                /** @param Options $options */
+                #[AsTwigFunction('button')]
+                public function button(array $options): string {}
+
+                public function plain(): void {}
+            }
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+
+        self::assertSame("/**\n * @psalm-type Options = array{size?: 'sm'|'md'}\n */", $document->typeDeclarations[0]->docComment);
+        self::assertSame(['/** @param Options $options */', null], array_map(static fn (PhpMethodDeclaration $method): ?string => $method->docComment, $document->methodDeclarations));
+    }
+
     public function testDoesNotResolveAnonymousClassSelfCallablesToTheOuterClass(): void
     {
         $source = <<<'PHP'

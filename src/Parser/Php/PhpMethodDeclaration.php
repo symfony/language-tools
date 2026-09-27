@@ -21,6 +21,7 @@ final class PhpMethodDeclaration
         public readonly ?int $bodyEndOffset = null,
         public readonly bool $bodyClosed = false,
         public readonly bool $public = true,
+        public readonly ?string $docComment = null,
     ) {
     }
 }

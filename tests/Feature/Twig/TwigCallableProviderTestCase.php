@@ -16,8 +16,10 @@ use Symfony\Lsp\Feature\Twig\TwigCallableCompletionProvider;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableDiagnosticProvider;
 use Symfony\Lsp\Feature\Twig\TwigCallableMethodResolver;
+use Symfony\Lsp\Feature\Twig\TwigCallablePhpDocParser;
 use Symfony\Lsp\Feature\Twig\TwigCallableReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableRelationshipProvider;
+use Symfony\Lsp\Feature\Twig\TwigCallableShapeResolver;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
@@ -79,19 +81,16 @@ class TwigCallableProviderTestCase extends TestCase
         $classIndexes = new DependencyInjectionSourceIndexRegistry();
         $classIndexes->forProject($project)->replace(...$classFacts);
         $protocol = new LspProtocolMapper();
-        $methodResolver = new TwigCallableMethodResolver(
-            $classIndexes,
-            new ProjectDocumentReader($documents, ProjectPaths::resolver()),
-            $phpParser,
-            $indexes,
-        );
+        $reader = new ProjectDocumentReader($documents, ProjectPaths::resolver());
+        $methodResolver = new TwigCallableMethodResolver($classIndexes, $reader, $phpParser, $indexes);
+        $shapeResolver = new TwigCallableShapeResolver($methodResolver, new TwigCallablePhpDocParser(), $phpParser, $classIndexes, $reader);
 
         return [
             'documents' => $documents,
             'requests' => new ProviderRequests($documents, $projects),
             'converter' => $converter,
             'protocol' => $protocol,
-            'completion' => new TwigCallableCompletionProvider($converter, $protocol, $indexes, $methodResolver, $argumentAnalyzer, $commentParser, $directives),
+            'completion' => new TwigCallableCompletionProvider($converter, $protocol, $indexes, $methodResolver, $argumentAnalyzer, $commentParser, $directives, $shapeResolver),
             'diagnostic' => new TwigCallableDiagnosticProvider($protocol, $indexes, $methodResolver),
             'relationship' => new TwigCallableRelationshipProvider($converter, $protocol, $indexes, $referenceExtractor, $methodResolver, $phpParser),
         ];

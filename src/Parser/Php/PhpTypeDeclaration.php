@@ -20,6 +20,7 @@ final class PhpTypeDeclaration
         public readonly ?string $description,
         public readonly array $traitNames = [],
         public readonly array $interfaceNames = [],
+        public readonly ?string $docComment = null,
     ) {
     }
 

@@ -11,6 +11,7 @@
         "amphp/sync": "^2.3",
         "fabpot/json-rpc-peer": "^0.6",
         "fabpot/tolerant-php-parser": "^0.3",
+        "phpstan/phpdoc-parser": "^2.3",
         "symfony/config": "^8.1",
         "symfony/dependency-injection": "^8.1",
         "symfony/filesystem": "^8.1",

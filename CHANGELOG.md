@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Complete the keys and string values of a Twig function or filter hash argument from its PHP array shape
+
 ## 0.23.0 (2026-09-26)
 
 - Complete translation keys inside a Twig string interpolation

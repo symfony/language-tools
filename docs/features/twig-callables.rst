@@ -21,10 +21,28 @@ In the Editor
 
 * completion for function and filter names, and for the named arguments of a
   recognized call;
+* completion for the keys of a hash argument, and for the string values of
+  those keys, when the PHP parameter documents an array shape;
 * hover shows the PHP method behind the callable, its signature and its
   description;
 * go to definition opens that method, and find references lists the template
   usages and the declaration.
+
+For example, with this parameter, ``button({ size: '' })`` completes ``sm``,
+``md`` and ``lg`` inside the quotes:
+
+.. code-block:: php
+
+    /**
+     * @param array{size?: 'sm'|'md'|'lg', icon?: IconOptions} $options
+     */
+    public function button(array $options): string
+
+The shape can be written in ``@param``, ``@phpstan-param`` or
+``@psalm-param``, directly or through a ``@phpstan-type`` or ``@psalm-type``
+alias, including one imported with ``@phpstan-import-type`` or
+``@psalm-import-type``. Nested hashes complete the keys of their own shape.
+Only literal string values are offered.
 
 Diagnostics
 -----------

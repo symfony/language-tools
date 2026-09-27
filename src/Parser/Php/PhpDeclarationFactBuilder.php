@@ -302,6 +302,8 @@ final class PhpDeclarationFactBuilder
             PhpTypeKind::Enum => $declaration->enumMembers,
         };
 
+        $docComment = $declaration->getDocCommentText();
+
         return new PhpTypeDeclaration(
             (string) $declaration->getNamespacedName(),
             null === $parentClassName ? null : (string) $parentClassName,
@@ -311,9 +313,10 @@ final class PhpDeclarationFactBuilder
             $declaration->getEndPosition(),
             $kind,
             trim(substr($source, $start, $members->getStartPosition() - $start)),
-            $this->description($declaration),
+            $this->commentDescription($docComment),
             $this->traitNames($traitUses, $source, $names),
             $declaration instanceof TraitDeclaration ? [] : $this->interfaceNames($declaration, $source, $names),
+            $docComment,
         );
     }
 
@@ -443,19 +446,22 @@ final class PhpDeclarationFactBuilder
             );
         }
 
+        $docComment = $declaration->getDocCommentText();
+
         return new PhpMethodDeclaration(
             (string) $owner->getNamespacedName(),
             $name,
             $nameToken->getStartPosition(),
             $nameToken->getEndPosition(),
             trim(substr($source, $signatureStart, $signatureEnd - $signatureStart)),
-            $this->description($declaration),
+            $this->commentDescription($docComment),
             $attributes,
             $parameters,
             $body instanceof CompoundStatementNode ? $body->getStartPosition() : null,
             $body instanceof CompoundStatementNode ? $body->getEndPosition() : null,
             $body instanceof CompoundStatementNode && !$body->closeBrace instanceof MissingToken,
             !$declaration->hasModifier(TokenKind::ProtectedKeyword) && !$declaration->hasModifier(TokenKind::PrivateKeyword),
+            $docComment,
         );
     }
 
@@ -572,7 +578,11 @@ final class PhpDeclarationFactBuilder
 
     private function description(Node $node): ?string
     {
-        $comment = $node->getDocCommentText();
+        return $this->commentDescription($node->getDocCommentText());
+    }
+
+    private function commentDescription(?string $comment): ?string
+    {
         if (null === $comment) {
             return null;
         }

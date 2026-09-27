@@ -21,6 +21,7 @@ final class TwigCallableCompletionProvider implements CompletionProviderInterfac
         private readonly TwigCallableArgumentAnalyzer $arguments,
         private readonly TwigCommentParser $comments,
         private readonly TwigDirectiveLocator $directives,
+        private readonly TwigCallableShapeResolver $shapes,
     ) {
     }
 
@@ -36,6 +37,10 @@ final class TwigCallableCompletionProvider implements CompletionProviderInterfac
             return [];
         }
         $directive = substr($masked, $start, $offset - $start);
+        $hash = $this->arguments->hashArgument($directive);
+        if (null !== $hash) {
+            return $this->hashItems($request, $hash);
+        }
         $context = $this->arguments->incompleteCall($directive, $start);
         if (null !== $context) {
             $parameters = $this->methods->parameters($request->project, [
@@ -88,5 +93,60 @@ final class TwigCallableCompletionProvider implements CompletionProviderInterfac
         }
 
         return $items;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function hashItems(PositionedRequest $request, TwigCallableHashArgument $hash): array
+    {
+        $declarations = $this->indexes->forProject($request->project)->declarations($hash->kind, $hash->callee);
+        $range = new Range(
+            $this->converter->toPosition($request->document->text, $request->offset - \strlen($hash->prefix)),
+            $request->position,
+        );
+        $items = [];
+        if (null !== $hash->key) {
+            foreach ($this->shapes->values($request->project, $hash, $declarations) as $value) {
+                if (!str_starts_with($value, $hash->prefix) || null === $hash->quote || str_contains($value, $hash->quote) || str_contains($value, '\\')) {
+                    continue;
+                }
+                $items[] = $this->protocol->completionItem(
+                    $value,
+                    CompletionItemKind::Value,
+                    'Twig '.$hash->kind->value.' argument value',
+                    $this->protocol->textEdit($range, $value),
+                );
+            }
+
+            return $items;
+        }
+        foreach ($this->shapes->keys($request->project, $hash, $declarations) as $key) {
+            if (!str_starts_with($key->name, $hash->prefix) || \in_array($key->name, $hash->usedKeys, true)) {
+                continue;
+            }
+            $text = $this->hashKeyText($key->name, $hash->quote);
+            if (null === $text) {
+                continue;
+            }
+            $items[] = $this->protocol->completionItem(
+                $key->name,
+                CompletionItemKind::Property,
+                ($key->optional ? '(optional) ' : '').$key->type,
+                $this->protocol->textEdit($range, $text),
+            );
+        }
+
+        return $items;
+    }
+
+    private function hashKeyText(string $key, ?string $quote): ?string
+    {
+        if (null !== $quote) {
+            return str_contains($key, $quote) || str_contains($key, '\\') ? null : $key;
+        }
+        if (1 === preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $key)) {
+            return $key;
+        }
+
+        return "'".str_replace(['\\', "'"], ['\\\\', "\\'"], $key)."'";
     }
 }
