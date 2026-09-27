@@ -16,10 +16,14 @@ use Symfony\Lsp\Feature\DependencyInjection\ServiceIndexRegistry;
 use Symfony\Lsp\Feature\Route\ProjectRouteSnapshotLoader;
 use Symfony\Lsp\Feature\Route\Route;
 use Symfony\Lsp\Feature\Route\RouteIndexRegistry;
+use Symfony\Lsp\Feature\Twig\ProjectTwigCallableSnapshotLoader;
+use Symfony\Lsp\Feature\Twig\TwigCallableKind;
+use Symfony\Lsp\Feature\Twig\TwigCallableRuntimeIndexRegistry;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectAnalysisSettings;
 use Symfony\Lsp\Project\ProjectRegistry;
+use Symfony\Lsp\Project\UriToPathConverter;
 use Symfony\Lsp\Runtime\BridgeExecutionException;
 use Symfony\Lsp\Runtime\BridgeInstaller;
 use Symfony\Lsp\Runtime\ContainerPathMapper;
@@ -764,6 +768,64 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertMatchesRegularExpression('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+00:00$/D', $status['lastSuccessfulAt'] ?? '');
         self::assertSame('The application failed to boot.', $status['error'] ?? null);
         self::assertSame('bootstrap', $status['stage'] ?? null);
+    }
+
+    public function testRestoresPersistedTwigCallablesWhenTheInitialBridgeExecutionFails(): void
+    {
+        $source = $this->workspace->path('source.php');
+        file_put_contents($source, '<?php');
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
+        $projects = self::projects($project);
+        $configuration = new RuntimeConfiguration();
+        $file = $this->workspace->rootPath.'/vendor/symfony/ux-css/src/Twig/CssRuntime.php';
+        $bridgeOutputs = [
+            json_encode([
+                'schemaVersion' => 1,
+                'sections' => [
+                    'twig' => [
+                        'complete' => true,
+                        'paths' => [],
+                        'globals' => [],
+                        'callables' => [[
+                            'kind' => 'function',
+                            'name' => 'css',
+                            'class' => 'Symfony\\UX\\Css\\Twig\\CssRuntime',
+                            'method' => 'css',
+                            'declaringClass' => 'Symfony\\UX\\Css\\Twig\\CssRuntime',
+                            'file' => $file,
+                            'needsContext' => true,
+                        ]],
+                        'warnings' => [],
+                    ],
+                ],
+            ], \JSON_THROW_ON_ERROR),
+            null,
+        ];
+        foreach ($bridgeOutputs as $output) {
+            $indexes = new TwigCallableRuntimeIndexRegistry();
+            $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
+                new CapturingProcessRunner(null === $output ? new ProcessResult(1, '', '') : new ProcessResult(0, $output, '')),
+                self::snapshotLoaders(new ProjectTwigCallableSnapshotLoader($indexes, new UriToPathConverter())),
+                $projects,
+                configuration: $configuration,
+                snapshotStore: new RuntimeSnapshotStore($configuration, new Filesystem()),
+                snapshotState: new RuntimeSnapshotState(),
+            );
+
+            try {
+                $initializer->initialize($project, RuntimeRefreshPlan::reuse());
+                self::assertNotNull($output, 'The failed bridge execution was accepted.');
+            } catch (BridgeExecutionException) {
+                self::assertNull($output);
+            }
+
+            $declarations = $indexes->forProject($project)->declarations(TwigCallableKind::Function, 'css');
+            self::assertCount(1, $declarations);
+            self::assertSame('Symfony\\UX\\Css\\Twig\\CssRuntime', $declarations[0]->className);
+            self::assertSame('css', $declarations[0]->method);
+            self::assertSame((new UriToPathConverter())->toUri($file), $declarations[0]->uri);
+            self::assertTrue($declarations[0]->needsContext);
+        }
     }
 
     public function testKeepsTheActiveSnapshotWhenARefreshFails(): void

@@ -37,8 +37,11 @@ use Symfony\Lsp\Feature\Stimulus\StimulusIndexRegistry;
 use Symfony\Lsp\Feature\Translation\ProjectTranslationSnapshotLoader;
 use Symfony\Lsp\Feature\Translation\TranslationIndexRegistry;
 use Symfony\Lsp\Feature\Twig\ProjectTemplateSnapshotLoader;
+use Symfony\Lsp\Feature\Twig\ProjectTwigCallableSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\ProjectTwigComponentSnapshotLoader;
 use Symfony\Lsp\Feature\Twig\TemplateIndexRegistry;
+use Symfony\Lsp\Feature\Twig\TwigCallableKind;
+use Symfony\Lsp\Feature\Twig\TwigCallableRuntimeIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigComponentIndexRegistry;
 use Symfony\Lsp\Parser\JavaScript\JavaScriptTokenizer;
 use Symfony\Lsp\Project\Project;
@@ -191,6 +194,13 @@ final class RuntimeSnapshotLoaderContractTest extends TestCase
             new ProjectTemplateSnapshotLoader($templates, new UriToPathConverter()),
             ['globals' => ['app']],
             static fn (Project $project): bool => $templates->forProject($project)->isGlobal('app'),
+        ];
+
+        $callables = new TwigCallableRuntimeIndexRegistry();
+        yield 'twig callables' => [
+            new ProjectTwigCallableSnapshotLoader($callables, new UriToPathConverter()),
+            ['callables' => [['kind' => 'function', 'name' => 'css', 'class' => 'App\\Css', 'method' => 'css', 'declaringClass' => 'App\\Css', 'file' => '/workspace/src/Css.php']]],
+            static fn (Project $project): bool => [] !== $callables->forProject($project)->declarations(TwigCallableKind::Function, 'css'),
         ];
 
         $components = new TwigComponentIndexRegistry();
