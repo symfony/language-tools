@@ -6,6 +6,7 @@ use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
 use PHPStan\PhpDocParser\Lexer\Lexer;
 use PHPStan\PhpDocParser\Parser\ConstExprParser;
 use PHPStan\PhpDocParser\Parser\PhpDocParser;
+use PHPStan\PhpDocParser\Parser\TokenIterator;
 use PHPStan\PhpDocParser\Parser\TypeParser;
 use PHPStan\PhpDocParser\ParserConfig;
 
@@ -36,7 +37,7 @@ final class TwigCallablePhpDocParser
 
             return $this->cache[$key] = $node;
         }
-        $node = $this->parser->parse(new TwigCallablePhpDocTokens($this->lexer->tokenize($docComment)));
+        $node = $this->parser->parse(new TokenIterator($this->lexer->tokenize($docComment)));
         if (\count($this->cache) >= self::CACHE_SIZE) {
             unset($this->cache[array_key_first($this->cache)]);
         }
