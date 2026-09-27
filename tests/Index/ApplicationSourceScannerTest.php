@@ -26,6 +26,10 @@ use Symfony\Lsp\Feature\Route\RouteSourceFacts;
 use Symfony\Lsp\Feature\Security\SecurityExtractor;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexer;
 use Symfony\Lsp\Feature\Security\SecuritySourceIndexRegistry;
+use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
+use Symfony\Lsp\Feature\Twig\TwigCallableReferenceExtractor;
+use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexer;
+use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexRegistry;
 use Symfony\Lsp\Index\ApplicationSourceScanner;
 use Symfony\Lsp\Index\PersistentSourceIndexStore;
 use Symfony\Lsp\Index\PhpParseHealthResolver;
@@ -60,6 +64,7 @@ use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Project\ProjectFileScopeRegistry;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Project\UriToPathConverter;
+use Symfony\Lsp\Runtime\RuntimeRefreshPlanner;
 use Symfony\Lsp\Server\SensitiveDataRedactor;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Tests\Support\InMemorySourceIndexStore;
@@ -368,6 +373,49 @@ PHP;
     {
         yield 'ordinary source' => ['src/Controller.php', false];
         yield 'executed source' => ['src/EventSubscriber/Controller.php', true];
+    }
+
+    #[DataProvider('twigExtensionPathProvider')]
+    public function testSchedulesATwigRefreshWhenAnExtensionGainsAFunction(string $relativePath): void
+    {
+        $path = $this->workspace->path($relativePath);
+        if (!is_dir(\dirname($path))) {
+            mkdir(\dirname($path), 0777, true);
+        }
+        $source = <<<'PHP'
+<?php
+namespace App\Extension;
+use Twig\Extension\AbstractExtension;
+use Twig\TwigFunction;
+final class AppExtension extends AbstractExtension
+{
+    public function getFunctions(): array
+    {
+        return [
+            new TwigFunction('first', [AppRuntime::class, 'first']),
+        ];
+    }
+}
+PHP;
+        file_put_contents($path, $source);
+        $scanner = $this->scanner($this->twigCallableIndexer());
+        $scanner->indexAll();
+
+        file_put_contents($path, str_replace('        ];', "            new TwigFunction('second', [AppRuntime::class, 'second']),\n        ];", $source));
+        $change = $scanner->refreshUri('file://'.$path);
+
+        self::assertTrue($change->requiresRuntimeRefresh());
+        self::assertSame(['twig_callable'], $change->domains());
+        $planner = new RuntimeRefreshPlanner();
+        self::assertTrue($planner->requiresRefresh($relativePath, $change));
+        self::assertContains('twig', $planner->plan($relativePath, $change)->sections());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function twigExtensionPathProvider(): iterable
+    {
+        yield 'Twig directory' => ['src/Twig/AppExtension.php'];
+        yield 'other directory' => ['src/Extension/AppExtension.php'];
     }
 
     public function testKeepsConfigurationReferenceChangesForRuntimePlanning(): void
@@ -772,6 +820,22 @@ PHP;
                 new CommentParserRegistry(['twig' => new TwigCommentParser(), 'php' => new PhpCommentParser()]),
                 new TolerantPhpParser(new Parser()),
                 new TwigDocumentParser($treeSitter, new TwigCommentParser(), new TwigDirectiveLocator()),
+                new TwigDirectiveLocator(),
+            ),
+        );
+    }
+
+    private function twigCallableIndexer(): TwigCallableSourceIndexer
+    {
+        $converter = new PositionConverter();
+        $treeSitter = new NativeTreeSitterParser(new TreeSitterResultDecoder());
+
+        return new TwigCallableSourceIndexer(
+            new TwigCallableSourceIndexRegistry(),
+            new TwigCallableDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
+            new TwigCallableReferenceExtractor(
+                new TwigDocumentParser($treeSitter, new TwigCommentParser(), new TwigDirectiveLocator()),
+                $converter,
                 new TwigDirectiveLocator(),
             ),
         );

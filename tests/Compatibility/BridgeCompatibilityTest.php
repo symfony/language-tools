@@ -174,6 +174,17 @@ final class BridgeCompatibilityTest extends TestCase
         );
         self::assertContains('fixture_upper', array_column(\is_array($environment['processors'] ?? null) ? $environment['processors'] : [], 'name'));
         self::assertNotSame([], $twig['paths'] ?? []);
+        $twigCallables = [];
+        foreach (\is_array($twig['callables'] ?? null) ? $twig['callables'] : [] as $callable) {
+            if (\is_array($callable) && \is_string($callable['kind'] ?? null) && \is_string($callable['name'] ?? null)) {
+                $twigCallables[$callable['kind'].':'.$callable['name']] = [$callable['declaringClass'] ?? null, $callable['method'] ?? null];
+            }
+        }
+        self::assertSame(['App\\Twig\\FixtureRuntime', 'format'], $twigCallables['function:fixture_runtime'] ?? null);
+        self::assertSame(['App\\Twig\\FixtureFormattingTrait', 'shout'], $twigCallables['filter:fixture_trait'] ?? null);
+        self::assertSame(['App\\Twig\\FixtureExtension', 'firstClass'], $twigCallables['filter:fixture_first_class'] ?? null);
+        self::assertSame(['Symfony\\Bridge\\Twig\\Extension\\RoutingExtension', 'getPath'], $twigCallables['function:path'] ?? null);
+        self::assertArrayNotHasKey('function:fixture_closure', $twigCallables);
         self::assertContains('command.bus', array_column(\is_array($messenger['buses'] ?? null) ? $messenger['buses'] : [], 'name'));
         self::assertContains('async', array_column(\is_array($messenger['transports'] ?? null) ? $messenger['transports'] : [], 'name'));
         self::assertContains('App\\Message\\Ping', array_column(\is_array($messenger['messages'] ?? null) ? $messenger['messages'] : [], 'class'));

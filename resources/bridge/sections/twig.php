@@ -4,6 +4,7 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): array
 {
     $paths = [];
     $globals = [];
+    $callables = [];
     $warnings = [];
     $complete = true;
     if (class_exists(Twig\Environment::class)) {
@@ -44,6 +45,19 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): array
         } catch (Throwable $error) {
             $context->addError('twig', $error);
         }
+        try {
+            $application = $context->application();
+            if ($application->has('debug:twig')) {
+                $environment = symfonyLspBridgeTwigEnvironment($application);
+                if (null === $environment) {
+                    $warnings[] = 'The Twig callables are unavailable.';
+                } else {
+                    $callables = symfonyLspBridgeTwigCallables($environment);
+                }
+            }
+        } catch (Throwable) {
+            $warnings[] = 'The Twig callables could not be listed.';
+        }
     }
     $paths = array_values(array_unique($paths, SORT_REGULAR));
     // a name resolves against the paths of its namespace in order, so grouping
@@ -55,35 +69,151 @@ function symfonyLspBridgeTwigSection(SymfonyLspBridgeContext $context): array
         'complete' => $complete,
         'paths' => $paths,
         'globals' => $globals,
+        'callables' => $callables,
         'warnings' => $warnings,
     ];
 }
 
 /*
- * Reads the paths from the filesystem loaders the Twig environment actually
- * uses, which a decorating loader keeps reachable but hides from debug:twig.
  * The environment is private, so it is read from the debug:twig command that
  * already received it.
+ */
+function symfonyLspBridgeTwigEnvironment(object $application): ?Twig\Environment
+{
+    if (!$application->has('debug:twig')) {
+        return null;
+    }
+    $command = $application->find('debug:twig');
+    if ($command instanceof Symfony\Component\Console\Command\LazyCommand) {
+        $command = $command->getCommand();
+    }
+    foreach ((new ReflectionObject($command))->getProperties() as $property) {
+        $value = $property->isInitialized($command) ? $property->getValue($command) : null;
+        if ($value instanceof Twig\Environment) {
+            return $value;
+        }
+    }
+
+    return null;
+}
+
+/*
+ * Lists the functions and filters whose callable is a method, with the file
+ * declaring that method, so their signature can be read without indexing the
+ * package that provides them.
+ */
+function symfonyLspBridgeTwigCallables(Twig\Environment $environment): array
+{
+    $callables = [];
+    foreach (['function' => $environment->getFunctions(), 'filter' => $environment->getFilters()] as $kind => $definitions) {
+        foreach ($definitions as $definition) {
+            if (!is_object($definition) || !method_exists($definition, 'getName') || !method_exists($definition, 'getCallable')) {
+                continue;
+            }
+            $name = $definition->getName();
+            if (!is_string($name) || str_contains($name, '*')) {
+                continue;
+            }
+            try {
+                $method = symfonyLspBridgeTwigCallableMethod($definition->getCallable());
+            } catch (Throwable) {
+                continue;
+            }
+            if (null === $method) {
+                continue;
+            }
+            $callable = ['kind' => $kind, 'name' => $name, ...$method];
+            foreach ([
+                'needsCharset' => 'needsCharset',
+                'needsEnvironment' => 'needsEnvironment',
+                'needsContext' => 'needsContext',
+                'needsIsSandboxed' => 'needsIsSandboxed',
+                'variadic' => 'isVariadic',
+            ] as $option => $getter) {
+                if (method_exists($definition, $getter)) {
+                    $callable[$option] = (bool) $definition->$getter();
+                }
+            }
+            $callables[] = $callable;
+        }
+    }
+    usort($callables, static fn (array $a, array $b): int => [$a['kind'], $a['name']] <=> [$b['kind'], $b['name']]);
+
+    return $callables;
+}
+
+/**
+ * @return array{class: string, method: string, declaringClass: string, file: string}|null
+ */
+function symfonyLspBridgeTwigCallableMethod(mixed $callable): ?array
+{
+    $class = null;
+    $method = null;
+    if ($callable instanceof Closure) {
+        $function = new ReflectionFunction($callable);
+        $scope = method_exists($function, 'getClosureCalledClass') ? $function->getClosureCalledClass() : null;
+        $scope ??= null !== $function->getClosureThis() ? new ReflectionObject($function->getClosureThis()) : $function->getClosureScopeClass();
+        if (null === $scope) {
+            return null;
+        }
+        [$class, $method] = [$scope->getName(), $function->getName()];
+    } elseif (is_array($callable) && 2 === count($callable) && is_string($callable[1] ?? null)) {
+        $target = $callable[0] ?? null;
+        $class = is_object($target) ? get_class($target) : $target;
+        $method = $callable[1];
+    } elseif (is_string($callable) && 1 === substr_count($callable, '::')) {
+        [$class, $method] = explode('::', $callable);
+    } elseif (is_object($callable) && method_exists($callable, '__invoke')) {
+        [$class, $method] = [get_class($callable), '__invoke'];
+    }
+    if (!is_string($class) || !is_string($method) || !class_exists($class) || !method_exists($class, $method)) {
+        return null;
+    }
+    $classReflection = new ReflectionClass($class);
+    if ($classReflection->isAnonymous()) {
+        return null;
+    }
+    $reflection = $classReflection->getMethod($method);
+    $file = $reflection->getFileName();
+    if (!is_string($file) || !is_file($file)) {
+        return null;
+    }
+
+    return [
+        'class' => $classReflection->getName(),
+        'method' => $reflection->getName(),
+        'declaringClass' => symfonyLspBridgeTwigMethodDeclaringClass($reflection->getDeclaringClass(), $reflection->getName(), $file),
+        'file' => $file,
+    ];
+}
+
+/*
+ * Reflection reports the class using a trait as the declaring class of the
+ * trait methods, while their file is the trait's.
+ */
+function symfonyLspBridgeTwigMethodDeclaringClass(ReflectionClass $class, string $method, string $file): string
+{
+    if ($class->getFileName() === $file) {
+        return $class->getName();
+    }
+    foreach ($class->getTraits() as $trait) {
+        if ($trait->hasMethod($method)) {
+            return symfonyLspBridgeTwigMethodDeclaringClass($trait, $method, $file);
+        }
+    }
+
+    return $class->getName();
+}
+
+/*
+ * Reads the paths from the filesystem loaders the Twig environment actually
+ * uses, which a decorating loader keeps reachable but hides from debug:twig.
  */
 function symfonyLspBridgeTwigLoaderPaths(object $application): array
 {
     $paths = [];
     try {
-        if (!$application->has('debug:twig')) {
-            return [];
-        }
-        $command = $application->find('debug:twig');
-        if ($command instanceof Symfony\Component\Console\Command\LazyCommand) {
-            $command = $command->getCommand();
-        }
-        $environment = null;
-        foreach ((new ReflectionObject($command))->getProperties() as $property) {
-            $value = $property->isInitialized($command) ? $property->getValue($command) : null;
-            if ($value instanceof Twig\Environment) {
-                $environment = $value;
-                break;
-            }
-        }
+        $environment = symfonyLspBridgeTwigEnvironment($application);
         if (null === $environment) {
             return [];
         }

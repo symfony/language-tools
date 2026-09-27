@@ -273,6 +273,107 @@ PHP,
         ));
     }
 
+    public function writeTwigApplicationWithFailingCallables(): void
+    {
+        $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
+            __INSTALLED_VERSIONS__
+            namespace Twig;
+            final class Environment
+            {
+                public function getFunctions(): array { throw new \RuntimeException('CANARY_SECRET_EXTENSION_FAILURE'); }
+            }
+            namespace Symfony\Bridge\Twig\Command;
+            final class DebugCommand
+            {
+                public function __construct(private \Twig\Environment $twig) {}
+            }
+            __CONSOLE_IO__
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+            }
+            __FRAMEWORK_APPLICATION__
+            PHP,
+            applicationMembers: <<<'PHP'
+    public function has(string $name): bool { return true; }
+    public function find(string $name): object
+    {
+        return new \Symfony\Bridge\Twig\Command\DebugCommand(new \Twig\Environment());
+    }
+    public function run(object $input, object $output): int
+    {
+        $output->write(json_encode(['globals' => ['app' => []], 'loader_paths' => ['(None)' => ['/templates']]], JSON_THROW_ON_ERROR));
+
+        return 0;
+    }
+PHP,
+        ));
+    }
+
+    public function writeTwigApplicationWithAnUnloadableCallableClass(): void
+    {
+        $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
+            __INSTALLED_VERSIONS__
+            namespace Twig;
+            final class TwigFunction
+            {
+                public function __construct(private string $name, private mixed $callable) {}
+                public function getName(): string { return $this->name; }
+                public function getCallable(): mixed { return $this->callable; }
+            }
+            final class Environment
+            {
+                public function getFunctions(): array
+                {
+                    return [
+                        'broken' => new TwigFunction('broken', ['App\Twig\BrokenRuntime', 'render']),
+                        'working' => new TwigFunction('working', [\App\Twig\WorkingRuntime::class, 'render']),
+                    ];
+                }
+                public function getFilters(): array { return []; }
+            }
+            namespace Symfony\Bridge\Twig\Command;
+            final class DebugCommand
+            {
+                public function __construct(private \Twig\Environment $twig) {}
+            }
+            __CONSOLE_IO__
+            namespace App\Twig;
+            spl_autoload_register(static function (string $class): void {
+                if ('App\Twig\BrokenRuntime' === $class) {
+                    eval('namespace App\Twig; final class BrokenRuntime extends MissingParent {}');
+                }
+            });
+            final class WorkingRuntime
+            {
+                public function render(): string { return ''; }
+            }
+            namespace App;
+            final class Kernel
+            {
+                public function __construct(string $environment, bool $debug) {}
+                public function shutdown(): void {}
+            }
+            __FRAMEWORK_APPLICATION__
+            PHP,
+            applicationMembers: <<<'PHP'
+    public function has(string $name): bool { return true; }
+    public function find(string $name): object
+    {
+        return new \Symfony\Bridge\Twig\Command\DebugCommand(new \Twig\Environment());
+    }
+    public function run(object $input, object $output): int
+    {
+        $output->write(json_encode(['globals' => [], 'loader_paths' => ['(None)' => ['/templates']]], JSON_THROW_ON_ERROR));
+
+        return 0;
+    }
+PHP,
+        ));
+    }
+
     public function writeTwigApplicationWithoutDebugCommand(): void
     {
         $this->workspace->write('vendor/autoload.php', $this->prelude->render(<<<'PHP'
