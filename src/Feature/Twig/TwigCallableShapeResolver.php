@@ -38,15 +38,11 @@ final class TwigCallableShapeResolver
         $this->printer = new Printer();
     }
 
-    /**
-     * @param list<TwigCallableDeclaration> $declarations
-     *
-     * @return list<TwigCallableShapeKey>
-     */
-    public function keys(Project $project, TwigCallableHashArgument $argument, array $declarations): array
+    /** @return list<TwigCallableShapeKey> */
+    public function keys(Project $project, TwigCallableHashArgument $argument): array
     {
         $keys = [];
-        foreach ($this->navigate($project, $argument, $declarations, $argument->path) as [$type, $scope]) {
+        foreach ($this->navigate($project, $argument, $argument->path) as [$type, $scope]) {
             foreach ($this->shapes($project, $type, $scope, 0) as [$shape]) {
                 foreach ($shape->items as $item) {
                     $name = $this->keyName($item);
@@ -60,18 +56,14 @@ final class TwigCallableShapeResolver
         return array_values($keys);
     }
 
-    /**
-     * @param list<TwigCallableDeclaration> $declarations
-     *
-     * @return list<string>
-     */
-    public function values(Project $project, TwigCallableHashArgument $argument, array $declarations): array
+    /** @return list<string> */
+    public function values(Project $project, TwigCallableHashArgument $argument): array
     {
         if (null === $argument->key) {
             return [];
         }
         $values = [];
-        foreach ($this->navigate($project, $argument, $declarations, [...$argument->path, $argument->key]) as [$type, $scope]) {
+        foreach ($this->navigate($project, $argument, [...$argument->path, $argument->key]) as [$type, $scope]) {
             foreach ($this->literals($project, $type, $scope, 0) as $value) {
                 $values[$value] = true;
             }
@@ -81,14 +73,13 @@ final class TwigCallableShapeResolver
     }
 
     /**
-     * @param list<TwigCallableDeclaration> $declarations
-     * @param list<string>                  $path
+     * @param list<string> $path
      *
      * @return list<array{TypeNode, TwigCallableShapeScope}>
      */
-    private function navigate(Project $project, TwigCallableHashArgument $argument, array $declarations, array $path): array
+    private function navigate(Project $project, TwigCallableHashArgument $argument, array $path): array
     {
-        $current = $this->parameterType($project, $argument, $declarations);
+        $current = $this->parameterType($project, $argument);
         if (null === $current) {
             return [];
         }
@@ -110,40 +101,26 @@ final class TwigCallableShapeResolver
         return $current;
     }
 
-    /**
-     * @param list<TwigCallableDeclaration> $declarations
-     *
-     * @return array{TypeNode, TwigCallableShapeScope}|null
-     */
-    private function parameterType(Project $project, TwigCallableHashArgument $argument, array $declarations): ?array
+    /** @return array{TypeNode, TwigCallableShapeScope}|null */
+    private function parameterType(Project $project, TwigCallableHashArgument $argument): ?array
     {
-        $parameters = $this->methods->parameters($project, [
-            'callable' => ['kind' => $argument->kind, 'declarations' => $declarations],
-        ])['callable'] ?? null;
+        $parameters = $this->methods->callableParameters($project, $argument->kind, $argument->callee);
         if (null === $parameters) {
             return null;
         }
         $name = null === $argument->name ? ($parameters->nameable[$argument->position ?? -1] ?? null) : $argument->name;
-        if (null === $name || !\in_array($name, $parameters->nameable, true)) {
+        $method = $this->methods->callableMethod($project, $argument->kind, $argument->callee);
+        if (null === $name || !\in_array($name, $parameters->nameable, true) || null === $method?->declaration->docComment) {
             return null;
         }
-        foreach ($declarations as $declaration) {
-            foreach ($this->methods->resolve($project, [$declaration]) as $method) {
-                if (null === $method->declaration->docComment) {
-                    return null;
+        $document = $this->phpParser->parse($method->source);
+        $scope = $this->scope($method->uri, $method->source, $document, $method->declaration->className) ?? new TwigCallableShapeScope($method->uri);
+        $tags = $this->phpDoc->parse($method->declaration->docComment);
+        foreach (['@phpstan-param', '@psalm-param', '@param'] as $tagName) {
+            foreach ($tags->getParamTagValues($tagName) as $tag) {
+                if ('$'.$name === $tag->parameterName) {
+                    return [$tag->type, $scope];
                 }
-                $document = $this->phpParser->parse($method->source);
-                $scope = $this->scope($method->uri, $method->source, $document, $method->declaration->className) ?? new TwigCallableShapeScope($method->uri);
-                $tags = $this->phpDoc->parse($method->declaration->docComment);
-                foreach (['@phpstan-param', '@psalm-param', '@param'] as $tagName) {
-                    foreach ($tags->getParamTagValues($tagName) as $tag) {
-                        if ('$'.$name === $tag->parameterName) {
-                            return [$tag->type, $scope];
-                        }
-                    }
-                }
-
-                return null;
             }
         }
 
@@ -226,7 +203,7 @@ final class TwigCallableShapeResolver
             $uris[] = $class->uri;
         }
         foreach (array_unique($uris) as $uri) {
-            $source = $this->reader->read($project, $uri)?->text;
+            $source = ($this->reader->read($project, $uri) ?? ($uri === $fromUri ? $this->reader->readRuntimeFile($uri) : null))?->text;
             if (null === $source) {
                 continue;
             }

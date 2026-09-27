@@ -3,6 +3,9 @@
 namespace Symfony\Lsp\Tests\Feature\Twig;
 
 use Symfony\Lsp\Document\Document;
+use Symfony\Lsp\Feature\Twig\TwigCallableKind;
+use Symfony\Lsp\Feature\Twig\TwigCallableRuntimeDeclaration;
+use Symfony\Lsp\Tests\Support\TestWorkspace;
 
 final class TwigCallableShapeCompletionTest extends TwigCallableProviderTestCase
 {
@@ -157,19 +160,78 @@ final class TwigCallableShapeCompletionTest extends TwigCallableProviderTestCase
         self::assertSame([], $complete('{{ button_direct({ size: "#{ '));
     }
 
+    public function testCompletesCallablesDeclaredByInstalledPackagesFromRuntimeMetadata(): void
+    {
+        $workspace = new TestWorkspace();
+        try {
+            $runtimePath = $workspace->write('vendor/acme/css/src/Twig/CssRuntime.php', <<<'PHP'
+                <?php
+                namespace Acme\Css\Twig;
+
+                /**
+                 * @psalm-import-type CssStyles from \Acme\Css\CssReference
+                 */
+                abstract class AbstractCssRuntime
+                {
+                    /**
+                     * @param CssStyles|null $styles
+                     */
+                    public function css(?array $styles): string { return ''; }
+                }
+                PHP);
+            $uri = 'file://'.$runtimePath;
+            $declarations = [
+                new TwigCallableRuntimeDeclaration(TwigCallableKind::Function, 'css', 'Acme\Css\Twig\CssRuntime', 'css', 'Acme\Css\Twig\AbstractCssRuntime', $uri),
+                new TwigCallableRuntimeDeclaration(TwigCallableKind::Function, 'button_alias', 'Acme\Css\Twig\CssRuntime', 'css', 'Acme\Css\Twig\AbstractCssRuntime', $uri),
+                new TwigCallableRuntimeDeclaration(TwigCallableKind::Function, 'missing', 'Acme\Css\Twig\CssRuntime', 'css', 'Acme\Css\Twig\AbstractCssRuntime', 'file://'.$workspace->path('vendor/missing.php')),
+            ];
+            $complete = fn (string $text): array => array_column($this->items($text, [
+                'file:///workspace/config/reference_css.php' => <<<'PHP'
+                    <?php
+                    namespace Acme\Css;
+
+                    /**
+                     * @psalm-type ColorToken = 'brand'|'accent'|string
+                     * @psalm-type CssStyles = array{
+                     *     color?: ColorToken|array<ColorToken|array<array-key, mixed>>,
+                     *     _hover?: CssStyles,
+                     * }
+                     */
+                    final class CssReference
+                    {
+                    }
+                    PHP,
+            ], $declarations), 'label');
+
+            self::assertSame(['styles'], $complete('{{ css('));
+            self::assertSame(['color', '_hover'], $complete('{{ css({ '));
+            self::assertSame(['brand', 'accent'], $complete("{{ css({ _hover: { color: '"));
+            self::assertSame(['icon'], $complete("{{ button_alias({ size: 'sm', variant: 'primary', "));
+            self::assertSame([], $complete('{{ missing({ '));
+        } finally {
+            $workspace->cleanup();
+        }
+    }
+
     /** @return \Closure(string): list<mixed> */
     private function completion(): \Closure
     {
         return fn (string $text): array => array_column($this->items($text), 'label');
     }
 
-    /** @return list<array{label: string, detail: string, textEdit: array{range: mixed, newText: string}}> */
-    private function items(string $text): array
+    /**
+     * @param array<string, string>                $phpDocuments
+     * @param list<TwigCallableRuntimeDeclaration> $runtimeDeclarations
+     *
+     * @return list<array{label: string, detail: string, textEdit: array{range: mixed, newText: string}}>
+     */
+    private function items(string $text, array $phpDocuments = [], array $runtimeDeclarations = []): array
     {
         $environment = $this->providers([
             'file:///workspace/src/Twig/ButtonExtension.php' => self::EXTENSION,
             'file:///workspace/src/Twig/ButtonRuntime.php' => self::RUNTIME,
-        ]);
+            ...$phpDocuments,
+        ], runtimeDeclarations: $runtimeDeclarations);
         $uri = 'file:///workspace/templates/probe.html.twig';
         $environment['documents']->open(new Document($uri, 'twig', 1, $text));
         $position = $environment['converter']->toPosition($text, \strlen($text));

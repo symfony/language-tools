@@ -10,6 +10,11 @@ final class ProjectPathResolver
     ) {
     }
 
+    public function path(string $uri): ?string
+    {
+        return $this->uriToPathConverter->convert($uri);
+    }
+
     public function relative(Project $project, string $uri): ?string
     {
         $path = $this->uriToPathConverter->convert($uri);

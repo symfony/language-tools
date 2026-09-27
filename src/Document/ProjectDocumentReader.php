@@ -30,4 +30,19 @@ final class ProjectDocumentReader
 
         return false === $text ? null : new ProjectDocument($text, null);
     }
+
+    /** Dependency-owned files are allowed because the running application reported them. */
+    public function readRuntimeFile(string $uri): ?ProjectDocument
+    {
+        if (null !== $document = $this->documents->get($uri)) {
+            return new ProjectDocument($document->text, $document->version);
+        }
+        $path = $this->paths->path($uri);
+        if (null === $path || !is_file($path)) {
+            return null;
+        }
+        $text = @file_get_contents($path);
+
+        return false === $text ? null : new ProjectDocument($text, null);
+    }
 }

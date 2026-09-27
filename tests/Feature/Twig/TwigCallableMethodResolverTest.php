@@ -17,6 +17,7 @@ use Symfony\Lsp\Feature\Twig\TwigCallableDeclaration;
 use Symfony\Lsp\Feature\Twig\TwigCallableDeclarationExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableKind;
 use Symfony\Lsp\Feature\Twig\TwigCallableMethodResolver;
+use Symfony\Lsp\Feature\Twig\TwigCallableRuntimeIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
 use Symfony\Lsp\Parser\Php\PhpDocument;
@@ -110,6 +111,7 @@ final class TwigCallableMethodResolverTest extends TestCase
             new ProjectDocumentReader($documents, ProjectPaths::resolver()),
             $countingParser,
             $callableIndexes,
+            new TwigCallableRuntimeIndexRegistry(),
         );
         $range = new Range(new Position(0, 0), new Position(0, 1));
         $image = new TwigCallableDeclaration(
@@ -228,6 +230,7 @@ final class TwigCallableMethodResolverTest extends TestCase
             new ProjectDocumentReader($documents, ProjectPaths::resolver()),
             $parser,
             $callableIndexes,
+            new TwigCallableRuntimeIndexRegistry(),
         );
         $declaration = new TwigCallableDeclaration(
             TwigCallableKind::Function,

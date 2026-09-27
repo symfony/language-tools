@@ -43,12 +43,7 @@ final class TwigCallableCompletionProvider implements CompletionProviderInterfac
         }
         $context = $this->arguments->incompleteCall($directive, $start);
         if (null !== $context) {
-            $parameters = $this->methods->parameters($request->project, [
-                'callable' => [
-                    'kind' => $context->kind,
-                    'declarations' => $this->indexes->forProject($request->project)->declarations($context->kind, $context->callee),
-                ],
-            ])['callable'] ?? null;
+            $parameters = $this->methods->callableParameters($request->project, $context->kind, $context->callee);
             if (null === $parameters) {
                 return [];
             }
@@ -98,14 +93,13 @@ final class TwigCallableCompletionProvider implements CompletionProviderInterfac
     /** @return list<array<string, mixed>> */
     private function hashItems(PositionedRequest $request, TwigCallableHashArgument $hash): array
     {
-        $declarations = $this->indexes->forProject($request->project)->declarations($hash->kind, $hash->callee);
         $range = new Range(
             $this->converter->toPosition($request->document->text, $request->offset - \strlen($hash->prefix)),
             $request->position,
         );
         $items = [];
         if (null !== $hash->key) {
-            foreach ($this->shapes->values($request->project, $hash, $declarations) as $value) {
+            foreach ($this->shapes->values($request->project, $hash) as $value) {
                 if (!str_starts_with($value, $hash->prefix) || null === $hash->quote || str_contains($value, $hash->quote) || str_contains($value, '\\')) {
                     continue;
                 }
@@ -119,7 +113,7 @@ final class TwigCallableCompletionProvider implements CompletionProviderInterfac
 
             return $items;
         }
-        foreach ($this->shapes->keys($request->project, $hash, $declarations) as $key) {
+        foreach ($this->shapes->keys($request->project, $hash) as $key) {
             if (!str_starts_with($key->name, $hash->prefix) || \in_array($key->name, $hash->usedKeys, true)) {
                 continue;
             }

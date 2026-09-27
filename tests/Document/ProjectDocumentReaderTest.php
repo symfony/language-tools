@@ -66,6 +66,19 @@ final class ProjectDocumentReaderTest extends TestCase
         self::assertNull($this->reader->read($this->project, $uri));
     }
 
+    public function testReadsDependencyOwnedFilesReportedByTheRunningApplication(): void
+    {
+        $this->workspace->mkdir('vendor/acme');
+        $uri = 'file://'.$this->workspace->write('vendor/acme/Runtime.php', '<?php // saved');
+
+        self::assertSame('<?php // saved', $this->reader->readRuntimeFile($uri)?->text);
+
+        $this->documents->open(new Document($uri, 'php', 3, '<?php // unsaved'));
+
+        self::assertSame('<?php // unsaved', $this->reader->readRuntimeFile($uri)->text);
+        self::assertNull($this->reader->readRuntimeFile('file://'.$this->workspace->path('vendor/acme/Missing.php')));
+    }
+
     public function testRejectsUrisOutsideTheProjectRoot(): void
     {
         self::assertNull($this->reader->read($this->project, 'file:///outside/Service.php'));

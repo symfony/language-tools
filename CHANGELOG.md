@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Complete the keys and string values of a Twig function or filter hash argument from its PHP array shape
+- Complete the arguments of Twig functions and filters provided by installed packages when runtime analysis is enabled
 
 ## 0.23.0 (2026-09-26)
 

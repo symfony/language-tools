@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\Twig;
 
+use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\ProjectDocumentReader;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -15,7 +17,88 @@ final class TwigCallableMethodResolver
         private readonly ProjectDocumentReader $reader,
         private readonly PhpParserInterface $phpParser,
         private readonly TwigCallableSourceIndexRegistry $callableIndexes,
+        private readonly TwigCallableRuntimeIndexRegistry $runtimeIndexes,
     ) {
+    }
+
+    /** Declarations found in the project sources win because they reflect unsaved edits. */
+    public function callableParameters(Project $project, TwigCallableKind $kind, string $name): ?TwigCallableParameters
+    {
+        $declarations = $this->callableIndexes->forProject($project)->declarations($kind, $name);
+        if ([] !== $declarations) {
+            return $this->parameters($project, ['callable' => ['kind' => $kind, 'declarations' => $declarations]])['callable'] ?? null;
+        }
+        foreach ($this->runtimeIndexes->forProject($project)->declarations($kind, $name) as $runtime) {
+            $method = $this->runtimeMethod($runtime);
+            if (null !== $method) {
+                return $this->methodParameters(
+                    array_map(
+                        static fn ($parameter): TwigCallableMethodParameter => new TwigCallableMethodParameter($parameter->name, $parameter->types, $parameter->variadic),
+                        $method->declaration->parameters,
+                    ),
+                    $method->reliable,
+                    $this->runtimeDeclaration($runtime),
+                    $kind,
+                );
+            }
+        }
+
+        return null;
+    }
+
+    public function callableMethod(Project $project, TwigCallableKind $kind, string $name): ?TwigCallableResolvedMethod
+    {
+        $declarations = $this->callableIndexes->forProject($project)->declarations($kind, $name);
+        if ([] !== $declarations) {
+            foreach ($declarations as $declaration) {
+                foreach ($this->resolve($project, [$declaration]) as $method) {
+                    return $method;
+                }
+            }
+
+            return null;
+        }
+        foreach ($this->runtimeIndexes->forProject($project)->declarations($kind, $name) as $runtime) {
+            $method = $this->runtimeMethod($runtime);
+            if (null !== $method) {
+                return $method;
+            }
+        }
+
+        return null;
+    }
+
+    private function runtimeMethod(TwigCallableRuntimeDeclaration $runtime): ?TwigCallableResolvedMethod
+    {
+        $source = $this->reader->readRuntimeFile($runtime->uri)?->text;
+        if (null === $source) {
+            return null;
+        }
+        $document = $this->phpParser->parse($source);
+        foreach ($document->methodDeclarations as $method) {
+            if (0 === strcasecmp($runtime->declaringClassName, $method->className) && 0 === strcasecmp($runtime->method, $method->name)) {
+                return new TwigCallableResolvedMethod($runtime->uri, $source, $method, [] === $document->diagnostics);
+            }
+        }
+
+        return null;
+    }
+
+    private function runtimeDeclaration(TwigCallableRuntimeDeclaration $runtime): TwigCallableDeclaration
+    {
+        return new TwigCallableDeclaration(
+            kind: $runtime->kind,
+            name: $runtime->name,
+            uri: $runtime->uri,
+            range: new Range(new Position(0, 0), new Position(0, 0)),
+            className: $runtime->className,
+            method: $runtime->method,
+            needsEnvironment: $runtime->needsEnvironment,
+            needsContext: $runtime->needsContext,
+            variadic: $runtime->variadic,
+            needsCharset: $runtime->needsCharset,
+            needsIsSandboxed: $runtime->needsIsSandboxed,
+        );
     }
 
     /**

@@ -3,7 +3,8 @@ Twig Functions and Filters
 
 Completion, navigation and argument checking for the Twig functions and
 filters your project declares. This works from your source files, with no
-runtime analysis.
+runtime analysis. With runtime analysis, the arguments of functions and
+filters from installed packages are completed too; see `how it works`_.
 
 Where It Works
 --------------
@@ -41,8 +42,9 @@ For example, with this parameter, ``button({ size: '' })`` completes ``sm``,
 The shape can be written in ``@param``, ``@phpstan-param`` or
 ``@psalm-param``, directly or through a ``@phpstan-type`` or ``@psalm-type``
 alias, including one imported with ``@phpstan-import-type`` or
-``@psalm-import-type``. Nested hashes complete the keys of their own shape.
-Only literal string values are offered.
+``@psalm-import-type``, from a class in your project or in the method file.
+Nested hashes complete the keys of their own shape. Only literal string
+values are offered.
 
 Diagnostics
 -----------
@@ -54,9 +56,12 @@ Diagnostics
 Limitations
 -----------
 
-* only callables declared in your project are known. Twig's built-in
-  functions and filters, and those provided by installed packages, are left
-  to a general Twig language server;
+* the names of Twig's built-in functions and filters, and of those provided
+  by installed packages, aren't completed, hovered or checked; they are left
+  to a general Twig language server. Their arguments are completed only with
+  runtime analysis;
 * a ``TwigFunction`` or ``TwigFilter`` created outside ``getFunctions()`` or
   ``getFilters()``, in a helper method for example, isn't recognized;
 * rename isn't available.
+
+.. _`how it works`: index.rst

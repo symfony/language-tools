@@ -19,6 +19,8 @@ use Symfony\Lsp\Feature\Twig\TwigCallableMethodResolver;
 use Symfony\Lsp\Feature\Twig\TwigCallablePhpDocParser;
 use Symfony\Lsp\Feature\Twig\TwigCallableReferenceExtractor;
 use Symfony\Lsp\Feature\Twig\TwigCallableRelationshipProvider;
+use Symfony\Lsp\Feature\Twig\TwigCallableRuntimeDeclaration;
+use Symfony\Lsp\Feature\Twig\TwigCallableRuntimeIndexRegistry;
 use Symfony\Lsp\Feature\Twig\TwigCallableShapeResolver;
 use Symfony\Lsp\Feature\Twig\TwigCallableSourceIndexRegistry;
 use Symfony\Lsp\Index\SourceDocument;
@@ -37,8 +39,9 @@ use Symfony\Lsp\Tests\Support\ProviderRequests;
 class TwigCallableProviderTestCase extends TestCase
 {
     /**
-     * @param array<string, string> $phpDocuments
-     * @param array<string, string> $twigDocuments
+     * @param array<string, string>                $phpDocuments
+     * @param array<string, string>                $twigDocuments
+     * @param list<TwigCallableRuntimeDeclaration> $runtimeDeclarations
      *
      * @return array{
      *     documents: DocumentStore,
@@ -50,7 +53,7 @@ class TwigCallableProviderTestCase extends TestCase
      *     relationship: TwigCallableRelationshipProvider
      * }
      */
-    protected function providers(array $phpDocuments, array $twigDocuments = []): array
+    protected function providers(array $phpDocuments, array $twigDocuments = [], array $runtimeDeclarations = []): array
     {
         $converter = new PositionConverter();
         $phpParser = new TolerantPhpParser(new Parser());
@@ -82,7 +85,9 @@ class TwigCallableProviderTestCase extends TestCase
         $classIndexes->forProject($project)->replace(...$classFacts);
         $protocol = new LspProtocolMapper();
         $reader = new ProjectDocumentReader($documents, ProjectPaths::resolver());
-        $methodResolver = new TwigCallableMethodResolver($classIndexes, $reader, $phpParser, $indexes);
+        $runtimeIndexes = new TwigCallableRuntimeIndexRegistry();
+        $runtimeIndexes->forProject($project)->replace(...$runtimeDeclarations);
+        $methodResolver = new TwigCallableMethodResolver($classIndexes, $reader, $phpParser, $indexes, $runtimeIndexes);
         $shapeResolver = new TwigCallableShapeResolver($methodResolver, new TwigCallablePhpDocParser(), $phpParser, $classIndexes, $reader);
 
         return [
