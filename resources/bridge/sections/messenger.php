@@ -89,8 +89,9 @@ function symfonyLspBridgeMessengerTaggedTopology(array $definitions): array
             continue;
         }
         foreach (symfonyLspBridgeDefinitionTagParameters($definition, 'messenger.bus') as $parameters) {
-            $buses[$id] = [
-                'name' => $id,
+            $name = symfonyLspBridgeMessengerDecoratedId($id, $definition);
+            $buses[$name] = [
+                'name' => $name,
                 'default' => in_array('messenger.default_bus', is_array($definition['usages'] ?? null) ? $definition['usages'] : [], true),
             ];
         }
@@ -106,6 +107,18 @@ function symfonyLspBridgeMessengerTaggedTopology(array $definitions): array
     }
 
     return [$buses, $transports];
+}
+
+// decorators such as the profiler's debug.traced.* take over the tags of the bus they decorate
+function symfonyLspBridgeMessengerDecoratedId(string $id, array $definition): string
+{
+    foreach (symfonyLspBridgeDefinitionTagParameters($definition, 'container.decorator') as $parameters) {
+        if (is_string($parameters['id'] ?? null) && '' !== $parameters['id']) {
+            return $parameters['id'];
+        }
+    }
+
+    return $id;
 }
 
 function symfonyLspBridgeMessengerConfiguration(SymfonyLspBridgeContext $context): array

@@ -621,4 +621,32 @@ final class BridgeSectionsTest extends TestCase
             'App\\Message\\HandlerOnly' => ['class' => 'App\\Message\\HandlerOnly', 'transports' => []],
         ], json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR));
     }
+
+    public function testNamesDecoratedMessengerBusesAfterTheBusTheyDecorate(): void
+    {
+        $script = <<<'PHP'
+            require $argv[1].'/resources/bridge/container.php';
+            require $argv[1].'/resources/bridge/sections/messenger.php';
+            echo json_encode(symfonyLspBridgeMessengerTaggedTopology([
+                'debug.traced.command.bus' => [
+                    'tags' => [
+                        ['name' => 'messenger.bus', 'parameters' => []],
+                        ['name' => 'container.decorator', 'parameters' => ['id' => 'command.bus', 'inner' => 'debug.traced.command.bus.inner']],
+                    ],
+                    'usages' => ['messenger.default_bus', 'command.bus'],
+                ],
+                'query.bus' => [
+                    'tags' => [['name' => 'messenger.bus', 'parameters' => []]],
+                    'usages' => [],
+                ],
+            ])[0], JSON_THROW_ON_ERROR);
+            PHP;
+        exec(\sprintf('%s -r %s %s', escapeshellarg(\PHP_BINARY), escapeshellarg($script), escapeshellarg(\dirname(__DIR__, 2))), $output, $exitCode);
+
+        self::assertSame(0, $exitCode, implode("\n", $output));
+        self::assertSame([
+            'command.bus' => ['name' => 'command.bus', 'default' => true],
+            'query.bus' => ['name' => 'query.bus', 'default' => false],
+        ], json_decode(implode("\n", $output), true, 512, \JSON_THROW_ON_ERROR));
+    }
 }
