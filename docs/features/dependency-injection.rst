@@ -13,6 +13,9 @@ Where It Works
   ``config/``;
 * PHP: the ``service:`` and ``param:`` arguments of ``#[Autowire]``, and
   ``%parameter%`` inside any of its string arguments;
+* PHP: the name passed to ``#[Target]`` on a parameter, matched against the
+  named autowiring aliases (such as ``Psr\Log\LoggerInterface $httpClientLogger``)
+  of the parameter's type;
 * XML service files are indexed as navigation targets.
 
 In the Editor
@@ -22,6 +25,11 @@ In the Editor
 * service hover shows the class, visibility, whether it's lazy or deprecated,
   what it decorates, its tags and its autowiring types. Parameter hover shows
   the name and its deprecation, never the value;
+* completion for ``#[Target]`` names, limited to the aliases of the
+  parameter's declared type (every type on closure, function and untyped
+  parameters). Hover shows the type, the alias it picks, and the service and
+  class behind it. ``#[Target]`` names aren't service IDs, so they have no go
+  to definition, references, rename or diagnostics;
 * go to definition, find references and rename across YAML, PHP and XML
   declarations. Rename asks for confirmation and never edits files outside
   your project.
@@ -43,6 +51,9 @@ Limitations
   that can't be parsed completely contributes nothing;
 * ``@service`` references are recognized under ``services:``, not in
   arbitrary configuration keys;
+* ``#[Target]`` aliases match the parameter's type exactly, not its parent
+  classes or interfaces. Aliases registered by bundles, such as Monolog
+  channels, need the running application;
 * ``env()`` placeholders are left to the `environment variables`_
   integration;
 * diagnostics and references skip sections that belong to another

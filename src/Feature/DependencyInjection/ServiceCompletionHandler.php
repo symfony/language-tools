@@ -2,7 +2,9 @@
 
 namespace Symfony\Lsp\Feature\DependencyInjection;
 
+use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Feature\CompletionProviderInterface;
 use Symfony\Lsp\Parser\Yaml\YamlCommentParser;
 use Symfony\Lsp\Project\Project;
@@ -18,6 +20,7 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
         private readonly DependencyInjectionProjectLookup $lookup,
         private readonly PhpAutowireArgumentResolver $autowireArguments,
         private readonly YamlCommentParser $yamlComments,
+        private readonly PhpTargetAttributeResolver $targetArguments,
     ) {
     }
 
@@ -50,7 +53,9 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
         $text = $request->document->text;
         $argument = $this->autowireArguments->resolve($text, $request->offset);
         if (null === $argument) {
-            return null;
+            $target = $this->targetArguments->resolve($text, $request->offset);
+
+            return null === $target ? null : $this->completeTargets($request->project, $target, $text, $request->position);
         }
 
         $parameterContext = ParameterCompletionContext::fromPhpAutowire($argument, $text, $request->position, $this->positionConverter);
@@ -89,6 +94,25 @@ final class ServiceCompletionHandler implements CompletionProviderInterface
                 CompletionItemKind::Value,
                 null !== $parameter->deprecation ? 'Deprecated Symfony parameter' : 'Symfony parameter',
                 $this->protocol->textEdit($context->replacementRange, $context->completionText($parameter->name)),
+            );
+        }
+
+        return $items;
+    }
+
+    /** @return list<array<array-key, mixed>> */
+    private function completeTargets(Project $project, PhpTargetArgument $argument, string $text, Position $position): array
+    {
+        $range = new Range($this->positionConverter->toPosition($text, $argument->valueStartOffset), $position);
+        $items = [];
+        foreach ($this->lookup->autowiringTargets($project, $argument->types, $argument->value) as $target) {
+            $items[] = $this->protocol->completionItem(
+                $target->name,
+                CompletionItemKind::Reference,
+                null === $target->serviceId || $target->serviceId === $target->aliasId
+                    ? $target->type
+                    : $target->type.' → '.$target->serviceId,
+                $this->protocol->textEdit($range, $target->name),
             );
         }
 

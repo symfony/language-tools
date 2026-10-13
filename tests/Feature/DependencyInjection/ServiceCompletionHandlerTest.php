@@ -17,6 +17,7 @@ use Symfony\Lsp\Feature\DependencyInjection\Parameter;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterDeclaration;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpAutowireArgumentResolver;
+use Symfony\Lsp\Feature\DependencyInjection\PhpTargetAttributeResolver;
 use Symfony\Lsp\Feature\DependencyInjection\ProjectServiceSnapshotLoader;
 use Symfony\Lsp\Feature\DependencyInjection\Service;
 use Symfony\Lsp\Feature\DependencyInjection\ServiceCompletionHandler;
@@ -78,6 +79,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             new DependencyInjectionProjectLookup($indexes, $parameterIndexes, $sourceIndexes),
             $this->autowireArguments(),
             $this->yamlComments(),
+            $this->targetArguments(),
         );
 
         $result = $handler->complete((new ProviderRequests($documents, $projects))->positioned([
@@ -140,6 +142,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             new DependencyInjectionProjectLookup($serviceIndexes, $parameterIndexes, $sourceIndexes),
             $this->autowireArguments(),
             $this->yamlComments(),
+            $this->targetArguments(),
         );
 
         $serviceUri = 'file:///workspace/config/services.yaml';
@@ -196,6 +199,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             ),
             $this->autowireArguments(),
             $this->yamlComments(),
+            $this->targetArguments(),
         );
         $uri = 'file:///workspace/config/services.yaml';
         $documents->open(new Document($uri, 'yaml', 1, $text));
@@ -232,6 +236,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             ),
             $this->autowireArguments(),
             $this->yamlComments(),
+            $this->targetArguments(),
         );
         $uri = 'file:///workspace/src/Service.php';
         $text = $this->php("// #[Autowire(param: 'app.a");
@@ -278,6 +283,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             ),
             $this->autowireArguments(),
             $this->yamlComments(),
+            $this->targetArguments(),
         );
 
         $yamlUri = 'file:///workspace/config/services.yaml';
@@ -362,6 +368,7 @@ final class ServiceCompletionHandlerTest extends TestCase
             ),
             $this->autowireArguments(),
             $this->yamlComments(),
+            $this->targetArguments(),
         );
         $uri = 'file:///workspace/src/Service.php';
         $text = $this->php($body);
@@ -415,6 +422,142 @@ final class ServiceCompletionHandlerTest extends TestCase
         yield 'cursor after a closed service argument' => ["#[Autowire(service: 'app.mailer')]", "'app.mailer'", []];
     }
 
+    public function testCompletesTargetNamesFilteredByParameterType(): void
+    {
+        $result = $this->completeTarget(
+            "final class S { public function __construct(#[Target('http_')] LoggerInterface \$logger) {} }",
+            "Target('http_",
+        );
+
+        self::assertSame([
+            [
+                'label' => 'http_client.logger',
+                'kind' => 18,
+                'detail' => 'Psr\\Log\\LoggerInterface → monolog.logger.http_client',
+                'textEdit' => [
+                    'range' => [
+                        'start' => ['line' => 5, 'character' => 54],
+                        'end' => ['line' => 5, 'character' => 59],
+                    ],
+                    'newText' => 'http_client.logger',
+                ],
+            ],
+        ], $result);
+    }
+
+    /**
+     * @param list<string> $labels
+     * @param list<string> $details
+     */
+    #[DataProvider('phpTargetCompletionProvider')]
+    public function testCompletesTargetNames(string $body, string $cursorAfter, array $labels, array $details = []): void
+    {
+        $result = $this->completeTarget($body, $cursorAfter);
+
+        self::assertSame($labels, array_column($result, 'label'));
+        if ([] !== $details) {
+            self::assertSame($details, array_column($result, 'detail'));
+        }
+    }
+
+    /** @return iterable<string, array{0: string, 1: string, 2: list<string>, 3?: list<string>}> */
+    public static function phpTargetCompletionProvider(): iterable
+    {
+        yield 'empty positional argument' => [
+            "final class S { public function __construct(#[Target('')] LoggerInterface \$logger) {} }",
+            "Target('",
+            ['appLogger', 'httpClientLogger', 'http_client.logger'],
+            ['Psr\\Log\\LoggerInterface → app.logger', 'Psr\\Log\\LoggerInterface → monolog.logger.http_client', 'Psr\\Log\\LoggerInterface → monolog.logger.http_client'],
+        ];
+        yield 'named argument' => [
+            "final class S { public function __construct(#[Target(name: 'http')] ?LoggerInterface \$logger) {} }",
+            "name: 'http",
+            ['httpClientLogger', 'http_client.logger'],
+        ];
+        yield 'union type' => [
+            "final class S { public function __construct(#[Target('')] LoggerInterface|CacheInterface \$x) {} }",
+            "Target('",
+            ['appLogger', 'httpClientLogger', 'http_client.logger', 'userCache'],
+        ];
+        yield 'closure parameter accepts every type' => [
+            "\$f = function (#[Target('')] \$x) {};",
+            "Target('",
+            ['appLogger', 'httpClientLogger', 'http_client.logger', 'userCache'],
+            ['Psr\\Log\\LoggerInterface → app.logger', 'Psr\\Log\\LoggerInterface → monolog.logger.http_client', 'Psr\\Log\\LoggerInterface → monolog.logger.http_client', 'Symfony\\Contracts\\Cache\\CacheInterface → cache.user'],
+        ];
+        yield 'fully qualified attribute' => [
+            "final class S { public function __construct(#[\\Symfony\\Component\\DependencyInjection\\Attribute\\Target('user')] CacheInterface \$c) {} }",
+            "Target('user",
+            ['userCache'],
+        ];
+        yield 'cursor outside the string' => [
+            "final class S { public function __construct(#[Target('http_client.logger')] LoggerInterface \$logger) {} }",
+            "Target('http_client.logger'",
+            [],
+        ];
+        yield 'non-string expression' => [
+            'final class S { public function __construct(#[Target(self::NAME)] LoggerInterface $logger) {} }',
+            'self::NA',
+            [],
+        ];
+        yield 'other attribute' => [
+            "final class S { public function __construct(#[Other('http')] LoggerInterface \$logger) {} }",
+            "Other('http",
+            [],
+        ];
+    }
+
+    public function testKeepsAutowireCompletionWhenATargetAttributeIsPresent(): void
+    {
+        $result = $this->completeTarget(
+            "final class S { public function __construct(#[Target('appLogger')] #[Autowire(service: 'app.')] LoggerInterface \$logger) {} }",
+            "service: 'app.",
+        );
+
+        self::assertSame(['app.logger'], array_column($result, 'label'));
+    }
+
+    /** @return list<array<array-key, mixed>> */
+    private function completeTarget(string $body, string $cursorAfter): array
+    {
+        $documents = new DocumentStore();
+        $projects = new ProjectRegistry();
+        $projects->replace([$project = new Project('/workspace', 'file:///workspace')]);
+        $serviceIndexes = new ServiceIndexRegistry();
+        $serviceIndexes->forProject($project)->replace(
+            true,
+            new Service('monolog.logger.http_client', 'Monolog\\Logger', null, false, false, null, [], null, []),
+            new Service('Psr\\Log\\LoggerInterface $httpClientLogger', null, 'monolog.logger.http_client', false, false, null, [], null, []),
+            new Service('.Psr\\Log\\LoggerInterface $http_client.logger', null, 'Psr\\Log\\LoggerInterface $httpClientLogger', false, false, null, [], null, []),
+            new Service('Symfony\\Contracts\\Cache\\CacheInterface $userCache', null, 'cache.user', false, false, null, [], null, []),
+        );
+        $sourceIndexes = new DependencyInjectionSourceIndexRegistry();
+        $sourceUri = 'file:///workspace/config/services.yaml';
+        $range = new Range(new Position(0, 0), new Position(0, 1));
+        $sourceIndexes->forProject($project)->replace(new DependencyInjectionSourceFacts($sourceUri, [
+            new ServiceDeclaration('app.logger', $sourceUri, $range, 'App\\Logger'),
+            new ServiceDeclaration('Psr\\Log\\LoggerInterface $appLogger', $sourceUri, $range, null, 'app.logger'),
+        ]));
+        $converter = new PositionConverter();
+        $handler = new ServiceCompletionHandler(
+            $converter,
+            new LspProtocolMapper(),
+            new DependencyInjectionProjectLookup($serviceIndexes, new ParameterIndexRegistry(), $sourceIndexes),
+            $this->autowireArguments(),
+            $this->yamlComments(),
+            $this->targetArguments(),
+        );
+        $uri = 'file:///workspace/src/Service.php';
+        $text = "<?php\n\nuse Psr\\Log\\LoggerInterface;\nuse Symfony\\Component\\DependencyInjection\\Attribute\\{Autowire, Target};\nuse Symfony\\Contracts\\Cache\\CacheInterface;\n".$body;
+        $documents->open(new Document($uri, 'php', 1, $text));
+        $cursor = strrpos($text, $cursorAfter);
+        self::assertIsInt($cursor);
+
+        return $handler->complete((new ProviderRequests($documents, $projects))->positioned(
+            LspRequests::offset($uri, $text, $cursor + \strlen($cursorAfter)),
+        ));
+    }
+
     private function php(string $body): string
     {
         return "<?php\n\nuse Symfony\\Component\\DependencyInjection\\Attribute\\Autowire;\n\n".$body;
@@ -423,6 +566,11 @@ final class ServiceCompletionHandlerTest extends TestCase
     private function autowireArguments(): PhpAutowireArgumentResolver
     {
         return new PhpAutowireArgumentResolver(new TolerantPhpParser(new Parser()));
+    }
+
+    private function targetArguments(): PhpTargetAttributeResolver
+    {
+        return new PhpTargetAttributeResolver(new TolerantPhpParser(new Parser()));
     }
 
     private function yamlComments(): YamlCommentParser

@@ -12,11 +12,19 @@ final class DependencyInjectionHoverHandler implements HoverProviderInterface
         private readonly LspProtocolMapper $protocol,
         private readonly DependencyInjectionSymbolResolver $symbolResolver,
         private readonly DependencyInjectionProjectLookup $lookup,
+        private readonly PhpTargetAttributeResolver $targetArguments,
     ) {
     }
 
     public function hover(PositionedRequest $request): ?array
     {
+        if ('php' === $request->document->languageId) {
+            $argument = $this->targetArguments->resolveLiteral($request->document->text, $request->offset);
+            if (null !== $argument) {
+                return $this->targetHover($request, $argument);
+            }
+        }
+
         $symbol = $this->symbolResolver->resolve($request);
         if (null === $symbol) {
             return null;
@@ -74,6 +82,33 @@ final class DependencyInjectionHoverHandler implements HoverProviderInterface
         $decorationStack = $service->decorationStack;
         if ([] !== $decorationStack) {
             $details[] = \sprintf('Decoration stack: `%s`', implode('` → `', $decorationStack));
+        }
+
+        return $this->protocol->markdownHover(implode("\n\n", $details));
+    }
+
+    /** @return array<array-key, mixed>|null */
+    private function targetHover(PositionedRequest $request, PhpTargetArgument $argument): ?array
+    {
+        if (null === $argument->name) {
+            return null;
+        }
+
+        $target = $this->lookup->autowiringTarget($request->project, $argument->types, $argument->name);
+        if (null === $target) {
+            return null;
+        }
+
+        $details = [
+            \sprintf('Autowiring target: `%s`', $argument->name),
+            \sprintf('Type: `%s`', $target->type),
+            \sprintf('Alias: `%s`', $target->aliasId),
+        ];
+        if (null !== $target->serviceId && $target->serviceId !== $target->aliasId) {
+            $details[] = \sprintf('Service: `%s`', $target->serviceId);
+        }
+        if (null !== $target->className) {
+            $details[] = \sprintf('Class: `%s`', $target->className);
         }
 
         return $this->protocol->markdownHover(implode("\n\n", $details));

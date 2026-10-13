@@ -123,4 +123,70 @@ final class DependencyInjectionHoverHandlerTest extends TestCase
             Decoration stack: `app.shared` → `app.inner`
             MARKDOWN, $kit->hoverText($hover));
     }
+
+    public function testDisplaysTheAutowiringTargetOfATargetAttribute(): void
+    {
+        $uri = 'file:///workspace/src/Service.php';
+        $text = <<<'PHP'
+            <?php
+
+            use Psr\Log\LoggerInterface;
+            use Symfony\Component\DependencyInjection\Attribute\Target;
+
+            final class Service
+            {
+                public function __construct(
+                    #[Target('http_client.logger')] LoggerInterface $dotted,
+                    #[Target('httpClientLogger')] LoggerInterface $camel,
+                    #[Target('http-client logger')] LoggerInterface $parsed,
+                    #[Target('unknownLogger')] LoggerInterface $unknown,
+                ) {
+                }
+            }
+            PHP;
+        $kit = (new ProjectTestKit())->open($uri, $text)->runtime('container', [
+            'servicesComplete' => true,
+            'items' => [
+                ['id' => 'monolog.logger.http_client', 'class' => 'Monolog\\Logger'],
+                ['id' => 'Psr\\Log\\LoggerInterface $httpClientLogger', 'alias' => 'monolog.logger.http_client'],
+                ['id' => '.Psr\\Log\\LoggerInterface $http_client.logger', 'alias' => 'Psr\\Log\\LoggerInterface $httpClientLogger'],
+            ],
+        ]);
+        $handler = $kit->get(DependencyInjectionHoverHandler::class);
+
+        self::assertSame(<<<'MARKDOWN'
+            Autowiring target: `http_client.logger`
+
+            Type: `Psr\Log\LoggerInterface`
+
+            Alias: `.Psr\Log\LoggerInterface $http_client.logger`
+
+            Service: `monolog.logger.http_client`
+
+            Class: `Monolog\Logger`
+            MARKDOWN, $kit->hoverText($handler->hover($kit->positioned($kit->inside($uri, 'http_client.logger')))));
+        self::assertSame(<<<'MARKDOWN'
+            Autowiring target: `httpClientLogger`
+
+            Type: `Psr\Log\LoggerInterface`
+
+            Alias: `Psr\Log\LoggerInterface $httpClientLogger`
+
+            Service: `monolog.logger.http_client`
+
+            Class: `Monolog\Logger`
+            MARKDOWN, $kit->hoverText($handler->hover($kit->positioned($kit->inside($uri, 'httpClientLogger')))));
+        self::assertSame(<<<'MARKDOWN'
+            Autowiring target: `http-client logger`
+
+            Type: `Psr\Log\LoggerInterface`
+
+            Alias: `Psr\Log\LoggerInterface $httpClientLogger`
+
+            Service: `monolog.logger.http_client`
+
+            Class: `Monolog\Logger`
+            MARKDOWN, $kit->hoverText($handler->hover($kit->positioned($kit->inside($uri, 'http-client logger')))));
+        self::assertNull($handler->hover($kit->positioned($kit->inside($uri, 'unknownLogger'))));
+    }
 }
