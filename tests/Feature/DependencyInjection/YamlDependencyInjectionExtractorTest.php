@@ -30,10 +30,6 @@ final class YamlDependencyInjectionExtractorTest extends TestCase
         $configuration = $extractor->extract('file:///workspace/config/packages/assets.yaml', $yaml);
         self::assertSame(['kernel.project_dir'], array_map(static fn ($reference): string => $reference->name, $configuration->references));
 
-        // outside a config directory the same yaml could be a translation catalog with literal placeholders
-        $catalog = $extractor->extract('file:///workspace/translations/messages.en.yaml', "greeting: 'Hello %name%'\n");
-        self::assertSame([], $catalog->references);
-
         // %% escapes a literal percent, as in monolog line formats
         $monolog = $extractor->extract('file:///workspace/config/services.yaml', <<<'YAML'
             monolog:

@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexer;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\ParameterExpressionScanner;
@@ -128,14 +129,17 @@ final class RouteSourceIndexerTest extends TestCase
                 ),
                 new DependencyInjectionSourceIndexer(
                     $classIndexes,
-                    new YamlDependencyInjectionExtractor(
-                        new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-                        new YamlDependencyInjectionDeclarationExtractor($positionConverter),
-                        new YamlDependencyInjectionReferenceExtractor($positionConverter, new ParameterExpressionScanner()),
+                    new DependencyInjectionDocumentExtractor(
+                        ProjectPaths::resolver(),
+                        new YamlDependencyInjectionExtractor(
+                            new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                            new YamlDependencyInjectionDeclarationExtractor($positionConverter),
+                            new YamlDependencyInjectionReferenceExtractor($positionConverter, new ParameterExpressionScanner()),
+                        ),
+                        new XmlDependencyInjectionExtractor($positionConverter, new ParameterExpressionScanner()),
+                        new PhpAutowireReferenceExtractor($positionConverter, $parser, new ParameterExpressionScanner()),
+                        new PhpClassDeclarationExtractor($positionConverter, $parser),
                     ),
-                    new XmlDependencyInjectionExtractor($positionConverter, new ParameterExpressionScanner()),
-                    new PhpAutowireReferenceExtractor($positionConverter, $parser, new ParameterExpressionScanner()),
-                    new PhpClassDeclarationExtractor($positionConverter, $parser),
                 ),
             ],
         );
@@ -261,14 +265,17 @@ final class RouteSourceIndexerTest extends TestCase
             $indexer,
             new DependencyInjectionSourceIndexer(
                 $classIndexes,
-                new YamlDependencyInjectionExtractor(
-                    new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-                    new YamlDependencyInjectionDeclarationExtractor($positionConverter),
-                    new YamlDependencyInjectionReferenceExtractor($positionConverter, new ParameterExpressionScanner()),
+                new DependencyInjectionDocumentExtractor(
+                    ProjectPaths::resolver(),
+                    new YamlDependencyInjectionExtractor(
+                        new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                        new YamlDependencyInjectionDeclarationExtractor($positionConverter),
+                        new YamlDependencyInjectionReferenceExtractor($positionConverter, new ParameterExpressionScanner()),
+                    ),
+                    new XmlDependencyInjectionExtractor($positionConverter, new ParameterExpressionScanner()),
+                    new PhpAutowireReferenceExtractor($positionConverter, $parser, new ParameterExpressionScanner()),
+                    new PhpClassDeclarationExtractor($positionConverter, $parser),
                 ),
-                new XmlDependencyInjectionExtractor($positionConverter, new ParameterExpressionScanner()),
-                new PhpAutowireReferenceExtractor($positionConverter, $parser, new ParameterExpressionScanner()),
-                new PhpClassDeclarationExtractor($positionConverter, $parser),
             ),
         ]);
         $uri = 'file://'.$this->temporaryDirectory.'/src/Controller.php';

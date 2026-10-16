@@ -10,23 +10,11 @@ use Symfony\Lsp\Project\Project;
 /** @extends AbstractSourceIndexer<DependencyInjectionSourceFacts> */
 final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
 {
-    private readonly DependencyInjectionDocumentExtractor $extractor;
-
     public function __construct(
         DependencyInjectionSourceIndexRegistry $indexes,
-        YamlDependencyInjectionExtractor $yamlExtractor,
-        XmlDependencyInjectionExtractor $xmlExtractor,
-        PhpAutowireReferenceExtractor $autowireExtractor,
-        PhpClassDeclarationExtractor $classExtractor,
+        private readonly DependencyInjectionDocumentExtractor $extractor,
     ) {
         parent::__construct($indexes, 'dependency_injection', DependencyInjectionSourceFacts::class);
-
-        $this->extractor = new DependencyInjectionDocumentExtractor(
-            $yamlExtractor,
-            $xmlExtractor,
-            $autowireExtractor,
-            $classExtractor,
-        );
     }
 
     protected function payloadElementClasses(): array
@@ -43,7 +31,7 @@ final class DependencyInjectionSourceIndexer extends AbstractSourceIndexer
 
     protected function extract(Project $project, SourceDocument $document): ?DependencyInjectionSourceFacts
     {
-        return $this->extractor->extractForIndexing($document);
+        return $this->extractor->extractForIndexing($project, $document);
     }
 
     protected function refreshRelevantFacts(SourceFactsInterface $facts): array

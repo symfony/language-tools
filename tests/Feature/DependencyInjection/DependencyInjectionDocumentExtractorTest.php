@@ -3,6 +3,7 @@
 namespace Symfony\Lsp\Tests\Feature\DependencyInjection;
 
 use Microsoft\PhpParser\Parser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
@@ -19,9 +20,61 @@ use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
 use Symfony\Lsp\Parser\Yaml\YamlDocumentParser;
+use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Tests\Support\ProjectPaths;
 
 final class DependencyInjectionDocumentExtractorTest extends TestCase
 {
+    private const SERVICES = <<<'YAML'
+        services:
+            web:
+                image: '@registry/web'
+                environment:
+                    - SYMFONY_IDE=phpstorm://open?file=%f&line=%l&/app/>${PWD}/
+        YAML;
+
+    #[DataProvider('yamlOutsideConfigurationDirectoriesProvider')]
+    public function testIgnoresYamlOutsideConfigurationDirectories(string $root, string $path): void
+    {
+        $extractor = $this->extractor();
+        $document = new SourceDocument('file://'.$root.'/'.$path, 'yaml', self::SERVICES);
+        $project = new Project($root, 'file://'.$root);
+
+        self::assertNull($extractor->extractForIndexing($project, $document));
+        self::assertNull($extractor->extractForInteractive($project, $document));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function yamlOutsideConfigurationDirectoriesProvider(): iterable
+    {
+        yield 'docker compose' => ['/workspace', 'compose.yaml'];
+        yield 'nested docker compose' => ['/workspace', 'docker/docker-compose.override.yml'];
+        yield 'translation catalog' => ['/workspace', 'translations/messages.en.yaml'];
+        yield 'test fixture' => ['/workspace', 'tests/Fixtures/app/config.yml'];
+        yield 'project inside a config directory' => ['/home/me/config/app', 'compose.yaml'];
+    }
+
+    #[DataProvider('yamlInsideConfigurationDirectoriesProvider')]
+    public function testExtractsYamlInsideConfigurationDirectories(string $path): void
+    {
+        $facts = $this->extractor()->extractForIndexing(
+            new Project('/workspace', 'file:///workspace'),
+            new SourceDocument('file:///workspace/'.$path, 'yaml', "services:\n    app.foo:\n        arguments: ['@app.bar']\n"),
+        );
+
+        self::assertInstanceOf(DependencyInjectionSourceFacts::class, $facts);
+        self::assertSame(['app.foo'], array_map(static fn ($service): string => $service->id, $facts->services));
+        self::assertSame(['app.bar'], array_map(static fn ($reference): string => $reference->name, $facts->references));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function yamlInsideConfigurationDirectoriesProvider(): iterable
+    {
+        yield 'application' => ['config/services.yaml'];
+        yield 'bundle' => ['src/AcmeBundle/config/services.yaml'];
+        yield 'legacy bundle' => ['src/AcmeBundle/Resources/config/services.yaml'];
+    }
+
     public function testXmlDefinitionsAreIndexedWithoutEnablingInteractiveFeatures(): void
     {
         $extractor = $this->extractor();
@@ -34,16 +87,18 @@ final class DependencyInjectionDocumentExtractorTest extends TestCase
             </container>
             XML;
 
-        $facts = $extractor->extractForIndexing(new SourceDocument($uri, 'xml', $text));
+        $project = new Project('/workspace', 'file:///workspace');
+        $facts = $extractor->extractForIndexing($project, new SourceDocument($uri, 'xml', $text));
 
         self::assertInstanceOf(DependencyInjectionSourceFacts::class, $facts);
         self::assertSame(['app.mailer'], array_map(static fn ($service): string => $service->id, $facts->services));
-        self::assertNull($extractor->extractForInteractive(new SourceDocument($uri, 'xml', $text)));
+        self::assertNull($extractor->extractForInteractive($project, new SourceDocument($uri, 'xml', $text)));
     }
 
     public function testPhpExtractionCombinesAutowireReferencesAndClassDeclarations(): void
     {
         $facts = $this->extractor()->extractForIndexing(
+            new Project('/workspace', 'file:///workspace'),
             new SourceDocument('file:///workspace/src/Consumer.php',
                 'php',
                 <<<'PHP'
@@ -73,6 +128,7 @@ final class DependencyInjectionDocumentExtractorTest extends TestCase
         $parser = new TolerantPhpParser(new Parser());
 
         return new DependencyInjectionDocumentExtractor(
+            ProjectPaths::resolver(),
             new YamlDependencyInjectionExtractor(
                 new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
                 new YamlDependencyInjectionDeclarationExtractor($converter),

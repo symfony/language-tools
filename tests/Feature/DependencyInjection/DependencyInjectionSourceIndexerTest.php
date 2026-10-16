@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
+use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionDocumentExtractor;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexer;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSymbolKind;
@@ -68,14 +69,17 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
         $parser = new TolerantPhpParser(new Parser());
         $indexer = new DependencyInjectionSourceIndexer(
             $indexes,
-            new YamlDependencyInjectionExtractor(
-                new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-                new YamlDependencyInjectionDeclarationExtractor($converter),
-                new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
+            new DependencyInjectionDocumentExtractor(
+                ProjectPaths::resolver(),
+                new YamlDependencyInjectionExtractor(
+                    new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                    new YamlDependencyInjectionDeclarationExtractor($converter),
+                    new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
+                ),
+                new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
+                new PhpAutowireReferenceExtractor($converter, $parser, new ParameterExpressionScanner()),
+                new PhpClassDeclarationExtractor($converter, $parser),
             ),
-            new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
-            new PhpAutowireReferenceExtractor($converter, $parser, new ParameterExpressionScanner()),
-            new PhpClassDeclarationExtractor($converter, $parser),
         );
         $uri = 'file://'.$this->temporaryDirectory.'/src/Service.php';
 
@@ -125,14 +129,17 @@ final class DependencyInjectionSourceIndexerTest extends TestCase
         $files = ProjectPaths::enumerator(new ProjectFileScopeRegistry(new GlobPatternCompiler()));
         $pipeline = new SourceIndexProviderPipeline(new SourceIndexPayloadCodec(), [new DependencyInjectionSourceIndexer(
             $indexes,
-            new YamlDependencyInjectionExtractor(
-                new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
-                new YamlDependencyInjectionDeclarationExtractor($converter),
-                new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
+            new DependencyInjectionDocumentExtractor(
+                ProjectPaths::resolver(),
+                new YamlDependencyInjectionExtractor(
+                    new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder())),
+                    new YamlDependencyInjectionDeclarationExtractor($converter),
+                    new YamlDependencyInjectionReferenceExtractor($converter, new ParameterExpressionScanner()),
+                ),
+                new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
+                new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new ParameterExpressionScanner()),
+                new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
             ),
-            new XmlDependencyInjectionExtractor($converter, new ParameterExpressionScanner()),
-            new PhpAutowireReferenceExtractor($converter, new TolerantPhpParser(new Parser()), new ParameterExpressionScanner()),
-            new PhpClassDeclarationExtractor($converter, new TolerantPhpParser(new Parser())),
         )]);
         $health = new SourceOverlayHealthRegistry();
         $scanner = new ApplicationSourceScanner(

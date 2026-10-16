@@ -5,6 +5,7 @@
 - Complete the keys and string values of a Twig function or filter hash argument from its PHP array shape
 - Complete the arguments of Twig functions and filters provided by installed packages when runtime analysis is enabled
 - Stop reporting decorated Messenger buses, such as those traced by the profiler, as unknown when the Messenger configuration can't be read
+- Only read YAML service definitions from `config/` directories, so files such as `compose.yaml` are no longer analyzed
 
 ## 0.23.0 (2026-09-26)
 

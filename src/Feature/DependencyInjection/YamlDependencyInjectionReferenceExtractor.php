@@ -26,9 +26,6 @@ final class YamlDependencyInjectionReferenceExtractor
 
         foreach ($document->scalars as $scalar) {
             $inSection = \in_array($scalar->path[0] ?? null, ['parameters', 'services'], true);
-            if (!$inSection && !str_contains('/'.$uri, '/config/')) {
-                continue;
-            }
             $content = substr($text, $scalar->contentStartByte, $scalar->contentEndByte - $scalar->contentStartByte);
             preg_match_all('/^.*(?:\R|$)/m', $content, $lines, \PREG_OFFSET_CAPTURE);
             foreach ($lines[0] as [$rawLine, $relativeOffset]) {

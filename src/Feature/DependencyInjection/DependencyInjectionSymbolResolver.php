@@ -16,7 +16,7 @@ final class DependencyInjectionSymbolResolver
     public function resolve(PositionedRequest $request): ?DependencyInjectionSymbol
     {
         $document = $request->source;
-        $facts = $this->extractor->extractForInteractive($document);
+        $facts = $this->extractor->extractForInteractive($request->project, $document);
         if (null === $facts) {
             return null;
         }

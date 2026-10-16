@@ -8,9 +8,9 @@ application; see `how it works`_.
 Where It Works
 --------------
 
-* YAML: ``@service`` and ``@?service`` references under ``services:``,
-  ``alias:`` and ``decorates:`` values, and ``%parameter%`` anywhere under
-  ``config/``;
+* YAML files in a ``config/`` directory, including bundle ones:
+  ``@service`` and ``@?service`` references under ``services:``, ``alias:``
+  and ``decorates:`` values, and ``%parameter%`` anywhere;
 * PHP: the ``service:`` and ``param:`` arguments of ``#[Autowire]``, and
   ``%parameter%`` inside any of its string arguments;
 * XML service files are indexed as navigation targets.
