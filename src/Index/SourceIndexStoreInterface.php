@@ -5,7 +5,7 @@ namespace Symfony\Lsp\Index;
 use Symfony\Lsp\Project\Project;
 
 /**
- * @phpstan-type SourceIndexMetadata array{size: int, modifiedAt: int, hash: string, languageId: string, runtimeStructure: ?string}
+ * @phpstan-type SourceIndexMetadata array{hash: string, languageId: string, runtimeStructure: ?string}
  */
 interface SourceIndexStoreInterface
 {

@@ -7,7 +7,7 @@ namespace Symfony\Lsp\Index;
  */
 final class SourceIndexJsonLinesCodec
 {
-    private const SCHEMA_VERSION = 12;
+    private const SCHEMA_VERSION = 13;
 
     public function __construct(private readonly string $serverVersion)
     {
@@ -106,9 +106,7 @@ final class SourceIndexJsonLinesCodec
 
         $runtimeStructure = $record['runtimeStructure'] ?? null;
         $providers = $record['providers'] ?? null;
-        if (!\is_int($record['size'] ?? null)
-            || !\is_int($record['modifiedAt'] ?? null)
-            || !\is_string($record['hash'] ?? null)
+        if (!\is_string($record['hash'] ?? null)
             || 64 !== \strlen($record['hash'])
             || !\is_string($record['languageId'] ?? null)
             || (null !== $runtimeStructure && !\is_string($runtimeStructure))
@@ -120,8 +118,6 @@ final class SourceIndexJsonLinesCodec
         return [
             'path' => $path,
             'metadata' => [
-                'size' => $record['size'],
-                'modifiedAt' => $record['modifiedAt'],
                 'hash' => $record['hash'],
                 'languageId' => $record['languageId'],
                 'runtimeStructure' => $runtimeStructure,

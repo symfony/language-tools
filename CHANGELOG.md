@@ -7,6 +7,7 @@
 - Stop reporting decorated Messenger buses, such as those traced by the profiler, as unknown when the Messenger configuration can't be read
 - Only read YAML service definitions from `config/` directories, so files such as `compose.yaml` are no longer analyzed
 - Use the configuration directory declared by `extra.config-dir` in `composer.json` instead of always assuming `config/`
+- Reuse indexed files whose content is unchanged after a fresh checkout, so a cached `var/symfony-lsp/` speeds up CI runs
 
 ## 0.23.0 (2026-09-26)
 

@@ -22,7 +22,7 @@ final class SourceIndexFileProcessor
         if (null === $source) {
             return null;
         }
-        if (null !== $cached && $this->isFresh($location->path, $languageId, $source['hash'], $cached['metadata'])) {
+        if (null !== $cached && $languageId === $cached['metadata']['languageId'] && $source['hash'] === $cached['metadata']['hash']) {
             try {
                 $this->providers->restore($location->project, $cached['payloads']);
             } catch (\Throwable $error) {
@@ -95,33 +95,6 @@ final class SourceIndexFileProcessor
         $document = new SourceDocument($location->uri, $languageId, $source['text']);
         $runtimeStructure = $this->runtimeStructureHasher->analyze($location->project, $location->relativePath, $source['text']);
 
-        return [$document, $runtimeStructure, $this->metadata($location->path, $languageId, $source['hash'], $runtimeStructure->hash)];
-    }
-
-    /** @param SourceIndexMetadata $entry */
-    private function isFresh(string $path, string $languageId, string $hash, array $entry): bool
-    {
-        return $languageId === $entry['languageId']
-            && filesize($path) === $entry['size']
-            && filemtime($path) === $entry['modifiedAt']
-            && $hash === $entry['hash'];
-    }
-
-    /** @return SourceIndexMetadata */
-    private function metadata(string $path, string $languageId, string $hash, ?string $runtimeStructure): array
-    {
-        $size = filesize($path);
-        $modifiedAt = filemtime($path);
-        if (false === $size || false === $modifiedAt) {
-            throw new \RuntimeException(\sprintf('Unable to read source metadata for "%s".', $path));
-        }
-
-        return [
-            'size' => $size,
-            'modifiedAt' => $modifiedAt,
-            'hash' => $hash,
-            'languageId' => $languageId,
-            'runtimeStructure' => $runtimeStructure,
-        ];
+        return [$document, $runtimeStructure, ['hash' => $source['hash'], 'languageId' => $languageId, 'runtimeStructure' => $runtimeStructure->hash]];
     }
 }

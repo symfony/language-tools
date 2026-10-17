@@ -152,7 +152,7 @@ final class PersistentSourceIndexStoreTest extends TestCase
         $reader->close();
 
         self::assertSame(['src/A.php'], array_keys($records));
-        self::assertSame(3, $records['src/A.php']['metadata']['size']);
+        self::assertSame(str_repeat('3', 64), $records['src/A.php']['metadata']['hash']);
         self::assertSame(['routes' => 'current'], $records['src/A.php']['payloads']);
         self::assertSame(['routes' => 'current'], $store->loadPayloads($this->project, 'src/A.php'));
     }
@@ -166,11 +166,11 @@ final class PersistentSourceIndexStoreTest extends TestCase
 
         $store->append($this->project, 'src/A.php', $this->metadata(3), ['routes' => 'current']);
 
-        self::assertSame(3, $store->loadMetadata($this->project)['src/A.php']['size'] ?? null);
+        self::assertSame(str_repeat('3', 64), $store->loadMetadata($this->project)['src/A.php']['hash'] ?? null);
         self::assertSame(['routes' => 'current'], $store->loadPayloads($this->project, 'src/A.php'));
 
         $fresh = $this->store();
-        self::assertSame(3, $fresh->loadMetadata($this->project)['src/A.php']['size'] ?? null);
+        self::assertSame(str_repeat('3', 64), $fresh->loadMetadata($this->project)['src/A.php']['hash'] ?? null);
         self::assertSame(['routes' => 'current'], $fresh->loadPayloads($this->project, 'src/A.php'));
     }
 
@@ -290,12 +290,10 @@ final class PersistentSourceIndexStoreTest extends TestCase
     /**
      * @return SourceIndexMetadata
      */
-    private function metadata(int $size): array
+    private function metadata(int $version): array
     {
         return [
-            'size' => $size,
-            'modifiedAt' => 1_700_000_000 + $size,
-            'hash' => str_repeat('a', 64),
+            'hash' => str_repeat((string) $version, 64),
             'languageId' => 'php',
             'runtimeStructure' => null,
         ];

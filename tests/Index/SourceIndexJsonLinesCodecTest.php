@@ -15,9 +15,9 @@ final class SourceIndexJsonLinesCodecTest extends TestCase
     {
         $codec = new SourceIndexJsonLinesCodec('test');
 
-        self::assertSame("{\"schemaVersion\":12,\"serverVersion\":\"test\"}\n", $codec->encodeHeader());
+        self::assertSame("{\"schemaVersion\":13,\"serverVersion\":\"test\"}\n", $codec->encodeHeader());
         self::assertSame(
-            '{"path":"src/A.php","size":1,"modifiedAt":1700000001,"hash":"'.str_repeat('a', 64)."\",\"languageId\":\"php\",\"runtimeStructure\":null,\"providers\":{\"routes\":\"payload\"}}\n",
+            '{"path":"src/A.php","hash":"'.str_repeat('a', 64)."\",\"languageId\":\"php\",\"runtimeStructure\":null,\"providers\":{\"routes\":\"payload\"}}\n",
             $codec->encodeRecord('src/A.php', $this->metadata(), ['routes' => 'payload']),
         );
         self::assertSame("{\"path\":\"src/A.php\",\"deleted\":true}\n", $codec->encodeDeletion('src/A.php'));
@@ -28,8 +28,8 @@ final class SourceIndexJsonLinesCodecTest extends TestCase
         $codec = new SourceIndexJsonLinesCodec('test');
 
         self::assertTrue($codec->validHeader($codec->encodeHeader()));
-        self::assertFalse($codec->validHeader("{\"schemaVersion\":11,\"serverVersion\":\"test\"}\n"));
-        self::assertFalse($codec->validHeader("{\"schemaVersion\":12,\"serverVersion\":\"other\"}\n"));
+        self::assertFalse($codec->validHeader("{\"schemaVersion\":12,\"serverVersion\":\"test\"}\n"));
+        self::assertFalse($codec->validHeader("{\"schemaVersion\":13,\"serverVersion\":\"other\"}\n"));
     }
 
     public function testDefersProviderPayloadValidationUntilPayloadDecoding(): void
@@ -62,8 +62,6 @@ final class SourceIndexJsonLinesCodecTest extends TestCase
     private function metadata(): array
     {
         return [
-            'size' => 1,
-            'modifiedAt' => 1_700_000_001,
             'hash' => str_repeat('a', 64),
             'languageId' => 'php',
             'runtimeStructure' => null,

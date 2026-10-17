@@ -264,6 +264,22 @@ final class ApplicationSourceScannerTest extends TestCase
         self::assertSame(1, $provider->restores);
     }
 
+    public function testRestoresUnchangedContentWithANewModificationTime(): void
+    {
+        $path = $this->workspace->path('src/Controller.php');
+        $this->workspace->write('src/Controller.php', '<?php final class Controller {}');
+        touch($path, 1_700_000_000);
+        $this->scanner(new RecordingSourceIndexProvider())->indexAll();
+
+        touch($path, 1_800_000_000);
+        clearstatcache(true, $path);
+        $provider = new RecordingSourceIndexProvider();
+        $this->scanner($provider)->indexAll();
+
+        self::assertSame(0, $provider->extractions);
+        self::assertSame(1, $provider->restores);
+    }
+
     public function testReindexesSameSizeContentSavedWithTheCachedModificationTime(): void
     {
         $path = $this->workspace->path('.env');
