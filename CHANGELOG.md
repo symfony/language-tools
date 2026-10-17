@@ -8,6 +8,7 @@
 - Only read YAML service definitions from `config/` directories, so files such as `compose.yaml` are no longer analyzed
 - Use the configuration directory declared by `extra.config-dir` in `composer.json` instead of always assuming `config/`
 - Reuse indexed files whose content is unchanged after a fresh checkout, so a cached `var/symfony-lsp/` speeds up CI runs
+- Explain that the PHP command was not found or is not executable instead of only reporting the bridge exit status
 
 ## 0.23.0 (2026-09-26)
 

@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Tests\Runtime;
 
 use Amp\Cancellation;
 use Amp\CancelledException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Lsp\Feature\Configuration\ConfigurationValidationException;
@@ -975,6 +976,38 @@ final class ProjectRuntimeInitializerTest extends TestCase
         } catch (BridgeExecutionException $error) {
             self::assertSame('The project bridge failed with status 1.', $error->getMessage());
         }
+    }
+
+    #[DataProvider('provideUnrunnablePhpCommandStatuses')]
+    public function testExplainsAnUnrunnablePhpCommand(int $status, string $message): void
+    {
+        $source = $this->workspace->path('source.php');
+        file_put_contents($source, '<?php');
+        $project = new Project($this->workspace->rootPath, 'file://'.$this->workspace->rootPath);
+        $initializer = (new ProjectRuntimeInitializerFixtureBuilder($source))->build(
+            new CapturingProcessRunner(new ProcessResult($status, '', "sh: php: not found\n")),
+            self::snapshotLoaders(
+                new ProjectRouteSnapshotLoader(new RouteIndexRegistry()),
+            ),
+            self::projects($project),
+            configuration: new RuntimeConfiguration(),
+        );
+
+        try {
+            $initializer->initialize($project, RuntimeRefreshPlan::reuse());
+            self::fail('The failed bridge execution was accepted.');
+        } catch (BridgeExecutionException $error) {
+            self::assertSame($message, $error->getMessage());
+        }
+    }
+
+    /**
+     * @return iterable<string, array{int, string}>
+     */
+    public static function provideUnrunnablePhpCommandStatuses(): iterable
+    {
+        yield 'not found' => [127, 'The project bridge failed with status 127: the PHP command was not found. Install PHP or set phpCommand to run it in a container.'];
+        yield 'not executable' => [126, 'The project bridge failed with status 126: the PHP command is not executable. Check the phpCommand setting.'];
     }
 
     public function testLoadsTheSnapshotWhenStrayOutputSurroundsThePayload(): void

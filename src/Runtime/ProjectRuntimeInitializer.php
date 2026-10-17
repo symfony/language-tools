@@ -79,7 +79,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 }
             } catch (\RuntimeException $error) {
                 if (0 !== $result->exitCode) {
-                    throw new BridgeExecutionException(\sprintf('The project bridge failed with status %d.', $result->exitCode), previous: $error);
+                    throw new BridgeExecutionException($this->failureMessage($result->exitCode), previous: $error);
                 }
 
                 throw $error;
@@ -269,6 +269,15 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
         $branch = \is_array($project) ? ($project['symfonyBranch'] ?? null) : null;
 
         return \is_string($branch) && 1 === preg_match('/^[0-9]+\.[0-9]+$/D', $branch) ? $branch : null;
+    }
+
+    private function failureMessage(int $exitCode): string
+    {
+        return match ($exitCode) {
+            126 => 'The project bridge failed with status 126: the PHP command is not executable. Check the phpCommand setting.',
+            127 => 'The project bridge failed with status 127: the PHP command was not found. Install PHP or set phpCommand to run it in a container.',
+            default => \sprintf('The project bridge failed with status %d.', $exitCode),
+        };
     }
 
     /**
