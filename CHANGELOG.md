@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.24.0 (2026-10-17)
 
 - Complete the keys and string values of a Twig function or filter hash argument from its PHP array shape
