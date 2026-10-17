@@ -48,7 +48,7 @@ require __DIR__.'/bridge/sections/doctrine.php';
 require __DIR__.'/bridge/sections/environment.php';
 require __DIR__.'/bridge/sections/console.php';
 
-$options = getopt('', ['project:', 'environment::', 'kernel::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::', 'error-details::', 'configuration-generation::', 'release-metadata-url:', 'release-metadata-cache:']);
+$options = getopt('', ['project:', 'environment::', 'kernel::', 'debug::', 'sections::', 'targeted-refresh::', 'rebuild-container::', 'error-details::', 'configuration-generation::', 'release-metadata-url:', 'release-metadata-cache:', 'cache-lock:']);
 $project = $options['project'] ?? null;
 if (!is_string($project) || '' === $project) {
     fwrite(STDERR, "The --project option is required.\n");
@@ -140,6 +140,12 @@ if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
     );
 }
 
+$cacheLockOption = $options['cache-lock'] ?? null;
+// targeted refreshes discard stale translation catalogue caches
+$cacheLock = is_string($cacheLockOption) && '' !== $cacheLockOption
+    ? symfonyLspBridgeLockApplicationCache($cacheLockOption, $rebuildContainer || $targetedRefresh)
+    : null;
+
 $context = new SymfonyLspBridgeContext($project, $environment, $debug, $targetedRefresh, $rebuildContainer, $errorDetails, $kernel);
 $bootstrapMilliseconds = $elapsedMilliseconds($bridgeStartedAt);
 $kernelStartedAt = hrtime(true);
@@ -180,6 +186,10 @@ $shutdownStartedAt = hrtime(true);
 try {
     $context->shutdown();
 } catch (Throwable) {
+}
+if (null !== $cacheLock) {
+    flock($cacheLock, LOCK_UN);
+    fclose($cacheLock);
 }
 $shutdownMilliseconds = $elapsedMilliseconds($shutdownStartedAt);
 $totalMilliseconds = $elapsedMilliseconds($bridgeStartedAt);

@@ -10,6 +10,9 @@ use Symfony\Lsp\Tests\Support\Bridge\BridgeProcessResult;
 use Symfony\Lsp\Tests\Support\Bridge\RouteFixtureBuilder;
 use Symfony\Lsp\Tests\Support\TestWorkspace;
 
+use function Amp\async;
+use function Amp\delay;
+
 final class BridgeTest extends TestCase
 {
     private TestWorkspace $workspace;
@@ -198,6 +201,85 @@ final class BridgeTest extends TestCase
 
         self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
         self::assertFileDoesNotExist($this->workspace->rootPath.'/var/cache/marker');
+    }
+
+    /** @param list<string> $options */
+    #[DataProvider('cacheDeletingRunProvider')]
+    public function testCacheDeletingRunsWaitForConcurrentBridgeRuns(array $options): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
+        $catalogue = $this->workspace->write('var/cache/translations/catalogue.en.stale.php', '<?php return [];');
+        $lockPath = $this->workspace->path('bridge.lock');
+        $reader = fopen($lockPath, 'c');
+        self::assertIsResource($reader);
+        self::assertTrue(flock($reader, \LOCK_SH));
+
+        $run = async(fn (): BridgeProcessResult => $this->bridge->run(['--sections=translations', '--cache-lock='.$lockPath, ...$options]));
+        delay(1);
+
+        self::assertFalse($run->isComplete());
+        self::assertFileExists($catalogue);
+        flock($reader, \LOCK_UN);
+        fclose($reader);
+        $process = $run->await();
+        self::assertInstanceOf(BridgeProcessResult::class, $process);
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertFileDoesNotExist($catalogue);
+        $this->workspace->remove('var');
+    }
+
+    /** @return iterable<string, array{list<string>}> */
+    public static function cacheDeletingRunProvider(): iterable
+    {
+        yield 'container rebuild' => [['--rebuild-container=1']];
+        yield 'targeted refresh' => [['--targeted-refresh=1']];
+    }
+
+    public function testBridgeRunsWaitForAConcurrentCacheDeletion(): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
+        $lockPath = $this->workspace->path('bridge.lock');
+        $rebuild = fopen($lockPath, 'c');
+        self::assertIsResource($rebuild);
+        self::assertTrue(flock($rebuild, \LOCK_EX));
+
+        $run = async(fn (): BridgeProcessResult => $this->bridge->run(['--sections=routes', '--cache-lock='.$lockPath]));
+        delay(1);
+
+        self::assertFalse($run->isComplete());
+        flock($rebuild, \LOCK_UN);
+        fclose($rebuild);
+        $process = $run->await();
+        self::assertInstanceOf(BridgeProcessResult::class, $process);
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+    }
+
+    public function testConcurrentBridgeRunsShareTheCacheLock(): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
+        $lockPath = $this->workspace->path('bridge.lock');
+        $reader = fopen($lockPath, 'c');
+        self::assertIsResource($reader);
+        self::assertTrue(flock($reader, \LOCK_SH));
+
+        try {
+            $process = $this->bridge->run(['--sections=routes', '--cache-lock='.$lockPath]);
+        } finally {
+            fclose($reader);
+        }
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertContains('homepage', $this->routeNames($process));
+    }
+
+    public function testRunsWithoutTheCacheLockWhenItCannotBeCreated(): void
+    {
+        (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
+
+        $process = $this->bridge->run(['--sections=routes', '--rebuild-container=1', '--cache-lock='.$this->workspace->path('missing/bridge.lock')]);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        self::assertContains('homepage', $this->routeNames($process));
     }
 
     public function testTargetedRefreshDiscardsStaleTranslationCatalogueCaches(): void

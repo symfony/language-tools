@@ -137,8 +137,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertSame('--sections=routes,container', $processRunner->command[6]);
         self::assertSame('--configuration-generation=0', $processRunner->command[7]);
         self::assertSame('--error-details=1', $processRunner->command[8]);
-        self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[9]);
-        self::assertMatchesRegularExpression('{^--release-metadata-cache=.+/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[10]);
+        self::assertSame('--cache-lock='.$this->workspace->rootPath.'/var/symfony-lsp/bridge.lock', $processRunner->command[9]);
+        self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[10]);
+        self::assertMatchesRegularExpression('{^--release-metadata-cache=.+/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[11]);
         self::assertSame($this->workspace->rootPath, $processRunner->workingDirectory);
         self::assertSame(90.0, $processRunner->timeout);
         self::assertSame([
@@ -338,8 +339,9 @@ final class ProjectRuntimeInitializerTest extends TestCase
         self::assertStringStartsWith('/app/var/symfony-lsp/test/', $processRunner->command[6]);
         self::assertStringEndsWith('/bridge.php', $processRunner->command[6]);
         self::assertSame('--project=/app', $processRunner->command[7]);
-        self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[13]);
-        self::assertMatchesRegularExpression('{^--release-metadata-cache=/app/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[14]);
+        self::assertSame('--cache-lock=/app/var/symfony-lsp/bridge.lock', $processRunner->command[13]);
+        self::assertSame('--release-metadata-url=https://symfony.com/releases.json', $processRunner->command[14]);
+        self::assertMatchesRegularExpression('{^--release-metadata-cache=/app/var/symfony-lsp/test/[a-f0-9]{64}/release-metadata\.json$}', $processRunner->command[15]);
         self::assertSame($this->workspace->rootPath, $processRunner->workingDirectory);
         self::assertFileExists($this->workspace->rootPath.substr($processRunner->command[6], \strlen('/app')));
     }

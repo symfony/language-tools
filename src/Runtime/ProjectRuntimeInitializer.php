@@ -4,9 +4,11 @@ namespace Symfony\Lsp\Runtime;
 
 use Amp\Cancellation;
 use Amp\CancelledException;
+use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Feature\Configuration\ProjectConfigurationValidationSnapshotLoader;
 use Symfony\Lsp\Index\ProjectIndexStatusRegistry;
 use Symfony\Lsp\Project\Project;
+use Symfony\Lsp\Project\ProjectPathPolicy;
 use Symfony\Lsp\Project\ProjectRegistry;
 use Symfony\Lsp\Server\ServerLogger;
 use Symfony\Lsp\Server\Utf8StringTruncator;
@@ -55,6 +57,7 @@ final class ProjectRuntimeInitializer implements RuntimeInitializerInterface
                 '--configuration-generation='.$this->configurationValidation->generation($project),
                 // the cause of a failure is reported and logged, never persisted, so it is always collected
                 '--error-details=1',
+                '--cache-lock='.$this->pathMapper->toContainer($project, Path::join($project->rootPath, ProjectPathPolicy::STORAGE_PATH, 'bridge.lock')),
                 ...('' === $this->releaseMetadataUrl || !$this->configuration->releaseMetadata($project) ? [] : [
                     '--release-metadata-url='.$this->releaseMetadataUrl,
                     '--release-metadata-cache='.$this->pathMapper->toContainer($project, \dirname($bridge).'/release-metadata.json'),

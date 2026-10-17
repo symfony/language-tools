@@ -28,6 +28,28 @@ function symfonyLspBridgeDiscardApplicationErrorLogs(): void
     }
 }
 
+/*
+ * Bridges of separate processes, such as an editor and a headless check, share
+ * the application cache, so a run deleting cache files must not overlap readers.
+ *
+ * @return resource|null
+ */
+function symfonyLspBridgeLockApplicationCache(string $path, bool $exclusive)
+{
+    // best effort: a filesystem without lock support never prevents a run
+    $handle = @fopen($path, 'c');
+    if (false === $handle) {
+        return null;
+    }
+    if (!@flock($handle, $exclusive ? LOCK_EX : LOCK_SH)) {
+        fclose($handle);
+
+        return null;
+    }
+
+    return $handle;
+}
+
 /** @return list<string>|null */
 function symfonyLspBridgeSupportedVersions(string $url, string $cache): ?array
 {
