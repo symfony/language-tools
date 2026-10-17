@@ -69,8 +69,10 @@ final class RouteSourceIndexer extends AbstractSourceIndexer
             return false;
         }
 
-        return str_starts_with($relativePath, 'config/routes/')
-            || (str_starts_with($relativePath, 'config/routes.')
+        $configRelativePath = $project->configRelativePath($relativePath) ?? '';
+
+        return str_starts_with($configRelativePath, 'routes/')
+            || (str_starts_with($configRelativePath, 'routes.')
                 && \in_array(Path::getExtension($relativePath, true), ['yaml', 'yml'], true));
     }
 }

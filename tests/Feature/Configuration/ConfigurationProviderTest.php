@@ -373,6 +373,23 @@ final class ConfigurationProviderTest extends TestCase
         self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [], 'code'));
     }
 
+    public function testDiagnosesOnlyTheConfiguredConfigurationDirectory(): void
+    {
+        $fixture = $this->providers(configPath: 'etc');
+        foreach (['config/packages/framework.yaml', 'etc/routes.yaml', 'etc/routes/admin.yaml'] as $path) {
+            $uri = 'file:///workspace/'.$path;
+            $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
+
+            self::assertNull($fixture->diagnostics->diagnostics($fixture->document($uri)), $path);
+            $fixture->documents->close($uri);
+        }
+
+        $uri = 'file:///workspace/etc/packages/framework.yaml';
+        $fixture->documents->open(new Document($uri, 'yaml', 1, "framework:\n    mystery: true\n"));
+
+        self::assertSame(['config.unknown_key'], array_column($fixture->diagnostics->diagnostics($fixture->document($uri)) ?? [], 'code'));
+    }
+
     public function testDiagnosesConfigurationInEveryEnvironmentBlock(): void
     {
         $fixture = $this->providers();
@@ -1571,9 +1588,9 @@ final class ConfigurationProviderTest extends TestCase
         ];
     }
 
-    private function providers(string $root = '/workspace', string $environment = 'dev', ?ConfigurationValidationResult $validation = null): ConfigurationProviderFixture
+    private function providers(string $root = '/workspace', string $environment = 'dev', ?ConfigurationValidationResult $validation = null, string $configPath = 'config'): ConfigurationProviderFixture
     {
-        $kit = (new ProjectTestKit($root))
+        $kit = (new ProjectTestKit($root, configPath: $configPath))
             ->runtime('routes', ['complete' => true, 'items' => [], 'resources' => ['config/http_endpoints.yaml', 'config/routes/framework.yaml']])
             ->runtime('environment', ['complete' => true, 'processors' => [['name' => 'bool', 'type' => 'bool'], ['name' => 'json', 'type' => 'array']]])
             ->runtime('configuration', ['bundles' => [

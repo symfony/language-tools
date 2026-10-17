@@ -15,7 +15,7 @@ final class EnvironmentScopedDiagnosticFilterTest extends TestCase
 {
     /** @param list<string> $expectedCodes */
     #[DataProvider('conventionalEnvironmentFileProvider')]
-    public function testKeepsSelectedEnvironmentDiagnosticsOnlyInDocumentsThatEnvironmentLoads(string $uri, string $environment, array $expectedCodes): void
+    public function testKeepsSelectedEnvironmentDiagnosticsOnlyInDocumentsThatEnvironmentLoads(string $uri, string $environment, array $expectedCodes, string $configPath = 'config'): void
     {
         $diagnostics = array_map(
             static fn (string $code): CollectedDiagnostic => new CollectedDiagnostic('stub', ['code' => $code]),
@@ -26,12 +26,12 @@ final class EnvironmentScopedDiagnosticFilterTest extends TestCase
             $expectedCodes,
             array_map(
                 static fn (CollectedDiagnostic $diagnostic): mixed => $diagnostic->diagnostic['code'],
-                $this->filter($environment)->filter($uri, $diagnostics),
+                $this->filter($environment, $configPath)->filter($uri, $diagnostics),
             ),
         );
     }
 
-    /** @return iterable<string, array{string, string, list<string>}> */
+    /** @return iterable<string, array{0: string, 1: string, 2: list<string>, 3?: string}> */
     public static function conventionalEnvironmentFileProvider(): iterable
     {
         $all = ['service.not_found', 'parameter.not_found', 'messenger.unknown_transport', 'security.unknown_provider', 'env.unknown_processor', 'config.unknown_key', 'env.malformed_chain'];
@@ -46,6 +46,8 @@ final class EnvironmentScopedDiagnosticFilterTest extends TestCase
         yield 'package file lookalike' => ['file:///workspace/config/packages/test.yaml', 'dev', $all];
         yield 'service file outside config' => ['file:///workspace/src/services_test.yaml', 'dev', $all];
         yield 'document outside any project' => ['file:///elsewhere/config/services_test.yaml', 'dev', $all];
+        yield 'inactive file in a custom configuration directory' => ['file:///workspace/etc/packages/test/security.yaml', 'dev', $environmentAgnostic, 'etc'];
+        yield 'default configuration directory with a custom one' => ['file:///workspace/config/services_test.yaml', 'dev', $all, 'etc'];
     }
 
     public function testKeepsDiagnosticsWithoutAKnownCode(): void
@@ -58,10 +60,10 @@ final class EnvironmentScopedDiagnosticFilterTest extends TestCase
         self::assertSame($diagnostics, $this->filter()->filter('file:///workspace/config/services_test.yaml', $diagnostics));
     }
 
-    private function filter(string $environment = 'dev'): EnvironmentScopedDiagnosticFilter
+    private function filter(string $environment = 'dev', string $configPath = 'config'): EnvironmentScopedDiagnosticFilter
     {
         $projects = new ProjectRegistry();
-        $projects->replace([new Project('/workspace', 'file:///workspace')]);
+        $projects->replace([new Project('/workspace', 'file:///workspace', configPath: $configPath)]);
 
         return new EnvironmentScopedDiagnosticFilter($projects, EnvironmentScopes::resolver($environment), new DiagnosticCodeRegistry());
     }

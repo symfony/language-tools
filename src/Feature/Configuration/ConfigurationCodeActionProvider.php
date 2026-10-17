@@ -35,8 +35,8 @@ final class ConfigurationCodeActionProvider implements CodeActionProviderInterfa
         }
         $relative = $this->paths->relative($request->project, $request->document->uri);
         if (null === $relative || !$this->paths->isApplicationOwned($request->project, $request->document->uri)
-            || !str_starts_with($relative, 'config/') || str_starts_with($relative, 'config/routes.')
-            || str_starts_with($relative, 'config/routes/') || $this->routes->forProject($request->project)->isResource($relative)
+            || null === $request->project->configRelativePath($relative) || $request->project->isRouteConfigPath($relative)
+            || $this->routes->forProject($request->project)->isResource($relative)
         ) {
             return [];
         }

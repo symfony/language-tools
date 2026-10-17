@@ -93,7 +93,7 @@ final class SourceIndexFileProcessor
     private function analyze(SourceIndexFileLocation $location, string $languageId, array $source): array
     {
         $document = new SourceDocument($location->uri, $languageId, $source['text']);
-        $runtimeStructure = $this->runtimeStructureHasher->analyze($location->relativePath, $source['text']);
+        $runtimeStructure = $this->runtimeStructureHasher->analyze($location->project, $location->relativePath, $source['text']);
 
         return [$document, $runtimeStructure, $this->metadata($location->path, $languageId, $source['hash'], $runtimeStructure->hash)];
     }

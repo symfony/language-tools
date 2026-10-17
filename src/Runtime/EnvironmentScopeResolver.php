@@ -20,14 +20,15 @@ final class EnvironmentScopeResolver
     public function includesDocument(Project $project, string $uri): bool
     {
         $relativePath = $this->projectPaths->relative($project, $uri);
-        if (null === $relativePath) {
+        $configRelativePath = null === $relativePath ? null : $project->configRelativePath($relativePath);
+        if (null === $configRelativePath) {
             return true;
         }
         $environment = $this->runtimeConfiguration->environment($project);
-        if (preg_match('#^config/(?:packages|routes)/([^/]+)/#D', $relativePath, $matches)) {
+        if (preg_match('#^(?:packages|routes)/([^/]+)/#D', $configRelativePath, $matches)) {
             return $environment === $matches[1];
         }
-        if (preg_match('#^config/services_([^/]+)\.(?:php|ya?ml)$#iD', $relativePath, $matches)) {
+        if (preg_match('#^services_([^/]+)\.(?:php|ya?ml)$#iD', $configRelativePath, $matches)) {
             return $environment === $matches[1];
         }
 

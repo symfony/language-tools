@@ -2,16 +2,18 @@
 
 namespace Symfony\Lsp\Index;
 
+use Symfony\Lsp\Project\Project;
+
 final class PhpRuntimeStructureHasher
 {
     private const EXECUTED_SOURCE_PATTERN = '/\b(?:extends|implements)\s+[^;{]*(?:AbstractExtension|AbstractType|Bundle|CompilerPassInterface|EnvVarProcessorInterface|EventSubscriberInterface|ExtensionInterface|FormTypeInterface|Kernel|LoaderInterface|ServiceSubscriberInterface)\b/';
 
-    public function analyze(string $relativePath, string $text): PhpRuntimeStructureAnalysis
+    public function analyze(Project $project, string $relativePath, string $text): PhpRuntimeStructureAnalysis
     {
         if (!str_ends_with($relativePath, '.php')) {
             return new PhpRuntimeStructureAnalysis(null, false);
         }
-        if ($this->pathRequiresFullTracking($relativePath)) {
+        if ($this->pathRequiresFullTracking($project, $relativePath)) {
             return new PhpRuntimeStructureAnalysis(hash('sha256', $text), true);
         }
 
@@ -60,13 +62,13 @@ final class PhpRuntimeStructureHasher
         );
     }
 
-    private function pathRequiresFullTracking(string $relativePath): bool
+    private function pathRequiresFullTracking(Project $project, string $relativePath): bool
     {
-        if ('src/Kernel.php' === $relativePath) {
+        if ('src/Kernel.php' === $relativePath || null !== $project->configRelativePath($relativePath)) {
             return true;
         }
 
-        foreach (['config/', 'src/DependencyInjection/', 'src/EventSubscriber/', 'src/Form/', 'src/Twig/', 'src/Validator/'] as $prefix) {
+        foreach (['src/DependencyInjection/', 'src/EventSubscriber/', 'src/Form/', 'src/Twig/', 'src/Validator/'] as $prefix) {
             if (str_starts_with($relativePath, $prefix)) {
                 return true;
             }

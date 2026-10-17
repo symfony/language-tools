@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Index;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Index\PhpRuntimeStructureHasher;
+use Symfony\Lsp\Project\Project;
 
 final class PhpRuntimeStructureHasherTest extends TestCase
 {
@@ -12,8 +13,8 @@ final class PhpRuntimeStructureHasherTest extends TestCase
     public function testIgnoresOrdinaryMethodBodies(string $path): void
     {
         $hasher = new PhpRuntimeStructureHasher();
-        $original = $hasher->analyze($path, '<?php final class Service { public function value(): int { return 1; } }');
-        $changed = $hasher->analyze($path, '<?php final class Service { public function value(): int { return 2; } }');
+        $original = $hasher->analyze(self::project(), $path, '<?php final class Service { public function value(): int { return 1; } }');
+        $changed = $hasher->analyze(self::project(), $path, '<?php final class Service { public function value(): int { return 2; } }');
 
         self::assertFalse($original->requiresFullTracking);
         self::assertSame($original->hash, $changed->hash);
@@ -33,8 +34,8 @@ final class PhpRuntimeStructureHasherTest extends TestCase
     public function testDetectsDeclarationChanges(): void
     {
         $hasher = new PhpRuntimeStructureHasher();
-        $original = $hasher->analyze('src/Service.php', '<?php final class Service { public function value(): int { return 1; } }');
-        $changed = $hasher->analyze('src/Service.php', '<?php final class Service { #[AutowireMethodOf] public function value(string $name): int { return 1; } }');
+        $original = $hasher->analyze(self::project(), 'src/Service.php', '<?php final class Service { public function value(): int { return 1; } }');
+        $changed = $hasher->analyze(self::project(), 'src/Service.php', '<?php final class Service { #[AutowireMethodOf] public function value(string $name): int { return 1; } }');
 
         self::assertNotSame($original->hash, $changed->hash);
     }
@@ -43,8 +44,8 @@ final class PhpRuntimeStructureHasherTest extends TestCase
     public function testPreservesBodiesThatCanRunWhileBuildingRuntimeMetadata(string $path, string $declaration): void
     {
         $hasher = new PhpRuntimeStructureHasher();
-        $original = $hasher->analyze($path, '<?php '.$declaration.' { public function configure(): int { return 1; } }');
-        $changed = $hasher->analyze($path, '<?php '.$declaration.' { public function configure(): int { return 2; } }');
+        $original = $hasher->analyze(self::project(), $path, '<?php '.$declaration.' { public function configure(): int { return 1; } }');
+        $changed = $hasher->analyze(self::project(), $path, '<?php '.$declaration.' { public function configure(): int { return 2; } }');
 
         self::assertTrue($original->requiresFullTracking);
         self::assertNotSame($original->hash, $changed->hash);
@@ -66,11 +67,25 @@ final class PhpRuntimeStructureHasherTest extends TestCase
         yield 'PHP attribute' => ['src/Attribute/AppAttribute.php', '#[Attribute] final class AppAttribute'];
     }
 
+    public function testFullyTracksPhpFilesInTheConfiguredConfigurationDirectory(): void
+    {
+        $hasher = new PhpRuntimeStructureHasher();
+        $project = self::project('etc');
+
+        self::assertTrue($hasher->analyze($project, 'etc/services.php', '<?php return new class {};')->requiresFullTracking);
+        self::assertFalse($hasher->analyze($project, 'config/services.php', '<?php return new class {};')->requiresFullTracking);
+    }
+
     public function testIgnoresNonPhpFiles(): void
     {
-        $analysis = (new PhpRuntimeStructureHasher())->analyze('templates/index.html.twig', '{{ value }}');
+        $analysis = (new PhpRuntimeStructureHasher())->analyze(self::project(), 'templates/index.html.twig', '{{ value }}');
 
         self::assertNull($analysis->hash);
         self::assertFalse($analysis->requiresFullTracking);
+    }
+
+    private static function project(string $configPath = 'config'): Project
+    {
+        return new Project('/workspace', 'file:///workspace', configPath: $configPath);
     }
 }

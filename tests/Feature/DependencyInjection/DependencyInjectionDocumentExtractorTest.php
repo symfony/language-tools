@@ -55,10 +55,10 @@ final class DependencyInjectionDocumentExtractorTest extends TestCase
     }
 
     #[DataProvider('yamlInsideConfigurationDirectoriesProvider')]
-    public function testExtractsYamlInsideConfigurationDirectories(string $path): void
+    public function testExtractsYamlInsideConfigurationDirectories(string $path, string $configPath = 'config'): void
     {
         $facts = $this->extractor()->extractForIndexing(
-            new Project('/workspace', 'file:///workspace'),
+            new Project('/workspace', 'file:///workspace', configPath: $configPath),
             new SourceDocument('file:///workspace/'.$path, 'yaml', "services:\n    app.foo:\n        arguments: ['@app.bar']\n"),
         );
 
@@ -67,10 +67,11 @@ final class DependencyInjectionDocumentExtractorTest extends TestCase
         self::assertSame(['app.bar'], array_map(static fn ($reference): string => $reference->name, $facts->references));
     }
 
-    /** @return iterable<string, array{string}> */
+    /** @return iterable<string, array{0: string, 1?: string}> */
     public static function yamlInsideConfigurationDirectoriesProvider(): iterable
     {
         yield 'application' => ['config/services.yaml'];
+        yield 'custom application directory' => ['etc/services.yaml', 'etc'];
         yield 'bundle' => ['src/AcmeBundle/config/services.yaml'];
         yield 'legacy bundle' => ['src/AcmeBundle/Resources/config/services.yaml'];
     }

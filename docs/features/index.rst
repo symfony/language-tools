@@ -176,6 +176,10 @@ is analyzed normally.
 Add ``excludePaths`` in `project configuration`_ for embedded fixtures or
 generated sources that aren't ignored.
 
+These pages refer to the configuration directory as ``config/``. When
+``composer.json`` sets ``extra.config-dir``, as Symfony Flex expects for a
+custom directory structure, that directory is used instead.
+
 Values are never read: dotenv files contribute variable names, and parameter
 values, secrets and application objects never appear in hovers, diagnostics,
 caches or logs.

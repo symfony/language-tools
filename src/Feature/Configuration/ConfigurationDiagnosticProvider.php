@@ -43,9 +43,8 @@ final class ConfigurationDiagnosticProvider implements DiagnosticProviderInterfa
         // application's own configuration is validated against its trees
         $relativePath = $this->projectPaths->relative($request->project, $request->document->uri);
         if (null === $relativePath
-            || !str_starts_with($relativePath, 'config/')
-            || str_starts_with($relativePath, 'config/routes.')
-            || str_starts_with($relativePath, 'config/routes/')
+            || null === $request->project->configRelativePath($relativePath)
+            || $request->project->isRouteConfigPath($relativePath)
             || $this->routeIndexes->forProject($request->project)->isResource($relativePath)
         ) {
             return null;

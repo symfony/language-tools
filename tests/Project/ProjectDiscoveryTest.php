@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Tests\Project;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Project\GitignoreMatcher;
 use Symfony\Lsp\Project\Project;
@@ -94,6 +95,34 @@ final class ProjectDiscoveryTest extends TestCase
             array_map(static fn (Project $project): string => $project->rootPath, $projects),
         );
         self::assertSame('libraries', $projects[0]->vendorPath);
+    }
+
+    /** @param array<string, mixed> $extra */
+    #[DataProvider('configDirectoryProvider')]
+    public function testReadsTheFlexConfigurationDirectory(array $extra, ?string $configPath): void
+    {
+        $this->workspace->write('composer.json', json_encode([
+            'type' => 'project',
+            'extra' => $extra,
+            'require' => ['symfony/framework-bundle' => '^8.0'],
+        ], \JSON_THROW_ON_ERROR));
+
+        $projects = (new ProjectDiscovery(new UriToPathConverter(), new GitignoreMatcher()))->discover([
+            ['uri' => 'file://'.$this->workspace->rootPath],
+        ]);
+
+        self::assertCount(1, $projects);
+        self::assertSame($configPath, $projects[0]->configPath);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, string|null}> */
+    public static function configDirectoryProvider(): iterable
+    {
+        yield 'default' => [[], 'config'];
+        yield 'custom' => [['config-dir' => 'etc'], 'etc'];
+        yield 'nested with a trailing slash' => [['config-dir' => './app/config/'], 'app/config'];
+        yield 'invalid' => [['config-dir' => ['etc']], 'config'];
+        yield 'outside the project' => [['config-dir' => '../shared'], null];
     }
 
     public function testSkipsGitignoredProjectsUnlessExplicitlyConfigured(): void

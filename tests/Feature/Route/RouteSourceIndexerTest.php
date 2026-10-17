@@ -35,6 +35,7 @@ use Symfony\Lsp\Index\SourceIndexPayloadCodec;
 use Symfony\Lsp\Index\SourceIndexProviderInterface;
 use Symfony\Lsp\Index\SourceIndexProviderPipeline;
 use Symfony\Lsp\Index\SourceOverlayHealthRegistry;
+use Symfony\Lsp\Index\SourceParseHealth;
 use Symfony\Lsp\Parser\Php\TolerantPhpParser;
 use Symfony\Lsp\Parser\TreeSitter\NativeTreeSitterParser;
 use Symfony\Lsp\Parser\TreeSitter\TreeSitterResultDecoder;
@@ -239,6 +240,29 @@ final class RouteSourceIndexerTest extends TestCase
         $scanner->updateOpenDocument($packageUri);
 
         self::assertSame([], $indexes->forProject($project)->declarations('fake_route'));
+    }
+
+    public function testIndexesRouteFilesFromTheConfiguredConfigurationDirectory(): void
+    {
+        $project = new Project('/workspace', 'file:///workspace', configPath: 'etc');
+        $indexes = new RouteSourceIndexRegistry(new DependencyInjectionSourceIndexRegistry(), new RouteControllerClassifier());
+        $positionConverter = new PositionConverter();
+        $indexer = new RouteSourceIndexer(
+            $indexes,
+            new PhpRouteDeclarationExtractor($positionConverter, new TolerantPhpParser(new Parser())),
+            new YamlRouteDeclarationExtractor($positionConverter, new YamlDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()))),
+            RouteReferenceExtractorFactory::create($positionConverter),
+            new TwigRouteReferenceExtractor($positionConverter, new TwigDocumentParser(new NativeTreeSitterParser(new TreeSitterResultDecoder()), new TwigCommentParser(), new TwigDirectiveLocator())),
+            ProjectPaths::resolver(),
+        );
+
+        foreach (['etc/routes.yaml' => 'custom_route', 'etc/routes/admin.yaml' => 'custom_admin_route', 'config/routes.yaml' => 'default_route'] as $path => $name) {
+            $indexer->overlay($project, new Document('file:///workspace/'.$path, 'yaml', 1, $name.":\n    path: /".$name."\n"), SourceParseHealth::Healthy);
+        }
+
+        self::assertCount(1, $indexes->forProject($project)->declarations('custom_route'));
+        self::assertCount(1, $indexes->forProject($project)->declarations('custom_admin_route'));
+        self::assertSame([], $indexes->forProject($project)->declarations('default_route'));
     }
 
     public function testPartialPhpOverlayPreservesRoutesAndUpdatesReferencesAtomically(): void

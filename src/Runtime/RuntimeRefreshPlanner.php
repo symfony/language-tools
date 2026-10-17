@@ -4,6 +4,7 @@ namespace Symfony\Lsp\Runtime;
 
 use Symfony\Component\Filesystem\Path;
 use Symfony\Lsp\Index\SourceFileChange;
+use Symfony\Lsp\Project\Project;
 
 final class RuntimeRefreshPlanner
 {
@@ -26,7 +27,7 @@ final class RuntimeRefreshPlanner
     /** Domains the application describes without its container, so the compiled one stays usable. */
     private const CONTAINER_FREE_DOMAINS = ['asset', 'route', 'stimulus', 'translation'];
 
-    public function requiresRefresh(string $path, SourceFileChange $change): bool
+    public function requiresRefresh(Project $project, string $path, SourceFileChange $change): bool
     {
         if (!$change->requiresRuntimeRefresh() || str_starts_with($path, 'var/') || str_starts_with($path, 'vendor/')) {
             return false;
@@ -42,7 +43,7 @@ final class RuntimeRefreshPlanner
         }
         if ('xml' === $extension) {
             return [] !== $change->domains()
-                || str_starts_with($path, 'config/')
+                || null !== $project->configRelativePath($path)
                 || false !== stripos('/'.$path, '/resources/config/');
         }
         if (\in_array($extension, ['ini', 'json', 'xlf', 'xliff'], true)) {
@@ -52,16 +53,16 @@ final class RuntimeRefreshPlanner
             return false;
         }
 
-        return str_starts_with($path, 'config/') || $this->isTranslationPath($path);
+        return null !== $project->configRelativePath($path) || $this->isTranslationPath($path);
     }
 
-    public function plan(string $path, SourceFileChange $change): RuntimeRefreshPlan
+    public function plan(Project $project, string $path, SourceFileChange $change): RuntimeRefreshPlan
     {
         $domains = $change->domains();
         if ([] === $domains) {
-            $domains = $this->domainsFromPath($path);
+            $domains = $this->domainsFromPath($project, $path);
         }
-        if ([] === $domains || $this->isAmbiguousConfiguration($path)) {
+        if ([] === $domains || $this->isAmbiguousConfiguration($project, $path)) {
             return RuntimeRefreshPlan::rebuild();
         }
 
@@ -80,7 +81,7 @@ final class RuntimeRefreshPlanner
     }
 
     /** @return list<string> */
-    private function domainsFromPath(string $path): array
+    private function domainsFromPath(Project $project, string $path): array
     {
         if (str_starts_with($path, 'assets/')) {
             return ['asset', 'stimulus'];
@@ -88,18 +89,16 @@ final class RuntimeRefreshPlanner
         if ($this->isTranslationPath($path)) {
             return ['translation'];
         }
-        if (str_starts_with($path, 'config/routes.') || str_starts_with($path, 'config/routes/')) {
+        if ($project->isRouteConfigPath($path)) {
             return ['route'];
         }
 
         return [];
     }
 
-    private function isAmbiguousConfiguration(string $path): bool
+    private function isAmbiguousConfiguration(Project $project, string $path): bool
     {
-        return str_starts_with($path, 'config/')
-            && !str_starts_with($path, 'config/routes.')
-            && !str_starts_with($path, 'config/routes/');
+        return null !== $project->configRelativePath($path) && !$project->isRouteConfigPath($path);
     }
 
     /** Bundles name their catalog directory `translations` or `Translations`. */

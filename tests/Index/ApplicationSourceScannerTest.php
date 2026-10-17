@@ -407,8 +407,8 @@ PHP;
         self::assertTrue($change->requiresRuntimeRefresh());
         self::assertSame(['twig_callable'], $change->domains());
         $planner = new RuntimeRefreshPlanner();
-        self::assertTrue($planner->requiresRefresh($relativePath, $change));
-        self::assertContains('twig', $planner->plan($relativePath, $change)->sections());
+        self::assertTrue($planner->requiresRefresh($this->project, $relativePath, $change));
+        self::assertContains('twig', $planner->plan($this->project, $relativePath, $change)->sections());
     }
 
     /** @return iterable<string, array{string}> */

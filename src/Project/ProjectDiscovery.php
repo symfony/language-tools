@@ -124,29 +124,30 @@ final class ProjectDiscovery
             return null;
         }
 
-        return new Project($rootPath, rtrim($rootUri, '/'), $this->vendorPath($rootPath, $composer));
+        $config = \is_array($composer['config'] ?? null) ? $composer['config'] : [];
+        $extra = \is_array($composer['extra'] ?? null) ? $composer['extra'] : [];
+
+        return new Project(
+            $rootPath,
+            rtrim($rootUri, '/'),
+            $this->directory($rootPath, $config['vendor-dir'] ?? null, 'vendor'),
+            $this->directory($rootPath, $extra['config-dir'] ?? null, 'config'),
+        );
     }
 
-    /**
-     * Composer installs dependencies in `vendor/` unless the project declares another directory.
-     *
-     * @param array<array-key, mixed> $composer
-     */
-    private function vendorPath(string $rootPath, array $composer): ?string
+    private function directory(string $rootPath, mixed $directory, string $default): ?string
     {
-        $config = \is_array($composer['config'] ?? null) ? $composer['config'] : [];
-        $vendorDir = $config['vendor-dir'] ?? 'vendor';
-        if (!\is_string($vendorDir) || '' === $vendorDir) {
-            return 'vendor';
+        if (!\is_string($directory) || '' === $directory) {
+            return $default;
         }
 
         $root = Path::canonicalize($rootPath);
-        $vendorPath = Path::canonicalize(Path::isAbsolute($vendorDir) ? $vendorDir : Path::join($root, $vendorDir));
-        if ($root === $vendorPath || !Path::isBasePath($root, $vendorPath)) {
+        $path = Path::canonicalize(Path::isAbsolute($directory) ? $directory : Path::join($root, $directory));
+        if ($root === $path || !Path::isBasePath($root, $path)) {
             return null;
         }
 
-        return str_replace('\\', '/', Path::makeRelative($vendorPath, $root));
+        return str_replace('\\', '/', Path::makeRelative($path, $root));
     }
 
     /**

@@ -55,6 +55,7 @@ final class DependencyInjectionDocumentExtractor
     {
         $relativePath = $this->paths->relative($project, $uri);
 
-        return null !== $relativePath && str_contains('/'.$relativePath, '/config/');
+        return null !== $relativePath
+            && (null !== $project->configRelativePath($relativePath) || str_contains('/'.$relativePath, '/config/'));
     }
 }

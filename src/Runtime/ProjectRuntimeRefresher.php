@@ -50,13 +50,13 @@ final class ProjectRuntimeRefresher
         if (!$this->configuration->runtimeIndexing($project)
             || TrustStatus::Trusted !== $this->workspaceTrust->status($project)
             || null === $path
-            || !$this->planner->requiresRefresh($path, $sourceFileChange)
+            || !$this->planner->requiresRefresh($project, $path, $sourceFileChange)
         ) {
             return;
         }
 
         $this->configurationValidations->pending($project);
         $this->statuses->runtimeStale($project);
-        $this->refreshScheduler->schedule($project, $this->planner->plan($path, $sourceFileChange));
+        $this->refreshScheduler->schedule($project, $this->planner->plan($project, $path, $sourceFileChange));
     }
 }

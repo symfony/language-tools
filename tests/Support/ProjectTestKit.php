@@ -49,11 +49,11 @@ final class ProjectTestKit
 
     private ?ProviderRequests $providerRequests = null;
 
-    public function __construct(string $rootPath = '/workspace', ?string $rootUri = null, ?string $vendorPath = 'vendor')
+    public function __construct(string $rootPath = '/workspace', ?string $rootUri = null, ?string $vendorPath = 'vendor', ?string $configPath = 'config')
     {
         $this->container = TestContainer::create();
         $this->container->set(ServerLogger::class, new ServerLogger(null, new SensitiveDataRedactor(new Utf8StringTruncator())));
-        $this->project = new Project($rootPath, $rootUri ?? 'file://'.$rootPath, $vendorPath);
+        $this->project = new Project($rootPath, $rootUri ?? 'file://'.$rootPath, $vendorPath, $configPath);
         $this->get(ProjectRegistry::class)->replace([$this->project]);
     }
 

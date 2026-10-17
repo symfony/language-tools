@@ -6,6 +6,7 @@
 - Complete the arguments of Twig functions and filters provided by installed packages when runtime analysis is enabled
 - Stop reporting decorated Messenger buses, such as those traced by the profiler, as unknown when the Messenger configuration can't be read
 - Only read YAML service definitions from `config/` directories, so files such as `compose.yaml` are no longer analyzed
+- Use the configuration directory declared by `extra.config-dir` in `composer.json` instead of always assuming `config/`
 
 ## 0.23.0 (2026-09-26)
 

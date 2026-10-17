@@ -5,6 +5,7 @@ namespace Symfony\Lsp\Tests\Runtime;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Lsp\Index\SourceFileChange;
+use Symfony\Lsp\Project\Project;
 use Symfony\Lsp\Runtime\RuntimeRefreshMode;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlan;
 use Symfony\Lsp\Runtime\RuntimeRefreshPlanner;
@@ -15,7 +16,7 @@ final class RuntimeRefreshPlannerTest extends TestCase
     #[DataProvider('preservedProvider')]
     public function testPreservesTheContainerForDomainsDescribedWithoutIt(string $path, SourceFileChange $change, array $sections): void
     {
-        $plan = (new RuntimeRefreshPlanner())->plan($path, $change);
+        $plan = (new RuntimeRefreshPlanner())->plan(self::project(), $path, $change);
 
         self::assertSame(RuntimeRefreshMode::Preserve, $plan->mode());
         self::assertSame($sections, $plan->sections());
@@ -38,7 +39,7 @@ final class RuntimeRefreshPlannerTest extends TestCase
     #[DataProvider('rebuiltProvider')]
     public function testRebuildsTheContainerForDomainsDescribedFromIt(string $path, SourceFileChange $change, array $sections): void
     {
-        $plan = (new RuntimeRefreshPlanner())->plan($path, $change);
+        $plan = (new RuntimeRefreshPlanner())->plan(self::project(), $path, $change);
 
         self::assertSame(RuntimeRefreshMode::Rebuild, $plan->mode());
         self::assertSame($sections, $plan->sections());
@@ -59,7 +60,7 @@ final class RuntimeRefreshPlannerTest extends TestCase
     #[DataProvider('refreshedPathProvider')]
     public function testDecidesWhetherAChangedPathCanMakeRuntimeMetadataStale(string $path, SourceFileChange $change, bool $requiresRefresh): void
     {
-        self::assertSame($requiresRefresh, (new RuntimeRefreshPlanner())->requiresRefresh($path, $change));
+        self::assertSame($requiresRefresh, (new RuntimeRefreshPlanner())->requiresRefresh(self::project(), $path, $change));
     }
 
     /** @return iterable<string, array{string, SourceFileChange, bool}> */
@@ -79,6 +80,18 @@ final class RuntimeRefreshPlannerTest extends TestCase
         yield 'unrelated XML' => ['public/sitemap.xml', SourceFileChange::untracked(), false];
     }
 
+    public function testFollowsTheConfiguredConfigurationDirectory(): void
+    {
+        $planner = new RuntimeRefreshPlanner();
+        $project = self::project('etc');
+
+        self::assertTrue($planner->requiresRefresh($project, 'etc/packages/framework.yaml', SourceFileChange::untracked()));
+        self::assertFalse($planner->requiresRefresh($project, 'config/packages/framework.yaml', SourceFileChange::untracked()));
+        self::assertSame(RuntimeRefreshMode::Rebuild, $planner->plan($project, 'etc/packages/framework.yaml', SourceFileChange::factsChanged(['dependency_injection']))->mode());
+        self::assertTrue($planner->plan($project, 'etc/packages/framework.yaml', SourceFileChange::factsChanged(['dependency_injection']))->refreshesEverySection());
+        self::assertSame(['routes'], $planner->plan($project, 'etc/routes.yaml', SourceFileChange::untracked())->sections());
+    }
+
     public function testCombinedPlansKeepTheStrongestModeAndEverySection(): void
     {
         $preserved = RuntimeRefreshPlan::preserve(['routes']);
@@ -89,5 +102,10 @@ final class RuntimeRefreshPlannerTest extends TestCase
         self::assertSame(['routes', 'container'], $preserved->combine(RuntimeRefreshPlan::rebuild(['container']))->sections());
         self::assertTrue($preserved->combine(RuntimeRefreshPlan::reuse())->refreshesEverySection());
         self::assertSame(RuntimeRefreshMode::Reuse, $preserved->combine(RuntimeRefreshPlan::reuse())->mode());
+    }
+
+    private static function project(string $configPath = 'config'): Project
+    {
+        return new Project('/workspace', 'file:///workspace', configPath: $configPath);
     }
 }
