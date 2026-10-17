@@ -61,5 +61,5 @@ async function testDependencyInjectionFeatures(): Promise<void> {
         );
         assert.ok(!diagnostics.some((item) => item.message.includes('missing.service')));
         assert.ok(diagnostics.some((item) => item.message.includes('missing.parameter')));
-    });
+    }, undefined, '.lsp-e2e/config');
 }
