@@ -40,6 +40,18 @@ final class BridgeContainerTest extends TestCase
         self::assertTrue($result['sections']['container']['parametersComplete'] ?? null);
         self::assertSame([
             [
+                'id' => 'App\\MailerInterface $transactionalMailer',
+                'class' => null,
+                'alias' => 'app.mailer',
+                'public' => false,
+                'lazy' => null,
+                'deprecation' => null,
+                'tags' => [],
+                'decorates' => null,
+                'decorationStack' => [],
+                'autowiringTypes' => [],
+            ],
+            [
                 'id' => 'app.mailer',
                 'class' => 'App\\Mailer',
                 'alias' => null,
@@ -49,7 +61,7 @@ final class BridgeContainerTest extends TestCase
                 'tags' => ['kernel.reset', 'monolog.logger'],
                 'decorates' => 'mailer',
                 'decorationStack' => ['app.mailer', 'mailer.inner'],
-                'autowiringTypes' => ['App\\MailerInterface'],
+                'autowiringTypes' => ['App\\MailerInterface', 'App\\MailerInterface $transactionalMailer'],
             ],
             [
                 'id' => 'mailer',

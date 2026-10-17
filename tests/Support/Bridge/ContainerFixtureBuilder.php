@@ -58,6 +58,7 @@ final class ContainerFixtureBuilder
                 'definitions' => [],
                 'aliases' => [
                     'App\\MailerInterface' => ['service' => 'app.mailer', 'public' => false],
+                    'App\\MailerInterface $transactionalMailer' => ['service' => 'app.mailer', 'public' => false],
                 ],
                 'services' => [],
             ];

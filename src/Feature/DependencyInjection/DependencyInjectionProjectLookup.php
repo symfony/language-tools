@@ -54,6 +54,57 @@ final class DependencyInjectionProjectLookup
         return array_values($parameters);
     }
 
+    /** @return list<AutowiringVariant> */
+    public function autowiringVariants(Project $project, string $type): array
+    {
+        $variants = [];
+        $parsedNames = [];
+        $targetPrefix = '.'.$type.' $';
+        foreach ($this->matchingServices($project, $targetPrefix) as $service) {
+            $name = substr($service->id, \strlen($targetPrefix));
+            if (null !== $service->alias && '' !== $name) {
+                $variants[$name] = new AutowiringVariant($name, $service->id, $service->alias);
+                $parsedNames[] = $this->parsedTargetName($name);
+            }
+        }
+
+        $argumentPrefix = $type.' $';
+        foreach ($this->matchingServices($project, $argumentPrefix) as $service) {
+            $name = substr($service->id, \strlen($argumentPrefix));
+            if (null !== $service->alias && '' !== $name && !isset($variants[$name]) && !\in_array($name, $parsedNames, true)) {
+                $variants[$name] = new AutowiringVariant($name, $service->id, $service->alias);
+            }
+        }
+        ksort($variants);
+
+        return array_values($variants);
+    }
+
+    public function autowiringVariant(Project $project, string $type, string $name): ?AutowiringVariant
+    {
+        $variants = $this->autowiringVariants($project, $type);
+        foreach ($variants as $variant) {
+            if ($name === $variant->name) {
+                return $variant;
+            }
+        }
+
+        $parsedName = $this->parsedTargetName($name);
+        foreach ($variants as $variant) {
+            if ($parsedName === $this->parsedTargetName($variant->name)) {
+                return $variant;
+            }
+        }
+
+        foreach ($variants as $variant) {
+            if ($name === $variant->serviceId) {
+                return $variant;
+            }
+        }
+
+        return null;
+    }
+
     public function service(Project $project, string $id): ?Service
     {
         $runtime = $this->serviceIndexes->forProject($project)->get($id);
@@ -157,6 +208,11 @@ final class DependencyInjectionProjectLookup
 
         return null !== $this->parameterIndexes->forProject($project)->get($name)
             || $this->hasDeclaration($project, $kind, $name);
+    }
+
+    private function parsedTargetName(string $name): string
+    {
+        return lcfirst(str_replace(' ', '', ucwords((string) preg_replace('/[^a-zA-Z0-9\x7f-\xff]++/', ' ', $name))));
     }
 
     private function sourceService(ServiceDeclaration $declaration): Service

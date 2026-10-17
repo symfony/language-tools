@@ -13,12 +13,17 @@ Where It Works
   and ``decorates:`` values, and ``%parameter%`` anywhere;
 * PHP: the ``service:`` and ``param:`` arguments of ``#[Autowire]``, and
   ``%parameter%`` inside any of its string arguments;
+* PHP: the name of ``#[Target]`` on a method parameter typed with a single
+  class or interface;
 * XML service files are indexed as navigation targets.
 
 In the Editor
 -------------
 
 * completion for service IDs and parameter names;
+* ``#[Target]`` completion lists the named variants of the parameter type,
+  the ones ``debug:autowiring`` shows, and hover shows the service a name
+  selects;
 * service hover shows the class, visibility, whether it's lazy or deprecated,
   what it decorates, its tags and its autowiring types. Parameter hover shows
   the name and its deprecation, never the value;
@@ -33,7 +38,9 @@ Diagnostics
   environment. Needs the running application.
 
 Unknown service IDs aren't reported: a container can create services that no
-listing exposes, so an unknown ID isn't proof of a mistake.
+listing exposes, so an unknown ID isn't proof of a mistake. Unknown
+``#[Target]`` names aren't reported either: Symfony already rejects them when
+it builds the container.
 
 Limitations
 -----------
@@ -41,6 +48,8 @@ Limitations
 * XML files provide navigation targets only. Completion, hover, references
   and rename don't work with the cursor inside an XML file, and an XML file
   that can't be parsed completely contributes nothing;
+* without the running application, ``#[Target]`` only knows the variants
+  declared in your service files;
 * ``@service`` references are recognized under ``services:``, not in
   arbitrary configuration keys;
 * ``env()`` placeholders are left to the `environment variables`_

@@ -80,7 +80,13 @@ final class BridgeCompatibilityTest extends TestCase
         self::assertSame(['fixture_localized_alias.en', 'fixture_localized_alias.fr'], array_column($localizedAliases, 'name'));
         $expectedAliasCanonical = 'missing' === $localizedAliasGeneration ? null : 'fixture_localized_alias';
         self::assertSame([$expectedAliasCanonical, $expectedAliasCanonical], array_column($localizedAliases, 'canonical'));
-        self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], 'class'));
+        $containerItems = array_column(\is_array($container['items'] ?? null) ? $container['items'] : [], null, 'id');
+        self::assertContains('App\\Environment\\CustomEnvVarProcessor', array_column($containerItems, 'class'));
+        foreach (['.Symfony\\Component\\Messenger\\MessageBusInterface $event.bus', 'Symfony\\Component\\Messenger\\MessageBusInterface $eventBus'] as $autowiringAlias) {
+            $item = $containerItems[$autowiringAlias] ?? null;
+            self::assertIsArray($item);
+            self::assertSame('event.bus', $item['alias'] ?? null);
+        }
         self::assertContains('fixture.message', array_column(\is_array($translations['items'] ?? null) ? $translations['items'] : [], 'key'));
         $configurationBundles = \is_array($configuration['bundles'] ?? null) ? $configuration['bundles'] : [];
         self::assertContains('framework', array_column($configurationBundles, 'alias'));

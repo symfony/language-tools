@@ -85,6 +85,13 @@ function symfonyLspBridgeNormalizeServices(array $container, array $types): arra
         }
     }
 
+    // the --show-hidden listing lacks the named autowiring aliases that #[Target] selects
+    foreach (is_array($types['aliases'] ?? null) ? $types['aliases'] : [] as $id => $alias) {
+        if (is_string($id) && str_contains($id, ' $') && !isset($services[$id]) && is_array($alias) && is_string($alias['service'] ?? null)) {
+            $services[$id] = symfonyLspBridgeNormalizeService($id, $alias, $alias['service']);
+        }
+    }
+
     $typesByService = symfonyLspBridgeNormalizeAutowiringTypes($types);
     foreach ($services as $id => $service) {
         $service['autowiringTypes'] = $typesByService[$id] ?? [];
