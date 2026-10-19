@@ -16,6 +16,7 @@ final class SymfonyLspBridgeContext
     private ?SymfonyLspBridgeEffectiveConfiguration $effectiveConfiguration = null;
     private ?Throwable $kernelError = null;
     private bool $kernelErrorReported = false;
+    private bool $environmentLoaded = false;
     private array $errors = [];
 
     public function __construct(
@@ -304,6 +305,7 @@ final class SymfonyLspBridgeContext
 
     private function boot(object $kernel): object
     {
+        $this->loadEnvironment($this->kernelProjectDir($kernel));
         if ($this->rebuildContainer) {
             // application runtimes may boot the kernel themselves; shut it down so the cache removal precedes the boot below
             if (method_exists($kernel, 'shutdown')) {
@@ -325,6 +327,45 @@ final class SymfonyLspBridgeContext
         }
 
         return $kernel;
+    }
+
+    /*
+     * Env files belong to the application, which is not always the analyzed
+     * root: bundles commonly ship a test application in a subdirectory whose
+     * own front controllers load its env files.
+     */
+    private function loadEnvironment(string $projectDir): void
+    {
+        if ($this->environmentLoaded) {
+            return;
+        }
+
+        $projectDir = rtrim($projectDir, '/\\');
+        $hasEnvFile = is_file($projectDir.'/.env') || is_file($projectDir.'/.env.dist') || is_file($projectDir.'/.env.local.php');
+        if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
+            new Symfony\Component\Runtime\SymfonyRuntime([
+                'project_dir' => $projectDir,
+                'env' => $this->environment,
+                'debug' => $this->debug,
+                // applications such as Shopware ship no env file at all
+                'disable_dotenv' => !$hasEnvFile,
+            ]);
+        } elseif ($hasEnvFile && class_exists(Symfony\Component\Dotenv\Dotenv::class)) {
+            (new Symfony\Component\Dotenv\Dotenv())->bootEnv($projectDir.'/.env', $this->environment);
+        }
+        $this->environmentLoaded = true;
+    }
+
+    private function kernelProjectDir(object $kernel): string
+    {
+        try {
+            // distributions such as Pimcore derive it from constants their front controllers define
+            $projectDir = method_exists($kernel, 'getProjectDir') ? $kernel->getProjectDir() : null;
+        } catch (Throwable) {
+            $projectDir = null;
+        }
+
+        return is_string($projectDir) && is_dir($projectDir) ? $projectDir : $this->project;
     }
 
     private function conventionalKernelClass(): ?string
@@ -395,6 +436,7 @@ final class SymfonyLspBridgeContext
         // front controllers parse argv, which must not expose the bridge options
         $_SERVER['argv'] = [$path];
         try {
+            $this->loadEnvironment($this->runtimeConfiguration()[1]['project_dir']);
             $app = require $path;
 
             return $app instanceof Closure ? $this->resolveRuntimeApplication($app) : null;
@@ -424,7 +466,7 @@ final class SymfonyLspBridgeContext
         $runtime = new $runtimeClass(array_replace($configuredOptions, $environmentOptions, [
             'env' => $this->environment,
             'debug' => $this->debug,
-            // the bridge already booted the environment at startup
+            // the bridge already loaded the env files
             'disable_dotenv' => true,
         ]));
         if (!method_exists($runtime, 'getResolver')) {

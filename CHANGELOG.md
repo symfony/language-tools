@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Collect runtime translations from parent and fallback locale catalogues, so keys defined only in `en` are found for an `en_US` locale
+- Load env files from the kernel's project directory, such as a bundle's test application, instead of the analyzed root
 
 ## 0.24.0 (2026-10-17)
 

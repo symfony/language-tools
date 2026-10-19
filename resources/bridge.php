@@ -123,23 +123,6 @@ if (is_string($releaseMetadataUrl) && '' !== $releaseMetadataUrl
     }
 }
 
-$projectRoot = rtrim($project, '/\\');
-$hasEnvFile = is_file($projectRoot.'/.env') || is_file($projectRoot.'/.env.dist') || is_file($projectRoot.'/.env.local.php');
-if (class_exists(Symfony\Component\Runtime\SymfonyRuntime::class)) {
-    new Symfony\Component\Runtime\SymfonyRuntime([
-        'project_dir' => $project,
-        'env' => $environment,
-        'debug' => $debug,
-        // applications such as Shopware ship no env file at all
-        'disable_dotenv' => !$hasEnvFile,
-    ]);
-} elseif ($hasEnvFile && class_exists(Symfony\Component\Dotenv\Dotenv::class)) {
-    (new Symfony\Component\Dotenv\Dotenv())->bootEnv(
-        $projectRoot.'/.env',
-        $environment,
-    );
-}
-
 $cacheLockOption = $options['cache-lock'] ?? null;
 // targeted refreshes discard stale translation catalogue caches
 $cacheLock = is_string($cacheLockOption) && '' !== $cacheLockOption
