@@ -18,6 +18,7 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     /** @var array<string, true> */
     private array $caseInsensitiveRuntimeNames = [];
     private string $anonymousTemplateDirectory = 'components';
+    private bool $defaultAnonymousTemplateFinder = false;
 
     /** @var list<TwigComponent> */
     private array $components = [];
@@ -106,13 +107,14 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
      * @param list<string>        $caseInsensitiveNames
      * @param list<TwigComponent> $components
      */
-    public function replaceRuntime(bool $complete, bool $enabled, array $names, string $anonymousTemplateDirectory, array $caseInsensitiveNames = [], array $components = []): void
+    public function replaceRuntime(bool $complete, bool $enabled, array $names, string $anonymousTemplateDirectory, array $caseInsensitiveNames = [], array $components = [], bool $defaultAnonymousTemplateFinder = true): void
     {
         $this->runtimeComplete = $complete;
         $this->runtimeEnabled = $enabled;
         $this->runtimeNames = array_fill_keys($names, true);
         $this->caseInsensitiveRuntimeNames = array_fill_keys(array_map('strtolower', $caseInsensitiveNames), true);
         $this->anonymousTemplateDirectory = $anonymousTemplateDirectory;
+        $this->defaultAnonymousTemplateFinder = $defaultAnonymousTemplateFinder;
         $this->runtimeComponents = [];
         foreach ($components as $component) {
             $this->runtimeComponents[$component->name] = $component;
@@ -147,6 +149,11 @@ final class TwigComponentIndex extends AbstractSourceFactsIndex
     public function anonymousTemplateDirectory(): string
     {
         return $this->anonymousTemplateDirectory;
+    }
+
+    public function hasDefaultAnonymousTemplateFinder(): bool
+    {
+        return $this->defaultAnonymousTemplateFinder;
     }
 
     protected function build(): void

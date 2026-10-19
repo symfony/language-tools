@@ -19,6 +19,7 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
+            'defaultAnonymousTemplateFinder' => false,
             'components' => [],
             'warnings' => [],
         ];
@@ -27,6 +28,7 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
     $caseInsensitiveNames = [];
     $components = [];
     $anonymousTemplateDirectory = 'components';
+    $defaultAnonymousTemplateFinder = false;
     $warnings = [];
     if (!class_exists(Symfony\Component\Console\Input\ArrayInput::class)
         || !class_exists(Symfony\Component\Console\Output\BufferedOutput::class)
@@ -50,6 +52,7 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
             $anonymousTemplateDirectory = is_string($configuration['anonymous_template_directory'] ?? null)
                 ? $configuration['anonymous_template_directory']
                 : 'components';
+            $defaultAnonymousTemplateFinder = symfonyLspBridgeHasDefaultAnonymousTemplateFinder($application, $commandOptions);
 
             $definitionsByTag = [];
             foreach (['twig.component', 'ux.twig_component.twig_renderer'] as $tag) {
@@ -131,9 +134,27 @@ function symfonyLspBridgeTwigComponentsSection(SymfonyLspBridgeContext $context)
         'names' => $names,
         'caseInsensitiveNames' => $caseInsensitiveNames,
         'anonymousTemplateDirectory' => $anonymousTemplateDirectory,
+        'defaultAnonymousTemplateFinder' => $defaultAnonymousTemplateFinder,
         'components' => $components,
         'warnings' => $warnings,
     ];
+}
+
+// a decorated finder is described as an alias, which has no class of its own
+function symfonyLspBridgeHasDefaultAnonymousTemplateFinder(object $application, array $commandOptions): bool
+{
+    try {
+        $finder = symfonyLspBridgeRunJsonCommand($application, [
+            'command' => 'debug:container',
+            'name' => 'ux.twig_component.component_template_finder',
+            '--format' => 'json',
+            ...$commandOptions,
+        ]);
+    } catch (Throwable) {
+        return false;
+    }
+
+    return Symfony\UX\TwigComponent\ComponentTemplateFinder::class === ($finder['class'] ?? null);
 }
 
 // Mirrors the automatic naming rule of TwigComponentPass for tags without an explicit key.

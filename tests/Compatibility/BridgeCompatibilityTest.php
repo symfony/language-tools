@@ -49,6 +49,8 @@ final class BridgeCompatibilityTest extends TestCase
         $assets = $this->section($result['sections'], 'assets');
         $stimulus = $this->section($result['sections'], 'stimulus');
         $console = $this->section($result['sections'], 'console');
+        $twigComponents = $this->section($result['sections'], 'twig_components');
+        self::assertTrue($twigComponents['defaultAnonymousTemplateFinder'] ?? null);
 
         $routeItems = \is_array($routes['items'] ?? null) ? $routes['items'] : [];
         self::assertContains('fixture_home', array_column($routeItems, 'name'));

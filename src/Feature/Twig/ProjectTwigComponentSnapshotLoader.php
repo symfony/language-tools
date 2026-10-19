@@ -43,6 +43,7 @@ final class ProjectTwigComponentSnapshotLoader implements RuntimeSnapshotLoaderI
             $section->string('anonymousTemplateDirectory') ?: 'components',
             $section->strings('caseInsensitiveNames'),
             $components,
+            $section->bool('defaultAnonymousTemplateFinder'),
         );
     }
 }

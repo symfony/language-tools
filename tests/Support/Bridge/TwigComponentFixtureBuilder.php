@@ -12,7 +12,7 @@ final class TwigComponentFixtureBuilder
     ) {
     }
 
-    public function writeTwigComponentApplication(bool $withUnnameableComponent = false, bool $bundleRegistered = true): void
+    public function writeTwigComponentApplication(bool $withUnnameableComponent = false, bool $bundleRegistered = true, bool $decoratedTemplateFinder = false): void
     {
         $unnameable = $withUnnameableComponent
             ? '"Vendor\\\\Hidden\\\\Component": {"class": "Vendor\\\\Hidden\\\\Component", "tags": [{"name": "twig.component", "parameters": {"expose_public_props": true}}]},'
@@ -64,6 +64,12 @@ final class TwigComponentFixtureBuilder
                 ],
                 'anonymous_template_directory' => 'components',
             ]], JSON_THROW_ON_ERROR));
+
+            return 0;
+        }
+
+        if ('ux.twig_component.component_template_finder' === ($input->arguments['name'] ?? null)) {
+            $output->write(__TEMPLATE_FINDER__);
 
             return 0;
         }
@@ -122,6 +128,9 @@ final class TwigComponentFixtureBuilder
     }
 PHP,
         );
+        $source = str_replace('__TEMPLATE_FINDER__', var_export(json_encode($decoratedTemplateFinder
+            ? [['service' => 'app.component_template_finder', 'public' => false], ['class' => 'App\\ComponentTemplateFinder', 'public' => false]]
+            : ['class' => 'Symfony\\UX\\TwigComponent\\ComponentTemplateFinder', 'public' => false], \JSON_THROW_ON_ERROR), true), $source);
         $this->workspace->write('vendor/autoload.php', str_replace(
             ['__UNNAMEABLE__', '__BUNDLES__', '__CONFIG_COMMAND__'],
             $bundleRegistered

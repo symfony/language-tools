@@ -23,6 +23,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
             'names' => ['ux:icon', 'Alert', 42, ['nested']],
             'caseInsensitiveNames' => ['ux:icon', 42, ['nested']],
             'anonymousTemplateDirectory' => 'ui',
+            'defaultAnonymousTemplateFinder' => true,
             'components' => [
                 [
                     'name' => 'UX:Icon',
@@ -53,6 +54,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         self::assertFalse($index->hasRuntimeName('alert'));
         self::assertFalse($index->hasRuntimeName('42'));
         self::assertSame('ui', $index->anonymousTemplateDirectory());
+        self::assertTrue($index->hasDefaultAnonymousTemplateFinder());
     }
 
     public function testClearsRuntimeNamesWhenTheIntegrationIsUnavailable(): void
@@ -93,6 +95,7 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         self::assertFalse($index->isRuntimeComplete());
         self::assertTrue($index->hasRuntimeName('ux:icon'));
         self::assertSame('components', $index->anonymousTemplateDirectory());
+        self::assertFalse($index->hasDefaultAnonymousTemplateFinder());
     }
 
     public function testDropsMalformedNames(): void

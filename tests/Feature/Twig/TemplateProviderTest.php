@@ -712,6 +712,10 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(false, true, [], 'components');
         $withIncompleteRuntimeNames = $provider->diagnostics($params);
         self::assertSame([], $withIncompleteRuntimeNames);
+
+        $indexes->forProject($project)->replaceRuntime(true, true, ['ux:icon'], 'components', ['ux:icon'], defaultAnonymousTemplateFinder: false);
+        $withDecoratedTemplateFinder = $provider->diagnostics($params);
+        self::assertSame([], $withDecoratedTemplateFinder);
     }
 
     public function testDoesNotDiagnoseComponentsWithoutTheTwigComponentIntegration(): void

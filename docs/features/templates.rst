@@ -57,6 +57,8 @@ Limitations
   and no template diagnostics are reported;
 * a template name built from a variable isn't resolved;
 * ``component('...')`` calls are navigated and diagnosed but not completed;
+* unknown component names aren't reported when the application or a bundle,
+  such as Sylius, changes how anonymous component templates are found;
 * rename isn't available for template names.
 
 .. _`how it works`: index.rst

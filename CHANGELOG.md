@@ -5,6 +5,7 @@
 - Collect runtime translations from parent and fallback locale catalogues, so keys defined only in `en` are found for an `en_US` locale
 - Load env files from the kernel's project directory, such as a bundle's test application, instead of the analyzed root
 - Stop completing bundle templates nested under a `components` subdirectory as anonymous Twig components
+- Stop reporting unknown Twig components when the application customizes how anonymous component templates are found, as Sylius does
 
 ## 0.24.0 (2026-10-17)
 

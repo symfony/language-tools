@@ -42,7 +42,25 @@ final class BridgeTwigComponentsTest extends TestCase
         self::assertSame(['Alert', 'Form:Input', 'acme:Badge', 'ux:icon'], $section['names']);
         self::assertSame(['ux:icon'], $section['caseInsensitiveNames']);
         self::assertSame('components', $section['anonymousTemplateDirectory']);
+        self::assertTrue($section['defaultAnonymousTemplateFinder']);
         self::assertSame([], $section['warnings']);
+    }
+
+    public function testReportsADecoratedAnonymousTemplateFinder(): void
+    {
+        (new TwigComponentFixtureBuilder($this->workspace))->writeTwigComponentApplication(decoratedTemplateFinder: true);
+
+        $process = $this->bridge->run(['--sections=twig_components']);
+
+        self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
+        $result = $process->snapshot;
+        self::assertIsArray($result);
+        self::assertSame([], $result['errors']);
+        self::assertIsArray($result['sections'] ?? null);
+        $section = $result['sections']['twig_components'] ?? null;
+        self::assertIsArray($section);
+        self::assertTrue($section['complete']);
+        self::assertFalse($section['defaultAnonymousTemplateFinder']);
     }
 
     public function testReportsIncompleteTwigComponentNamesInsteadOfGuessing(): void
@@ -81,6 +99,7 @@ final class BridgeTwigComponentsTest extends TestCase
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
+            'defaultAnonymousTemplateFinder' => false,
             'components' => [],
             'warnings' => [],
         ], $section);
@@ -106,6 +125,7 @@ final class BridgeTwigComponentsTest extends TestCase
             'names' => [],
             'caseInsensitiveNames' => [],
             'anonymousTemplateDirectory' => 'components',
+            'defaultAnonymousTemplateFinder' => false,
             'components' => [],
             'warnings' => [],
         ], $section);

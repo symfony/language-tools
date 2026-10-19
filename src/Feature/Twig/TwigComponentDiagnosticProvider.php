@@ -37,7 +37,7 @@ final class TwigComponentDiagnosticProvider implements DiagnosticProviderInterfa
         $diagnostics = [];
         foreach ($facts instanceof TwigComponentSourceFacts ? $facts->references : [] as $reference) {
             $name = $reference->name;
-            if (null !== $index->get($name) || $index->hasRuntimeName($name) || $this->components->anonymousTemplateExists($request->project, $name)) {
+            if (null !== $index->get($name) || $index->hasRuntimeName($name) || !$index->hasDefaultAnonymousTemplateFinder() || $this->components->anonymousTemplateExists($request->project, $name)) {
                 continue;
             }
             $diagnostics[] = $this->protocol->diagnostic($reference->range, 1, 'twig_component.not_found', \sprintf('Twig component "%s" does not exist.', $name));
