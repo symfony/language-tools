@@ -20,3 +20,7 @@ framework:
         failure_transport: failed
         routing:
             App\Message\Ping: async
+
+when@regional_locale:
+    framework:
+        default_locale: en_US

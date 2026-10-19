@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Collect runtime translations from parent and fallback locale catalogues, so keys defined only in `en` are found for an `en_US` locale
+
 ## 0.24.0 (2026-10-17)
 
 - Complete the keys and string values of a Twig function or filter hash argument from its PHP array shape

@@ -27,8 +27,15 @@ function symfonyLspBridgeTranslationsSection(SymfonyLspBridgeContext $context): 
                             array_push($locales, ...array_filter($enabledLocales, 'is_string'));
                         }
                     }
-                    foreach (array_values(array_unique(array_filter($locales, 'is_string'))) as $locale) {
+                    $locales = array_values(array_unique(array_filter($locales, 'is_string')));
+                    for ($index = 0; $index < count($locales); ++$index) {
+                        $locale = $locales[$index];
                         $catalogue = $translator->getCatalogue($locale);
+                        for ($fallback = $catalogue->getFallbackCatalogue(); null !== $fallback; $fallback = $fallback->getFallbackCatalogue()) {
+                            if (!in_array($fallback->getLocale(), $locales, true)) {
+                                $locales[] = $fallback->getLocale();
+                            }
+                        }
                         foreach ($catalogue->all() as $domain => $messages) {
                             foreach (is_array($messages) ? $messages : [] as $key => $message) {
                                 if (is_string($domain) && is_string($key) && is_string($message)) {
