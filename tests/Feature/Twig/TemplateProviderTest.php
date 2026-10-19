@@ -761,6 +761,7 @@ final class TemplateProviderTest extends TestCase
             new TemplateDeclaration('components/Alert.html.twig', 'file:///workspace/templates/components/Alert.html.twig', $range),
             new TemplateDeclaration('components/Card/index.html.twig', 'file:///workspace/templates/components/Card/index.html.twig', $range),
             new TemplateDeclaration('@acme/components/badge.html.twig', 'file:///workspace/vendor/acme/bundle/templates/components/badge.html.twig', $range),
+            new TemplateDeclaration('@acme/shared/components/image.html.twig', 'file:///workspace/vendor/acme/bundle/templates/shared/components/image.html.twig', $range),
             new TemplateDeclaration('page.html.twig', 'file:///workspace/templates/page.html.twig', $range),
         );
         $requests = new ProviderRequests($documents, $projects);

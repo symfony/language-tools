@@ -56,8 +56,8 @@ final class TwigComponentResolver
             $templateName = $template->name;
             if (str_starts_with($templateName, $directory)) {
                 $path = substr($templateName, \strlen($directory));
-            } elseif (str_starts_with($templateName, '@') && \is_int($marker = strpos($templateName, '/components/'))) {
-                $path = substr($templateName, 1, $marker - 1).'/'.substr($templateName, $marker + \strlen('/components/'));
+            } elseif (preg_match('{^@([^/]+)/components/(.+)$}', $templateName, $match)) {
+                $path = $match[1].'/'.$match[2];
             } else {
                 continue;
             }
