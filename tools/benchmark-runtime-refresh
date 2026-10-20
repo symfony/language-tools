@@ -200,7 +200,7 @@ $cases = [
     [
         'name' => 'configuration',
         'file' => 'config/packages/framework.yaml',
-        'replace' => ['default_locale: en', 'default_locale: fr'],
+        'replace' => ["default_locale: en\n", "default_locale: fr\n"],
         'section' => 'configuration',
         'preserveContainer' => false,
         'generationChanges' => false,
