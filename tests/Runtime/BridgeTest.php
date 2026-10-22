@@ -191,24 +191,26 @@ final class BridgeTest extends TestCase
         self::assertStringContainsString('Deprecated', $stderr);
     }
 
-    public function testRebuildsContainerCacheBeforeLoadingSections(): void
+    public function testContainerRebuildInvalidatesTheContainerWithoutDeletingCacheFilesInUse(): void
     {
         (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
-        $this->workspace->mkdir('var/cache');
-        $this->workspace->write('var/cache/marker', 'stale');
+        $metadata = $this->workspace->write('var/cache/FixtureContainer.php.meta', 'stale');
+        $compiledService = $this->workspace->write('var/cache/ContainerFixture/getRouterService.php', '<?php');
 
         $process = $this->bridge->run(['--sections=routes', '--rebuild-container=1']);
 
         self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
-        self::assertFileDoesNotExist($this->workspace->rootPath.'/var/cache/marker');
+        self::assertFileDoesNotExist($metadata);
+        self::assertFileExists($compiledService);
+        $this->workspace->remove('var');
     }
 
     /** @param list<string> $options */
-    #[DataProvider('cacheDeletingRunProvider')]
-    public function testCacheDeletingRunsWaitForConcurrentBridgeRuns(array $options): void
+    #[DataProvider('cacheInvalidatingRunProvider')]
+    public function testCacheInvalidatingRunsWaitForConcurrentBridgeRuns(array $options, string $cacheFile): void
     {
         (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
-        $catalogue = $this->workspace->write('var/cache/translations/catalogue.en.stale.php', '<?php return [];');
+        $cache = $this->workspace->write($cacheFile, '<?php return [];');
         $lockPath = $this->workspace->path('bridge.lock');
         $reader = fopen($lockPath, 'c');
         self::assertIsResource($reader);
@@ -218,24 +220,24 @@ final class BridgeTest extends TestCase
         delay(1);
 
         self::assertFalse($run->isComplete());
-        self::assertFileExists($catalogue);
+        self::assertFileExists($cache);
         flock($reader, \LOCK_UN);
         fclose($reader);
         $process = $run->await();
         self::assertInstanceOf(BridgeProcessResult::class, $process);
         self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
-        self::assertFileDoesNotExist($catalogue);
+        self::assertFileDoesNotExist($cache);
         $this->workspace->remove('var');
     }
 
-    /** @return iterable<string, array{list<string>}> */
-    public static function cacheDeletingRunProvider(): iterable
+    /** @return iterable<string, array{list<string>, string}> */
+    public static function cacheInvalidatingRunProvider(): iterable
     {
-        yield 'container rebuild' => [['--rebuild-container=1']];
-        yield 'targeted refresh' => [['--targeted-refresh=1']];
+        yield 'container rebuild' => [['--rebuild-container=1'], 'var/cache/FixtureContainer.php.meta'];
+        yield 'targeted refresh' => [['--targeted-refresh=1'], 'var/cache/translations/catalogue.en.stale.php.meta'];
     }
 
-    public function testBridgeRunsWaitForAConcurrentCacheDeletion(): void
+    public function testBridgeRunsWaitForAConcurrentCacheInvalidation(): void
     {
         (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
         $lockPath = $this->workspace->path('bridge.lock');
@@ -282,27 +284,39 @@ final class BridgeTest extends TestCase
         self::assertContains('homepage', $this->routeNames($process));
     }
 
-    public function testTargetedRefreshDiscardsStaleTranslationCatalogueCaches(): void
+    #[DataProvider('refreshRunProvider')]
+    public function testRefreshesInvalidateTranslationCatalogueCachesWithoutDeletingThem(string $option): void
     {
         (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
         $catalogue = $this->workspace->write('var/cache/translations/catalogue.en.stale.php', '<?php return [];');
+        $metadata = $this->workspace->write('var/cache/translations/catalogue.en.stale.php.meta', 'stale');
 
-        $process = $this->bridge->run(['--sections=translations', '--targeted-refresh=1']);
+        $process = $this->bridge->run(['--sections=translations', $option]);
 
         self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
-        self::assertFileDoesNotExist($catalogue);
+        self::assertFileExists($catalogue);
+        self::assertFileDoesNotExist($metadata);
         $this->workspace->remove('var');
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function refreshRunProvider(): iterable
+    {
+        yield 'container rebuild' => ['--rebuild-container=1'];
+        yield 'targeted refresh' => ['--targeted-refresh=1'];
     }
 
     public function testInitialIndexKeepsTranslationCatalogueCaches(): void
     {
         (new RouteFixtureBuilder($this->workspace))->writeRouteApplication();
         $catalogue = $this->workspace->write('var/cache/translations/catalogue.en.stale.php', '<?php return [];');
+        $metadata = $this->workspace->write('var/cache/translations/catalogue.en.stale.php.meta', 'stale');
 
         $process = $this->bridge->run(['--sections=translations']);
 
         self::assertSame(0, $process->exitCode, $process->stderr."\n".$process->stdout);
         self::assertFileExists($catalogue);
+        self::assertFileExists($metadata);
         $this->workspace->remove('var');
     }
 

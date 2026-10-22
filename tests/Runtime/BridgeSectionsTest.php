@@ -127,10 +127,11 @@ final class BridgeSectionsTest extends TestCase
         self::assertSame(['boot-1'], $this->cacheEntries());
     }
 
-    public function testRebuildsTheContainerBeforeBootingAFrontControllerKernel(): void
+    public function testInvalidatesTheContainerBeforeRebootingAFrontControllerKernel(): void
     {
         (new RuntimeFrontControllerFixtureBuilder($this->workspace))->writeBootstrapDependentKernelApplication();
-        $this->workspace->write('var/cache/marker', 'stale');
+        $this->workspace->write('var/cache/FixtureContainer.php.meta', 'stale');
+        $this->workspace->write('var/cache/marker', 'in use');
 
         $process = $this->bridge->run(['--sections=events', '--rebuild-container=1']);
 
@@ -138,7 +139,7 @@ final class BridgeSectionsTest extends TestCase
         $result = $process->snapshot;
         self::assertIsArray($result);
         self::assertSame([], $result['errors'] ?? null, $process->stdout);
-        self::assertSame(['boot-2'], $this->cacheEntries());
+        self::assertSame(['boot-1', 'boot-2', 'marker'], $this->cacheEntries());
     }
 
     public function testReportsTheFrontControllerFailureWhenBothBootstrapsFail(): void

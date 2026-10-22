@@ -7,10 +7,11 @@ function symfonyLspBridgeTranslationsSection(SymfonyLspBridgeContext $context): 
         try {
             $kernel = $context->kernel();
             // Catalogue caches are mtime-fresh at second granularity, so an edit
-            // in the same second as the cache write would be served stale.
-            if ($context->targetedRefresh() && method_exists($kernel, 'getCacheDir') && is_string($cacheDirectory = $kernel->getCacheDir())) {
-                foreach (glob($cacheDirectory.'/translations/*') ?: [] as $cachedCatalogue) {
-                    @unlink($cachedCatalogue);
+            // in the same second as the cache write would be served stale; removing
+            // their metadata keeps the catalogues other processes may be loading.
+            if (($context->targetedRefresh() || $context->rebuildContainer()) && method_exists($kernel, 'getCacheDir') && is_string($cacheDirectory = $kernel->getCacheDir())) {
+                foreach (glob($cacheDirectory.'/translations/*.php.meta') ?: [] as $catalogueMetadata) {
+                    @unlink($catalogueMetadata);
                 }
             }
             $container = $kernel->getContainer();

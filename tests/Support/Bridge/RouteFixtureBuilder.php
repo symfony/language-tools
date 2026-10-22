@@ -93,6 +93,7 @@ final class RouteFixtureBuilder
                 public function __construct(string $environment, bool $debug) {}
                 public function getCacheDir(): string { return dirname(__DIR__).'/var/cache'; }
                 public function getBuildDir(): string { return $this->getCacheDir(); }
+                protected function getContainerClass(): string { return 'FixtureContainer'; }
                 public function getContainer(): Container { return new Container(); }
                 public function shutdown(): void {}
             }

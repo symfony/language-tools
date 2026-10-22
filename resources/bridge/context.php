@@ -50,6 +50,11 @@ final class SymfonyLspBridgeContext
         return $this->targetedRefresh;
     }
 
+    public function rebuildContainer(): bool
+    {
+        return $this->rebuildContainer;
+    }
+
     /** @return array{--env: string, --no-debug: bool, --no-interaction: true} */
     public function commandOptions(): array
     {
@@ -307,19 +312,11 @@ final class SymfonyLspBridgeContext
     {
         $this->loadEnvironment($this->kernelProjectDir($kernel));
         if ($this->rebuildContainer) {
-            // application runtimes may boot the kernel themselves; shut it down so the cache removal precedes the boot below
+            // application runtimes may boot the kernel themselves; shut it down so the invalidation precedes the boot below
             if (method_exists($kernel, 'shutdown')) {
                 $kernel->shutdown();
             }
-            $directories = [];
-            foreach (['getCacheDir', 'getBuildDir'] as $method) {
-                if (method_exists($kernel, $method) && is_string($directory = $kernel->$method())) {
-                    $directories[] = $directory;
-                }
-            }
-            foreach (array_unique($directories) as $directory) {
-                $this->removeDirectory($directory);
-            }
+            $this->invalidateContainerCache($kernel);
         }
         symfonyLspBridgeDiscardApplicationErrorLogs();
         if (method_exists($kernel, 'boot')) {
@@ -680,22 +677,21 @@ final class SymfonyLspBridgeContext
         return $candidates;
     }
 
-    private function removeDirectory(string $directory): void
+    // other processes may still be loading the compiled container files, which the kernel's own rebuild keeps
+    private function invalidateContainerCache(object $kernel): void
     {
-        if (is_link($directory) || is_file($directory)) {
-            @unlink($directory);
-
+        if (!method_exists($kernel, 'getBuildDir') || !method_exists($kernel, 'getContainerClass')) {
             return;
         }
-        if (!is_dir($directory)) {
+        try {
+            $buildDirectory = $kernel->getBuildDir();
+            $containerClass = (new ReflectionMethod($kernel, 'getContainerClass'))->invoke($kernel);
+        } catch (Throwable) {
             return;
         }
-        foreach (scandir($directory) ?: [] as $entry) {
-            if ('.' !== $entry && '..' !== $entry) {
-                $this->removeDirectory($directory.DIRECTORY_SEPARATOR.$entry);
-            }
+        if (is_string($buildDirectory) && is_string($containerClass)) {
+            @unlink($buildDirectory.DIRECTORY_SEPARATOR.$containerClass.'.php.meta');
         }
-        @rmdir($directory);
     }
 
     public function addError(string $section, ?Throwable $error = null): void

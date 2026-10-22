@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Rebuild the container without deleting the application cache, so a concurrent `cache:clear`, such as the one Composer runs after installing a package, no longer fails
+
 ## 0.24.1 (2026-10-20)
 
 - Collect runtime translations from parent and fallback locale catalogues, so keys defined only in `en` are found for an `en_US` locale

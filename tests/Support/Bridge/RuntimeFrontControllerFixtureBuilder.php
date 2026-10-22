@@ -157,6 +157,8 @@ PHP,
                 private bool $booted = false;
                 public function __construct(public string $environment, public bool $debug) {}
                 public function getCacheDir(): string { return dirname(__DIR__).'/var/cache'; }
+                public function getBuildDir(): string { return $this->getCacheDir(); }
+                protected function getContainerClass(): string { return 'FixtureContainer'; }
                 public function boot(): void
                 {
                     if ($this->booted) {
