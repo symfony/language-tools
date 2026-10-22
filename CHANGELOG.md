@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.24.2 (2026-10-22)
 
 - Rebuild the container without deleting the application cache, so a concurrent `cache:clear`, such as the one Composer runs after installing a package, no longer fails
 - Find anonymous Twig components stored at the root of `templates/` when `anonymous_template_directory` is empty
