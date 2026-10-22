@@ -88,7 +88,6 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         $loader->load($project, SnapshotSections::of($project, [
             'complete' => false,
             'names' => ['ux:icon'],
-            'anonymousTemplateDirectory' => '',
         ]));
 
         $index = $indexes->forProject($project);
@@ -96,6 +95,21 @@ final class ProjectTwigComponentSnapshotLoaderTest extends TestCase
         self::assertTrue($index->hasRuntimeName('ux:icon'));
         self::assertSame('components', $index->anonymousTemplateDirectory());
         self::assertFalse($index->hasDefaultAnonymousTemplateFinder());
+    }
+
+    public function testKeepsAnEmptyAnonymousTemplateDirectory(): void
+    {
+        $indexes = new TwigComponentIndexRegistry();
+        $project = new Project('/workspace', 'file:///workspace');
+        $loader = new ProjectTwigComponentSnapshotLoader($indexes, new UriToPathConverter());
+
+        $loader->load($project, SnapshotSections::of($project, [
+            'complete' => true,
+            'names' => [],
+            'anonymousTemplateDirectory' => '',
+        ]));
+
+        self::assertSame('', $indexes->forProject($project)->anonymousTemplateDirectory());
     }
 
     public function testDropsMalformedNames(): void

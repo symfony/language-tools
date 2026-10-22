@@ -716,6 +716,23 @@ final class TemplateProviderTest extends TestCase
         $indexes->forProject($project)->replaceRuntime(true, true, ['ux:icon'], 'components', ['ux:icon'], defaultAnonymousTemplateFinder: false);
         $withDecoratedTemplateFinder = $provider->diagnostics($params);
         self::assertSame([], $withDecoratedTemplateFinder);
+
+        $indexes->forProject($project)->replaceRuntime(true, true, ['ux:icon'], '', ['ux:icon']);
+        $templateIndexes->forProject($project)->replaceRuntime(
+            true,
+            new TemplateDeclaration('Alert.html.twig', 'file:///workspace/templates/Alert.html.twig', $range),
+            new TemplateDeclaration('Card/index.html.twig', 'file:///workspace/templates/Card/index.html.twig', $range),
+            new TemplateDeclaration('@acme/components/badge.html.twig', 'file:///workspace/vendor/acme/bundle/templates/components/badge.html.twig', $range),
+        );
+        $fromTemplatesRoot = $provider->diagnostics($params);
+        self::assertIsArray($fromTemplatesRoot);
+        self::assertSame(
+            [
+                'Twig component "alert" does not exist.',
+                'Twig component "Unknown" does not exist.',
+            ],
+            array_column($fromTemplatesRoot, 'message'),
+        );
     }
 
     public function testDoesNotDiagnoseComponentsWithoutTheTwigComponentIntegration(): void
@@ -773,12 +790,15 @@ final class TemplateProviderTest extends TestCase
         $provider = new TwigComponentCompletionProvider($converter, new LspProtocolMapper(), $indexes, $componentResolver, $commentParser);
 
         $position = $converter->toPosition($completionText, \strlen($completionText));
-        $items = $provider->complete($requests->positioned([
+        $request = $requests->positioned([
             'textDocument' => ['uri' => $completionUri],
             'position' => ['line' => $position->line, 'character' => $position->character],
-        ]));
+        ]);
 
-        self::assertSame(['Alert', 'Card', 'acme:badge', 'ux:icon'], array_column($items, 'label'));
+        self::assertSame(['Alert', 'Card', 'acme:badge', 'ux:icon'], array_column($provider->complete($request), 'label'));
+
+        $indexes->forProject($project)->replaceRuntime(true, true, ['ux:icon'], '');
+        self::assertSame(['acme:badge', 'components:Alert', 'components:Card', 'page', 'ux:icon'], array_column($provider->complete($request), 'label'));
     }
 
     public function testResolvesBundleTemplateNames(): void

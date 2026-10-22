@@ -51,11 +51,12 @@ final class TwigComponentResolver
         $index = $this->indexes->forProject($project);
         $templates = $this->templates->forProject($project);
         $names = [];
-        $directory = rtrim($index->anonymousTemplateDirectory(), '/').'/';
+        $directory = rtrim($index->anonymousTemplateDirectory(), '/');
+        $prefix = '' === $directory ? '' : $directory.'/';
         foreach ($templates->matching('') as $template) {
             $templateName = $template->name;
-            if (str_starts_with($templateName, $directory)) {
-                $path = substr($templateName, \strlen($directory));
+            if ('' === $prefix ? !str_starts_with($templateName, '@') : str_starts_with($templateName, $prefix)) {
+                $path = substr($templateName, \strlen($prefix));
             } elseif (preg_match('{^@([^/]+)/components/(.+)$}', $templateName, $match)) {
                 $path = $match[1].'/'.$match[2];
             } else {

@@ -59,6 +59,8 @@ Limitations
 * ``component('...')`` calls are navigated and diagnosed but not completed;
 * unknown component names aren't reported when the application or a bundle,
   such as Sylius, changes how anonymous component templates are found;
+* go to definition, hover and references for anonymous components only work
+  for templates under ``templates/components/``;
 * rename isn't available for template names.
 
 .. _`how it works`: index.rst
