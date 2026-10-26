@@ -97,19 +97,17 @@ final class WorkflowTriggerTest extends TestCase
         self::assertStringNotContainsString('body_path: CHANGELOG.md', $contents);
     }
 
-    public function testOpenVsxStepsAreSkippedWithoutCredentials(): void
+    public function testOpenVsxPublishesOnlyFromTheTrustedReleaseWorkflow(): void
     {
         $contents = file_get_contents(self::ROOT.'/.github/workflows/publish-vscode.yaml');
         self::assertIsString($contents);
-        self::assertStringContainsString('            - name: Detect Open VSX credentials', $contents);
-        self::assertStringContainsString('              id: open-vsx', $contents);
-        self::assertStringContainsString('                  OVSX_PAT: ${{ secrets.OVSX_PAT }}', $contents);
-        self::assertStringContainsString("                      echo 'enabled=false' >> \"\$GITHUB_OUTPUT\"", $contents);
-        self::assertStringContainsString('skipping Open VSX verification and publication', $contents);
-        self::assertStringContainsString('            - name: Verify Open VSX access', $contents);
-        self::assertStringContainsString("              if: \${{ steps.open-vsx.outputs.enabled == 'true' }}", $contents);
+        self::assertStringNotContainsString('OVSX_PAT', $contents);
         self::assertStringContainsString('            - name: Publish release packages to Open VSX', $contents);
-        self::assertStringContainsString("              if: \${{ inputs.verify_only != true && steps.open-vsx.outputs.enabled == 'true' }}", $contents);
+        self::assertStringContainsString("              if: \${{ inputs.verify_only != true && startsWith(github.workflow_ref, format('{0}/.github/workflows/release.yaml@', github.repository)) }}", $contents);
+
+        $release = file_get_contents(self::ROOT.'/.github/workflows/release.yaml');
+        self::assertIsString($release);
+        self::assertStringContainsString('        uses: ./.github/workflows/publish-vscode.yaml', $release);
     }
 
     public function testAzureOutputSuppressionDoesNotHideTheLoginVersion(): void

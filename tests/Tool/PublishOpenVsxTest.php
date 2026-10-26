@@ -23,10 +23,7 @@ final class PublishOpenVsxTest extends TestCase
         $this->workspace->executable('bin/npx', <<<'BASH'
             #!/usr/bin/env bash
             set -euo pipefail
-            if [[ "$2" = verify-pat ]]; then
-                echo "$*" >> "$STATE_DIRECTORY/arguments"
-                exit
-            fi
+            echo "${OVSX_PAT-unset}" >> "$STATE_DIRECTORY/tokens"
             package="${!#}"
             name="$(basename "$package")"
             count_file="$STATE_DIRECTORY/$name"
@@ -59,8 +56,18 @@ final class PublishOpenVsxTest extends TestCase
         self::assertIsArray($arguments);
         self::assertCount(3, $arguments);
         foreach ($arguments as $argument) {
-            self::assertStringContainsString('ovsx publish --skip-duplicate ', $argument);
+            self::assertStringContainsString('ovsx publish --trusted-publishing --skip-duplicate ', $argument);
         }
+    }
+
+    public function testInheritedAccessTokenCannotOverrideTrustedPublishing(): void
+    {
+        touch(Path::join($this->packages, 'immediate.vsix'));
+
+        $result = $this->runPublisher();
+
+        self::assertSame(0, $result->exitCode, $result->stderr);
+        self::assertSame("unset\n", file_get_contents(Path::join($this->state, 'tokens')));
     }
 
     public function testFailsAfterTheConfiguredAttempts(): void
@@ -74,40 +81,17 @@ final class PublishOpenVsxTest extends TestCase
         self::assertSame('3', trim((string) file_get_contents(Path::join($this->state, 'failure.vsix'))));
     }
 
-    public function testVerifiesMarketplaceAccess(): void
-    {
-        $result = $this->runCommand(['--verify', 'symfony']);
-
-        self::assertSame(0, $result->exitCode, $result->stderr);
-        self::assertSame("ovsx verify-pat symfony\n", file_get_contents(Path::join($this->state, 'arguments')));
-    }
-
-    public function testRequiresAnAccessToken(): void
-    {
-        $result = $this->runCommand(['--verify', 'symfony'], false);
-
-        self::assertSame(2, $result->exitCode);
-        self::assertStringContainsString('OVSX_PAT is required to publish to Open VSX.', $result->stderr);
-        self::assertFileDoesNotExist(Path::join($this->state, 'arguments'));
-    }
-
     private function runPublisher(): ProcessResult
-    {
-        return $this->runCommand([$this->packages]);
-    }
-
-    /** @param list<string> $arguments */
-    private function runCommand(array $arguments, bool $authenticated = true): ProcessResult
     {
         $environment = getenv();
         $environment['PATH'] = $this->workspace->path('bin').\PATH_SEPARATOR.($environment['PATH'] ?? '');
         $environment['STATE_DIRECTORY'] = $this->state;
         $environment['OVSX_PUBLISH_ATTEMPTS'] = '3';
         $environment['OVSX_PUBLISH_RETRY_DELAY'] = '0';
-        $environment['OVSX_PAT'] = $authenticated ? 'token' : '';
+        $environment['OVSX_PAT'] = 'token';
 
         return (new ExecutableRunner())->run(
-            [Path::join(\dirname(__DIR__, 2), 'tools/publish-open-vsx'), ...$arguments],
+            [Path::join(\dirname(__DIR__, 2), 'tools/publish-open-vsx'), $this->packages],
             $this->workspace->rootPath,
             $environment,
         );

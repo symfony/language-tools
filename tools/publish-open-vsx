@@ -1,27 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-require_token() {
-    if [[ -z "${OVSX_PAT:-}" ]]; then
-        echo "OVSX_PAT is required to publish to Open VSX." >&2
-        exit 2
-    fi
-}
-
-if [[ "${1:-}" = --verify ]]; then
-    if [[ $# -ne 2 ]]; then
-        echo "Usage: publish-open-vsx --verify NAMESPACE" >&2
-        exit 2
-    fi
-    require_token
-    npx ovsx verify-pat "$2"
-    exit
-fi
 if [[ $# -ne 1 ]]; then
     echo "Usage: publish-open-vsx VSIX_DIRECTORY" >&2
     exit 2
 fi
-require_token
 
 vsix_directory="$1"
 attempts="${OVSX_PUBLISH_ATTEMPTS:-3}"
@@ -30,7 +13,7 @@ if [[ ! "$attempts" =~ ^[1-9][0-9]*$ || ! "$retry_delay" =~ ^[0-9]+$ ]]; then
     echo "Publish attempts must be positive and retry delay must be non-negative." >&2
     exit 2
 fi
-options=(publish --skip-duplicate)
+options=(publish --trusted-publishing --skip-duplicate)
 
 shopt -s nullglob
 packages=("$vsix_directory"/*.vsix)
@@ -38,6 +21,9 @@ if [[ ${#packages[@]} -eq 0 ]]; then
     echo "No VSIX packages found in $vsix_directory." >&2
     exit 1
 fi
+
+# An access token takes precedence over trusted publishing in ovsx.
+unset OVSX_PAT
 
 for package in "${packages[@]}"; do
     published=false

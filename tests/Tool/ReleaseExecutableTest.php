@@ -404,7 +404,7 @@ final class ReleaseExecutableTest extends TestCase
             self::assertStringContainsString('Workflow release.yaml failed without an automatic rerun.', $result->stderr);
             self::assertStringContainsString(
                 'Tag v9.9.9 is published and main starts the next development cycle, but its release workflow failed.'
-                    .' Recover the extension publication with "gh workflow run publish-vscode.yaml --ref main -f tag=v9.9.9".',
+                    .' Recover the extension publications by rerunning the failed jobs of the run reported above with "gh run rerun RUN_ID --failed".',
                 $result->stderr,
             );
 

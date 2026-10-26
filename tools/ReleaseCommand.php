@@ -184,7 +184,7 @@ final class ReleaseCommand
         $this->finishRelease($releaseCommit);
 
         if (null !== $tagWorkflowFailure) {
-            throw new \RuntimeException(\sprintf('Tag %s is published and main starts the next development cycle, but its release workflow failed. Recover the extension publication with "gh workflow run publish-vscode.yaml --ref main -f tag=%s".', $tag, $tag), 0, $tagWorkflowFailure);
+            throw new \RuntimeException(\sprintf('Tag %s is published and main starts the next development cycle, but its release workflow failed. Recover the extension publications by rerunning the failed jobs of the run reported above with "gh run rerun RUN_ID --failed".', $tag), 0, $tagWorkflowFailure);
         }
     }
 

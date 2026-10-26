@@ -45,17 +45,6 @@ jobs:
                       echo "Invalid release tag: $RELEASE_TAG" >&2
                       exit 1
                   fi
-            - name: Detect Open VSX credentials
-              id: open-vsx
-              env:
-                  OVSX_PAT: ${{ secrets.OVSX_PAT }}
-              run: |
-                  if [[ -n "$OVSX_PAT" ]]; then
-                      echo 'enabled=true' >> "$GITHUB_OUTPUT"
-                  else
-                      echo 'enabled=false' >> "$GITHUB_OUTPUT"
-                      echo '::notice::OVSX_PAT is not configured; skipping Open VSX verification and publication.'
-                  fi
             - uses: actions/checkout@v7
             - uses: actions/setup-node@v7
               with:
@@ -133,14 +122,6 @@ jobs:
               run: |
                   publisher="$(node --print "require('./package.json').publisher")"
                   npx vsce verify-pat "$publisher" --azure-credential
-            - name: Verify Open VSX access
-              if: ${{ steps.open-vsx.outputs.enabled == 'true' }}
-              working-directory: editor/vscode
-              env:
-                  OVSX_PAT: ${{ secrets.OVSX_PAT }}
-              run: |
-                  publisher="$(node --print "require('./package.json').publisher")"
-                  ../../tools/publish-open-vsx --verify "$publisher"
             - name: Publish release packages to Visual Studio Marketplace
               if: ${{ inputs.verify_only != true }}
               working-directory: editor/vscode
@@ -148,9 +129,8 @@ jobs:
                   AZURE_CORE_OUTPUT: none
                   PRERELEASE: ${{ steps.release.outputs.prerelease }}
               run: ../../tools/publish-vscode "$VSIX_DIRECTORY"
+            # The Open VSX trusted publisher is registered for the calling release workflow only.
             - name: Publish release packages to Open VSX
-              if: ${{ inputs.verify_only != true && steps.open-vsx.outputs.enabled == 'true' }}
+              if: ${{ inputs.verify_only != true && startsWith(github.workflow_ref, format('{0}/.github/workflows/release.yaml@', github.repository)) }}
               working-directory: editor/vscode
-              env:
-                  OVSX_PAT: ${{ secrets.OVSX_PAT }}
               run: ../../tools/publish-open-vsx "$VSIX_DIRECTORY"
