@@ -8,16 +8,16 @@ install. It requires VS Code 1.91 or later.
 
     $ code --install-extension symfony.language-tools
 
-Add ``--pre-release`` for prerelease versions. VSCodium users install the
-matching ``.vsix`` from the `GitHub release`_:
+VSCodium installs it from the `Open VSX Registry`_:
 
 .. code-block:: terminal
 
-    $ codium --install-extension /path/to/downloaded-extension.vsix
+    $ codium --install-extension symfony.language-tools
 
-The Marketplace picks the package for the machine that hosts the workspace,
-so a container or remote host gets its own. Packages exist for Linux x64 and
-ARM64, musl-based Linux, macOS ARM64 and Windows x64.
+Add ``--pre-release`` for prerelease versions. The registry picks the package
+for the machine that hosts the workspace, so a container or remote host gets
+its own. Packages exist for Linux x64 and ARM64, musl-based Linux, macOS ARM64
+and Windows x64.
 
 Trust the workspace: VS Code disables the extension in Restricted Mode.
 
@@ -76,4 +76,4 @@ points to an existing executable, and that the installed package matches the
 platform running the workspace.
 
 .. _`project configuration`: ../configuration.rst
-.. _`GitHub release`: https://github.com/symfony/language-tools/releases
+.. _`Open VSX Registry`: https://open-vsx.org/extension/symfony/language-tools

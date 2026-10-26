@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Publish the VS Code extension on Open VSX with trusted publishing instead of an access token
+- Publish the VS Code extension on Open VSX, so VSCodium users can install it from the registry
 
 ## 0.24.2 (2026-10-22)
 

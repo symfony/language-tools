@@ -19,15 +19,15 @@ about Symfony.
 ### Visual Studio Code
 
 Install the self-contained extension from the
-[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=symfony.language-tools):
+[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=symfony.language-tools)
+or, for VSCodium, the [Open VSX Registry](https://open-vsx.org/extension/symfony/language-tools):
 
 ```console
 code --install-extension symfony.language-tools
+codium --install-extension symfony.language-tools
 ```
 
-Add `--pre-release` for prerelease versions. VSCodium users can install the
-matching `.vsix` from
-[GitHub Releases](https://github.com/symfony/language-tools/releases). See the
+Add `--pre-release` for prerelease versions. See the
 [VS Code guide](docs/editors/vscode.rst).
 
 ### Neovim

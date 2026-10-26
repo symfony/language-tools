@@ -27,7 +27,8 @@ Installing
 ----------
 
 **VS Code**: install the Symfony Language Tools extension from the
-`Visual Studio Marketplace`_. It bundles the server.
+`Visual Studio Marketplace`_, or from the `Open VSX Registry`_ for VSCodium. It
+bundles the server.
 
 .. code-block:: terminal
 
@@ -108,6 +109,7 @@ codebases and different Symfony features.
 .. _`Zed guide`: editors/zed.rst
 .. _`OpenCode guide`: editors/opencode.rst
 .. _`Visual Studio Marketplace`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools
+.. _`Open VSX Registry`: https://open-vsx.org/extension/symfony/language-tools
 .. _`GitHub release`: https://github.com/symfony/language-tools/releases
 .. _`Kimai`: https://github.com/kimai/kimai
 .. _`Mautic`: https://github.com/mautic/mautic
