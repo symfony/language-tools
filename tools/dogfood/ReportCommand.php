@@ -15,7 +15,7 @@ final class ReportCommand
         Options:
           --record             Persist observations and regenerate the history page
           --matrix-dir DIR     Artifact collection or single timestamped run
-          --history-dir DIR    Durable ledger directory (default: .gerard/dogfood/history)
+          --history-dir DIR    Durable ledger directory (required with --record)
           --output FILE        HTML destination (default with --record: history/index.html;
                                otherwise: var/dogfood/report.html)
           --help               Show this help
@@ -44,21 +44,23 @@ final class ReportCommand
 
                 return 0;
             }
-            if ($options['record'] && !$options['customHistory'] && !is_dir($this->root.'/.gerard')) {
-                throw new \RuntimeException('Recording requires a .gerard workspace or an explicit --history-dir.');
-            }
+            $history = $options['history'];
             if ($options['record']) {
-                $this->filesystem->mkdir($options['history']);
-                $options['history'] = realpath($options['history']) ?: $options['history'];
+                if (null === $history) {
+                    throw new \RuntimeException('Recording requires an explicit --history-dir.');
+                }
+                $this->filesystem->mkdir($history);
+                $history = realpath($history) ?: $history;
             }
-            $ledger = $options['history'].'/ledger.jsonl';
-            $output = $options['output'] ?? ($options['record'] ? $options['history'].'/index.html' : $this->root.'/var/dogfood/report.html');
+            $ledger = null === $history ? null : $history.'/ledger.jsonl';
+            $recordedLedger = $options['record'] ? $ledger : null;
+            $output = $options['output'] ?? (null !== $recordedLedger ? $history.'/index.html' : $this->root.'/var/dogfood/report.html');
             if (!\in_array(strtolower(pathinfo($output, \PATHINFO_EXTENSION)), ['html', 'htm'], true)) {
                 throw new \InvalidArgumentException('The output must be an .html or .htm file.');
             }
             $lock = null;
-            if ($options['record']) {
-                $lockPath = $this->root.'/var/dogfood/report-locks/'.hash('sha256', $ledger).'.lock';
+            if (null !== $recordedLedger) {
+                $lockPath = $this->root.'/var/dogfood/report-locks/'.hash('sha256', $recordedLedger).'.lock';
                 $this->filesystem->mkdir(\dirname($lockPath));
                 $lock = fopen($lockPath, 'c');
                 if (false === $lock) {
@@ -70,7 +72,7 @@ final class ReportCommand
                 }
             }
             try {
-                $existing = $this->history->load($ledger);
+                $existing = null === $ledger ? [] : $this->history->load($ledger);
                 $finalized = [];
                 foreach ($existing as $entry) {
                     if ($entry['finalized']) {
@@ -89,14 +91,14 @@ final class ReportCommand
                     throw new \RuntimeException('No behavioral dogfood history was found. Run the matrix first.');
                 }
                 $html = $this->html->render($merged['entries']);
-                if ($options['record']) {
-                    $this->history->save($ledger, $merged['entries']);
+                if (null !== $recordedLedger) {
+                    $this->history->save($recordedLedger, $merged['entries']);
                 }
                 if (!is_file($output) || $html !== file_get_contents($output)) {
                     $this->filesystem->dumpFile($output, $html);
                 }
-                if ($options['record']) {
-                    fwrite(\STDOUT, \sprintf("Recorded %d new observation%s, updated %d observation%s; %d in history.\nLedger: %s\n", $merged['added'], 1 === $merged['added'] ? '' : 's', $merged['updated'], 1 === $merged['updated'] ? '' : 's', \count($merged['entries']), $ledger));
+                if (null !== $recordedLedger) {
+                    fwrite(\STDOUT, \sprintf("Recorded %d new observation%s, updated %d observation%s; %d in history.\nLedger: %s\n", $merged['added'], 1 === $merged['added'] ? '' : 's', $merged['updated'], 1 === $merged['updated'] ? '' : 's', \count($merged['entries']), $recordedLedger));
                 }
                 fwrite(\STDOUT, 'HTML: '.$output."\n");
                 if (0 < $imported['legacy']) {
@@ -123,7 +125,7 @@ final class ReportCommand
     /**
      * @param list<string> $arguments
      *
-     * @return array{record: bool, help: bool, matrix: string, history: string, output: ?string, customHistory: bool, customMatrix: bool}
+     * @return array{record: bool, help: bool, matrix: string, history: ?string, output: ?string, customMatrix: bool}
      */
     private function options(array $arguments): array
     {
@@ -131,9 +133,8 @@ final class ReportCommand
             'record' => false,
             'help' => false,
             'matrix' => $this->root.'/var/dogfood/matrix',
-            'history' => $this->root.'/.gerard/dogfood/history',
+            'history' => null,
             'output' => null,
-            'customHistory' => false,
             'customMatrix' => false,
         ];
         while (null !== $argument = array_shift($arguments)) {
@@ -159,7 +160,6 @@ final class ReportCommand
                 $options['customMatrix'] = true;
             } elseif ('--history-dir' === $name) {
                 $options['history'] = $value;
-                $options['customHistory'] = true;
             } else {
                 $options['output'] = $value;
             }

@@ -108,6 +108,27 @@ final class ReportCommandTest extends TestCase
         self::assertFileDoesNotExist($this->workspace->path('history/ledger.jsonl'));
     }
 
+    public function testRecordingRequiresAnExplicitHistoryDirectory(): void
+    {
+        $this->fixtures();
+
+        $result = $this->execute(['--record'], history: false);
+
+        self::assertSame(1, $result->exitCode);
+        self::assertStringContainsString('Recording requires an explicit --history-dir', $result->stderr);
+    }
+
+    public function testPreviewWithoutHistoryDirectoryRendersTheMatrixOnly(): void
+    {
+        $this->fixtures();
+        $output = $this->workspace->path('preview.html');
+
+        $result = $this->execute(['--output='.$output], history: false);
+
+        self::assertSame(0, $result->exitCode, $result->stderr);
+        self::assertStringContainsString('dogfood history', (string) file_get_contents($output));
+    }
+
     public function testRefusesCorruptHistoryWithoutOverwritingItOrThePage(): void
     {
         $this->fixtures();
@@ -140,13 +161,13 @@ final class ReportCommandTest extends TestCase
     }
 
     /** @param list<string> $arguments */
-    private function execute(array $arguments): ProcessResult
+    private function execute(array $arguments, bool $history = true): ProcessResult
     {
         return (new ExecutableRunner())->run([
             \PHP_BINARY,
             \dirname(__DIR__, 3).'/tools/dogfood-report',
             '--matrix-dir='.$this->workspace->path('artifacts'),
-            '--history-dir='.$this->workspace->path('history'),
+            ...($history ? ['--history-dir='.$this->workspace->path('history')] : []),
             ...$arguments,
         ]);
     }
