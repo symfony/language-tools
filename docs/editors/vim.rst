@@ -4,8 +4,6 @@ Vim
 Vim runs Symfony Language Tools through the `vim-lsp`_ plugin. Install the
 standalone server and put ``symfony-lsp`` on ``PATH``; see
 `installing the server`_. Linux and Apple Silicon macOS are supported.
-Windows isn't: vim-lsp speaks to language servers over standard input and
-output, which the Windows server can't do.
 
 Enabling It
 -----------

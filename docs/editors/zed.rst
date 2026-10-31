@@ -5,9 +5,7 @@ Zed runs Symfony Language Tools alongside a general PHP language server. The
 extension finds ``symfony-lsp`` on ``PATH`` or downloads the latest stable
 release for you.
 
-Linux on x86-64 and ARM64 and macOS on ARM64 are supported. Windows isn't:
-Zed speaks to language servers over standard input and output, which the
-Windows server can't do.
+Linux on x86-64 and ARM64 and macOS on ARM64 are supported.
 
 Installing the Extension
 ------------------------

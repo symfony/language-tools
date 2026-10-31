@@ -7,9 +7,7 @@ better integrated with the IDE than any language server.
 
 If you still want Symfony Language Tools, for example to get the same
 diagnostics as ``symfony-lsp check``, run it through the `LSP4IJ`_ plugin.
-Linux and Apple Silicon macOS are supported. Windows isn't: LSP4IJ speaks to
-language servers over standard input and output, which the Windows server
-can't do.
+Linux and Apple Silicon macOS are supported.
 
 Installing
 ----------
