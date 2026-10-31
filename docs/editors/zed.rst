@@ -7,8 +7,7 @@ release for you.
 
 Linux on x86-64 and ARM64 and macOS on ARM64 are supported. Windows isn't:
 Zed speaks to language servers over standard input and output, which the
-Windows server can't do. Intel macOS isn't either, since no release is built
-for it.
+Windows server can't do.
 
 Installing the Extension
 ------------------------
