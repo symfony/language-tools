@@ -11,7 +11,8 @@ Pick your editor:
 * `VS Code`_;
 * `Neovim`_;
 * `Zed`_;
-* `OpenCode`_.
+* `OpenCode`_;
+* `JetBrains IDEs`_.
 
 Any editor with a Language Server Protocol client can run the server; see
 `installing the server`_. Code lenses use the ``editor.action.showReferences``
@@ -88,6 +89,7 @@ terminal.
 .. _`Neovim`: neovim.rst
 .. _`Zed`: zed.rst
 .. _`OpenCode`: opencode.rst
+.. _`JetBrains IDEs`: jetbrains.rst
 .. _`installing the server`: ../index.rst
 .. _`Symfony integrations`: ../features/index.rst
 .. _`project configuration`: ../configuration.rst

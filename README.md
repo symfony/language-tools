@@ -51,6 +51,13 @@ Install `symfony-lsp`, then declare it as a custom language server so the
 coding agent gets Symfony diagnostics and navigation. See the
 [OpenCode guide](docs/editors/opencode.rst).
 
+### PhpStorm and other JetBrains IDEs
+
+Prefer the native
+[Symfony Plugin](https://plugins.jetbrains.com/plugin/7219-symfony-plugin).
+To use this server instead, run it through the LSP4IJ plugin. See the
+[JetBrains guide](docs/editors/jetbrains.rst).
+
 ### Standalone server
 
 Download the archive for your platform from

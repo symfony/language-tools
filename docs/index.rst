@@ -43,6 +43,10 @@ pending. It downloads the server for you. See the `Zed guide`_.
 **OpenCode**: install the server, then declare it as a custom language
 server. See the `OpenCode guide`_.
 
+**PhpStorm and other JetBrains IDEs**: prefer the native Symfony Plugin. To
+use this server instead, run it through the LSP4IJ plugin. See the
+`JetBrains guide`_.
+
 **Any other client, and the command line**: download the standalone server
 below.
 
@@ -108,6 +112,7 @@ codebases and different Symfony features.
 .. _`Neovim guide`: editors/neovim.rst
 .. _`Zed guide`: editors/zed.rst
 .. _`OpenCode guide`: editors/opencode.rst
+.. _`JetBrains guide`: editors/jetbrains.rst
 .. _`Visual Studio Marketplace`: https://marketplace.visualstudio.com/items?itemName=symfony.language-tools
 .. _`Open VSX Registry`: https://open-vsx.org/extension/symfony/language-tools
 .. _`GitHub release`: https://github.com/symfony/language-tools/releases
