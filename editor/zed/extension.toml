@@ -1,6 +1,6 @@
 id = "symfony-language-tools"
 name = "Symfony Language Tools"
-description = "Symfony-aware completion, navigation, references and diagnostics on Linux and macOS. Windows is not supported."
+description = "Symfony-aware completion, navigation, references and diagnostics on Linux and macOS."
 version = "0.1.0"
 schema_version = 1
 authors = ["Fabien Potencier"]
