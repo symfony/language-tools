@@ -37,6 +37,9 @@ bundles the server.
 **Neovim**: install the server, then enable it through ``nvim-lspconfig``.
 See the `Neovim guide`_.
 
+**Vim**: install the server, then register it with the vim-lsp plugin. See
+the `Vim guide`_.
+
 **Zed**: install the extension from source while registry publication is
 pending. It downloads the server for you. See the `Zed guide`_.
 
@@ -110,6 +113,7 @@ codebases and different Symfony features.
 .. _`Symfony integrations`: features/index.rst
 .. _`Docker support`: docker.rst
 .. _`Neovim guide`: editors/neovim.rst
+.. _`Vim guide`: editors/vim.rst
 .. _`Zed guide`: editors/zed.rst
 .. _`OpenCode guide`: editors/opencode.rst
 .. _`JetBrains guide`: editors/jetbrains.rst

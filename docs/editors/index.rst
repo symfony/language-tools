@@ -10,6 +10,7 @@ Pick your editor:
 
 * `VS Code`_;
 * `Neovim`_;
+* `Vim`_;
 * `Zed`_;
 * `OpenCode`_;
 * `JetBrains IDEs`_.
@@ -87,6 +88,7 @@ terminal.
 
 .. _`VS Code`: vscode.rst
 .. _`Neovim`: neovim.rst
+.. _`Vim`: vim.rst
 .. _`Zed`: zed.rst
 .. _`OpenCode`: opencode.rst
 .. _`JetBrains IDEs`: jetbrains.rst

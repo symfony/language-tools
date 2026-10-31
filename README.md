@@ -40,6 +40,11 @@ vim.lsp.enable('symfony_lsp')
 
 See the [Neovim guide](docs/editors/neovim.rst).
 
+### Vim
+
+Install `symfony-lsp`, then register it with the vim-lsp plugin. See the
+[Vim guide](docs/editors/vim.rst).
+
 ### Zed
 
 The extension isn't in Zed's registry yet. Install it from source by following
