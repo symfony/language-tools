@@ -127,7 +127,7 @@ final class ThirdPartyLicensesTest extends TestCase
     {
         $contents = (string) file_get_contents($path);
 
-        return rtrim(preg_replace('/[ \t]+$/m', '', $contents) ?? '')."\n";
+        return rtrim(ltrim(preg_replace('/[ \t]+$/m', '', $contents) ?? '', "\r\n"))."\n";
     }
 
     private function packageLicense(string $directory): string
