@@ -43,7 +43,7 @@ final class NativeProcessRunnerTest extends TestCase
         }
 
         $result = (new NativeProcessRunner())->run([\PHP_BINARY, '-r', <<<'PHP'
-            $child = proc_open([PHP_BINARY, '-r', '$x = 0; for ($i = 0; $i < 2000000; ++$i) { $x += $i % 7; }'], [], $pipes);
+            $child = proc_open([PHP_BINARY, '-r', 'do { $usage = getrusage(); } while ($usage["ru_utime.tv_sec"] * 1000 + $usage["ru_utime.tv_usec"] / 1000 < 200);'], [], $pipes);
             proc_close($child);
             usleep(150000);
             echo getenv('SYMFONY_LSP_DOGFOOD_USAGE_FILE') === false ? 'isolated' : 'leaked';
@@ -52,7 +52,7 @@ final class NativeProcessRunnerTest extends TestCase
         self::assertTrue($result->successful());
         self::assertSame('isolated', $result->standardOutput);
         self::assertNotNull($result->cpuMilliseconds);
-        self::assertGreaterThan(50.0, $result->cpuMilliseconds);
+        self::assertGreaterThan(150.0, $result->cpuMilliseconds);
         self::assertLessThan($result->milliseconds, $result->cpuMilliseconds);
     }
 
