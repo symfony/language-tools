@@ -48,7 +48,6 @@ final class LanguageServerTest extends TestCase
                         'documentLinkProvider' => [
                             'resolveProvider' => false,
                         ],
-                        'colorProvider' => true,
                         'referencesProvider' => true,
                         'renameProvider' => [
                             'prepareProvider' => true,

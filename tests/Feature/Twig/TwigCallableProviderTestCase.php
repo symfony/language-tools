@@ -8,7 +8,6 @@ use Symfony\Lsp\Document\Document;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\PositionConverter;
 use Symfony\Lsp\Document\ProjectDocumentReader;
-use Symfony\Lsp\Feature\Css\CssReferenceTokenResolver;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceFacts;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Feature\DependencyInjection\PhpClassDeclarationExtractor;
@@ -89,7 +88,7 @@ class TwigCallableProviderTestCase extends TestCase
         $runtimeIndexes = new TwigCallableRuntimeIndexRegistry();
         $runtimeIndexes->forProject($project)->replace(...$runtimeDeclarations);
         $methodResolver = new TwigCallableMethodResolver($classIndexes, $reader, $phpParser, $indexes, $runtimeIndexes);
-        $shapeResolver = new TwigCallableShapeResolver($methodResolver, new TwigCallablePhpDocParser(), $phpParser, $classIndexes, $reader, new CssReferenceTokenResolver($classIndexes, $reader, $phpParser));
+        $shapeResolver = new TwigCallableShapeResolver($methodResolver, new TwigCallablePhpDocParser(), $phpParser, $classIndexes, $reader);
 
         return [
             'documents' => $documents,
