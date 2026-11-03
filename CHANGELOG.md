@@ -4,6 +4,7 @@
 
 - Publish the VS Code extension on Open VSX, so VSCodium users can install it from the registry
 - Show the value of each `symfony/ux-css` token when completing a `css()` hash
+- Show the color of each `symfony/ux-css` color token in its YAML and PHP configuration
 
 ## 0.24.2 (2026-10-22)
 

@@ -18,11 +18,13 @@ use Microsoft\PhpParser\Node\Expression\ScopedPropertyAccessExpression;
 use Microsoft\PhpParser\Node\MethodDeclaration;
 use Microsoft\PhpParser\Node\Parameter;
 use Microsoft\PhpParser\Node\PropertyDeclaration;
+use Microsoft\PhpParser\Node\SourceFileNode;
 use Microsoft\PhpParser\Node\Statement\ClassDeclaration;
 use Microsoft\PhpParser\Node\Statement\EnumDeclaration;
 use Microsoft\PhpParser\Node\Statement\InterfaceDeclaration;
 use Microsoft\PhpParser\Node\Statement\NamespaceDefinition;
 use Microsoft\PhpParser\Node\Statement\NamespaceUseDeclaration;
+use Microsoft\PhpParser\Node\Statement\ReturnStatement;
 use Microsoft\PhpParser\Node\Statement\TraitDeclaration;
 use Microsoft\PhpParser\Node\TraitUseClause;
 
@@ -40,7 +42,7 @@ final class TolerantPhpNodeCollection
     /** @var list<ObjectCreationExpression> */
     public readonly array $objectCreations;
 
-    /** @var list<ArrayCreationExpression> Arrays passed directly as a call, constructor or attribute argument */
+    /** @var list<ArrayCreationExpression> Arrays passed directly as a call, constructor or attribute argument, or returned by the file */
     public readonly array $literalArrays;
 
     /** @var list<MethodDeclaration> */
@@ -111,7 +113,8 @@ final class TolerantPhpNodeCollection
             } elseif ($node instanceof ObjectCreationExpression) {
                 $objectCreations[] = $node;
             } elseif ($node instanceof ArrayCreationExpression) {
-                if ($node->getParent() instanceof ArgumentExpression) {
+                $parent = $node->getParent();
+                if ($parent instanceof ArgumentExpression || ($parent instanceof ReturnStatement && $parent->getParent() instanceof SourceFileNode)) {
                     $literalArrays[] = $node;
                 }
             } elseif ($node instanceof MethodDeclaration) {

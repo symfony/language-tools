@@ -29,6 +29,8 @@ use Symfony\Lsp\Feature\DiagnosticProviderInterface;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticSuppressor;
 use Symfony\Lsp\Feature\Doctrine\DoctrineRelationshipCodeLensProvider;
+use Symfony\Lsp\Feature\DocumentColorProviderInterface;
+use Symfony\Lsp\Feature\DocumentColorProviderRegistry;
 use Symfony\Lsp\Feature\DocumentLinkProviderInterface;
 use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
 use Symfony\Lsp\Feature\Environment\EnvironmentCompletionProvider;
@@ -136,6 +138,7 @@ return static function (ContainerConfigurator $container): void {
         DiagnosticProviderInterface::class => 'lsp.provider.diagnostic',
         DefinitionProviderInterface::class => 'lsp.provider.definition',
         DocumentLinkProviderInterface::class => 'lsp.provider.document_link',
+        DocumentColorProviderInterface::class => 'lsp.provider.document_color',
         ReferencesProviderInterface::class => 'lsp.provider.references',
         RenameProviderInterface::class => 'lsp.provider.rename',
         SourceIndexProviderInterface::class => 'lsp.source_index_provider',
@@ -181,6 +184,7 @@ return static function (ContainerConfigurator $container): void {
             EnvironmentDiagnosticProvider::class,
         ],
         'Configuration' => [],
+        'Css' => [],
         'Messenger' => [],
         'Event' => [
             EventYamlListenerAnalyzer::class,
@@ -283,6 +287,7 @@ return static function (ContainerConfigurator $container): void {
         DiagnosticCollector::class => 'lsp.provider.diagnostic',
         DefinitionProviderRegistry::class => 'lsp.provider.definition',
         DocumentLinkProviderRegistry::class => 'lsp.provider.document_link',
+        DocumentColorProviderRegistry::class => 'lsp.provider.document_color',
         ReferencesProviderRegistry::class => 'lsp.provider.references',
         RenameProviderRegistry::class => 'lsp.provider.rename',
         SourceIndexProviderPipeline::class => 'lsp.source_index_provider',

@@ -13,6 +13,7 @@ use PHPStan\PhpDocParser\Ast\Type\TypeNode;
 use PHPStan\PhpDocParser\Ast\Type\UnionTypeNode;
 use PHPStan\PhpDocParser\Printer\Printer;
 use Symfony\Lsp\Document\ProjectDocumentReader;
+use Symfony\Lsp\Feature\Css\CssReferenceTokenResolver;
 use Symfony\Lsp\Feature\DependencyInjection\DependencyInjectionSourceIndexRegistry;
 use Symfony\Lsp\Parser\Php\PhpDocument;
 use Symfony\Lsp\Parser\Php\PhpParserInterface;
@@ -22,7 +23,6 @@ final class TwigCallableShapeResolver
 {
     private const MAX_DEPTH = 32;
     private const SCOPE_CACHE_SIZE = 32;
-    private const CSS_REFERENCE_CLASS = 'Symfony\UX\Css\CssReference';
 
     /** @var array<string, TwigCallableShapeScope> */
     private array $scopes = [];
@@ -35,6 +35,7 @@ final class TwigCallableShapeResolver
         private readonly PhpParserInterface $phpParser,
         private readonly DependencyInjectionSourceIndexRegistry $classIndexes,
         private readonly ProjectDocumentReader $reader,
+        private readonly CssReferenceTokenResolver $cssTokens,
     ) {
         $this->printer = new Printer();
     }
@@ -273,29 +274,9 @@ final class TwigCallableShapeResolver
      */
     private function cssTokenValues(PhpDocument $document, string $className, array $aliasNames): array
     {
-        if (0 !== strcasecmp(self::CSS_REFERENCE_CLASS, $className)) {
-            return [];
-        }
-        $tokens = array_find(
-            $document->constantDeclarations,
-            static fn ($constant): bool => 'TOKENS' === $constant->name && 0 === strcasecmp($constant->className, $className),
-        )?->arrayValue;
-        if (null === $tokens) {
-            return [];
-        }
         $categories = [];
-        foreach ($tokens->entries as $category) {
-            if (null === $category->key || null === $category->arrayValue) {
-                continue;
-            }
-            $values = [];
-            foreach ($category->arrayValue->entries as $token) {
-                $value = $token->value?->scalarValue;
-                if (null !== $token->key && (\is_string($value) || \is_int($value) || \is_float($value))) {
-                    $values[$token->key->value] = (string) $value;
-                }
-            }
-            $categories[ucfirst($category->key->value).'Token'] = $values;
+        foreach ($this->cssTokens->extract($document, $className) as $category => $values) {
+            $categories[ucfirst($category).'Token'] = $values;
         }
         $tokenValues = [];
         foreach ($aliasNames as $name) {

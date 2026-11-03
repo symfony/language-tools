@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Protocol;
 
+use Symfony\Lsp\Document\Color;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\Range;
 use Symfony\Lsp\Index\LocatedSourceSymbolInterface;
@@ -126,6 +127,25 @@ final class LspProtocolMapper
         $link = ['range' => $this->range($range), 'target' => $target];
 
         return null === $tooltip ? $link : [...$link, 'tooltip' => $tooltip];
+    }
+
+    /** @return array{range: array{start: array{line: int, character: int}, end: array{line: int, character: int}}, color: array{red: float, green: float, blue: float, alpha: float}} */
+    public function colorInformation(Range $range, Color $color): array
+    {
+        return [
+            'range' => $this->range($range),
+            'color' => ['red' => $color->red, 'green' => $color->green, 'blue' => $color->blue, 'alpha' => $color->alpha],
+        ];
+    }
+
+    /**
+     * @param array<array-key, mixed>|null $textEdit
+     *
+     * @return array{label: string, textEdit?: array<array-key, mixed>}
+     */
+    public function colorPresentation(string $label, ?array $textEdit = null): array
+    {
+        return null === $textEdit ? ['label' => $label] : ['label' => $label, 'textEdit' => $textEdit];
     }
 
     /** @return array{contents: array{kind: string, value: string}} */

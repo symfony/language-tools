@@ -3,7 +3,8 @@ Bundle Configuration
 
 Completion, hover and diagnostics for the configuration of the bundles your
 application registers. The schemas come from the running application, so
-without it this integration has nothing to offer; see `how it works`_.
+without it only import links and ``symfony/ux-css`` colors are available; see
+`how it works`_.
 
 Where It Works
 --------------
@@ -24,6 +25,10 @@ In the Editor
   the key is required, its default, its allowed values, an example and its
   deprecation;
 * a YAML ``resource`` import becomes a clickable link;
+* in the ``ux_css`` configuration of ``symfony/ux-css``, each color token under
+  ``tokens.colors`` or ``semantic_tokens.colors`` shows its color, also for a
+  reference such as ``{colors.blue.500}``, and the editor's color picker
+  rewrites a raw color;
 * a quick fix suggests close keys under the same parent in YAML, PHP and XML.
 
 Diagnostics
@@ -58,7 +63,11 @@ Limitations
 * tagged YAML values such as ``!php/const`` are not type-checked; enum
   cases are checked when the allowed cases are known;
 * go to definition, references and rename aren't available for configuration
-  keys.
+  keys;
+* a ``symfony/ux-css`` color written with ``var()``, ``color-mix()`` or
+  ``color()`` shows no color, and a reference shows the color that
+  ``config/reference_css.php`` records, so a token added since the
+  application last ran shows none.
 
 .. _`how it works`: index.rst
 .. _`routes`: routing.rst

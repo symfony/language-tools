@@ -2,6 +2,7 @@
 
 namespace Symfony\Lsp\Protocol;
 
+use Symfony\Lsp\Document\Color;
 use Symfony\Lsp\Document\DocumentStore;
 use Symfony\Lsp\Document\Position;
 use Symfony\Lsp\Document\PositionConverter;
@@ -100,6 +101,27 @@ final class LspRequestFactory
         $request = $this->positioned($params);
 
         return !\is_string($newName) || '' === $newName || null === $request ? null : new RenameRequest($request, $newName);
+    }
+
+    /** @param array<array-key, mixed> $params */
+    public function colorPresentation(array $params): ?ColorPresentationRequest
+    {
+        $request = $this->document($params);
+        $range = $this->range($params['range'] ?? null);
+        $color = $params['color'] ?? null;
+        if (null === $request || null === $range || !\is_array($color)) {
+            return null;
+        }
+        $channels = [];
+        foreach (['red', 'green', 'blue', 'alpha'] as $channel) {
+            $value = $color[$channel] ?? null;
+            if (!\is_int($value) && !\is_float($value)) {
+                return null;
+            }
+            $channels[] = (float) $value;
+        }
+
+        return new ColorPresentationRequest($request, $range, new Color(...$channels));
     }
 
     private function range(mixed $range): ?Range

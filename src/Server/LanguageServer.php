@@ -14,6 +14,7 @@ use Symfony\Lsp\Feature\CodeLensProviderRegistry;
 use Symfony\Lsp\Feature\CompletionProviderRegistry;
 use Symfony\Lsp\Feature\DefinitionProviderRegistry;
 use Symfony\Lsp\Feature\DiagnosticProviderRegistry;
+use Symfony\Lsp\Feature\DocumentColorProviderRegistry;
 use Symfony\Lsp\Feature\DocumentLinkProviderRegistry;
 use Symfony\Lsp\Feature\HoverProviderRegistry;
 use Symfony\Lsp\Feature\ReferencesProviderRegistry;
@@ -42,6 +43,7 @@ final class LanguageServer
         private readonly DiagnosticProviderRegistry $diagnosticProviders,
         private readonly DefinitionProviderRegistry $definitionProviders,
         private readonly DocumentLinkProviderRegistry $documentLinkProviders,
+        private readonly DocumentColorProviderRegistry $documentColorProviders,
         private readonly ReferencesProviderRegistry $referencesProviders,
         private readonly RenameProviderRegistry $renameProviders,
         private readonly ProjectRuntimeRefresher $projectRuntimeRefresher,
@@ -80,6 +82,8 @@ final class LanguageServer
         $this->dispatcher->onRequest('textDocument/hover', $this->guarded($this->hoverProviders->hover(...)));
         $this->dispatcher->onRequest('textDocument/definition', $this->guarded($this->definitionProviders->definition(...)));
         $this->dispatcher->onRequest('textDocument/documentLink', $this->guarded($this->documentLinkProviders->links(...)));
+        $this->dispatcher->onRequest('textDocument/documentColor', $this->guarded($this->documentColorProviders->colors(...)));
+        $this->dispatcher->onRequest('textDocument/colorPresentation', $this->guarded($this->documentColorProviders->presentations(...)));
         $this->dispatcher->onRequest('textDocument/references', $this->guarded($this->referencesProviders->references(...)));
         $this->dispatcher->onRequest('textDocument/prepareRename', $this->guarded($this->renameProviders->prepare(...)));
         $this->dispatcher->onRequest('textDocument/rename', $this->guarded($this->renameProviders->rename(...)));
@@ -125,6 +129,7 @@ final class LanguageServer
                 'documentLinkProvider' => [
                     'resolveProvider' => false,
                 ],
+                'colorProvider' => true,
                 'referencesProvider' => true,
                 'renameProvider' => [
                     'prepareProvider' => true,

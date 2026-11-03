@@ -1717,6 +1717,27 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame([$defaults, $rendered], $document->literalArrays);
     }
 
+    public function testKeepsLiteralArrayFactsForTheArrayReturnedByTheFile(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App;
+
+            function messages(): array
+            {
+                return ['welcome' => 'Bienvenue'];
+            }
+
+            return ['framework' => ['secret' => 'value']];
+            PHP;
+
+        $document = (new TolerantPhpParser(new Parser()))->parse($source);
+
+        self::assertCount(1, $document->literalArrays);
+        self::assertSame(['framework'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $document->literalArrays[0]->keys));
+        self::assertSame(['secret'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $document->literalArrays[0]->entries[0]->arrayValue->keys ?? []));
+    }
+
     public function testFiltersAttributesByTarget(): void
     {
         $source = <<<'PHP'
