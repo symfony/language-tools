@@ -100,14 +100,14 @@ final class TwigCallableCompletionProvider implements CompletionProviderInterfac
         $items = [];
         if (null !== $hash->key) {
             foreach ($this->shapes->values($request->project, $hash) as $value) {
-                if (!str_starts_with($value, $hash->prefix) || null === $hash->quote || str_contains($value, $hash->quote) || str_contains($value, '\\')) {
+                if (!str_starts_with($value->value, $hash->prefix) || null === $hash->quote || str_contains($value->value, $hash->quote) || str_contains($value->value, '\\')) {
                     continue;
                 }
                 $items[] = $this->protocol->completionItem(
-                    $value,
+                    $value->value,
                     CompletionItemKind::Value,
-                    'Twig '.$hash->kind->value.' argument value',
-                    $this->protocol->textEdit($range, $value),
+                    $value->detail ?? 'Twig '.$hash->kind->value.' argument value',
+                    $this->protocol->textEdit($range, $value->value),
                 );
             }
 

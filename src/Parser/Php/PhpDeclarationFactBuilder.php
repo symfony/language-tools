@@ -10,6 +10,7 @@ use Microsoft\PhpParser\Node\ClassConstDeclaration;
 use Microsoft\PhpParser\Node\ConstElement;
 use Microsoft\PhpParser\Node\DelimitedList\QualifiedNameList;
 use Microsoft\PhpParser\Node\EnumCaseDeclaration;
+use Microsoft\PhpParser\Node\Expression\ArrayCreationExpression;
 use Microsoft\PhpParser\Node\Expression\ObjectCreationExpression;
 use Microsoft\PhpParser\Node\MethodDeclaration;
 use Microsoft\PhpParser\Node\Parameter;
@@ -68,7 +69,7 @@ final class PhpDeclarationFactBuilder
         $constantDeclarations = [];
         foreach ($collection->constantDeclarations as $node) {
             if ($node instanceof ClassConstDeclaration) {
-                array_push($constantDeclarations, ...$this->classConstants($node, $source));
+                array_push($constantDeclarations, ...$this->classConstants($node, $source, $classReferencesByNode));
             } else {
                 $constant = $this->enumCase($node, $source);
                 if (null !== $constant) {
@@ -352,8 +353,12 @@ final class PhpDeclarationFactBuilder
         return $interfaceNames;
     }
 
-    /** @return list<PhpConstantDeclaration> */
-    private function classConstants(ClassConstDeclaration $declaration, string $source): array
+    /**
+     * @param array<int, PhpClassReference> $classReferencesByNode
+     *
+     * @return list<PhpConstantDeclaration>
+     */
+    private function classConstants(ClassConstDeclaration $declaration, string $source, array $classReferencesByNode): array
     {
         $owner = $declaration->getFirstAncestor(ObjectCreationExpression::class, ClassDeclaration::class, InterfaceDeclaration::class, TraitDeclaration::class, EnumDeclaration::class);
         if ($owner instanceof ObjectCreationExpression || (!$owner instanceof ClassDeclaration && !$owner instanceof InterfaceDeclaration && !$owner instanceof TraitDeclaration && !$owner instanceof EnumDeclaration)) {
@@ -383,6 +388,7 @@ final class PhpDeclarationFactBuilder
                 trim($prefix.$name).';',
                 $this->description($declaration),
                 $public,
+                $element->assignment instanceof ArrayCreationExpression ? $this->expressions->literalArray($element->assignment, $source, $classReferencesByNode) : null,
             );
         }
 

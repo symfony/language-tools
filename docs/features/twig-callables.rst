@@ -44,7 +44,8 @@ The shape can be written in ``@param``, ``@phpstan-param`` or
 alias, including one imported with ``@phpstan-import-type`` or
 ``@psalm-import-type``, from a class in your project or in the method file.
 Nested hashes complete the keys of their own shape. Only literal string
-values are offered.
+values are offered. In a ``css()`` hash from ``symfony/ux-css``, each token
+shows its value, such as ``1rem`` for ``md`` under ``p``.
 
 Diagnostics
 -----------

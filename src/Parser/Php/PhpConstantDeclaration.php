@@ -13,6 +13,7 @@ final class PhpConstantDeclaration
         public readonly string $signature,
         public readonly ?string $description,
         public readonly bool $public,
+        public readonly ?PhpLiteralArray $arrayValue = null,
     ) {
     }
 }

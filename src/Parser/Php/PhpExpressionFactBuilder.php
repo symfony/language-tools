@@ -291,7 +291,7 @@ final class PhpExpressionFactBuilder
     }
 
     /** @param array<int, PhpClassReference> $classReferencesByNode */
-    private function literalArray(ArrayCreationExpression $expression, string $source, array $classReferencesByNode): PhpLiteralArray
+    public function literalArray(ArrayCreationExpression $expression, string $source, array $classReferencesByNode): PhpLiteralArray
     {
         $entries = [];
         $hasUnknownKeys = false;
@@ -333,6 +333,7 @@ final class PhpExpressionFactBuilder
             $value instanceof StringLiteral ? $this->stringLiteral($value, $source) : null,
             $this->literal($value, $source),
             $classReferencesByNode[spl_object_id($value)] ?? null,
+            $value instanceof ArrayCreationExpression ? $this->literalArray($value, $source, $classReferencesByNode) : null,
         );
     }
 

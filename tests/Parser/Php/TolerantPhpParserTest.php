@@ -1115,6 +1115,29 @@ final class TolerantPhpParserTest extends TestCase
         }
     }
 
+    public function testExposesTheArrayValuesOfClassConstants(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            final class Reference
+            {
+                public const TOKENS = [
+                    'colors' => ['primary' => '#3b82f6'],
+                    'spacing' => ['-md' => '-1rem'],
+                ], LABEL = 'Reference';
+            }
+            PHP;
+
+        $constants = (new TolerantPhpParser(new Parser()))->parse($source)->constantDeclarations;
+        $tokens = $constants[0]->arrayValue;
+
+        self::assertInstanceOf(PhpLiteralArray::class, $tokens);
+        self::assertSame(['colors', 'spacing'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $tokens->keys));
+        self::assertSame('#3b82f6', $tokens->entries[0]->arrayValue?->entries[0]->stringValue?->value);
+        self::assertSame('-md', $tokens->entries[1]->arrayValue?->entries[0]->key?->value);
+        self::assertNull($constants[1]->arrayValue);
+    }
+
     public function testKeepsImportsFromIncompleteGroupedSyntax(): void
     {
         $document = (new TolerantPhpParser(new Parser()))->parse("<?php\n// café\nnamespace App;\nuse Vendor\\Package\\{First, Second as Alias");
@@ -1613,6 +1636,8 @@ final class TolerantPhpParserTest extends TestCase
         self::assertSame(PhpLiteralKind::Null, $entries['missing']->value?->kind);
         self::assertSame(3, $entries['count']->value?->scalarValue);
         self::assertSame(PhpLiteralKind::Array, $entries['nested']->value?->kind);
+        self::assertSame(['inner'], array_map(static fn (PhpStringLiteral $key): string => $key->value, $entries['nested']->arrayValue->keys ?? []));
+        self::assertNull($entries['count']->arrayValue);
         self::assertSame("['inner' => true]", substr($source, $entries['nested']->valueStartOffset, $entries['nested']->valueEndOffset - $entries['nested']->valueStartOffset));
         self::assertNull($entries['dynamic']->value);
         self::assertSame(['first', null], array_map(

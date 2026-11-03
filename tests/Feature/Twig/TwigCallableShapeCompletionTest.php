@@ -213,6 +213,90 @@ final class TwigCallableShapeCompletionTest extends TwigCallableProviderTestCase
         }
     }
 
+    public function testShowsTheValuesOfSymfonyUxCssTokens(): void
+    {
+        $workspace = new TestWorkspace();
+        try {
+            $runtimePath = $workspace->write('vendor/symfony/ux-css/src/Twig/CssRuntime.php', <<<'PHP'
+                <?php
+                namespace Symfony\UX\Css\Twig;
+
+                /**
+                 * @psalm-import-type CssStyles from \Symfony\UX\Css\CssReference
+                 */
+                final class CssRuntime
+                {
+                    /**
+                     * @param CssStyles|null $styles
+                     */
+                    public function css(?array $styles): string { return ''; }
+                }
+                PHP);
+            $declarations = [
+                new TwigCallableRuntimeDeclaration(TwigCallableKind::Function, 'css', 'Symfony\UX\Css\Twig\CssRuntime', 'css', 'Symfony\UX\Css\Twig\CssRuntime', 'file://'.$runtimePath),
+            ];
+            $reference = <<<'PHP'
+                <?php
+                namespace Symfony\UX\Css;
+
+                /**
+                 * @psalm-type BreakpointsToken = 'md'|'sm'|string
+                 * @psalm-type ColorsToken = 'primary'|'blue.500'|string
+                 * @psalm-type SpacingToken = '-md'|'md'|string
+                 * @psalm-type SpacingToken2 = 'auto'|'md'|string
+                 * @psalm-type DisplayValue = 'block'|'flex'|string
+                 * @psalm-type CssStyles = array{
+                 *     color?: ColorsToken|array<ColorsToken|array<array-key, mixed>>,
+                 *     display?: DisplayValue,
+                 *     m?: SpacingToken2,
+                 *     p?: SpacingToken,
+                 *     scrollbarGutter?: BreakpointsToken,
+                 *     _hover?: CssStylesNested,
+                 * }
+                 * @psalm-type CssStylesNested = array{
+                 *     p?: SpacingToken,
+                 * }
+                 */
+                final class CssReference
+                {
+                    public const TOKENS = [
+                        'colors' => [
+                            'blue.500' => '#3b82f6',
+                            'primary' => '#3b82f6',
+                        ],
+                        'spacing' => [
+                            'md' => '1rem',
+                            '-md' => '-1rem',
+                        ],
+                        'breakpoints' => [
+                            'sm' => '40rem',
+                            'md' => '48rem',
+                        ],
+                    ];
+                }
+                PHP;
+            $complete = fn (string $text): array => array_column($this->items($text, [
+                'file:///workspace/config/reference_css.php' => $reference,
+            ], $declarations), 'detail', 'label');
+
+            self::assertSame(['-md' => '-1rem', 'md' => '1rem'], $complete("{{ css({ p: '"));
+            self::assertSame(['-md' => '-1rem', 'md' => '1rem'], $complete("{{ css({ _hover: { p: '"));
+            self::assertSame(['auto' => 'Twig function argument value', 'md' => '1rem'], $complete("{{ css({ m: '"));
+            self::assertSame(['md' => '48rem', 'sm' => '40rem'], $complete("{{ css({ scrollbarGutter: '"));
+            self::assertSame(['primary' => '#3b82f6', 'blue.500' => '#3b82f6'], $complete("{{ css({ color: '"));
+            self::assertSame(['block' => 'Twig function argument value', 'flex' => 'Twig function argument value'], $complete("{{ css({ display: '"));
+
+            $otherReference = str_replace('namespace Symfony\UX\Css;', 'namespace Acme\Css;', $reference);
+            $otherRuntimePath = $workspace->write('vendor/acme/css/src/Twig/CssRuntime.php', str_replace(['Symfony\UX\Css\Twig', '\Symfony\UX\Css\CssReference'], ['Acme\Css\Twig', '\Acme\Css\CssReference'], (string) file_get_contents($runtimePath)));
+            $items = $this->items("{{ css({ p: '", ['file:///workspace/config/reference_css.php' => $otherReference], [
+                new TwigCallableRuntimeDeclaration(TwigCallableKind::Function, 'css', 'Acme\Css\Twig\CssRuntime', 'css', 'Acme\Css\Twig\CssRuntime', 'file://'.$otherRuntimePath),
+            ]);
+            self::assertSame(['-md' => 'Twig function argument value', 'md' => 'Twig function argument value'], array_column($items, 'detail', 'label'));
+        } finally {
+            $workspace->cleanup();
+        }
+    }
+
     /** @return \Closure(string): list<mixed> */
     private function completion(): \Closure
     {

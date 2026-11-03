@@ -22,6 +22,7 @@ final class TwigCallableShapeResolver
 {
     private const MAX_DEPTH = 32;
     private const SCOPE_CACHE_SIZE = 32;
+    private const CSS_REFERENCE_CLASS = 'Symfony\UX\Css\CssReference';
 
     /** @var array<string, TwigCallableShapeScope> */
     private array $scopes = [];
@@ -56,7 +57,7 @@ final class TwigCallableShapeResolver
         return array_values($keys);
     }
 
-    /** @return list<string> */
+    /** @return list<TwigCallableShapeValue> */
     public function values(Project $project, TwigCallableHashArgument $argument): array
     {
         if (null === $argument->key) {
@@ -64,12 +65,14 @@ final class TwigCallableShapeResolver
         }
         $values = [];
         foreach ($this->navigate($project, $argument, [...$argument->path, $argument->key]) as [$type, $scope]) {
-            foreach ($this->literals($project, $type, $scope, 0) as $value) {
-                $values[$value] = true;
+            foreach ($this->literals($project, $type, $scope, 0, []) as $value) {
+                if (null === ($values[$value->value] ?? null)?->detail) {
+                    $values[$value->value] = $value;
+                }
             }
         }
 
-        return array_map(strval(...), array_keys($values));
+        return array_values($values);
     }
 
     /**
@@ -148,44 +151,50 @@ final class TwigCallableShapeResolver
             return $shapes;
         }
         if ($type instanceof IdentifierTypeNode && null !== $alias = $this->alias($project, $type->name, $scope, $depth)) {
-            return $this->shapes($project, $alias[0], $alias[1], $depth + 1);
+            return $this->shapes($project, $alias[1], $alias[2], $depth + 1);
         }
 
         return [];
     }
 
-    /** @return list<string> */
-    private function literals(Project $project, TypeNode $type, TwigCallableShapeScope $scope, int $depth): array
+    /**
+     * @param array<string, string> $tokenValues
+     *
+     * @return list<TwigCallableShapeValue>
+     */
+    private function literals(Project $project, TypeNode $type, TwigCallableShapeScope $scope, int $depth, array $tokenValues): array
     {
         if ($depth > self::MAX_DEPTH) {
             return [];
         }
         if ($type instanceof ConstTypeNode) {
-            return $type->constExpr instanceof ConstExprStringNode ? [$type->constExpr->value] : [];
+            return $type->constExpr instanceof ConstExprStringNode ? [new TwigCallableShapeValue($type->constExpr->value, $tokenValues[$type->constExpr->value] ?? null)] : [];
         }
         if ($type instanceof NullableTypeNode) {
-            return $this->literals($project, $type->type, $scope, $depth + 1);
+            return $this->literals($project, $type->type, $scope, $depth + 1, $tokenValues);
         }
         if ($type instanceof UnionTypeNode) {
             $values = [];
             foreach ($type->types as $member) {
-                $values = [...$values, ...$this->literals($project, $member, $scope, $depth + 1)];
+                $values = [...$values, ...$this->literals($project, $member, $scope, $depth + 1, $tokenValues)];
             }
 
             return $values;
         }
         if ($type instanceof IdentifierTypeNode && null !== $alias = $this->alias($project, $type->name, $scope, $depth)) {
-            return $this->literals($project, $alias[0], $alias[1], $depth + 1);
+            [$name, $aliasType, $aliasScope] = $alias;
+
+            return $this->literals($project, $aliasType, $aliasScope, $depth + 1, $aliasScope->tokenValues[$name] ?? []);
         }
 
         return [];
     }
 
-    /** @return array{TypeNode, TwigCallableShapeScope}|null */
+    /** @return array{string, TypeNode, TwigCallableShapeScope}|null */
     private function alias(Project $project, string $name, TwigCallableShapeScope $scope, int $depth): ?array
     {
         if (isset($scope->aliases[$name])) {
-            return [$scope->aliases[$name], $scope];
+            return [$name, $scope->aliases[$name], $scope];
         }
         if (!isset($scope->imports[$name]) || $depth > self::MAX_DEPTH) {
             return null;
@@ -252,7 +261,51 @@ final class TwigCallableShapeResolver
             unset($this->scopes[array_key_first($this->scopes)]);
         }
 
-        return $this->scopes[$key] = new TwigCallableShapeScope($uri, $aliases, $imports);
+        return $this->scopes[$key] = new TwigCallableShapeScope($uri, $aliases, $imports, $this->cssTokenValues($document, $type->name, array_keys($aliases)));
+    }
+
+    /**
+     * symfony/ux-css names each token alias after its category, with a numeric suffix when a category has several types.
+     *
+     * @param list<string> $aliasNames
+     *
+     * @return array<string, array<string, string>>
+     */
+    private function cssTokenValues(PhpDocument $document, string $className, array $aliasNames): array
+    {
+        if (0 !== strcasecmp(self::CSS_REFERENCE_CLASS, $className)) {
+            return [];
+        }
+        $tokens = array_find(
+            $document->constantDeclarations,
+            static fn ($constant): bool => 'TOKENS' === $constant->name && 0 === strcasecmp($constant->className, $className),
+        )?->arrayValue;
+        if (null === $tokens) {
+            return [];
+        }
+        $categories = [];
+        foreach ($tokens->entries as $category) {
+            if (null === $category->key || null === $category->arrayValue) {
+                continue;
+            }
+            $values = [];
+            foreach ($category->arrayValue->entries as $token) {
+                $value = $token->value?->scalarValue;
+                if (null !== $token->key && (\is_string($value) || \is_int($value) || \is_float($value))) {
+                    $values[$token->key->value] = (string) $value;
+                }
+            }
+            $categories[ucfirst($category->key->value).'Token'] = $values;
+        }
+        $tokenValues = [];
+        foreach ($aliasNames as $name) {
+            $category = rtrim($name, '0123456789');
+            if (isset($categories[$category])) {
+                $tokenValues[$name] = $categories[$category];
+            }
+        }
+
+        return $tokenValues;
     }
 
     private function keyName(ArrayShapeItemNode $item): ?string

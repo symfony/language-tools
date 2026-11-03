@@ -11,6 +11,7 @@ final class PhpLiteralArrayEntry
         public readonly ?PhpStringLiteral $stringValue,
         public readonly ?PhpLiteral $value,
         public readonly ?PhpClassReference $classReference,
+        public readonly ?PhpLiteralArray $arrayValue = null,
     ) {
     }
 }
